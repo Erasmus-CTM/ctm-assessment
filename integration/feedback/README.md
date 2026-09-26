@@ -4,7 +4,7 @@ All common examples and acceptance checks belong to **ctm-assessment**.
 The source is the root **`example.qmd`**: six text/image activities plus
 Python unit-test, mathematics and Pyodide exercises.
 The entry page uses topic includes in `examples/` to render one HTML page with
-**Non-Python**, **Python**, **Mathematics** and **Pyodide** tabs. The Python tab includes five
+**Non-Python**, **Python**, **Mathematics**, **Pyodide** and **JSXGraph** tabs. The Python tab includes five
 partially completed functions, with separate author notes and learner tasks.
 Add a sibling tab and topic include for each new integration.
 Develop and validate each shared adapter here first; only then open consumer PRs.
@@ -13,7 +13,7 @@ The current adapters are py-exercise, math-exercise and pyodide-interaktiv.
 ## Set up and serve
 
 Requirements: Python 3.12+, Git, Node 22/npm and Quarto **1.8.27**. Install
-`sympy==1.14.0` and `networkx==3.4.2` in the Python used by `python`, or set
+`PyYAML==6.0.2`, `sympy==1.14.0` and `networkx==3.4.2` in the Python used by `python`, or set
 `PYTHON` to that interpreter for the mathematics tests.
 
 ```sh
@@ -32,7 +32,7 @@ Use an HTTP origin: Monaco and Pyodide workers do not work reliably with `file:/
 
 | Repository | Branch | Default source |
 |---|---|---|
-| ctm-assessment | `main` | This checkout, including local edits |
+| ctm-assessment | `feature/shared-assessment` | This checkout, including local edits |
 | ai-feedback | `feature/shared-context` | Pinned shared-library revision |
 | py-exercise | `feature/shared-feedback-integration` | Pinned branch commit |
 | math-exercise | `feature/shared-feedback-integration` | Pinned branch commit |
@@ -116,3 +116,7 @@ The builder rejects consumer runtime copies and installs the shared
 runtime byte for byte. Tests cover fresh stdout evidence, edit/reset/run/restart
 invalidation, no raw stderr, standalone documents and both filter orders.
 Consumer PRs remain deferred until this common page is accepted.
+
+## JSXGraph integration
+
+The fifth tab draws a right triangle for a math-exercise task and a circle and square for a non-Python German naming activity. Browser checks verify both diagrams initialize, the length answer passes, and the language activity produces shared feedback.
