@@ -6,7 +6,7 @@ What if students could try an idea while reading your course notes? Give them a
 sentence to improve, a calculation to finish, a small program to debug or a
 diagram to explore. Let them check their work and ask for a useful next step.
 
-[Try the activities](example.qmd){.btn .btn-primary}
+[Try the activities](example.html){.btn .btn-primary}
 
 The examples start with unfinished work. Try changing an answer and see what
 happens. Then open the source beneath an activity and adapt it to your own

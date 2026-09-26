@@ -2,7 +2,7 @@
 
 Bring writing, mathematics, Python and interactive diagrams together on a Quarto page. Students can try an idea, check their work and ask for help while staying close to your explanation.
 
-[Try the activities](https://erasmus-ctm.github.io/ctm-assessment/example.html) · [Example to adapt](example.qmd) · [Authoring guide](docs/authoring.md)
+[Try the activities](https://erasmus-ctm.github.io/ctm-assessment/example.html) · [Authoring guide](docs/authoring.md)
 
 ## Try it, then make it yours
 
@@ -27,6 +27,18 @@ can offer different help at different stages of learning.
 If your course has an AI service set up, it can show the reply on the exercise
 page. AI advice is for discussion and revision; it does not replace your
 judgment or the exercise's checks.
+
+## Open an example in your editor
+
+[Example source — download and open in your editor](https://github.com/Erasmus-CTM/ctm-assessment/blob/feature/scoped-policies/example.qmd).
+
+On GitHub, choose **Download raw file**, then open the saved `.qmd` in your
+editor—for example, **VS Code**. The link above is editable Quarto source; use
+the example link at the top of this README to try the rendered page.
+
+This example also uses topic includes and feedback settings. Keep those files
+in their original folders; the [source download guide](docs/example-source.md)
+explains how to get a complete copy.
 
 ## Take the next step
 
