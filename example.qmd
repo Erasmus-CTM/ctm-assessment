@@ -1,6 +1,8 @@
 ---
 title: "Working feedback examples"
-filters: [ctm-assessment]
+filters: [_filters/example-source.lua, ctm-assessment]
+ai-feedback:
+  page-policy-files: [feedback/page.yml, feedback/comparison.yml]
 ---
 
 This page is both a demonstration for course authors and a set of activities you

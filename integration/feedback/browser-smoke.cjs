@@ -34,6 +34,15 @@ const server = http.createServer((req, res) => {
     await page.locator('.math-check-btn').first().waitFor({state: 'attached'});
     await page.waitForFunction(() => globalThis.monaco?.editor.getModels().some(m => m.getValue().includes('def add')));
     console.log('Python and mathematics controls initialized.');
+    await page.evaluate(() => {
+      const apply = AIFeedback.applyPolicy;
+      window.__scopedPolicyCalls = [];
+      AIFeedback.applyPolicy = function (...args) {
+        const result = apply(...args);
+        window.__scopedPolicyCalls.push({integration:args[0], selection:args[4], words:result.feedback.maxWords, task:result.task, full:result.feedback.allowFullRewrite});
+        return result;
+      };
+    });
     assert.equal(await page.locator('.ai-feedback-activity .feedback-criteria').count(), 0);
     assert.ok(!/read the handwritten Spanish|Do not rewrite the whole response/i.test(await page.locator('#handwriting').innerText()));
     assert.equal(await page.locator('#handwriting #handwriting-sample-download').count(), 1);
@@ -61,7 +70,7 @@ const server = http.createServer((req, res) => {
     assert.equal(await addition.locator('.py-exercise-result').textContent(), '');
     assert.ok(await page.evaluate(() => monaco.editor.getModels().some(m => m.getValue().includes('return a - b'))));
     report.checks.push('Reset restores the starter and clears results');
-    async function assertCompactMathControls(expectedRows = 5) {
+    async function assertCompactMathControls(expectedRows = 7) {
       const rows = await page.locator('.tab-pane.active .math-exercise-controls').evaluateAll(bars => bars.map(bar => {
         const check = bar.querySelector('.math-check-btn');
         const reference = check.cloneNode(true);
@@ -80,6 +89,27 @@ const server = http.createServer((req, res) => {
     await page.locator('#task-math-product .math-check-btn').click();
     await page.waitForFunction(() => document.querySelector('.math-input').classList.contains('math-input-ok'));
     report.checks.push('Mathematics checker accepts 42');
+    const policyPrompts = [];
+    for (const label of ['policy-question','policy-worked']) {
+      const cell = page.locator('[data-label="' + label + '"]');
+      assert.equal(await cell.locator('.math-input').inputValue(),'3');
+      await cell.locator('.math-feedback-btn').click();
+      await cell.locator('pre.ai-feedback-prompt').waitFor();
+      policyPrompts.push(await cell.locator('pre.ai-feedback-prompt').textContent());
+    }
+    assert.match(policyPrompts[0],/Ask one guiding question/);
+    assert.match(policyPrompts[1],/Give a complete worked solution/);
+    const comparison = await page.evaluate(() => ['guiding-question','worked-explanation'].map(name => window.__scopedPolicyCalls.find(c=>c.selection?.name===name)));
+    assert.equal(comparison[0].task,comparison[1].task);
+    assert.equal(comparison[0].full,false);assert.equal(comparison[1].full,true);
+    const sources=page.locator('details.math-example-source');
+    assert.ok(await sources.count() >= 26);
+    assert.equal(await page.locator('details.math-example-source[open]').count(),0);
+    await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
+    assert.match(await page.locator('.tab-pane.active details.math-example-source').first().innerText(),/ai-feedback|feedback-policy/);
+    await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
+    report.checks.push('Identical math tasks select different YAML feedback policies; example sources and YAML are collapsed');
+
     await nonPythonTab.click();
     await page.locator('#spanish-writing .ai-feedback-button').first().click();
     await page.locator('#spanish-writing pre').waitFor();
@@ -298,7 +328,7 @@ const server = http.createServer((req, res) => {
     // Local policy overrides enable the same progression in both review integrations.
     await page.evaluate(() => {
       window.__savedPolicies = window.__aiFeedbackPolicies;
-      window.__aiFeedbackPolicies = {layers:[{integrations:{
+      window.__aiFeedbackPolicies = {pageLayers:window.__savedPolicies.pageLayers,layers:[{integrations:{
         'py-exercise':{'reset-on-run':false,steps:[{prompt:'LOCAL FIRST'},{prompt:'LOCAL SECOND'}]},
         'non-python':{steps:[{prompt:'WRITING FIRST'},{prompt:'WRITING SECOND'}]}
       }}]};
@@ -348,6 +378,11 @@ const server = http.createServer((req, res) => {
     await page.evaluate(() => AIFeedback.saveConfig({mode: 'copy', storage: 'session'}));
     report.checks.push('Python API feedback uses shared settings and current code without execution or hidden tests (mock provider)');
     report.checks.push('Feedback renders all four LaTeX delimiters and preserves literal code');
+    const scoped = await page.evaluate(() => window.__scopedPolicyCalls);
+    for (const integration of ['non-python','math-exercise','py-exercise','pyodide-interaktiv']) {
+      assert.ok(scoped.some(c => c.integration === integration && c.selection?.name === 'practice-feedback' && c.words === 160), integration + ': named page policy must reach the actual feedback request');
+    }
+    report.checks.push('All four integrations apply the selected YAML page policy to real feedback requests');
     assert.deepEqual(report.pageErrors, []);
     await page.screenshot({path: path.join(site, 'python-practice-desktop.png'), fullPage: true});
     await page.setViewportSize({width: 390, height: 844});

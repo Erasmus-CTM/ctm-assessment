@@ -26,7 +26,7 @@ contains verb-agreement mistakes; learners may edit it or write their own text.
 `context="none"` keeps these demonstration notes out of the prompt.
 :::
 
-::: {.ai-feedback #spanish-writing profile="language-quality" response-language="es" feedback-language="en" learner-level="Spanish course 1" context="none"}
+::: {.ai-feedback #spanish-writing feedback-policy="practice-feedback" profile="language-quality" response-language="es" feedback-language="en" learner-level="Spanish course 1" context="none"}
 **Your task**
 
 Write three to five simple Spanish sentences about where you live and what you

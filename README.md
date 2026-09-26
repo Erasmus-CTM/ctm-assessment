@@ -7,8 +7,8 @@ Exercise plugins supply the task, current response and safe evidence from a
 previous Check or Run. Feedback never executes learner code or assigns grades.
 
 [Examples](https://erasmus-ctm.github.io/ctm-assessment/example.html) ·
-[Examples source](example.qmd) · [Teaching policies](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/shared-context/docs/feedback-policies.md) ·
-[JavaScript API](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/shared-context/docs/api.md)
+[Examples source](example.qmd) · [Teaching policies](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/feedback-policies.md) ·
+[JavaScript API](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/api.md)
 
 ## Install the tested meta-package
 
@@ -44,7 +44,7 @@ Before the first deployment the public archive URL is not available.
 To install only selected integrations, install ai-feedback once alongside the
 chosen consumers and list those consumer filters. They automatically load the
 shared module; no private feedback runtime remains inside them. During this
-preview use ai-feedback's `feature/shared-context` and the consumers'
+preview use ai-feedback's `feature/scoped-policies` and the consumers'
 `feature/shared-feedback-integration` branches. The manifest pins exact commits.
 
 Python exercises use the Pyodide runtime. Text/image feedback requires no Python
@@ -197,7 +197,7 @@ progress. Counters belong to the activity and page in the current browser tab.
 
 Policies also support `language`, `max-issues`, `allow-full-solution` and
 per-step limits. Prompts are author instructions; they never appear in the
-learner's task. [Full schema, precedence and examples](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/shared-context/docs/feedback-policies.md).
+learner's task. [Full schema, precedence and examples](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/feedback-policies.md).
 
 ## Provider settings and data sent
 
@@ -235,7 +235,7 @@ progression, settings, requests and rendering. `getRequest` should collect data
 without executing code. Use `AIFeedback.contextMaterials({mode, refs, text})` for
 context and `handle.reset('run')` on Run/Check. Call `handle.cancel({clearOutput:
 true})` on edits and `handle.reset()` on explicit Reset. The consumer owns its
-editor, checker and evidence boundary. [API reference](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/shared-context/docs/api.md).
+editor, checker and evidence boundary. [API reference](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/api.md).
 
 The Quarto side exposes `feedback-quarto.lua`: a `markCallout` filter prepass,
 `prepare(doc)` and `context(block, options, isPyodide)`. Consumers contain only
@@ -289,3 +289,7 @@ and a circle/square task asking for German names through non-Python feedback.
 AGPL-3.0-or-later. Shared rendering, context and model-policy code originated in
 Erasmus-CTM/math-exercise, with feedback-interface ideas from
 Erasmus-CTM/pyodide-interaktiv, under the same license.
+
+## Page and exercise policy examples
+
+The mathematics tab contains identical problems and drafts with different named YAML policies: a guiding question versus an immediate worked solution. The first activity in each integration also selects a shared page policy. All examples include collapsed copyable source directly after the activity, with JSXGraph source and policy YAML where used. Policy definitions live in YAML; inline `feedback-policy` attributes/options select existing names only. See [the scoped policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/feedback-policies.md).

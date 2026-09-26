@@ -114,6 +114,7 @@ def main():
         if hashlib.sha256(asset.read_bytes()).hexdigest() != spec['sha256']:
             raise SystemExit('Example asset checksum mismatch: ' + name)
     shutil.copytree(ROOT / 'examples', site / 'examples')
+    shutil.copytree(ROOT / '_filters', site / '_filters')
     hashes = {}
     for name, source in sources.items():
         extension = source / '_extensions' / name

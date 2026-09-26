@@ -11,11 +11,16 @@ test('common page renders the active extensions and keeps local dependencies res
   const dom = new JSDOM(html);
   const doc = dom.window.document;
   assert.equal(doc.querySelectorAll('.ai-feedback-activity').length, 7);
-  assert.equal(doc.querySelectorAll('.math-exercise-cell').length, 6);
+  assert.equal(doc.querySelectorAll('.math-exercise-cell').length, 8);
   assert.equal(doc.querySelectorAll('.py-exercise-cell').length, 6);
   assert.deepEqual([...doc.querySelectorAll('.panel-tabset > ul [role=tab]')].map(n => n.textContent.trim()), ['Non-Python', 'Python', 'Mathematics', 'Pyodide', 'JSXGraph']);
   const panels = doc.querySelectorAll('.panel-tabset > .tab-content > .tab-pane');
   assert.equal(panels.length, 5);
+  assert.deepEqual([...panels].map(panel => panel.querySelectorAll('details.math-example-source').length), [6, 6, 7, 3, 4], 'Every activity and JSXGraph board has a source panel');
+  assert.equal(doc.querySelectorAll('details.math-example-source[open]').length, 0);
+  for (const source of doc.querySelectorAll('details.math-example-source')) {
+    assert.match(source.textContent, /Policy YAML: feedback\/comparison.yml/);
+  }
   assert.equal(panels[0].querySelectorAll('.ai-feedback-activity').length, 6);
   assert.equal(panels[0].querySelectorAll('.math-exercise-cell').length, 0);
   assert.equal(panels[1].querySelectorAll('.py-exercise-cell').length, 6);
@@ -35,7 +40,7 @@ test('common page renders the active extensions and keeps local dependencies res
   }
   const record = JSON.parse(fs.readFileSync(path.join(site, 'resolved-repos.json'), 'utf8'));
   assert.deepEqual(Object.keys(record.repositories).sort(), ['ai-feedback', 'ctm-assessment', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
-  assert.equal(panels[2].querySelectorAll('.math-exercise-cell').length, 5);
+  assert.equal(panels[2].querySelectorAll('.math-exercise-cell').length, 7);
   assert.equal(record.repositories['math-exercise'].branch, 'feature/shared-feedback-integration');
   const python = record.repositories['py-exercise'];
   assert.equal(python.branch, 'feature/shared-feedback-integration');
@@ -60,6 +65,7 @@ test('common page renders the active extensions and keeps local dependencies res
 test('shared text feedback works on the combined page without running Python or making API calls', async () => {
   const dom = new JSDOM(html, {url: 'https://integration.invalid/', runScripts: 'outside-only'});
   const w = dom.window;
+  for (const script of w.document.scripts) if (script.textContent.includes('window.__aiFeedbackPolicies =')) w.eval(script.textContent);
   w.AbortController = AbortController;
   w.fetch = () => { throw new Error('Copy mode must not call a provider'); };
   for (const name of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) {
@@ -79,6 +85,7 @@ test('shared text feedback works on the combined page without running Python or 
 test('mathematics feedback excludes the author note from learning context', () => {
   const dom = new JSDOM(html, {url: 'https://integration.invalid/', runScripts: 'outside-only'});
   const w = dom.window;
+  for (const script of w.document.scripts) if (script.textContent.includes('window.__aiFeedbackPolicies =')) w.eval(script.textContent);
   for(const file of ['feedback-core.js','feedback-dom.js','ai-feedback.js']) w.eval(fs.readFileSync(path.join(process.env.AI_FEEDBACK_EXTENSION,file),'utf8'));
   w.__mathExerciseTestMode = true;
   // Exercise the real resolver/prompt builder without starting consumer runtimes.
@@ -100,6 +107,7 @@ test('mathematics feedback excludes the author note from learning context', () =
 test('Python practice keeps five incomplete starters and their tasks separate from author notes', () => {
   const dom = new JSDOM(html, {runScripts: 'outside-only'});
   const w = dom.window;
+  for (const script of w.document.scripts) if (script.textContent.includes('window.__aiFeedbackPolicies =')) w.eval(script.textContent);
   // Only the declarative exercise data is evaluated, not the Python runtime.
   for (const script of w.document.scripts) {
     if (script.textContent.trim().startsWith('(window.__pyExercises =')) w.eval(script.textContent);
@@ -111,9 +119,9 @@ test('Python practice keeps five incomplete starters and their tasks separate fr
   assert.equal(w.document.querySelectorAll('.example-learner-task:has(.py-exercise-cell)').length, 5);
   for (const task of w.document.querySelectorAll('.example-learner-task:has(.py-exercise-cell)')) {
     assert.equal(task.querySelectorAll('.py-exercise-cell').length, 1);
-    assert.equal(task.querySelectorAll('.example-author-notes').length, 0);
+    assert.equal(task.querySelectorAll('.example-author-notes:not(:has(details.math-example-source))').length, 0);
     const prose = task.cloneNode(true);
-    prose.querySelectorAll('script').forEach(s => s.remove());
+    prose.querySelectorAll('script,.ai-feedback-ignore').forEach(s => s.remove());
     assert.doesNotMatch(prose.textContent, /For course authors|Feature:|shared.feedback adapter|assert /);
   }
   for (const data of practice) {
@@ -150,13 +158,14 @@ test('standalone math and both shared-filter orders load one usable runtime', as
       const render = spawnSync(process.env.QUARTO_BIN || 'quarto', ['render', `order-${i}.qmd`], {cwd: dir, encoding: 'utf8', timeout: 120000});
       assert.equal(render.status, 0, render.stderr);
       const dom = new JSDOM(fs.readFileSync(path.join(dir, `order-${i}.html`), 'utf8'), {url: 'https://order.invalid/', runScripts: 'outside-only'});
-      const w = dom.window; w.document.addEventListener = () => {}; w.__mathExerciseTestMode = true;
+      const w = dom.window;
+  for (const script of w.document.scripts) if (script.textContent.includes('window.__aiFeedbackPolicies =')) w.eval(script.textContent); w.document.addEventListener = () => {}; w.__mathExerciseTestMode = true;
       for (const name of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) {
         const scripts = [...w.document.scripts].filter(s => s.src.endsWith('/' + name));
         assert.equal(scripts.length, 1, `${filters}: ${name}`);
         w.eval(fs.readFileSync(path.join(dir, scripts[0].getAttribute('src')), 'utf8'));
       }
-      if (i < 3) assert.equal(w.AIFeedback.version, '0.5.0');
+      if (i < 3) assert.equal(w.AIFeedback.version, '0.6.0');
       w.AIFeedback.initialize();
       const math = [...w.document.scripts].find(s => s.textContent.includes('var ME_CFG ='));
       w.eval(math.textContent);
@@ -203,7 +212,7 @@ test('standalone Pyodide, both filter orders and disabled feedback render correc
         assert.equal(scripts.length,i===3?0:1);
         if(i!==3)w.eval(fs.readFileSync(path.join(dir,scripts[0].getAttribute('src')),'utf8'));
       }
-      if(i!==3){assert.equal(w.AIFeedback.version,'0.5.0');w.AIFeedback.openSettings();assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length,1);}
+      if(i!==3){assert.equal(w.AIFeedback.version,'0.6.0');w.AIFeedback.openSettings();assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length,1);}
       assert.equal(w.document.querySelectorAll('[id^="qpyodide-insertion-location-"]').length,3);
       const dataScript = [...w.document.scripts].find(s=>s.textContent.includes('globalThis.qpyodideCellDetails ='));
       assert.ok(dataScript); w.eval(dataScript.textContent);

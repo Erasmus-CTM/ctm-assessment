@@ -20,8 +20,6 @@ format:
   html:
     toc: true
     theme: cosmo
-filters:
-  - ctm-assessment
 ai-feedback:
   policy-files: feedback.yml
   mode: copy
