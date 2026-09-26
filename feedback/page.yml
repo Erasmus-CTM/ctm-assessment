@@ -1,0 +1,4 @@
+ai-feedback:
+  policies:
+    practice-feedback:
+      max-words: 160

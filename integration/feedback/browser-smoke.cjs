@@ -34,6 +34,15 @@ const server = http.createServer((req, res) => {
     await page.locator('.math-check-btn').first().waitFor({state: 'attached'});
     await page.waitForFunction(() => globalThis.monaco?.editor.getModels().some(m => m.getValue().includes('def add')));
     console.log('Python and mathematics controls initialized.');
+    await page.evaluate(() => {
+      const apply = AIFeedback.applyPolicy;
+      window.__scopedPolicyCalls = [];
+      AIFeedback.applyPolicy = function (...args) {
+        const result = apply(...args);
+        window.__scopedPolicyCalls.push({integration:args[0], selection:args[4], words:result.feedback.maxWords});
+        return result;
+      };
+    });
     assert.equal(await page.locator('.ai-feedback-activity .feedback-criteria').count(), 0);
     assert.ok(!/read the handwritten Spanish|Do not rewrite the whole response/i.test(await page.locator('#handwriting').innerText()));
     assert.equal(await page.locator('#handwriting #handwriting-sample-download').count(), 1);
@@ -298,7 +307,7 @@ const server = http.createServer((req, res) => {
     // Local policy overrides enable the same progression in both review integrations.
     await page.evaluate(() => {
       window.__savedPolicies = window.__aiFeedbackPolicies;
-      window.__aiFeedbackPolicies = {layers:[{integrations:{
+      window.__aiFeedbackPolicies = {pageLayers:window.__savedPolicies.pageLayers,layers:[{integrations:{
         'py-exercise':{'reset-on-run':false,steps:[{prompt:'LOCAL FIRST'},{prompt:'LOCAL SECOND'}]},
         'non-python':{steps:[{prompt:'WRITING FIRST'},{prompt:'WRITING SECOND'}]}
       }}]};
@@ -348,6 +357,11 @@ const server = http.createServer((req, res) => {
     await page.evaluate(() => AIFeedback.saveConfig({mode: 'copy', storage: 'session'}));
     report.checks.push('Python API feedback uses shared settings and current code without execution or hidden tests (mock provider)');
     report.checks.push('Feedback renders all four LaTeX delimiters and preserves literal code');
+    const scoped = await page.evaluate(() => window.__scopedPolicyCalls);
+    for (const integration of ['non-python','math-exercise','py-exercise','pyodide-interaktiv']) {
+      assert.ok(scoped.some(c => c.integration === integration && c.selection?.name === 'practice-feedback' && c.words === 160), integration + ': named page policy must reach the actual feedback request');
+    }
+    report.checks.push('All four integrations apply the selected YAML page policy to real feedback requests');
     assert.deepEqual(report.pageErrors, []);
     await page.screenshot({path: path.join(site, 'python-practice-desktop.png'), fullPage: true});
     await page.setViewportSize({width: 390, height: 844});

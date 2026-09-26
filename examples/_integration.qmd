@@ -21,3 +21,14 @@ separate consumer PR. Python, mathematics and Pyodide are the current consumer i
 For installation and copyable authoring examples, see the
 [README and API guide](https://github.com/Erasmus-CTM/ctm-assessment).
 :::
+
+::: {.callout-note .example-author-notes}
+### Page and exercise policies
+
+This page loads `feedback/page.yml`. The first activity in each of the four
+feedback integrations selects its existing `practice-feedback` policy, using
+`feedback-policy="practice-feedback"` for text or
+`#| feedback-policy: practice-feedback` for code. All policy settings remain in
+YAML; the inline selector supplies only a name. The policy sets a common word
+limit while preserving each integration's existing hint sequence.
+:::

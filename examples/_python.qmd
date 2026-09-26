@@ -36,6 +36,7 @@ Keep the existing tax calculation and finish the return value. Do not round it.
 
 ```{py-exercise}
 #| label: practice-price
+#| feedback-policy: practice-feedback
 #| task: Complete price_with_tax(price, rate) to return price plus tax. The rate is a decimal (0.25 means 25%). Keep the tax calculation and do not round the result.
 def price_with_tax(price, rate):
     tax = price * rate

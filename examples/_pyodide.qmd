@@ -20,6 +20,7 @@ A book costs 80 before tax. Calculate the price after adding 25% tax and print
 that final price. Complete the starter below.
 
 ```{pyodide-python}
+#| feedback-policy: practice-feedback
 #| task: A book costs 80 before tax. Calculate and print the price including 25% tax.
 price = 80
 rate = 0.25

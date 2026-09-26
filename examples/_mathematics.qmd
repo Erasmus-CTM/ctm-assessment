@@ -25,6 +25,7 @@ A draft answer is already entered. Correct it and check your result.
 
 ```{math-exercise}
 #| label: integration-math
+#| feedback-policy: practice-feedback
 #| context: none
 What is $6\cdot7$? _[42]
 ```
