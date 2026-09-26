@@ -1,19 +1,14 @@
-Hint progression restarts when you choose **Check** or **Run**. Editing alone
-keeps the current hint level.
-
-Each activity contains a draft answer with something to finish or correct.
-Edit the fields, then choose **Check**. **Feedback** offers progressively more
-help: a guiding question, a conceptual hint, a method, and finally a worked
-solution. It uses your current response without running the checker. The cogwheel
-opens the shared settings; **Copy prompt** works without an API account.
+Finish or correct the draft answers, then choose **Check**. If you are stuck,
+**Feedback** offers increasing help: a question, a hint about the idea, a method,
+and finally a worked solution. Editing keeps your place in the hints; another
+Check starts them again.
 
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-This tab loads the math-exercise integration branch. Only a previous Check of
-unchanged work supplies private status and score evidence. Hidden answers,
-checker code and checker messages are excluded. All examples explicitly opt out
-of surrounding author notes as learning context. [Exact revisions](resolved-repos.json).
+Let students make an attempt before asking for help. Encourage them to compare
+their method with the hint and decide what to change. A correct answer is also
+a useful starting point for explaining why a method works.
 :::
 
 ### 1. Multiplication
@@ -130,11 +125,10 @@ document.addEventListener('DOMContentLoaded', function () {
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-Both exercises have identical problem text and the same unfinished answer.
-Choose **Feedback** on each: the first requests one guiding question; the second
-permits a worked solution immediately. In copy mode, compare the generated
-prompts; API replies depend on the model. The difference comes entirely from
-the named YAML policies, not from different learner instructions.
+Both exercises have the same question and starting answer. The first offers
+a guiding question, useful during practice; the second allows a worked
+explanation, useful when reviewing an attempt. Choose Feedback on each and
+compare the messages. Open the source to see the two sets of instructions.
 :::
 
 #### A — Guiding question

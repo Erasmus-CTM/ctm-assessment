@@ -1,34 +1,28 @@
-## Integration development
+## Make an activity your own
 
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-The Python, mathematics and Pyodide examples load the selected consumer branches on this same examples
-page. Python, mathematics and Pyodide use the shared feedback adapters. [Exact source revisions for this build](resolved-repos.json).
+Choose one example that fits your lesson. Open its source, copy it into your
+Quarto page, and change the task and starting response. Keep the first attempt
+small enough for students to discuss and revise.
 :::
-
-
 
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-All shared-feedback development and acceptance checks live in this repository's
-`example.qmd` entry page and its topic includes. Add a new tab and topic include
-for each subsequent integration.
-Once an adapter works here, its changes can be propagated in a
-separate consumer PR. Python, mathematics and Pyodide are the current consumer integrations.
+Decide what you want students to notice. Should they explain a choice, fix a
+mistake, or compare two methods? Try a plausible wrong answer yourself and
+check that the feedback offers a useful next step.
 
-For installation and copyable authoring examples, see the
-[README and API guide](https://github.com/Erasmus-CTM/ctm-assessment).
+[Follow the authoring guide](https://github.com/Erasmus-CTM/ctm-assessment/blob/feature/scoped-policies/docs/authoring.md).
 :::
 
 ::: {.callout-note .example-author-notes}
-### Page and exercise policies
+### Choose the kind of help
 
-This page loads `feedback/page.yml`. The first activity in each of the four
-feedback integrations selects its existing `practice-feedback` policy, using
-`feedback-policy="practice-feedback"` for text or
-`#| feedback-policy: practice-feedback` for code. All policy settings remain in
-YAML; the inline selector supplies only a name. The policy sets a common word
-limit while preserving each integration's existing hint sequence.
+You can reuse the same feedback instructions across a course, then choose
+different help for one page or one activity. In the mathematics tab, compare
+a guiding question with a worked explanation of the same problem. Open the
+source to see how each activity selects its instructions from a YAML file.
 :::
