@@ -11,7 +11,7 @@ test('common page renders the active extensions and keeps local dependencies res
   const dom = new JSDOM(html);
   const doc = dom.window.document;
   assert.equal(doc.querySelectorAll('.ai-feedback-activity').length, 7);
-  assert.equal(doc.querySelectorAll('.math-exercise-cell').length, 6);
+  assert.equal(doc.querySelectorAll('.math-exercise-cell').length, 8);
   assert.equal(doc.querySelectorAll('.py-exercise-cell').length, 6);
   assert.deepEqual([...doc.querySelectorAll('.panel-tabset > ul [role=tab]')].map(n => n.textContent.trim()), ['Non-Python', 'Python', 'Mathematics', 'Pyodide', 'JSXGraph']);
   const panels = doc.querySelectorAll('.panel-tabset > .tab-content > .tab-pane');
@@ -35,7 +35,7 @@ test('common page renders the active extensions and keeps local dependencies res
   }
   const record = JSON.parse(fs.readFileSync(path.join(site, 'resolved-repos.json'), 'utf8'));
   assert.deepEqual(Object.keys(record.repositories).sort(), ['ai-feedback', 'ctm-assessment', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
-  assert.equal(panels[2].querySelectorAll('.math-exercise-cell').length, 5);
+  assert.equal(panels[2].querySelectorAll('.math-exercise-cell').length, 7);
   assert.equal(record.repositories['math-exercise'].branch, 'feature/shared-feedback-integration');
   const python = record.repositories['py-exercise'];
   assert.equal(python.branch, 'feature/shared-feedback-integration');

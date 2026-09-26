@@ -39,7 +39,7 @@ const server = http.createServer((req, res) => {
       window.__scopedPolicyCalls = [];
       AIFeedback.applyPolicy = function (...args) {
         const result = apply(...args);
-        window.__scopedPolicyCalls.push({integration:args[0], selection:args[4], words:result.feedback.maxWords});
+        window.__scopedPolicyCalls.push({integration:args[0], selection:args[4], words:result.feedback.maxWords, task:result.task, full:result.feedback.allowFullRewrite});
         return result;
       };
     });
@@ -70,7 +70,7 @@ const server = http.createServer((req, res) => {
     assert.equal(await addition.locator('.py-exercise-result').textContent(), '');
     assert.ok(await page.evaluate(() => monaco.editor.getModels().some(m => m.getValue().includes('return a - b'))));
     report.checks.push('Reset restores the starter and clears results');
-    async function assertCompactMathControls(expectedRows = 5) {
+    async function assertCompactMathControls(expectedRows = 7) {
       const rows = await page.locator('.tab-pane.active .math-exercise-controls').evaluateAll(bars => bars.map(bar => {
         const check = bar.querySelector('.math-check-btn');
         const reference = check.cloneNode(true);
@@ -89,6 +89,27 @@ const server = http.createServer((req, res) => {
     await page.locator('#task-math-product .math-check-btn').click();
     await page.waitForFunction(() => document.querySelector('.math-input').classList.contains('math-input-ok'));
     report.checks.push('Mathematics checker accepts 42');
+    const policyPrompts = [];
+    for (const label of ['policy-question','policy-worked']) {
+      const cell = page.locator('[data-label="' + label + '"]');
+      assert.equal(await cell.locator('.math-input').inputValue(),'3');
+      await cell.locator('.math-feedback-btn').click();
+      await cell.locator('pre.ai-feedback-prompt').waitFor();
+      policyPrompts.push(await cell.locator('pre.ai-feedback-prompt').textContent());
+    }
+    assert.match(policyPrompts[0],/Ask one guiding question/);
+    assert.match(policyPrompts[1],/Give a complete worked solution/);
+    const comparison = await page.evaluate(() => ['guiding-question','worked-explanation'].map(name => window.__scopedPolicyCalls.find(c=>c.selection?.name===name)));
+    assert.equal(comparison[0].task,comparison[1].task);
+    assert.equal(comparison[0].full,false);assert.equal(comparison[1].full,true);
+    const sources=page.locator('details.math-example-source');
+    assert.ok(await sources.count() >= 26);
+    assert.equal(await page.locator('details.math-example-source[open]').count(),0);
+    await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
+    assert.match(await page.locator('.tab-pane.active details.math-example-source').first().innerText(),/ai-feedback|feedback-policy/);
+    await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
+    report.checks.push('Identical math tasks select different YAML feedback policies; example sources and YAML are collapsed');
+
     await nonPythonTab.click();
     await page.locator('#spanish-writing .ai-feedback-button').first().click();
     await page.locator('#spanish-writing pre').waitFor();
