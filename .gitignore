@@ -1,0 +1,12 @@
+node_modules/
+_site/
+.quarto/
+test-results/
+playwright-report/
+.feedback-workspace/
+__pycache__/
+
+/.quarto/
+**/*.quarto_ipynb
+
+/assets/spanish-handwriting.png

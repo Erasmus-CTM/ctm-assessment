@@ -1,0 +1,11 @@
+title: CTM Assessment
+author: Erasmus-CTM
+version: 0.1.0
+quarto-required: ">=1.8.27"
+contributes:
+  filters:
+    - ../ai-feedback/ai-feedback.lua
+    - ../jsxgraph/lua/jsxgraph.lua
+    - ../math-exercise/math-exercise.lua
+    - ../py-exercise/py-exercise.lua
+    - ../pyodide-interaktiv/qpyodide.lua

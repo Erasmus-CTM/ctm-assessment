@@ -1,0 +1,17 @@
+{
+  "name": "@erasmus-ctm/ctm-assessment",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared browser feedback and Quarto extension",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "test:render": "python scripts/setup-feedback-integration.py --test",
+    "test:integration": "node --test integration/feedback/*.test.cjs",
+    "test:browser": "node integration/feedback/browser-smoke.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0",
+    "katex": "0.16.11",
+    "playwright": "1.55.1"
+  }
+}

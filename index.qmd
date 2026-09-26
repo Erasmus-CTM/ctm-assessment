@@ -1,0 +1,21 @@
+---
+title: "CTM Assessment"
+---
+
+One Quarto setup for text, images, Python, mathematics and JSXGraph, with shared
+AI feedback. Explore partially completed tasks in the five tabs on one page.
+
+[Try the working examples](example.qmd){.btn .btn-primary}
+
+The page shares provider settings and configurable hint policies. Copy mode
+needs no account; Direct API mode uses your own endpoint, model and personal key.
+Feedback reviews current work without executing it. Check and Run remain
+separate actions and reset hints by default.
+
+[Download the installable package](ctm-assessment.tar.gz) ·
+[Exact source revisions](resolved-repos.json) ·
+[Authoring and installation guide](https://github.com/Erasmus-CTM/ctm-assessment)
+
+The package contains the tested ai-feedback, math-exercise, py-exercise,
+pyodide-interaktiv and JSXGraph revisions. Successful main builds automatically
+publish these examples and the matching package.
