@@ -4,7 +4,7 @@ All common examples and acceptance checks belong to **ctm-assessment**.
 The source is the root **`example.qmd`**: six text/image activities plus
 Python unit-test, mathematics and Pyodide exercises.
 The entry page uses topic includes in `examples/` to render one HTML page with
-**Non-Python**, **Python**, **Mathematics**, **Pyodide** and **JSXGraph** tabs. The Python tab includes five
+**Plain text**, **Python**, **Mathematics**, **Pyodide** and **JSXGraph** tabs. The Python tab includes five
 partially completed functions, with separate author notes and learner tasks.
 Add a sibling tab and topic include for each new integration.
 Develop and validate each shared adapter here first; only then open consumer PRs.
@@ -119,4 +119,4 @@ Consumer PRs remain deferred until this common page is accepted.
 
 ## JSXGraph integration
 
-The fifth tab draws a right triangle for a math-exercise task and a circle and square for a non-Python German naming activity. Browser checks verify both diagrams initialize, the length answer passes, and the language activity produces shared feedback.
+The fifth tab draws a right triangle for a math-exercise task and a circle and square for a plain-text German naming activity. Browser checks verify both diagrams initialize, the length answer passes, and the language activity produces shared feedback.

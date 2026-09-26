@@ -42,5 +42,5 @@ Source: GitHub Actions**. The deployment job uses only `pages: write` and
 `id-token: write`; no personal deployment token is stored in this project.
 
 The JSXGraph tab includes a right-triangle length task checked by math-exercise
-and a circle/square task asking for German names through non-Python feedback.
+and a circle/square task asking for German names through plain-text feedback.
 

@@ -49,7 +49,7 @@ const server = http.createServer((req, res) => {
     report.checks.push('Learner cards omit reviewer instructions and expose the handwriting download');
     // Switch tabs before interacting with the real consumer controls.
     const pythonTab = page.getByRole('tab', {name: 'Python', exact: true});
-    const nonPythonTab = page.getByRole('tab', {name: 'Non-Python', exact: true});
+    const plainTextTab = page.getByRole('tab', {name: 'Plain text', exact: true});
     await pythonTab.click();
     assert.equal(await page.locator('[role=tab][aria-selected="true"]').innerText(), 'Python');
     const additionId = await page.evaluate(() => window.__pyExercises.find(x => x.label === 'integration-add').id);
@@ -110,7 +110,7 @@ const server = http.createServer((req, res) => {
     await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
     report.checks.push('Identical math tasks select different YAML feedback policies; example sources and YAML are collapsed');
 
-    await nonPythonTab.click();
+    await plainTextTab.click();
     await page.locator('#spanish-writing .ai-feedback-button').first().click();
     await page.locator('#spanish-writing pre').waitFor();
     assert.match(await page.locator('#spanish-writing pre').textContent(), /Yo vive en Trondheim/);
@@ -330,7 +330,7 @@ const server = http.createServer((req, res) => {
       window.__savedPolicies = window.__aiFeedbackPolicies;
       window.__aiFeedbackPolicies = {pageLayers:window.__savedPolicies.pageLayers,layers:[{integrations:{
         'py-exercise':{'reset-on-run':false,steps:[{prompt:'LOCAL FIRST'},{prompt:'LOCAL SECOND'}]},
-        'non-python':{steps:[{prompt:'WRITING FIRST'},{prompt:'WRITING SECOND'}]}
+        'plain-text':{steps:[{prompt:'WRITING FIRST'},{prompt:'WRITING SECOND'}]}
       }}]};
     });
     await pythonTab.click();
@@ -346,7 +346,7 @@ const server = http.createServer((req, res) => {
     await policyCell.locator('.py-exercise-check').click();
     await page.waitForFunction(()=>!document.querySelector('#task-price .py-exercise-check').disabled);
     assert.match(await policyAsk(),/LOCAL FIRST/);
-    await nonPythonTab.click();
+    await plainTextTab.click();
     const writing=page.locator('#spanish-writing');
     for(const marker of ['WRITING FIRST','WRITING SECOND']){
       await writing.locator('button').first().click();await writing.locator('.ai-feedback-body').waitFor();assert.ok(apiRequest.messages[0].content.includes(marker));
@@ -372,14 +372,14 @@ const server = http.createServer((req, res) => {
     await shapes.locator('button').first().click();await shapes.locator('pre').waitFor();
     assert.match(await shapes.locator('pre').textContent(),/der Kreis|das Quadrat/);
     await page.screenshot({path:path.join(site,'jsxgraph-examples.png'),fullPage:true});
-    report.checks.push('JSXGraph draws triangle, circle and square; mathematics checks length and German naming uses non-Python feedback');
+    report.checks.push('JSXGraph draws triangle, circle and square; mathematics checks length and German naming uses plain-text feedback');
 
     await pythonTab.click();
     await page.evaluate(() => AIFeedback.saveConfig({mode: 'copy', storage: 'session'}));
     report.checks.push('Python API feedback uses shared settings and current code without execution or hidden tests (mock provider)');
     report.checks.push('Feedback renders all four LaTeX delimiters and preserves literal code');
     const scoped = await page.evaluate(() => window.__scopedPolicyCalls);
-    for (const integration of ['non-python','math-exercise','py-exercise','pyodide-interaktiv']) {
+    for (const integration of ['plain-text','math-exercise','py-exercise','pyodide-interaktiv']) {
       assert.ok(scoped.some(c => c.integration === integration && c.selection?.name === 'practice-feedback' && c.words === 160), integration + ': named page policy must reach the actual feedback request');
     }
     report.checks.push('All four integrations apply the selected YAML page policy to real feedback requests');

@@ -2,4 +2,4 @@
 title: "Working feedback examples"
 ---
 
-The combined example is now at [example.qmd](example.qmd).
+The combined example is now at [working examples](example.html).

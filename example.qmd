@@ -19,9 +19,9 @@ source beneath it when you want to make a version for your own students.
 
 :::::: {.panel-tabset}
 
-## Non-Python {#non-python}
+## Plain text {#plain-text}
 
-{{< include examples/_non-python.qmd >}}
+{{< include examples/_plain-text.qmd >}}
 
 ## Python {#python}
 
