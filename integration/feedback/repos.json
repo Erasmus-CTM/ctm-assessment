@@ -4,22 +4,22 @@
     "ai-feedback": {
       "repository": "Erasmus-CTM/ai-feedback",
       "branch": "feature/scoped-policies",
-      "commit": "f5b2e801d63cfea0ab6b6ec9e68108a3663f0c96"
+      "commit": "90f46a66104dfd0a2ce30030cbc3a00e4f1ce6de"
     },
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "feature/shared-feedback-integration",
-      "commit": "b61d2c79f5eb723d55717e68ac0739dfa1273e9c"
+      "commit": "337e4a419d9e9f73a613aca4262714564100d6e6"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "feature/shared-feedback-integration",
-      "commit": "296e7fa0e5a3fce8d8ddedda7fa127c137476754"
+      "commit": "72bcf1a9fd7489c6beaa5f2a34d271135795f0b6"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "feature/shared-feedback-integration",
-      "commit": "6873804d74ae065568eeb3a25ef33b61d8fa2b30"
+      "commit": "f68af42714609451beb304ecc74da4df125ca4cf"
     },
     "ctm-assessment": {
       "repository": "Erasmus-CTM/ctm-assessment",

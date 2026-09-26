@@ -13,7 +13,7 @@ test('common page renders the active extensions and keeps local dependencies res
   assert.equal(doc.querySelectorAll('.ai-feedback-activity').length, 7);
   assert.equal(doc.querySelectorAll('.math-exercise-cell').length, 8);
   assert.equal(doc.querySelectorAll('.py-exercise-cell').length, 6);
-  assert.deepEqual([...doc.querySelectorAll('.panel-tabset > ul [role=tab]')].map(n => n.textContent.trim()), ['Non-Python', 'Python', 'Mathematics', 'Pyodide', 'JSXGraph']);
+  assert.deepEqual([...doc.querySelectorAll('.panel-tabset > ul [role=tab]')].map(n => n.textContent.trim()), ['Plain text', 'Python', 'Mathematics', 'Pyodide', 'JSXGraph']);
   const panels = doc.querySelectorAll('.panel-tabset > .tab-content > .tab-pane');
   assert.equal(panels.length, 5);
   assert.deepEqual([...panels].map(panel => panel.querySelectorAll('details.math-example-source').length), [6, 6, 7, 3, 4], 'Every activity and JSXGraph board has a source panel');

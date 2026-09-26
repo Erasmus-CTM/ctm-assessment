@@ -23,7 +23,7 @@ See [the phase 1 record](phase-1.md) for the recovered scope and verification.
 Develop each shared adapter and its acceptance checks in this repository first.
 `examples.qmd` is the common page for the active integrations, built from explicit
 branch revisions by `scripts/setup-feedback-integration.py`.
-Its **Non-Python**, **Python**, **Mathematics** and **Pyodide** tabs contain all examples,
+Its **Plain text**, **Python**, **Mathematics** and **Pyodide** tabs contain all examples,
 including partially completed Python and mathematics tasks. Topic sources live in `examples/` and are included in
 one HTML page. Add a sibling tab and include for each subsequent integration. Only after the
 integration works here should a separate consumer PR propagate it. The live example site is deployed only after
