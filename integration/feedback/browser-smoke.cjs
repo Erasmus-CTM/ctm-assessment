@@ -61,8 +61,8 @@ const server = http.createServer((req, res) => {
     assert.equal(await addition.locator('.py-exercise-result').textContent(), '');
     assert.ok(await page.evaluate(() => monaco.editor.getModels().some(m => m.getValue().includes('return a - b'))));
     report.checks.push('Reset restores the starter and clears results');
-    async function assertCompactMathControls() {
-      const rows = await page.locator('.math-exercise-controls').evaluateAll(bars => bars.map(bar => {
+    async function assertCompactMathControls(expectedRows = 5) {
+      const rows = await page.locator('.tab-pane.active .math-exercise-controls').evaluateAll(bars => bars.map(bar => {
         const check = bar.querySelector('.math-check-btn');
         const reference = check.cloneNode(true);
         reference.style.alignSelf = 'center'; reference.style.visibility = 'hidden';
@@ -70,6 +70,7 @@ const server = http.createServer((req, res) => {
         const normal = reference.getBoundingClientRect().height; reference.remove();
         return {normal, heights: [...bar.querySelectorAll('button')].map(button => button.getBoundingClientRect().height)};
       }));
+      assert.equal(rows.length, expectedRows, 'Check every math control row in the active tab');
       assert.ok(rows.every(row => row.normal > 0 && row.heights.every(height => height <= row.normal + 1)), JSON.stringify(rows));
       report.checks.push('Math controls retain their native compact button height at ' + page.viewportSize().width + 'px');
     }
@@ -333,6 +334,7 @@ const server = http.createServer((req, res) => {
       await frame.waitForFunction(()=>window.JXG && Object.keys(JXG.boards).length>0);
       assert.ok(await frame.locator('svg').count());
     }
+    await assertCompactMathControls(1);
     const diagramMath=page.locator('#task-jsxgraph-math');
     await diagramMath.locator('.math-input').fill('5');await diagramMath.locator('.math-check-btn').click();
     await diagramMath.locator('.math-fb-ok').waitFor();
