@@ -1,13 +1,13 @@
-These diagrams use JSXGraph. One supplies a mathematics task; the other supplies
-a language task with no Python execution. Both use the same feedback settings.
+Use a diagram as the starting point for a calculation or a conversation.
+Try finding a missing length, then naming familiar shapes in another language.
 
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-The diagrams are drawn in sandboxed JSXGraph frames. The math task provides its
-relevant lengths as text as well as on the diagram. The language activity's
-hidden reviewer criteria describe the two figures, so feedback does not have to
-infer geometry from a screenshot or read source JavaScript.
+A diagram can support different learning goals. The triangle asks for a
+calculation; the circle and square ask for precise vocabulary in German.
+Keep the important visual facts in the feedback instructions too, so the advice
+has enough information to discuss the task.
 :::
 
 ### 1. Find a length

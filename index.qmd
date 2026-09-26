@@ -1,21 +1,25 @@
 ---
-title: "CTM Assessment"
+title: "Make room for practice"
 ---
 
-One Quarto setup for text, images, Python, mathematics and JSXGraph, with shared
-AI feedback. Explore partially completed tasks in the five tabs on one page.
+What if students could try an idea while reading your course notes? Give them a
+sentence to improve, a calculation to finish, a small program to debug or a
+diagram to explore. Let them check their work and ask for a useful next step.
 
-[Try the working examples](example.qmd){.btn .btn-primary}
+[Try the activities](example.qmd){.btn .btn-primary}
 
-The page shares provider settings and configurable hint policies. Copy mode
-needs no account; Direct API mode uses your own endpoint, model and personal key.
-Feedback reviews current work without executing it. Check and Run remain
-separate actions and reset hints by default.
+The examples start with unfinished work. Try changing an answer and see what
+happens. Then open the source beneath an activity and adapt it to your own
+subject. You can combine writing, mathematics, Python and diagrams on one page.
 
-[Download the installable package](ctm-assessment.tar.gz) ·
-[Exact source revisions](resolved-repos.json) ·
-[Authoring and installation guide](https://github.com/Erasmus-CTM/ctm-assessment)
+## Help that fits the moment
 
-The package contains the tested ai-feedback, math-exercise, py-exercise,
-pyodide-interaktiv and JSXGraph revisions. Successful main builds automatically
-publish these examples and the matching package.
+Sometimes a student needs a question, not a solution. At other times, a worked
+explanation helps them reflect on an attempt. Compare both approaches on the
+same mathematics problem in the examples.
+
+**Feedback** can prepare a message to paste into an AI chat you already use.
+If your course has an AI service set up, it can show the reply here instead.
+
+[Create your own activity](https://github.com/Erasmus-CTM/ctm-assessment/blob/feature/scoped-policies/docs/authoring.md) ·
+[Setup guide](https://github.com/Erasmus-CTM/ctm-assessment/blob/feature/scoped-policies/docs/installation.md)

@@ -5,13 +5,17 @@ ai-feedback:
   page-policy-files: [feedback/page.yml, feedback/comparison.yml]
 ---
 
-This page is both a demonstration for course authors and a set of activities you
-can try as a learner. Each **For course authors** note explains the feature being
-demonstrated. In Non-Python activities 1–6, the bordered **Your task** card contains the learner's instructions,
-response field and Feedback button. Author notes are not sent for feedback.
-Reviewer guidance is configured separately from the learner's task.
+Try these activities as a student, then borrow an idea for your teaching.
+Each starts with something to finish or improve. Choose a topic below, edit an
+answer and ask for feedback. For code or mathematics, use **Check** or **Run**
+to see what your work does.
 
-Choose a tab below. All examples share this page.
+With **Copy prompt**, Feedback prepares a message to paste into an AI chat you
+already use. If your course has arranged feedback directly on this page, use
+those settings instead. For image activities, attach the picture in your chat too.
+
+The **For course authors** notes suggest ways to use each activity. Open the
+source beneath it when you want to make a version for your own students.
 
 :::::: {.panel-tabset}
 

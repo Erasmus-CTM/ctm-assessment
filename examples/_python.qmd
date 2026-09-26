@@ -1,21 +1,14 @@
-Each exercise starts with a partially completed function. Read **Your task**,
-finish the code in the editor, then choose **Check** (or press **Shift+Enter**).
-You can check your work more than once. **Reset** restores the original draft
-and clears the results. Choose **Feedback** for guidance on your current code,
-before or after checking it. Its cogwheel opens the same feedback settings as
-the Non-Python activities. In **Copy prompt** mode, paste the prompt into your AI
-chat; select **Direct API** in settings for a reply on this page.
+Each exercise starts with a partly completed function. Read **Your task**,
+finish the code, then choose **Check** (or press **Shift+Enter**). You can check
+more than once. **Reset** restores the original draft. Choose **Feedback** when
+you want help deciding what to try next.
 
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-These examples use the selected py-exercise revision inside ctm-assessment's
-integration workbench. Each starter runs but needs a small correction or addition;
-none is a complete solution. The tests exercise ordinary cases and edge cases.
-The learner's code runs locally in the browser when **Check** is used. **Feedback**
-uses the shared adapter from the selected py-exercise feature branch without
-running code. Only a check of the unchanged code contributes a summary and
-learner output; hidden test source and assertion messages are excluded. [Source revisions](resolved-repos.json).
+Start with working structure and one idea to complete. These exercises let
+students see partial progress: some checks may already pass, while others reveal
+what is missing. Try an ordinary input and an unusual one before moving on.
 :::
 
 ### 1. A price including tax
@@ -23,8 +16,8 @@ learner output; hidden test source and assertion messages are excluded. [Source 
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-**Feature:** returning a calculated value. The draft already calculates the tax
-but returns the untaxed price. Checks include a zero rate and a decimal price.
+Use this task to distinguish calculating a value from returning it. Ask students
+to predict the result before they press Check, then explain any difference.
 :::
 
 ::: {.example-learner-task #task-price}
@@ -54,9 +47,8 @@ assert abs(price_with_tax(19.5, 0.2) - 23.4) < 1e-9, "Check a decimal price and 
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-**Feature:** an accumulator and a per-exercise restriction on `sum`.
-The starter includes the loop and return; the update inside the loop is unfinished.
-The empty-list check already passes, so learners can see partial progress.
+Practise keeping a running total. The empty list already works, so students
+can focus on what must change during each loop iteration.
 :::
 
 ::: {.example-learner-task #task-total}
@@ -88,9 +80,8 @@ assert total([-4, 1, 2]) == -1, "Include negative values in the total"
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-**Feature:** the difference between printed output and a returned value.
-The supplied call displays output even before the missing return is completed.
-Checks verify both the return value and the printed greeting.
+Help students distinguish a message on screen from the value a function
+returns. Ask them where each result is used.
 :::
 
 ::: {.example-learner-task #task-greet}
@@ -124,9 +115,8 @@ with __import__("contextlib").redirect_stdout(__import__("io").StringIO()) as ou
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-**Feature:** a per-exercise import restriction. The draft has the constant and a
-return expression, but is missing a factor of the radius. Checks use a tolerance
-for the supplied approximation of pi. Importing `math` is rejected before execution.
+Connect a familiar formula to a short program. Compare radius 1 with radius 2:
+why might one check pass even when the formula is incomplete?
 :::
 
 ::: {.example-learner-task #task-circle}
@@ -156,9 +146,9 @@ assert circle_area(0) == 0, "Zero radius should give zero area"
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-**Feature:** `show-test-hints: false` displays check results without assertion
-messages. The draft already normalizes letter case. The task explicitly states
-the empty-string and punctuation behavior instead of leaving hidden requirements.
+Ask students to identify useful examples before running the checks. Include
+a mixture of letter cases and an empty string. Here detailed check hints are
+hidden so students must return to the stated requirements.
 :::
 
 ::: {.example-learner-task #task-palindrome}
@@ -194,9 +184,8 @@ assert is_palindrome("a!") is False, "Keep punctuation in the comparison"
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-**Feature:** a py-exercise cell with its existing checker and Reset behavior.
-The shared adapter adds Feedback and the common settings cogwheel. It is
-validated on this page before a consumer PR is opened.
+Use a tiny function to introduce the cycle of trying, checking and revising.
+After correcting it, Reset lets students revisit the original mistake.
 :::
 
 **Your task**

@@ -1,1 +1,7 @@
-The handwriting example is preserved byte-for-byte from its original committed source. The builder downloads the immutable URL in `sources.json`, verifies SHA-256, and includes the PNG locally in the rendered site. A cached PNG with the same checksum can be placed here for offline builds. No credentials or write permissions are used.
+# Images for learning activities
+
+The Spanish handwriting sample gives authors a quick way to try feedback on a
+photograph of student work. It is AI-generated and contains deliberate beginner
+mistakes; students can also upload their own handwriting.
+
+[Image source and build details](../docs/example-assets.md).
