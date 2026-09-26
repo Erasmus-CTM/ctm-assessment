@@ -13,6 +13,7 @@ test('rendered examples load the runtime once and produce real copy prompts', { 
     assert.equal([...w.document.scripts].filter(s => s.src.endsWith('/' + file)).length, 1);
     w.eval(fs.readFileSync(path.join(process.env.AI_FEEDBACK_EXTENSION, file), 'utf8'));
   }
+  for (const script of w.document.scripts) if (script.textContent.includes('window.__aiFeedbackPolicies =')) w.eval(script.textContent);
   w.AIFeedback.initialize();
   const activities = [...w.document.querySelectorAll('.ai-feedback-activity')];
   assert.equal(activities.length, 7);
