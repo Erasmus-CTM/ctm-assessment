@@ -8,3 +8,5 @@ Start with the [authoring guide](authoring.md) to adapt an activity to your teac
 - [Development and builds](development.md)
 
 [Back to the project](../README.md)
+
+- [Public example audit: findings and validation, 16 October 2026](audit-2026-10-16.md)
