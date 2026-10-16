@@ -95,7 +95,8 @@ test('rendered examples load the runtime once and produce real copy prompts', { 
   imageTrigger.click();
   for (let i = 0; i < 40 && imageTrigger.disabled; i++) await new Promise(resolve => setTimeout(resolve, 5));
   assert.match(handwriting.querySelector('pre').textContent, /ATTACH THE ORIGINAL IMAGES/);
-  assert.equal(handwriting.querySelectorAll('.ai-feedback-images img').length, 1);
+  assert.equal(handwriting.querySelectorAll('.ai-feedback-output .ai-feedback-images img').length, 1);
+  assert.equal(handwriting.querySelectorAll('.ai-feedback-output a[download]').length, 1);
   // Exercise the same public button in API mode and inspect the outgoing image.
   let sent;
   w.fetch = async (url, init) => {
