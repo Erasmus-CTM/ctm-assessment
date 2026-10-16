@@ -37,7 +37,10 @@ to prove the exported state changes. It also verifies the copy-mode image link.
 Its CI result is recorded in the PR; a local Chromium run is unavailable in this
 sandbox. No live AI provider is called: the browser uses an intercepted provider.
 
-Use AI Feedback 0.7.0 and math-exercise 0.8.0, pinned by the assembly manifest.
+The diagram feature requires AI Feedback 0.7.0 and math-exercise 0.8.0.
+Normal builds follow their maintained `main` branches; only the pending Pyodide
+migration remains pinned. This coordinated PR's CI explicitly selects the two
+unmerged shared-feature branches. Resolved commits remain in the build report.
 Review/merge shared feedback, mathematics, this assembly, then the demo pins.
 No workflows or permissions change. The separate open WebAgg/Pyodide migration
 is outside this correction.

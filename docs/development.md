@@ -15,7 +15,8 @@ python -m http.server 8000 --directory .feedback-workspace/site/_site
 ```
 
 The builder renders one `example.html` from `example.qmd` and topic includes,
-using the exact branch commits in `integration/feedback/repos.json`. It records
+using the maintained branches in `integration/feedback/repos.json`. Only
+pyodide-interaktiv stays pinned until its shared-feedback migration is merged. It records
 revisions and hashes, rejects consumer runtime copies and tests installed shared
 loading, filter order, context reuse and browser behavior. Consumer tests receive
 `AI_FEEDBACK_EXTENSION` pointing to this checkout; running them independently
@@ -31,7 +32,7 @@ original restructuring; this README describes the current integration branches.
 ## Automatic builds and Pages deployment
 
 The workflow runs on pull requests, feature-branch pushes and pushes to `main`.
-Every build resolves pinned dependencies, renders all five topic tabs, runs unit
+Every build resolves current dependency branches and the temporary Pyodide pin, renders all five topic tabs, runs unit
 and cross-integration tests, then tests real Python/JSXGraph behavior in Chromium.
 It uploads the rendered site and installable archive as artifacts. A successful
 **main** build deploys both examples and archive to GitHub Pages; PRs never deploy.

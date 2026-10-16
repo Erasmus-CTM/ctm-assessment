@@ -45,8 +45,12 @@ test('common page renders the active extensions and keeps local dependencies res
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'repos.json'), 'utf8'));
   for (const [name, source] of Object.entries(record.repositories)) {
     assert.equal(source.branch, manifest.repositories[name].branch);
-    if (!source.local_override && !record.refresh) {
+    if (!source.local_override && !source.ref_override && manifest.repositories[name].commit) {
       assert.equal(source.commit, manifest.repositories[name].commit);
+    }
+    if (!source.local_override && !source.ref_override && !manifest.repositories[name].commit) {
+      assert.equal(source.requested_ref, manifest.repositories[name].branch);
+      assert.equal(source.pinned, false);
     }
   }
   assert.ok(record.extension_sha256['py-exercise']['py-exercise-feedback.js']);
