@@ -342,9 +342,9 @@ const server = http.createServer((req, res) => {
     // Local policy overrides enable the same progression in both review integrations.
     await page.evaluate(() => {
       window.__savedPolicies = window.__aiFeedbackPolicies;
-      window.__aiFeedbackPolicies = {pageLayers:window.__savedPolicies.pageLayers,layers:[{integrations:{
-        'py-exercise':{'reset-on-run':false,steps:[{prompt:'LOCAL FIRST'},{prompt:'LOCAL SECOND'}]},
-        'plain-text':{steps:[{prompt:'WRITING FIRST'},{prompt:'WRITING SECOND'}]}
+      window.__aiFeedbackPolicies = {pageLayers:window.__savedPolicies.pageLayers,projectPolicy:{'py-exercise':'code-hints','plain-text':'writing-hints'},layers:[{policies:{
+        'code-hints':{'reset-on-run':false,steps:[{'step-prompt':'LOCAL FIRST'},{'step-prompt':'LOCAL SECOND'}]},
+        'writing-hints':{steps:[{'step-prompt':'WRITING FIRST'},{'step-prompt':'WRITING SECOND'}]}
       }}]};
     });
     await pythonTab.click();
@@ -355,7 +355,7 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction(()=>!document.querySelector('#task-price .py-exercise-check').disabled);
     assert.match(await policyAsk(),/LOCAL SECOND/);
     await policyCell.locator('.py-exercise-reset').click();assert.match(await policyAsk(),/LOCAL FIRST/);
-    await page.evaluate(()=>window.__aiFeedbackPolicies.layers[0].integrations['py-exercise']['reset-on-run']=true);
+    await page.evaluate(()=>window.__aiFeedbackPolicies.layers[0].policies['code-hints']['reset-on-run']=true);
     await policyAsk();assert.match(await policyAsk(),/LOCAL SECOND/);
     await policyCell.locator('.py-exercise-check').click();
     await page.waitForFunction(()=>!document.querySelector('#task-price .py-exercise-check').disabled);

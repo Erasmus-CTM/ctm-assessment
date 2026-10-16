@@ -37,6 +37,12 @@ class SourceSelection(unittest.TestCase):
             self.assertEqual(builder.remote_revision('pyodide-interaktiv', source), 'c' * 40)
             remote.assert_not_called()
 
+    def test_explicit_review_sha_is_used_without_resolving_a_branch(self):
+        source = {'repository': 'Erasmus-CTM/ai-feedback', 'branch': 'main'}
+        with patch.object(builder.subprocess, 'check_output') as remote:
+            self.assertEqual(builder.remote_revision('ai-feedback', source, 'd' * 40), 'd' * 40)
+            remote.assert_not_called()
+
     def test_review_branch_is_explicit_and_does_not_change_defaults(self):
         source = {'repository': 'Erasmus-CTM/ai-feedback', 'branch': 'main'}
         with patch.object(builder.subprocess, 'check_output', return_value='d' * 40 + '\trefs/heads/review\n') as remote:

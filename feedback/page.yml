@@ -2,3 +2,6 @@ ai-feedback:
   policies:
     practice-feedback:
       max-words: 160
+    brief-practice:
+      extends: practice-feedback
+      max-words: 80
