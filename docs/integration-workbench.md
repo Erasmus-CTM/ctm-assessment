@@ -32,10 +32,10 @@ Use an HTTP origin: Monaco and Pyodide workers do not work reliably with `file:/
 
 | Repository | Branch | Default source |
 |---|---|---|
-| ctm-assessment | `feature/shared-assessment` | This checkout, including local edits |
-| ai-feedback | `feature/shared-context` | Pinned shared-library revision |
-| py-exercise | `feature/shared-feedback-integration` | Pinned branch commit |
-| math-exercise | `feature/shared-feedback-integration` | Pinned branch commit |
+| ctm-assessment | `main` | This checkout, including local edits |
+| ai-feedback | `main` | Pinned shared-library revision |
+| py-exercise | `main` | Pinned branch commit |
+| math-exercise | `main` | Pinned branch commit |
 | pyodide-interaktiv | `feature/shared-feedback-integration` | Pinned branch commit |
 
 The script records every resolved commit, local dirty-file list and copied

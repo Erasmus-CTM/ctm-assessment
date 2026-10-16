@@ -30,13 +30,13 @@ The mathematics examples show the same problem with a guiding question and a
 worked explanation. Use the first during practice and the second when reviewing
 an attempt. A feedback policy is simply a named set of instructions for this
 kind of help. Keep those instructions in a YAML file, then select the name in
-an exercise. [Learn how to choose and reuse feedback instructions](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/authoring.md#choose-the-kind-of-help).
+an exercise. [Learn how to choose and reuse feedback instructions](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/authoring.md#choose-the-kind-of-help).
 
 ## Adapt an example
 
-- [Writing and images](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/authoring.md)
-- [Mathematics](https://github.com/Erasmus-CTM/math-exercise/blob/feature/shared-feedback-integration/docs/authoring.md)
-- [Python exercises](https://github.com/Erasmus-CTM/py-exercise/blob/feature/shared-feedback-integration/docs/authoring.md)
+- [Writing and images](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/authoring.md)
+- [Mathematics](https://github.com/Erasmus-CTM/math-exercise/blob/main/docs/authoring.md)
+- [Python exercises](https://github.com/Erasmus-CTM/py-exercise/blob/main/docs/authoring.md)
 - [Python exploration](https://github.com/Erasmus-CTM/pyodide-interaktiv/blob/feature/shared-feedback-integration/docs/authoring.md)
 
 ## Try the page as a student

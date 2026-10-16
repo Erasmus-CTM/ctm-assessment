@@ -15,7 +15,7 @@ Decide what you want students to notice. Should they explain a choice, fix a
 mistake, or compare two methods? Try a plausible wrong answer yourself and
 check that the feedback offers a useful next step.
 
-[Follow the authoring guide](https://github.com/Erasmus-CTM/ctm-assessment/blob/feature/scoped-policies/docs/authoring.md).
+[Follow the authoring guide](https://github.com/Erasmus-CTM/ctm-assessment/blob/main/docs/authoring.md).
 :::
 
 ::: {.callout-note .example-author-notes}

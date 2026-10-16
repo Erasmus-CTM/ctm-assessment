@@ -35,9 +35,9 @@ a CI package artifact, or build locally and run
 
 To install only selected integrations, install ai-feedback once alongside the
 chosen consumers and list those consumer filters. They automatically load the
-shared module; no private feedback runtime remains inside them. During this
-preview use ai-feedback's `feature/scoped-policies` and the consumers'
-`feature/shared-feedback-integration` branches. The manifest pins exact commits.
+shared module; no private feedback runtime remains inside them. Use `main` for ai-feedback, math-exercise and py-exercise. Python exploration
+still uses pyodide-interaktiv's `feature/shared-feedback-integration` branch.
+The manifest pins exact commits, including any fix revision awaiting merge.
 
 Python exercises use the Pyodide runtime. Text/image feedback requires no Python
 execution. Resources initialize once even when the explicit ai-feedback filter
@@ -47,4 +47,4 @@ rendering with a clear instruction.
 
 ## Feedback setup
 
-For feedback directly on the page, follow the [shared connection guide](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/installation.md#provider-settings-and-data-sent). Without a connection, Feedback prepares a message to copy into an AI chat.
+For feedback directly on the page, follow the [shared connection guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/installation.md#provider-settings-and-data-sent). Without a connection, Feedback prepares a message to copy into an AI chat.

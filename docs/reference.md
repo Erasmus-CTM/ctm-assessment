@@ -147,7 +147,7 @@ progress. Counters belong to the activity and page in the current browser tab.
 
 Policies also support `language`, `max-issues`, `allow-full-solution` and
 per-step limits. Prompts are author instructions; they never appear in the
-learner's task. [Full schema, precedence and examples](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/feedback-policies.md).
+learner's task. [Full schema, precedence and examples](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
 
 ## Provider settings and data sent
 
@@ -185,7 +185,7 @@ progression, settings, requests and rendering. `getRequest` should collect data
 without executing code. Use `AIFeedback.contextMaterials({mode, refs, text})` for
 context and `handle.reset('run')` on Run/Check. Call `handle.cancel({clearOutput:
 true})` on edits and `handle.reset()` on explicit Reset. The consumer owns its
-editor, checker and evidence boundary. [API reference](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/api.md).
+editor, checker and evidence boundary. [API reference](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/api.md).
 
 The Quarto side exposes `feedback-quarto.lua`: a `markCallout` filter prepass,
 `prepare(doc)` and `context(block, options, isPyodide)`. Consumers contain only
@@ -194,4 +194,4 @@ belongs in the ai-feedback source repository.
 
 ## Page and exercise policy examples
 
-The mathematics tab contains identical problems and drafts with different named YAML policies: a guiding question versus an immediate worked solution. The first activity in each integration also selects a shared page policy. All examples include collapsed copyable source directly after the activity, with JSXGraph source and policy YAML where used. Policy definitions live in YAML; inline `feedback-policy` attributes/options select existing names only. See [the scoped policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/feedback-policies.md).
+The mathematics tab contains identical problems and drafts with different named YAML policies: a guiding question versus an immediate worked solution. The first activity in each integration also selects a shared page policy. All examples include collapsed copyable source directly after the activity, with JSXGraph source and policy YAML where used. Policy definitions live in YAML; inline `feedback-policy` attributes/options select existing names only. See [the scoped policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
