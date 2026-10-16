@@ -15,7 +15,8 @@ already use. If your course has arranged feedback directly on this page, use
 those settings instead. For image activities, attach the picture in your chat too.
 
 The **For course authors** notes suggest ways to use each activity. Open the
-source beneath it when you want to make a version for your own students.
+separate exercise source, policy YAML, and (where used) JSXGraph code panels
+beneath it when you want to make a version for your own students.
 
 :::::: {.panel-tabset}
 

@@ -17,10 +17,31 @@ test('common page renders the active extensions and keeps local dependencies res
   assert.deepEqual([...doc.querySelectorAll('.panel-tabset > ul [role=tab]')].map(n => n.textContent.trim()), ['Plain text', 'Python', 'Mathematics', 'Pyodide', 'JSXGraph']);
   const panels = doc.querySelectorAll('.panel-tabset > .tab-content > .tab-pane');
   assert.equal(panels.length, 5);
-  assert.deepEqual([...panels].map(panel => panel.querySelectorAll('details.math-example-source').length), [6, 6, 7, 3, 2], 'Every activity or complete applet/task pair has one source panel');
+  for (const kind of ['exercise', 'policy']) {
+    assert.deepEqual([...panels].map(panel => panel.querySelectorAll(`details[data-source-kind="${kind}"]`).length), [6, 6, 7, 3, 2]);
+  }
+  assert.equal(doc.querySelectorAll('details[data-source-kind="jsxgraph"]').length, 2);
   assert.equal(doc.querySelectorAll('details.math-example-source[open]').length, 0);
-  for (const source of doc.querySelectorAll('details.math-example-source')) {
-    assert.match(source.textContent, /Policy YAML: feedback\/comparison.yml/);
+  assert.equal(doc.querySelectorAll('details.math-example-source details').length, 0, 'Source panels must be siblings');
+  for (const exercise of doc.querySelectorAll('details[data-source-kind="exercise"]')) {
+    const group = exercise.parentElement;
+    assert.ok(group.classList.contains('ai-feedback-ignore'));
+    assert.equal(group.querySelectorAll('details[data-source-kind="exercise"]').length, 1);
+    assert.equal(group.querySelectorAll('details[data-source-kind="policy"]').length, 1);
+    assert.equal(exercise.querySelectorAll('code.language-yaml').length, 0);
+    assert.doesNotMatch(exercise.textContent, /JXG\.JSXGraph|```\{\.jsxgraph/);
+    const policy = group.querySelector('details[data-source-kind="policy"]');
+    assert.equal(policy.querySelectorAll('code.language-markdown').length, 0);
+    const names = [...policy.querySelectorAll('strong')].map(n => n.textContent);
+    assert.deepEqual(names, ['AI Feedback defaults (feedback-defaults.yml)', 'feedback/page.yml', 'feedback/comparison.yml']);
+    [...policy.querySelectorAll('code')].forEach((code, i) => {
+      assert.equal(code.textContent, fs.readFileSync(path.join(site, '..', i === 0 ? '_extensions/ai-feedback/feedback-defaults.yml' : names[i]), 'utf8'));
+    });
+  }
+  for (const diagram of doc.querySelectorAll('details[data-source-kind="jsxgraph"]')) {
+    assert.match(diagram.textContent, /JXG\.QuartoAssessment\.register/);
+    assert.doesNotMatch(diagram.textContent, /```\{math-exercise\}|\.ai-feedback|ai-feedback:\n/);
+    assert.equal(diagram.parentElement.querySelectorAll('details').length, 3);
   }
   assert.equal(panels[0].querySelectorAll('.ai-feedback-activity').length, 6);
   assert.equal(panels[0].querySelectorAll('.math-exercise-cell').length, 0);
@@ -93,22 +114,28 @@ test('copied examples reproduce only their declared drafts, with complete linked
     'practice-math-basis':['','',''], 'policy-question':['3'], 'policy-worked':['3'],
     'integration-jsxgraph-length':['']};
   const snippets = Object.keys(expected).map(label => {
-    const source = [...doc.querySelectorAll('details.math-example-source code.language-markdown')]
+    const source = [...doc.querySelectorAll('details[data-source-kind="exercise"] code.language-markdown')]
       .find(code => code.textContent.includes('#| label: ' + label + '\n'));
     assert.ok(source, label);
     assert.doesNotMatch(source.textContent, /<script>|math-drafts|MutationObserver|const drafts/);
     if (label === 'integration-jsxgraph-length') {
-      assert.match(source.textContent, /assessment_id="assessment-triangle"/);
-      assert.match(source.textContent, /JXG.QuartoAssessment.register/);
+      assert.doesNotMatch(source.textContent, /assessment_id=|JXG\.QuartoAssessment/);
+      const diagram = source.closest('.example-author-notes').querySelector('details[data-source-kind="jsxgraph"] code');
+      assert.match(diagram.textContent, /assessment_id="assessment-triangle"/);
+      assert.match(diagram.textContent, /JXG.QuartoAssessment.register/);
       assert.match(source.textContent, /context: task-jsxgraph-math, jsxgraph:assessment-triangle/);
       assert.doesNotMatch(source.textContent, /practice-math-fields/);
     } else assert.doesNotMatch(source.textContent, /assessment-triangle|assessment-german-shapes/);
-    return source.textContent;
+    const diagram = source.closest('.example-author-notes').querySelector('details[data-source-kind="jsxgraph"] code');
+    return (diagram ? diagram.textContent + '\n\n' : '') + source.textContent;
   });
-  const shapes = [...doc.querySelectorAll('details.math-example-source code.language-markdown')]
+  const shapes = [...doc.querySelectorAll('details[data-source-kind="exercise"] code.language-markdown')]
     .find(code => code.textContent.includes('#german-shapes'));
-  assert.match(shapes.textContent, /assessment_id="assessment-german-shapes"/);
-  assert.match(shapes.textContent, /JXG.QuartoAssessment.register/);
+  assert.doesNotMatch(shapes.textContent, /assessment_id=|JXG\.QuartoAssessment/);
+  const shapeDiagram = shapes.closest('.example-author-notes').querySelector('details[data-source-kind="jsxgraph"] code');
+  assert.match(shapeDiagram.textContent, /assessment_id="assessment-german-shapes"/);
+  assert.match(shapeDiagram.textContent, /JXG.QuartoAssessment.register/);
+  const shapeSource = shapeDiagram.textContent + '\n\n' + shapes.textContent;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctm-copied-source-'));
   let dom;
   try {
@@ -117,7 +144,7 @@ test('copied examples reproduce only their declared drafts, with complete linked
     fs.cpSync(path.join(original, 'feedback'), path.join(dir, 'feedback'), {recursive:true});
     fs.copyFileSync(path.join(original, 'feedback.yml'), path.join(dir, 'feedback.yml'));
     const metadata = '---\nformat: html\nfilters: [ctm-assessment]\nai-feedback:\n  policy-files: feedback.yml\n  page-policy-files: [feedback/page.yml, feedback/comparison.yml]\n---\n\n';
-    fs.writeFileSync(path.join(dir, 'copies.qmd'), metadata + snippets.join('\n\n') + '\n\n' + shapes.textContent +
+    fs.writeFileSync(path.join(dir, 'copies.qmd'), metadata + snippets.join('\n\n') + '\n\n' + shapeSource +
       '\n\n```{math-exercise}\n#| label: ordinary-empty\nNo draft: _[42].\n```\n');
     const render = spawnSync('quarto', ['render','copies.qmd'], {cwd:dir,encoding:'utf8',timeout:120000});
     assert.equal(render.status,0,render.stderr || render.error?.message);

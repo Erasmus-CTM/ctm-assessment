@@ -105,14 +105,23 @@ const server = http.createServer((req, res) => {
     const comparison = await page.evaluate(() => ['guiding-question','worked-explanation'].map(name => window.__scopedPolicyCalls.find(c=>c.selection?.name===name)));
     assert.equal(comparison[0].task,comparison[1].task);
     assert.equal(comparison[0].full,false);assert.equal(comparison[1].full,true);
-    const sources=page.locator('details.math-example-source');
-    assert.ok(await sources.count() >= 24);
+    const sources=page.locator('details[data-source-kind="exercise"]');
+    assert.equal(await sources.count(),24);
     assert.equal(await page.locator('details.math-example-source[open]').count(),0);
-    await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
-    assert.match(await page.locator('.tab-pane.active details.math-example-source').first().innerText(),/ai-feedback|feedback-policy/);
-    await page.locator('.tab-pane.active details.math-example-source').first().screenshot({path:path.join(site,'mathematics-example-source.png')});
-    await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
-    report.checks.push('Identical math tasks select different YAML feedback policies; example sources and YAML are collapsed');
+    const exerciseSource=page.locator('.tab-pane.active details[data-source-kind="exercise"]').first();
+    const sourceGroup=exerciseSource.locator('..');
+    const policySource=sourceGroup.locator('details[data-source-kind="policy"]');
+    await exerciseSource.locator('summary').click();
+    assert.match(await exerciseSource.innerText(),/feedback-policy: practice-feedback/);
+    assert.equal(await policySource.getAttribute('open'),null);
+    await policySource.locator('summary').click();
+    assert.notEqual(await exerciseSource.getAttribute('open'),null);
+    assert.match(await policySource.innerText(),/guiding-question:/);
+    await sourceGroup.screenshot({path:path.join(site,'mathematics-example-source.png')});
+    await exerciseSource.locator('summary').click();
+    assert.notEqual(await policySource.getAttribute('open'),null);
+    await policySource.locator('summary').click();
+    report.checks.push('Quarto source and policy YAML open independently and start collapsed');
 
     await plainTextTab.click();
     await page.locator('#spanish-writing .ai-feedback-button').first().click();
@@ -414,10 +423,17 @@ const server = http.createServer((req, res) => {
     assert.match(shapeRequest.responses[0].value,/der Kreis/);
     assert.equal(JSON.parse(shapeRequest.materials.find(m=>m.id==='diagram-assessment-german-shapes').text).state.shapes.length,2);
     report.checks.push('Diagram images and live state reach real math/text feedback requests as context; typed answers remain responses; copy mode exposes images');
-    const diagramSource=graphPanel.locator('details.math-example-source').first();
-    await diagramSource.locator('summary').click();
-    await diagramSource.screenshot({path:path.join(site,'jsxgraph-complete-source.png')});
-    await diagramSource.locator('summary').click();
+    const diagramSource=graphPanel.locator('details[data-source-kind="jsxgraph"]').first();
+    const diagramSourceGroup=diagramSource.locator('..');
+    assert.equal(await diagramSourceGroup.locator('details').count(),3);
+    for (const kind of ['jsxgraph','exercise','policy']) {
+      const panel=diagramSourceGroup.locator('details[data-source-kind="'+kind+'"]');
+      await panel.locator('summary').click();
+      assert.equal(await diagramSourceGroup.locator('details[open]').count(),1);
+      await diagramSourceGroup.screenshot({path:path.join(site,'jsxgraph-'+kind+'-source.png')});
+      await panel.locator('summary').click();
+    }
+    report.checks.push('JSXGraph code, Quarto exercise source and policy YAML are separate sibling disclosures');
     await page.screenshot({path:path.join(site,'jsxgraph-examples.png'),fullPage:true});
     report.checks.push('JSXGraph draws triangle, circle and square; mathematics checks length and German naming uses plain-text feedback');
 
