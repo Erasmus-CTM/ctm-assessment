@@ -329,7 +329,9 @@ const server = http.createServer((req, res) => {
       await page.waitForFunction(index => qpyodideCellContainer.cells[index].primaryUnit.feedbackEvidence !== null,index);
       assert.match(await cell.locator('.qpyodide-output-code-area').innerText(),new RegExp(example.result.replace('.', '\\.')));
       if(index===2)assert.match(JSON.stringify((await ask()).materials),/pi.*r/);
-      await cell.locator('.qpyodide-button-reset').click();
+      const confirmation=page.waitForEvent('dialog');
+      const resetClick=cell.locator('.qpyodide-button-reset').click();
+      const dialog=await confirmation;assert.equal(dialog.type(),'confirm');await dialog.accept();await resetClick;
       assert.equal(await cell.locator('.qpyodide-output-feedback-area').textContent(),'');
       assert.equal(await cell.locator('.qpyodide-output-code-area').textContent(),'');
       assert.ok(await page.evaluate(index => {const u=qpyodideCellContainer.cells[index].primaryUnit;return u.getCode()===u.code && u.getFeedbackEvidence().length===0;},index));
@@ -342,9 +344,9 @@ const server = http.createServer((req, res) => {
     // Local policy overrides enable the same progression in both review integrations.
     await page.evaluate(() => {
       window.__savedPolicies = window.__aiFeedbackPolicies;
-      window.__aiFeedbackPolicies = {pageLayers:window.__savedPolicies.pageLayers,layers:[{integrations:{
-        'py-exercise':{'reset-on-run':false,steps:[{prompt:'LOCAL FIRST'},{prompt:'LOCAL SECOND'}]},
-        'plain-text':{steps:[{prompt:'WRITING FIRST'},{prompt:'WRITING SECOND'}]}
+      window.__aiFeedbackPolicies = {pageLayers:window.__savedPolicies.pageLayers,projectPolicy:{'py-exercise':'code-hints','plain-text':'writing-hints'},layers:[{policies:{
+        'code-hints':{'reset-on-run':false,steps:[{'step-prompt':'LOCAL FIRST'},{'step-prompt':'LOCAL SECOND'}]},
+        'writing-hints':{steps:[{'step-prompt':'WRITING FIRST'},{'step-prompt':'WRITING SECOND'}]}
       }}]};
     });
     await pythonTab.click();
@@ -355,7 +357,7 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction(()=>!document.querySelector('#task-price .py-exercise-check').disabled);
     assert.match(await policyAsk(),/LOCAL SECOND/);
     await policyCell.locator('.py-exercise-reset').click();assert.match(await policyAsk(),/LOCAL FIRST/);
-    await page.evaluate(()=>window.__aiFeedbackPolicies.layers[0].integrations['py-exercise']['reset-on-run']=true);
+    await page.evaluate(()=>window.__aiFeedbackPolicies.layers[0].policies['code-hints']['reset-on-run']=true);
     await policyAsk();assert.match(await policyAsk(),/LOCAL SECOND/);
     await policyCell.locator('.py-exercise-check').click();
     await page.waitForFunction(()=>!document.querySelector('#task-price .py-exercise-check').disabled);

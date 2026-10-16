@@ -18,6 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Select explicit review dependencies (main keeps normal defaults)
+        id: review
+        env:
+          REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 .github/review-dependencies.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -30,7 +37,7 @@ jobs:
         with:
           version: '1.8.27'
       - name: Render and exercise the examples
-        run: python scripts/setup-feedback-integration.py --test
+        run: python scripts/setup-feedback-integration.py --review-refs "$CTM_REVIEW_REFS" --test
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Test all five integration tabs

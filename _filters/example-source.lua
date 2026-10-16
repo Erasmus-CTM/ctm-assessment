@@ -10,6 +10,18 @@ end
 local function codeHtml(source)
   return '<pre><code class="language-markdown">'..escape(source)..'</code></pre>'
 end
+local function policySummaryTarget(source)
+  local maxIssues=source:match('max%-issues="(%d+)"') or ''
+  local integration='plain-text'
+  if source:find('```{math%-exercise}') then integration='math-exercise'
+  elseif source:find('```{py%-exercise}') then integration='py-exercise'
+  elseif source:find('```{pyodide%-python}') then integration='pyodide-interaktiv' end
+  local id=source:match('#|%s*label:%s*([^\n]+)') or source:match('{[^}]*#([%w_%-]+)') or ''
+  local name=source:match('#|%s*feedback%-policy:%s*([^\n]+)') or source:match('feedback%-policy="([^"]+)"') or ''
+  id=id:gsub('^%s*["\']',''):gsub('["\']%s*$','')
+  name=name:gsub('^%s*["\']',''):gsub('["\']%s*$','')
+  return '<div class="ai-feedback-policy-summary" data-max-issues="'..maxIssues..'" data-integration="'..integration..'" data-exercise="'..escape(id)..'" data-policy="'..escape(name)..'"></div>'
+end
 local function panel(source, diagrams)
   local pieces = {'<div class="example-author-notes ai-feedback-ignore">'}
   if diagrams and #diagrams > 0 then
@@ -18,7 +30,7 @@ local function panel(source, diagrams)
   if source and source:match('%S') then
     table.insert(pieces, details('exercise', codeHtml(source)))
     if #policyFiles > 0 then
-      local policies = {}
+      local policies = {policySummaryTarget(source)}
       for _, file in ipairs(policyFiles) do
         table.insert(policies, '<p><strong>'..escape(file.name)..'</strong></p><pre><code class="language-yaml">'..escape(file.content)..'</code></pre>')
       end

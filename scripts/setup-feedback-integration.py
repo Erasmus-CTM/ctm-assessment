@@ -32,6 +32,8 @@ def download(url, target):
 
 
 def remote_revision(name, spec, review_ref=None):
+    if review_ref and re.fullmatch(r'[0-9a-f]{40}', review_ref):
+        return review_ref
     sha = spec.get('commit')
     if not sha or review_ref:
         branch = review_ref or spec['branch']
@@ -68,6 +70,7 @@ def main():
     parser.add_argument('--workspace', type=Path, default=ROOT / '.feedback-workspace')
     parser.add_argument('--refresh', action='store_true', help='Compatibility option: branches are always refreshed; explicit migration pins stay pinned')
     parser.add_argument('--ref', action='append', default=[], metavar='NAME=BRANCH', help='Use a review branch for a dependency without changing normal build defaults')
+    parser.add_argument('--review-refs', default='{}', help='Explicit JSON dependency SHA map for coordinated review builds; normal defaults stay unchanged')
     parser.add_argument('--source', action='append', default=[], metavar='NAME=PATH', help='Use a local Git checkout for a repository; record SHA and dirty files')
     parser.add_argument('--test', action='store_true', help='Run repository and common-page tests after rendering')
     parser.add_argument('--browser', action='store_true', help='Also run real Chromium/Pyodide/Monaco smoke tests (requires Playwright browser)')
@@ -93,7 +96,9 @@ def main():
         if name not in config['repositories']:
             raise SystemExit('Unknown repository: ' + name)
         local[name] = Path(path).resolve()
-    review_refs = {}
+    review_refs = json.loads(args.review_refs)
+    if not isinstance(review_refs, dict) or any(name not in config['repositories'] or not re.fullmatch(r'[0-9a-f]{40}', str(ref)) for name,ref in review_refs.items()):
+        raise SystemExit('Review refs must map known repositories to full SHAs')
     for entry in args.ref:
         name, ref = entry.split('=', 1)
         if name not in config['repositories'] or not ref.strip():

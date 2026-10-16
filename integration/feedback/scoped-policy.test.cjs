@@ -7,13 +7,13 @@ test('external project/page policies and inline named selections reach all four 
   fs.cpSync(path.join(path.dirname(site),'_extensions'),path.join(dir,'_extensions'),{recursive:true});
   fs.mkdirSync(path.join(dir,'chapter'));
   fs.writeFileSync(path.join(dir,'chapter/shape.svg'),'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="5"/></svg>');
-  fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\n  render: [chapter/example.qmd]\nfilters: [ctm-assessment]\nai-feedback:\n  policy-files: project.yml\npy-exercise:\n  feedback: true\npyodide:\n  feedback: true\n');
-  fs.writeFileSync(path.join(dir,'project.yml'),'ai-feedback:\n  integrations:\n    math-exercise:\n      max-words: 300\n  policies:\n    short:\n      prompt: NAMED_REVIEW_INSTRUCTION\n      steps:\n        - prompt: First hint\n        - prompt: Full solution\n          allow-full-solution: true\n');
-  let overrides='ai-feedback:\n  defaults:\n    max-words: 140\n  policies:\n    short:\n      steps:\n        - prompt: PAGE_HINT\n  exercises:\n';
+  fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\n  render: [chapter/example.qmd]\nfilters: [ctm-assessment]\nai-feedback:\n  policy-files: project.yml\n  project-policy: project-math\npy-exercise:\n  feedback: true\npyodide:\n  feedback: true\n');
+  fs.writeFileSync(path.join(dir,'project.yml'),'ai-feedback:\n  policies:\n    project-math:\n      max-words: 300\n    short:\n      base-prompt: NAMED_REVIEW_INSTRUCTION\n      steps:\n        - step-prompt: First hint\n        - step-prompt: Full solution\n          allow-full-solution: true\n');
+  let overrides='ai-feedback:\n  policies:\n    page-baseline:\n      max-words: 140\n    short:\n      steps:\n        - step-prompt: PAGE_HINT\n  exercises:\n';
   const names=['plain-text','math-exercise','py-exercise','pyodide-interaktiv'];
   for(const name of names)overrides+=`    ${name}:\n      exercise-one:\n        max-words: 80\n`;
   fs.writeFileSync(path.join(dir,'page.yml'),overrides);
-  const q='---\nai-feedback:\n  page-policy-files: page.yml\n---\n\n::: {.ai-feedback #exercise-one feedback-policy="short"}\nExplain your work.\n:::\n\n'+['math-exercise','py-exercise','pyodide-python'].map(name=>'```{'+name+'}\n#| label: exercise-one\n#| feedback-policy: short\n'+(name==='math-exercise'?'Find _[2]':name==='py-exercise'?'print(1)\n## TESTS ##\nassert True':'print(1)')+'\n```\n').join('\n')+'\n```{.python #bare-task}\n# pyodide: feedback-policy=short\nprint(1)\n```\n\n::: {.cell #wrapped-task}\n```python\n# pyodide: feedback-policy=short\nprint(1)\n```\n:::\n\n::: {.cell #cell-fig-display-task}\n```python\n# pyodide: feedback-policy=short\nprint(1)\n```\n::: {.cell-output-display}\n![Shape](shape.svg){#fig-display-task}\n:::\n:::\n\n::: {.cell #cell-fig-unrelated}\n```python\n# pyodide: feedback-policy=short\nprint(1)\n```\n:::\n\n![Unrelated figure](shape.svg){#fig-unrelated}\n';
+  const q='---\nai-feedback:\n  page-policy-files: page.yml\n  page-policy: page-baseline\n---\n\n::: {.ai-feedback #exercise-one feedback-policy="short"}\nExplain your work.\n:::\n\n'+['math-exercise','py-exercise','pyodide-python'].map(name=>'```{'+name+'}\n#| label: exercise-one\n#| feedback-policy: short\n'+(name==='math-exercise'?'Find _[2]':name==='py-exercise'?'print(1)\n## TESTS ##\nassert True':'print(1)')+'\n```\n').join('\n')+'\n```{.python #bare-task}\n# pyodide: feedback-policy=short\nprint(1)\n```\n\n::: {.cell #wrapped-task}\n```python\n# pyodide: feedback-policy=short\nprint(1)\n```\n:::\n\n::: {.cell #cell-fig-display-task}\n```python\n# pyodide: feedback-policy=short\nprint(1)\n```\n::: {.cell-output-display}\n![Shape](shape.svg){#fig-display-task}\n:::\n:::\n\n::: {.cell #cell-fig-unrelated}\n```python\n# pyodide: feedback-policy=short\nprint(1)\n```\n:::\n\n![Unrelated figure](shape.svg){#fig-unrelated}\n';
   fs.writeFileSync(path.join(dir,'chapter/example.qmd'),q);
   const render=()=>spawnSync(process.env.QUARTO_BIN||'quarto',['render'],{cwd:dir,encoding:'utf8',timeout:120000});
   let run=render();assert.equal(run.status,0,run.stderr);
@@ -24,7 +24,7 @@ test('external project/page policies and inline named selections reach all four 
   selections.forEach((selection,i)=>{
    assert.equal(selection.name,'short');assert.equal(selection.exercise,'exercise-one');
    const p=w.AIFeedback.resolvePolicy(names[i],'en',{},undefined,selection);
-   assert.equal(p['max-words'],80);assert.equal(p.steps.length,1);assert.equal(p.steps[0].prompt,'PAGE_HINT');assert.equal(p['allow-full-solution'],false);
+   assert.equal(p['max-words'],80);assert.equal(p.steps.length,1);assert.equal(p.steps[0]['step-prompt'],'PAGE_HINT');assert.equal(p['allow-full-solution'],false);
   });
   const marked=w.qpyodideCellDetails.slice(1).map(c=>c.options.policySelection);
   assert.deepEqual(Array.from(marked,s=>s.exercise),['bare-task','wrapped-task','fig-display-task','cell-fig-unrelated']);
@@ -37,8 +37,8 @@ test('external project/page policies and inline named selections reach all four 
    run=render();assert.notEqual(run.status,0);assert.match(run.stderr,/feedback-policy/);
   }
   fs.writeFileSync(path.join(dir,'chapter/example.qmd'),q);
-  fs.writeFileSync(path.join(dir,'project.yml'),'ai-feedback:\n  policies:\n    short: {}\n');
+  fs.writeFileSync(path.join(dir,'project.yml'),'ai-feedback:\n  policies:\n    project-math:\n      max-words: 300\n    short: {}\n');
   fs.rmSync(path.join(dir,'.quarto'),{recursive:true,force:true});
-  run=render();assert.equal(run.status,0,run.stderr); // Empty lower-priority metadata is omitted by Pandoc; the page definition remains valid.
+  run=render();assert.notEqual(run.status,0);assert.match(run.stderr,/must define at least one option/);
  } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
