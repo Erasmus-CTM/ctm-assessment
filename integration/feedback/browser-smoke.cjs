@@ -87,6 +87,7 @@ const server = http.createServer((req, res) => {
     await assertCompactMathControls();
     assert.ok(await page.locator('.tab-pane.active .math-exercise-cell:not([data-initial-values]) .math-input').evaluateAll(fields => fields.every(field => field.value === '')));
     assert.equal(await page.locator('.math-exercise-cell[data-initial-values]').count(), 2, 'Only policy comparison examples start from a shared attempt');
+    await page.screenshot({path:path.join(site,'mathematics-blank-defaults.png'),fullPage:true});
     await page.locator('#task-math-product .math-input').fill('42');
     await page.locator('#task-math-product .math-check-btn').click();
     await page.waitForFunction(() => document.querySelector('.math-input').classList.contains('math-input-ok'));
@@ -109,6 +110,7 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.locator('details.math-example-source[open]').count(),0);
     await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
     assert.match(await page.locator('.tab-pane.active details.math-example-source').first().innerText(),/ai-feedback|feedback-policy/);
+    await page.locator('.tab-pane.active details.math-example-source').first().screenshot({path:path.join(site,'mathematics-example-source.png')});
     await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
     report.checks.push('Identical math tasks select different YAML feedback policies; example sources and YAML are collapsed');
 
@@ -409,6 +411,10 @@ const server = http.createServer((req, res) => {
     assert.match(shapeRequest.responses[0].value,/der Kreis/);
     assert.equal(JSON.parse(shapeRequest.materials.find(m=>m.id==='diagram-assessment-german-shapes').text).state.shapes.length,2);
     report.checks.push('Diagram images and live state reach real math/text feedback requests as context; typed answers remain responses; copy mode exposes images');
+    const diagramSource=graphPanel.locator('details.math-example-source').first();
+    await diagramSource.locator('summary').click();
+    await diagramSource.screenshot({path:path.join(site,'jsxgraph-complete-source.png')});
+    await diagramSource.locator('summary').click();
     await page.screenshot({path:path.join(site,'jsxgraph-examples.png'),fullPage:true});
     report.checks.push('JSXGraph draws triangle, circle and square; mathematics checks length and German naming uses plain-text feedback');
 
