@@ -83,10 +83,10 @@ test('copied examples reproduce only their declared drafts, with complete linked
   const {spawnSync} = require('node:child_process');
   const os = require('node:os');
   const doc = new JSDOM(html).window.document;
-  const expected = {'integration-math':['40'], 'practice-math-fields':['5',''],
-    'practice-math-vector':['2*x',''], 'practice-math-matrix':['1','','','4'],
-    'practice-math-basis':['1','-1',''], 'policy-question':['3'], 'policy-worked':['3'],
-    'integration-jsxgraph-length':['4']};
+  const expected = {'integration-math':[''], 'practice-math-fields':['',''],
+    'practice-math-vector':['',''], 'practice-math-matrix':['','','',''],
+    'practice-math-basis':['','',''], 'policy-question':['3'], 'policy-worked':['3'],
+    'integration-jsxgraph-length':['']};
   const snippets = Object.keys(expected).map(label => {
     const source = [...doc.querySelectorAll('details.math-example-source code.language-markdown')]
       .find(code => code.textContent.includes('#| label: ' + label + '\n'));
@@ -127,7 +127,7 @@ test('copied examples reproduce only their declared drafts, with complete linked
     for (const cell of w.document.querySelectorAll('.math-exercise-cell')) {
       w.__mathExerciseTestApi.setupCell(cell);
       assert.deepEqual([...cell.querySelectorAll('.math-input')].map(field => field.value), expected[cell.dataset.label] || ['']);
-      if (cell.dataset.label === 'ordinary-empty') assert.equal(cell.hasAttribute('data-initial-values'),false);
+      assert.equal(cell.hasAttribute('data-initial-values'), ['policy-question','policy-worked'].includes(cell.dataset.label), cell.dataset.label);
     }
     assert.equal(w.document.querySelector('[data-label="integration-math"] input').dataset.answer,'42');
     assert.equal(w.document.querySelectorAll('iframe').length,2);

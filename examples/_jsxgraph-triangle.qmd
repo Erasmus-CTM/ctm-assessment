@@ -2,7 +2,7 @@
 **Your task**
 
 The right triangle has perpendicular sides of lengths 3 and 4. Find the length
-of the sloping side. A draft answer is already entered; finish or correct it.
+of the sloping side. Enter your answer and check it.
 
 ```{.jsxgraph assessment_id="assessment-triangle" width="600" height="340" style="max-width:100%; border:1px solid #ddd; border-radius:8px;"}
 var board = JXG.JSXGraph.initBoard(BOARDID, {
@@ -30,7 +30,6 @@ JXG.QuartoAssessment.register({
 
 ```{math-exercise}
 #| label: integration-jsxgraph-length
-#| initial-values: ["4"]
 #| context: task-jsxgraph-math, jsxgraph:assessment-triangle
 The right triangle has perpendicular sides 3 and 4. The sloping side has length _[5].
 ```

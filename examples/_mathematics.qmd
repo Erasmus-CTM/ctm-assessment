@@ -1,4 +1,4 @@
-Finish or correct the draft answers, then choose **Check**. If you are stuck,
+Enter your answers, then choose **Check**. If you are stuck,
 **Feedback** offers increasing help: a question, a hint about the idea, a method,
 and finally a worked solution. Editing keeps your place in the hints; another
 Check starts them again.
@@ -16,11 +16,10 @@ a useful starting point for explaining why a method works.
 ::: {.example-learner-task #task-math-product}
 **Your task**
 
-A draft answer is already entered. Correct it and check your result.
+Calculate the product and check your result.
 
 ```{math-exercise}
 #| label: integration-math
-#| initial-values: ["40"]
 #| feedback-policy: practice-feedback
 #| context: none
 What is $6\cdot7$? _[42]
@@ -32,11 +31,10 @@ What is $6\cdot7$? _[42]
 ::: {.example-learner-task #task-math-fields}
 **Your task**
 
-The first step has been started. Complete both fields.
+Complete both stages of the calculation.
 
 ```{math-exercise}
 #| label: practice-math-fields
-#| initial-values: ["5", ""]
 #| context: none
 For $3(x+2)=15$, first divide by $3$: $x+2=$ _[5]. Then $x=$ _[3].
 ```
@@ -47,11 +45,10 @@ For $3(x+2)=15$, first divide by $3$: $x+2=$ _[5]. Then $x=$ _[3].
 ::: {.example-learner-task #task-math-vector}
 **Your task**
 
-Review the first component and finish the second component.
+Calculate both components of the gradient.
 
 ```{math-exercise}
 #| label: practice-math-vector
-#| initial-values: ["2*x", ""]
 #| context: none
 #| vars: x,y
 For $f(x,y)=x^2+xy$, enter the gradient: $\nabla f=$ vec[2*x+y,x].
@@ -63,11 +60,10 @@ For $f(x,y)=x^2+xy$, enter the gradient: $\nabla f=$ vec[2*x+y,x].
 ::: {.example-learner-task #task-math-matrix}
 **Your task**
 
-Two entries are filled. Complete the transpose and check all four entries.
+Enter the transpose and check all four entries.
 
 ```{math-exercise}
 #| label: practice-math-matrix
-#| initial-values: ["1", "", "", "4"]
 #| context: none
 For $A=\begin{pmatrix}1&2\\3&4\end{pmatrix}$, enter $A^T=$ mat[1,3;2,4].
 ```
@@ -78,12 +74,11 @@ For $A=\begin{pmatrix}1&2\\3&4\end{pmatrix}$, enter $A^T=$ mat[1,3;2,4].
 ::: {.example-learner-task #task-math-basis}
 **Your task**
 
-One proposed vector is started. Complete it, then add or remove columns until
-the columns form a basis. Check your work more than once if needed.
+Enter a vector, then add or remove columns until the columns form a basis.
+Check your work more than once if needed.
 
 ```{math-exercise}
 #| label: practice-math-basis
-#| initial-values: ["1", "-1", ""]
 #| context: none
 #| mode: custom
 #| checker: |
@@ -108,7 +103,9 @@ Enter basis vectors as columns: mat{name=B,rows=3,cols=auto,min-cols=0,max-cols=
 ::: {.callout-note .example-author-notes}
 ### For course authors
 
-Both exercises have the same question and starting answer. The first offers
+These two comparison exercises exceptionally share a starting attempt so you
+can compare feedback on the same response. Ordinary exercises start blank.
+The first offers
 a guiding question, useful during practice; the second allows a worked
 explanation, useful when reviewing an attempt. Choose Feedback on each and
 compare the messages. Open the source to see the two sets of instructions.

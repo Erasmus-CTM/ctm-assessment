@@ -85,6 +85,8 @@ const server = http.createServer((req, res) => {
     }
     await page.getByRole('tab', {name: 'Mathematics', exact: true}).click();
     await assertCompactMathControls();
+    assert.ok(await page.locator('.tab-pane.active .math-exercise-cell:not([data-initial-values]) .math-input').evaluateAll(fields => fields.every(field => field.value === '')));
+    assert.equal(await page.locator('.math-exercise-cell[data-initial-values]').count(), 2, 'Only policy comparison examples start from a shared attempt');
     await page.locator('#task-math-product .math-input').fill('42');
     await page.locator('#task-math-product .math-check-btn').click();
     await page.waitForFunction(() => document.querySelector('.math-input').classList.contains('math-input-ok'));
@@ -222,16 +224,17 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.evaluate(() => window.__feedbackExecutionCount), executionCount);
     await page.getByRole('tab', {name: 'Mathematics', exact: true}).click();
     const mathCases = [
-      {id: 'task-math-product', draft: ['42'], correct: ['42']},
-      {id: 'task-math-fields', draft: ['5', ''], correct: ['5', '3']},
-      {id: 'task-math-vector', draft: ['2*x', ''], correct: ['2*x+y', 'x']},
-      {id: 'task-math-matrix', draft: ['1', '', '', '4'], correct: ['1', '3', '2', '4']},
-      {id: 'task-math-basis', draft: ['1', '-1', ''], correct: ['1', '1', '-1', '0', '0', '-1'], dynamic: true}
+      {id: 'task-math-product', start: ['42'], attempt: ['42'], correct: ['42']},
+      {id: 'task-math-fields', start: ['', ''], attempt: ['5', ''], correct: ['5', '3']},
+      {id: 'task-math-vector', start: ['', ''], attempt: ['2*x', ''], correct: ['2*x+y', 'x']},
+      {id: 'task-math-matrix', start: ['', '', '', ''], attempt: ['1', '', '', '4'], correct: ['1', '3', '2', '4']},
+      {id: 'task-math-basis', start: ['', '', ''], attempt: ['1', '-1', ''], correct: ['1', '1', '-1', '0', '0', '-1'], dynamic: true}
     ];
     for (const example of mathCases) {
       const cell = page.locator('#' + example.id);
       const feedback = cell.locator('.math-feedback-btn');
-      assert.deepEqual(await cell.locator('.math-input').evaluateAll(fields => fields.map(f => f.value)), example.draft);
+      assert.deepEqual(await cell.locator('.math-input').evaluateAll(fields => fields.map(f => f.value)), example.start);
+      for (let i = 0; i < example.attempt.length; i++) await cell.locator('.math-input').nth(i).fill(example.attempt[i]);
       let runs = await page.evaluate(() => window.__feedbackExecutionCount);
       await feedback.click();
       await cell.locator('.ai-feedback-body').waitFor();
@@ -366,6 +369,7 @@ const server = http.createServer((req, res) => {
     }
     await assertCompactMathControls(1);
     const diagramMath=page.locator('#task-jsxgraph-math');
+    assert.equal(await diagramMath.locator('.math-input').inputValue(), '');
     await diagramMath.locator('.math-input').fill('5');await diagramMath.locator('.math-check-btn').click();
     await diagramMath.locator('.math-fb-ok').waitFor();
     const shapes=page.locator('#german-shapes');

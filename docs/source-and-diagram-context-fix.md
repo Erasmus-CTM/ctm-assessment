@@ -1,13 +1,14 @@
 # Copyable source and diagram context correction
 
 Approved by AC on 16 October 2026, with the clarification that starting values
-are exceptional. Ordinary exercises remain empty; no unrelated activity gains
-a starting answer.
+are exceptional. The ordinary scalar, vector, matrix, basis and triangle
+exercises start empty. Only the two feedback-policy comparison exercises keep
+the same starting attempt so their feedback can be compared.
 
 ## What changed
 
-- The eight existing, explicitly drafted math activities declare optional
-  `initial-values` in their Quarto blocks. Their answer keys are unchanged.
+- Only the two policy-comparison activities declare optional `initial-values`
+  in their Quarto blocks. All eight mathematics answer keys are unchanged.
   The page-wide initializer and its repeated HTML/script source are removed.
 - Each JSXGraph source panel now contains one complete diagram/task example,
   read verbatim from its authored include. It includes the registration and
