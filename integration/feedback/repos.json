@@ -16,7 +16,7 @@
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "feature/shared-feedback-integration",
-      "commit": "d2247944898104a5f0162b8485cf0b31f4db7320"
+      "commit": "6820380624ddf027e2cfe6422ea15e048c18d0e3"
     },
     "ctm-assessment": {
       "repository": "Erasmus-CTM/ctm-assessment",

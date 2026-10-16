@@ -52,8 +52,11 @@ For unmerged dependencies, explicitly select a review branch:
 python scripts/setup-feedback-integration.py --ref ai-feedback=my-review-branch --test
 ```
 
-CI uses the normal manifest for every build, including pull requests. Merge
-required dependency changes into `main` before the assembly PR. To include local branch work:
+CI uses the normal manifest unless a non-main review commit explicitly declares
+exact dependency SHAs in a `CTM-Review-Refs: {...}` trailer. The named review
+selection step logs those refs and the builder records them. Main ignores the
+trailer. Merge upstream changes first, then remove the trailer and rerun ordinary
+dependency checks before merging a consumer PR. To include local branch work:
 
 ```sh
 python scripts/setup-feedback-integration.py \
