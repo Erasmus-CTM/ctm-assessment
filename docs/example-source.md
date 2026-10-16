@@ -34,7 +34,17 @@ Ordinary mathematics exercises start with empty fields. The exceptional examples
 that deliberately start from a draft declare `initial-values` in their Quarto
 block; omit that option when you want empty fields. The answer keys inside the
 exercise markers remain the correct answers. No page-initialization script is
-needed. Each JSXGraph source panel includes the applet, its context connection,
-and the linked activity together.
+needed.
+
+Each example has separate collapsed **Show Quarto exercise source** and
+**Show policy YAML** panels. Diagram examples also have **Show JSXGraph code**.
+You can open each independently. The policy panel includes the installed shared
+defaults and configured policy YAML files. The exercise source keeps its named policy and
+context references; policy definitions and applet code live in their own panels.
+
+To copy a diagram activity, copy both its JSXGraph block and its Quarto exercise
+source into the same page. Keep the applet's `assessment_id` and the exercise's
+`jsxgraph:...` context reference together. Copy any named policy YAML into the
+policy files configured for your page.
 
 [Installation and setup](installation.md) · [Authoring guide](authoring.md)
