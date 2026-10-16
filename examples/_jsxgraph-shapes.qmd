@@ -1,0 +1,45 @@
+```{.jsxgraph assessment_id="assessment-german-shapes" width="680" height="320" style="max-width:100%; border:1px solid #ddd; border-radius:8px;"}
+var board = JXG.JSXGraph.initBoard(BOARDID, {
+  boundingbox: [-4, 2.3, 4, -2.3], axis: false, keepaspectratio: true,
+  showNavigation: false, showCopyright: false
+});
+var circle = board.create('circle', [[-2, 0], 1], {
+  strokeColor: '#2563eb', fillColor: '#dbeafe', fillOpacity: 0.7, fixed: true
+});
+var square = board.create('polygon', [[1, -1], [3, -1], [3, 1], [1, 1]], {
+  vertices: {visible: false, fixed: true}, borders: {strokeColor: '#16a34a'},
+  fillColor: '#dcfce7', fillOpacity: 0.7, fixed: true
+});
+board.create('text', [-2.1, -1.5, 'A'], {fixed: true});
+board.create('text', [1.9, -1.5, 'B'], {fixed: true});
+JXG.QuartoAssessment.register({
+  board: board,
+  response: () => ({
+    shapes: [
+      {label: 'A', kind: 'circle', center: [circle.center.X(), circle.center.Y()], radius: circle.Radius()},
+      {label: 'B', kind: 'polygon', vertices: square.vertices.slice(0, -1).map(point => [point.X(), point.Y()])}
+    ],
+    view: board.getBoundingBox()
+  }),
+  ai: {render: true, summary: 'The current labelled shapes A and B.'}
+});
+```
+
+::: {.ai-feedback #german-shapes profile="language-quality" response-language="de" feedback-language="en" learner-level="German course 1" context="jsxgraph:assessment-german-shapes"}
+**Your task**
+
+Wie heißen die Formen A und B auf Deutsch? Schreibe den Namen mit dem bestimmten
+Artikel. Complete or correct the two German names in the draft.
+
+::: {.feedback-starter}
+A: der Kreis
+B: das Rechteck
+:::
+
+::: {.feedback-criteria}
+Figure A is a circle; figure B is a square. The expected German names with
+articles are "der Kreis" and "das Quadrat". Review the shape names and articles
+at beginner level. A square is a special rectangle, but this task asks for the
+more precise name. Do not rewrite unrelated text or invent visual details.
+:::
+:::

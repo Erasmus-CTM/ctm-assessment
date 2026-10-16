@@ -1,6 +1,5 @@
 -- Documentation-only source panels, emitted before the exercise filters.
 local policyFiles = {}
-local draftSource = nil
 local summary, jsxSummary = 'Show source and policy YAML', 'Show JSXGraph source and policy YAML'
 local function escape(text)
   return text:gsub('&','&amp;'):gsub('<','&lt;'):gsub('>','&gt;'):gsub('"','&quot;')
@@ -15,10 +14,6 @@ local function panel(source, title)
 end
 local function meta(m)
   policyFiles = {}
-  draftSource = nil
-  local base=quarto.project.directory or pandoc.path.directory(quarto.doc.input_file)
-  local draftFile=io.open(pandoc.path.join({base,'examples/math-drafts.js'}),'r')
-  if draftFile then draftSource=draftFile:read('*a');draftFile:close() end
   local lang=pandoc.utils.stringify(m.lang or 'en'):lower():match('^(%a+)')
   if lang=='nb' or lang=='no' then summary,jsxSummary='Vis kildekode og policy-YAML','Vis JSXGraph-kildekode og policy-YAML'
   elseif lang=='de' then summary,jsxSummary='Quellcode und Policy-YAML anzeigen','JSXGraph-Quellcode und Policy-YAML anzeigen'
@@ -54,15 +49,19 @@ local function code(el)
   end
   if not opening then return end
   local source='```'..opening..'\n'..el.text..'\n```'
-  local label=el.text:match('#|%s*label:%s*([^\r\n]+)')
-  if opening=='{math-exercise}' and draftSource and label and draftSource:find("'"..label.."'",1,true) then
-    source=source..'\n\n<script>\n'..draftSource..'</script>'
-  end
   return {el,panel(source,jsx and jsxSummary or summary)}
 end
 local function div(el)
-  if not quarto.doc.is_format('html') or not el.classes:includes('ai-feedback') then return end
+  if not quarto.doc.is_format('html') then return end
+  if el.classes:includes('example-source-group') then
+    local base=quarto.project.directory or pandoc.path.directory(quarto.doc.input_file)
+    local path=assert(el.attributes['source-file'], 'Source group requires source-file')
+    local file=assert(io.open(pandoc.path.join({base,path}),'r'), 'Cannot read example source: '..path)
+    local source=file:read('*a');file:close()
+    return {el,panel(source,jsxSummary)}, false
+  end
+  if not el.classes:includes('ai-feedback') then return end
   local source=pandoc.write(pandoc.Pandoc({el}),'markdown',{wrap_text='none'})
   return {el,panel(source,summary)}
 end
-return {{Meta=meta},{CodeBlock=code,Div=div}}
+return {{Meta=meta},{traverse='topdown',CodeBlock=code,Div=div}}

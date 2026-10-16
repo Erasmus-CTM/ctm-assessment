@@ -6,7 +6,7 @@
 
 CTM Assessment combines **ai-feedback, math-exercise, py-exercise,
 pyodide-interaktiv and JSXGraph**. Each component keeps its own source repository;
-this repository owns their pinned assembly, combined examples and acceptance tests.
+this repository owns their assembly, combined examples and acceptance tests.
 JSXGraph currently comes from the assessment bridge maintained in math-exercise.
 
 Install the assembled package:
@@ -37,7 +37,9 @@ To install only selected integrations, install ai-feedback once alongside the
 chosen consumers and list those consumer filters. They automatically load the
 shared module; no private feedback runtime remains inside them. Use `main` for ai-feedback, math-exercise and py-exercise. Python exploration
 still uses pyodide-interaktiv's `feature/shared-feedback-integration` branch.
-The manifest pins exact commits, including any fix revision awaiting merge.
+The manifest follows maintained `main` branches. Only pyodide-interaktiv is
+temporarily pinned until its shared-feedback migration is merged. Each build
+records the exact commits it resolved.
 
 Python exercises use the Pyodide runtime. Text/image feedback requires no Python
 execution. Resources initialize once even when the explicit ai-feedback filter

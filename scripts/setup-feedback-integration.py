@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build/test a common page from explicit CTM repository revisions (Python 3.12+)."""
+"""Build/test a common page from maintained CTM branches (Python 3.12+)."""
 import argparse
 import hashlib
 import json
@@ -31,6 +31,19 @@ def download(url, target):
         shutil.copyfileobj(response, out)
 
 
+def remote_revision(name, spec, review_ref=None):
+    sha = spec.get('commit')
+    if not sha or review_ref:
+        branch = review_ref or spec['branch']
+        refs = subprocess.check_output(['git', 'ls-remote', f'https://github.com/{spec["repository"]}.git', 'refs/heads/' + branch], text=True).split()
+        if len(refs) != 2:
+            raise SystemExit('Could not resolve branch: ' + name)
+        sha = refs[0]
+    if not re.fullmatch(r'[0-9a-f]{40}', sha):
+        raise SystemExit('Expected a full commit SHA: ' + name)
+    return sha
+
+
 def snapshot(repo, sha, cache):
     target = cache / (repo.rsplit('/', 1)[1] + '-' + sha)
     if (target / '.integration-source.json').exists():
@@ -53,7 +66,8 @@ def snapshot(repo, sha, cache):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--workspace', type=Path, default=ROOT / '.feedback-workspace')
-    parser.add_argument('--refresh', action='store_true', help='Resolve the configured remote branch tips instead of external pins')
+    parser.add_argument('--refresh', action='store_true', help='Compatibility option: branches are always refreshed; explicit migration pins stay pinned')
+    parser.add_argument('--ref', action='append', default=[], metavar='NAME=BRANCH', help='Use a review branch for a dependency without changing normal build defaults')
     parser.add_argument('--source', action='append', default=[], metavar='NAME=PATH', help='Use a local Git checkout for a repository; record SHA and dirty files')
     parser.add_argument('--test', action='store_true', help='Run repository and common-page tests after rendering')
     parser.add_argument('--browser', action='store_true', help='Also run real Chromium/Pyodide/Monaco smoke tests (requires Playwright browser)')
@@ -79,25 +93,29 @@ def main():
         if name not in config['repositories']:
             raise SystemExit('Unknown repository: ' + name)
         local[name] = Path(path).resolve()
+    review_refs = {}
+    for entry in args.ref:
+        name, ref = entry.split('=', 1)
+        if name not in config['repositories'] or not ref.strip():
+            raise SystemExit('Unknown repository or empty review branch: ' + name)
+        if name in local:
+            raise SystemExit('Choose either --source or --ref for ' + name)
+        review_refs[name] = ref
     sources, revisions = {}, {}
     for name, spec in config['repositories'].items():
-        sha = spec['commit']
+        sha = spec.get('commit')
+        requested_ref = review_refs.get(name, spec['branch'])
         dirty = []
         if name in local:
             source = local[name]
             sha = git(source, 'rev-parse', 'HEAD')
             dirty = git(source, 'status', '--porcelain', '--untracked-files=all').splitlines()
         else:
-            if args.refresh:
-                refs = subprocess.check_output(['git', 'ls-remote', f'https://github.com/{spec["repository"]}.git', 'refs/heads/' + spec['branch']], text=True).split()
-                if len(refs) != 2:
-                    raise SystemExit('Could not resolve branch: ' + name)
-                sha = refs[0]
-            if not re.fullmatch(r'[0-9a-f]{40}', sha):
-                raise SystemExit('Expected a full commit SHA: ' + name)
+            sha = remote_revision(name, spec, review_refs.get(name))
             source = snapshot(spec['repository'], sha, cache)
         sources[name] = source
-        revisions[name] = {'repository': spec['repository'], 'branch': spec['branch'], 'commit': sha, 'local_override': name in local, 'dirty_files': dirty}
+        revisions[name] = {'repository': spec['repository'], 'branch': spec['branch'], 'requested_ref': requested_ref, 'commit': sha, 'ref_override': name in review_refs, 'pinned': bool(spec.get('commit')), 'local_override': name in local, 'dirty_files': dirty}
+        print(f'Resolved {name}: {requested_ref} @ {sha}', flush=True)
     site = workspace / 'site'
     if site.exists():
         shutil.rmtree(site)  # Generated site inside the marked workspace only.
@@ -143,6 +161,7 @@ def main():
         env = dict(base_env, CTM_INTEGRATION_SITE=str(site / '_site'), CTM_INTEGRATION_RECORD=str(workspace / 'resolved-repos.json'), AI_FEEDBACK_EXTENSION=str(sources['ai-feedback'] / '_extensions' / 'ai-feedback'))
         run(['npm', 'ci', '--ignore-scripts'], cwd=ROOT)
         if args.test:
+            run(['python', '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_sources.py'], cwd=ROOT, env=env)
             run(['python', ROOT / 'scripts/test-package.py', archive], env=env)
             run(['python', sources['ai-feedback'] / 'scripts/sync-feedback-defaults.py', '--check'], env=env)
             run(['npm', 'test'], cwd=ROOT, env=env)

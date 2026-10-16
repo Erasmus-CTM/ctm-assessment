@@ -30,9 +30,11 @@ starting point.
 
 You can instead copy one activity from a rendered source panel into your own
 course page. If it selects a named feedback policy, copy that policy's YAML too.
-Math source panels also include the example's draft-answer setup script. Copy
-that script with the exercise to reproduce its prefilled starting answers;
-omit it when you want empty fields. The answer keys inside the exercise markers
-are the correct answers, while these drafts intentionally contain mistakes.
+Ordinary mathematics exercises start with empty fields. The exceptional examples
+that deliberately start from a draft declare `initial-values` in their Quarto
+block; omit that option when you want empty fields. The answer keys inside the
+exercise markers remain the correct answers. No page-initialization script is
+needed. Each JSXGraph source panel includes the applet, its context connection,
+and the linked activity together.
 
 [Installation and setup](installation.md) · [Authoring guide](authoring.md)

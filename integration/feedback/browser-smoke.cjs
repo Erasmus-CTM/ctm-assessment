@@ -85,6 +85,9 @@ const server = http.createServer((req, res) => {
     }
     await page.getByRole('tab', {name: 'Mathematics', exact: true}).click();
     await assertCompactMathControls();
+    assert.ok(await page.locator('.tab-pane.active .math-exercise-cell:not([data-initial-values]) .math-input').evaluateAll(fields => fields.every(field => field.value === '')));
+    assert.equal(await page.locator('.math-exercise-cell[data-initial-values]').count(), 2, 'Only policy comparison examples start from a shared attempt');
+    await page.screenshot({path:path.join(site,'mathematics-blank-defaults.png'),fullPage:true});
     await page.locator('#task-math-product .math-input').fill('42');
     await page.locator('#task-math-product .math-check-btn').click();
     await page.waitForFunction(() => document.querySelector('.math-input').classList.contains('math-input-ok'));
@@ -103,10 +106,11 @@ const server = http.createServer((req, res) => {
     assert.equal(comparison[0].task,comparison[1].task);
     assert.equal(comparison[0].full,false);assert.equal(comparison[1].full,true);
     const sources=page.locator('details.math-example-source');
-    assert.ok(await sources.count() >= 26);
+    assert.ok(await sources.count() >= 24);
     assert.equal(await page.locator('details.math-example-source[open]').count(),0);
     await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
     assert.match(await page.locator('.tab-pane.active details.math-example-source').first().innerText(),/ai-feedback|feedback-policy/);
+    await page.locator('.tab-pane.active details.math-example-source').first().screenshot({path:path.join(site,'mathematics-example-source.png')});
     await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
     report.checks.push('Identical math tasks select different YAML feedback policies; example sources and YAML are collapsed');
 
@@ -222,16 +226,17 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.evaluate(() => window.__feedbackExecutionCount), executionCount);
     await page.getByRole('tab', {name: 'Mathematics', exact: true}).click();
     const mathCases = [
-      {id: 'task-math-product', draft: ['42'], correct: ['42']},
-      {id: 'task-math-fields', draft: ['5', ''], correct: ['5', '3']},
-      {id: 'task-math-vector', draft: ['2*x', ''], correct: ['2*x+y', 'x']},
-      {id: 'task-math-matrix', draft: ['1', '', '', '4'], correct: ['1', '3', '2', '4']},
-      {id: 'task-math-basis', draft: ['1', '-1', ''], correct: ['1', '1', '-1', '0', '0', '-1'], dynamic: true}
+      {id: 'task-math-product', start: ['42'], attempt: ['42'], correct: ['42']},
+      {id: 'task-math-fields', start: ['', ''], attempt: ['5', ''], correct: ['5', '3']},
+      {id: 'task-math-vector', start: ['', ''], attempt: ['2*x', ''], correct: ['2*x+y', 'x']},
+      {id: 'task-math-matrix', start: ['', '', '', ''], attempt: ['1', '', '', '4'], correct: ['1', '3', '2', '4']},
+      {id: 'task-math-basis', start: ['', '', ''], attempt: ['1', '-1', ''], correct: ['1', '1', '-1', '0', '0', '-1'], dynamic: true}
     ];
     for (const example of mathCases) {
       const cell = page.locator('#' + example.id);
       const feedback = cell.locator('.math-feedback-btn');
-      assert.deepEqual(await cell.locator('.math-input').evaluateAll(fields => fields.map(f => f.value)), example.draft);
+      assert.deepEqual(await cell.locator('.math-input').evaluateAll(fields => fields.map(f => f.value)), example.start);
+      for (let i = 0; i < example.attempt.length; i++) await cell.locator('.math-input').nth(i).fill(example.attempt[i]);
       let runs = await page.evaluate(() => window.__feedbackExecutionCount);
       await feedback.click();
       await cell.locator('.ai-feedback-body').waitFor();
@@ -366,11 +371,53 @@ const server = http.createServer((req, res) => {
     }
     await assertCompactMathControls(1);
     const diagramMath=page.locator('#task-jsxgraph-math');
+    assert.equal(await diagramMath.locator('.math-input').inputValue(), '');
     await diagramMath.locator('.math-input').fill('5');await diagramMath.locator('.math-check-btn').click();
     await diagramMath.locator('.math-fb-ok').waitFor();
+    await diagramMath.screenshot({path:path.join(site,'triangle-task.png')});
     const shapes=page.locator('#german-shapes');
     await shapes.locator('button').first().click();await shapes.locator('pre').waitFor();
     assert.match(await shapes.locator('pre').textContent(),/der Kreis|das Quadrat/);
+    assert.equal(await shapes.locator('.ai-feedback-images img').count(),1);
+    assert.equal(await shapes.locator('a[download]').count(),1);
+    await page.evaluate(() => AIFeedback.saveConfig({mode:'api',storage:'session',
+      baseUrl:'https://feedback-test.invalid/v1',model:'test-model',apiKey:'test-only'}));
+    function visualPayload() {
+      const parts=apiRequest.messages[1].content;
+      assert.ok(Array.isArray(parts));
+      assert.equal(parts.filter(part=>part.type==='image_url').length,1);
+      const request=JSON.parse(parts[0].text);
+      assert.equal(request.attachments.length,1);
+      assert.equal(request.attachments[0].role,'context');
+      assert.doesNotMatch(JSON.stringify(apiRequest),/data-answer|math-drafts|MutationObserver|def check/);
+      return request;
+    }
+    await diagramMath.locator('.math-feedback-btn').click();
+    await diagramMath.locator('.ai-feedback-body').waitFor();
+    let diagramRequest=visualPayload();
+    fs.writeFileSync(path.join(site,'triangle-feedback-context.png'),Buffer.from(apiRequest.messages[1].content.find(part=>part.type==='image_url').image_url.url.split(',')[1],'base64'));
+    assert.match(diagramRequest.responses[0].value,/5/);
+    const triangleState=JSON.parse(diagramRequest.materials.find(m=>m.id==='diagram-assessment-triangle').text).state;
+    assert.equal(triangleState.givenLengths.AB,3);assert.equal(triangleState.givenLengths.BC,4);
+    assert.equal(triangleState.vertices.length,3);
+    // Prove collection reflects the live board, rather than a fixed text substitute.
+    const triangleFrame=await (await frames.nth(0).elementHandle()).contentFrame();
+    await triangleFrame.evaluate(()=>{c.setPosition(JXG.COORDS_BY_USER,[3,8]);board.update();});
+    await diagramMath.locator('.math-feedback-btn').click();
+    await diagramMath.locator('.ai-feedback-body').waitFor();
+    diagramRequest=visualPayload();
+    assert.equal(JSON.parse(diagramRequest.materials.find(m=>m.id==='diagram-assessment-triangle').text).state.givenLengths.BC,8);
+    await triangleFrame.evaluate(()=>{c.setPosition(JXG.COORDS_BY_USER,[3,4]);board.update();});
+    await shapes.locator('button').first().click();await shapes.locator('.ai-feedback-body').waitFor();
+    const shapeRequest=visualPayload();
+    fs.writeFileSync(path.join(site,'shapes-feedback-context.png'),Buffer.from(apiRequest.messages[1].content.find(part=>part.type==='image_url').image_url.url.split(',')[1],'base64'));
+    assert.match(shapeRequest.responses[0].value,/der Kreis/);
+    assert.equal(JSON.parse(shapeRequest.materials.find(m=>m.id==='diagram-assessment-german-shapes').text).state.shapes.length,2);
+    report.checks.push('Diagram images and live state reach real math/text feedback requests as context; typed answers remain responses; copy mode exposes images');
+    const diagramSource=graphPanel.locator('details.math-example-source').first();
+    await diagramSource.locator('summary').click();
+    await diagramSource.screenshot({path:path.join(site,'jsxgraph-complete-source.png')});
+    await diagramSource.locator('summary').click();
     await page.screenshot({path:path.join(site,'jsxgraph-examples.png'),fullPage:true});
     report.checks.push('JSXGraph draws triangle, circle and square; mathematics checks length and German naming uses plain-text feedback');
 

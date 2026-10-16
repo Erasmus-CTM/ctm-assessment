@@ -6,6 +6,7 @@ const { JSDOM } = require('jsdom');
 const site = process.env.CTM_INTEGRATION_SITE;
 assert.ok(site, 'Run scripts/setup-feedback-integration.py --test first.');
 const html = fs.readFileSync(path.join(site, 'example.html'), 'utf8');
+const sharedVersion = require(path.join(path.dirname(site), '_extensions/ai-feedback/feedback-core.js')).version;
 
 test('common page renders the active extensions and keeps local dependencies resolvable', () => {
   const dom = new JSDOM(html);
@@ -16,7 +17,7 @@ test('common page renders the active extensions and keeps local dependencies res
   assert.deepEqual([...doc.querySelectorAll('.panel-tabset > ul [role=tab]')].map(n => n.textContent.trim()), ['Plain text', 'Python', 'Mathematics', 'Pyodide', 'JSXGraph']);
   const panels = doc.querySelectorAll('.panel-tabset > .tab-content > .tab-pane');
   assert.equal(panels.length, 5);
-  assert.deepEqual([...panels].map(panel => panel.querySelectorAll('details.math-example-source').length), [6, 6, 7, 3, 4], 'Every activity and JSXGraph board has a source panel');
+  assert.deepEqual([...panels].map(panel => panel.querySelectorAll('details.math-example-source').length), [6, 6, 7, 3, 2], 'Every activity or complete applet/task pair has one source panel');
   assert.equal(doc.querySelectorAll('details.math-example-source[open]').length, 0);
   for (const source of doc.querySelectorAll('details.math-example-source')) {
     assert.match(source.textContent, /Policy YAML: feedback\/comparison.yml/);
@@ -44,8 +45,12 @@ test('common page renders the active extensions and keeps local dependencies res
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'repos.json'), 'utf8'));
   for (const [name, source] of Object.entries(record.repositories)) {
     assert.equal(source.branch, manifest.repositories[name].branch);
-    if (!source.local_override && !record.refresh) {
+    if (!source.local_override && !source.ref_override && manifest.repositories[name].commit) {
       assert.equal(source.commit, manifest.repositories[name].commit);
+    }
+    if (!source.local_override && !source.ref_override && !manifest.repositories[name].commit) {
+      assert.equal(source.requested_ref, manifest.repositories[name].branch);
+      assert.equal(source.pinned, false);
     }
   }
   assert.ok(record.extension_sha256['py-exercise']['py-exercise-feedback.js']);
@@ -79,32 +84,59 @@ test('shared text feedback works on the combined page without running Python or 
   dom.window.close();
 });
 
-test('each mathematics source reproduces the visible starting draft', () => {
-  const setup = fs.readFileSync(path.join(__dirname, '../../examples/math-drafts.js'), 'utf8');
-  const dom = new JSDOM(html);
-  const doc = dom.window.document;
-  const labels = ['integration-math', 'practice-math-fields', 'practice-math-vector',
-    'practice-math-matrix', 'practice-math-basis', 'policy-question', 'policy-worked',
-    'integration-jsxgraph-length'];
-  for (const label of labels) {
+test('copied examples reproduce only their declared drafts, with complete linked applet source', () => {
+  const {spawnSync} = require('node:child_process');
+  const os = require('node:os');
+  const doc = new JSDOM(html).window.document;
+  const expected = {'integration-math':[''], 'practice-math-fields':['',''],
+    'practice-math-vector':['',''], 'practice-math-matrix':['','','',''],
+    'practice-math-basis':['','',''], 'policy-question':['3'], 'policy-worked':['3'],
+    'integration-jsxgraph-length':['']};
+  const snippets = Object.keys(expected).map(label => {
     const source = [...doc.querySelectorAll('details.math-example-source code.language-markdown')]
       .find(code => code.textContent.includes('#| label: ' + label + '\n'));
     assert.ok(source, label);
-    assert.ok(source.textContent.includes(setup), label + ' must include the actual draft initializer');
-    // A copied snippet can be used without the other example-page containers.
-    const expectedCounts = {'practice-math-fields':2,'practice-math-vector':2,'practice-math-matrix':4,'practice-math-basis':3};
-    const count = expectedCounts[label] || 1;
-    const copy = new JSDOM(`<div class="math-exercise-cell" data-label="${label}">${'<input class="math-input">'.repeat(count)}</div>`, {runScripts:'outside-only'});
-    copy.window.eval(setup);
-    copy.window.document.dispatchEvent(new copy.window.Event('DOMContentLoaded'));
-    assert.equal(copy.window.document.querySelector('.math-input').value,
-      label === 'integration-math' ? '40' : label === 'practice-math-fields' ? '5' :
-      label === 'practice-math-vector' ? '2*x' : label === 'practice-math-matrix' || label === 'practice-math-basis' ? '1' :
-      label === 'integration-jsxgraph-length' ? '4' : '3');
-    copy.window.close();
-  }
-  assert.ok(fs.existsSync(path.join(site, 'examples/math-drafts.js')));
-  dom.window.close();
+    assert.doesNotMatch(source.textContent, /<script>|math-drafts|MutationObserver|const drafts/);
+    if (label === 'integration-jsxgraph-length') {
+      assert.match(source.textContent, /assessment_id="assessment-triangle"/);
+      assert.match(source.textContent, /JXG.QuartoAssessment.register/);
+      assert.match(source.textContent, /context: task-jsxgraph-math, jsxgraph:assessment-triangle/);
+      assert.doesNotMatch(source.textContent, /practice-math-fields/);
+    } else assert.doesNotMatch(source.textContent, /assessment-triangle|assessment-german-shapes/);
+    return source.textContent;
+  });
+  const shapes = [...doc.querySelectorAll('details.math-example-source code.language-markdown')]
+    .find(code => code.textContent.includes('#german-shapes'));
+  assert.match(shapes.textContent, /assessment_id="assessment-german-shapes"/);
+  assert.match(shapes.textContent, /JXG.QuartoAssessment.register/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctm-copied-source-'));
+  let dom;
+  try {
+    const original = path.resolve(site, '..');
+    fs.cpSync(path.join(original, '_extensions'), path.join(dir, '_extensions'), {recursive:true});
+    fs.cpSync(path.join(original, 'feedback'), path.join(dir, 'feedback'), {recursive:true});
+    fs.copyFileSync(path.join(original, 'feedback.yml'), path.join(dir, 'feedback.yml'));
+    const metadata = '---\nformat: html\nfilters: [ctm-assessment]\nai-feedback:\n  policy-files: feedback.yml\n  page-policy-files: [feedback/page.yml, feedback/comparison.yml]\n---\n\n';
+    fs.writeFileSync(path.join(dir, 'copies.qmd'), metadata + snippets.join('\n\n') + '\n\n' + shapes.textContent +
+      '\n\n```{math-exercise}\n#| label: ordinary-empty\nNo draft: _[42].\n```\n');
+    const render = spawnSync('quarto', ['render','copies.qmd'], {cwd:dir,encoding:'utf8',timeout:120000});
+    assert.equal(render.status,0,render.stderr || render.error?.message);
+    dom = new JSDOM(fs.readFileSync(path.join(dir,'copies.html'),'utf8'), {url:'https://copies.invalid/',runScripts:'outside-only'});
+    const w = dom.window; w.document.addEventListener = () => {}; w.AbortController = AbortController;
+    w.__mathExerciseTestMode = true;
+    for (const name of ['feedback-core.js','feedback-dom.js','ai-feedback.js'])
+      w.eval(fs.readFileSync(path.join(dir,'_extensions/ai-feedback',name),'utf8'));
+    const math = path.join(dir,'_extensions/math-exercise');
+    w.eval(fs.readFileSync(path.join(math,'shared/pyodide-runtime.js'),'utf8'));
+    w.eval(fs.readFileSync(path.join(math,'math-exercise.js'),'utf8'));
+    for (const cell of w.document.querySelectorAll('.math-exercise-cell')) {
+      w.__mathExerciseTestApi.setupCell(cell);
+      assert.deepEqual([...cell.querySelectorAll('.math-input')].map(field => field.value), expected[cell.dataset.label] || ['']);
+      assert.equal(cell.hasAttribute('data-initial-values'), ['policy-question','policy-worked'].includes(cell.dataset.label), cell.dataset.label);
+    }
+    assert.equal(w.document.querySelector('[data-label="integration-math"] input').dataset.answer,'42');
+    assert.equal(w.document.querySelectorAll('iframe').length,2);
+  } finally {dom?.window.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
 
 test('mathematics feedback excludes the author note from learning context', () => {
@@ -174,9 +206,9 @@ test('standalone math and both shared-filter orders load one usable runtime', as
     for (const [i, filters] of [['math-exercise'], ['ai-feedback', 'math-exercise'], ['math-exercise', 'ai-feedback'], ['ai-feedback', 'math-exercise'], ['math-exercise', 'ai-feedback']].entries()) {
       if (i === 3) {
         // Simulate the previously released explicit dependency and callback contract.
-        for (const name of ['ai-feedback.lua', 'feedback-core.js', 'ai-feedback.js']) {
+        for (const name of ['feedback-quarto.lua', 'feedback-core.js', 'ai-feedback.js']) {
           const file = path.join(dir, '_extensions/ai-feedback', name);
-          fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll('0.5.0', '0.1.0').replace('await getRequest({ hintLevel })', 'await getRequest()'));
+          fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll(sharedVersion, '0.1.0').replace('await getRequest({ hintLevel })', 'await getRequest()'));
         }
       }
       fs.writeFileSync(path.join(dir, `order-${i}.qmd`), `---\nformat: html\nfilters: [${filters.join(', ')}]\n---\n\n::: {#context .ai-context}\nUse $x^2$.\n:::\n\n\x60\x60\x60{math-exercise}\n#| label: order\n#| context: context\nCompute $2+2$: _[SECRET_ANSWER]\n\x60\x60\x60\n`);
@@ -190,7 +222,7 @@ test('standalone math and both shared-filter orders load one usable runtime', as
         assert.equal(scripts.length, 1, `${filters}: ${name}`);
         w.eval(fs.readFileSync(path.join(dir, scripts[0].getAttribute('src')), 'utf8'));
       }
-      if (i < 3) assert.equal(w.AIFeedback.version, '0.6.0');
+      assert.equal(w.AIFeedback.version, i < 3 ? sharedVersion : '0.1.0');
       w.AIFeedback.initialize();
       const math = [...w.document.scripts].find(s => s.textContent.includes('var ME_CFG ='));
       w.eval(math.textContent);
@@ -237,7 +269,7 @@ test('standalone Pyodide, both filter orders and disabled feedback render correc
         assert.equal(scripts.length,i===3?0:1);
         if(i!==3)w.eval(fs.readFileSync(path.join(dir,scripts[0].getAttribute('src')),'utf8'));
       }
-      if(i!==3){assert.equal(w.AIFeedback.version,'0.6.0');w.AIFeedback.openSettings();assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length,1);}
+      if(i!==3){assert.equal(w.AIFeedback.version,sharedVersion);w.AIFeedback.openSettings();assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length,1);}
       assert.equal(w.document.querySelectorAll('[id^="qpyodide-insertion-location-"]').length,3);
       const dataScript = [...w.document.scripts].find(s=>s.textContent.includes('globalThis.qpyodideCellDetails ='));
       assert.ok(dataScript); w.eval(dataScript.textContent);

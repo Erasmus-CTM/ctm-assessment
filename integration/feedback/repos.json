@@ -3,18 +3,15 @@
   "repositories": {
     "ai-feedback": {
       "repository": "Erasmus-CTM/ai-feedback",
-      "branch": "main",
-      "commit": "bda67fbe515a3e5e2a2fa4b827c1bd918552fbac"
+      "branch": "main"
     },
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
-      "branch": "main",
-      "commit": "db4db7705de424a0aface078204904f40f5ee22f"
+      "branch": "main"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
-      "branch": "main",
-      "commit": "c708e5e2a3a35829af229d2e28b5470bac5c31b7"
+      "branch": "main"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
@@ -23,8 +20,7 @@
     },
     "ctm-assessment": {
       "repository": "Erasmus-CTM/ctm-assessment",
-      "branch": "main",
-      "commit": "self"
+      "branch": "main"
     }
   }
 }

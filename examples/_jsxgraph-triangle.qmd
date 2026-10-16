@@ -1,0 +1,36 @@
+::: {#task-jsxgraph-math .example-learner-task .ai-context}
+**Your task**
+
+The right triangle has perpendicular sides of lengths 3 and 4. Find the length
+of the sloping side. Enter your answer and check it.
+
+```{.jsxgraph assessment_id="assessment-triangle" width="600" height="340" style="max-width:100%; border:1px solid #ddd; border-radius:8px;"}
+var board = JXG.JSXGraph.initBoard(BOARDID, {
+  boundingbox: [-1, 5, 6, -1], axis: false, keepaspectratio: true,
+  showNavigation: false, showCopyright: false
+});
+var a = board.create('point', [0, 0], {name: 'A', fixed: true});
+var b = board.create('point', [3, 0], {name: 'B', fixed: true});
+var c = board.create('point', [3, 4], {name: 'C', fixed: true});
+board.create('polygon', [a, b, c], {fillColor: '#dbeafe', fillOpacity: 0.5});
+board.create('text', [1.4, -0.45, '3'], {fixed: true});
+board.create('text', [3.3, 2, '4'], {fixed: true});
+board.create('text', [0.8, 2.2, '?'], {fixed: true});
+JXG.QuartoAssessment.register({
+  board: board,
+  response: () => ({
+    kind: 'triangle',
+    vertices: [a, b, c].map(point => ({label: point.name, x: point.X(), y: point.Y()})),
+    givenLengths: {AB: a.Dist(b), BC: b.Dist(c)},
+    view: board.getBoundingBox()
+  }),
+  ai: {render: true, summary: 'Right triangle ABC with the given sides AB and BC.'}
+});
+```
+
+```{math-exercise}
+#| label: integration-jsxgraph-length
+#| context: task-jsxgraph-math, jsxgraph:assessment-triangle
+The right triangle has perpendicular sides 3 and 4. The sloping side has length _[5].
+```
+:::

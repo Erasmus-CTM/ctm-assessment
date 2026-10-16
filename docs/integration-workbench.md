@@ -33,24 +33,28 @@ Use an HTTP origin: Monaco and Pyodide workers do not work reliably with `file:/
 | Repository | Branch | Default source |
 |---|---|---|
 | ctm-assessment | `main` | This checkout, including local edits |
-| ai-feedback | `main` | Pinned shared-library revision |
-| py-exercise | `main` | Pinned branch commit |
-| math-exercise | `main` | Pinned branch commit |
-| pyodide-interaktiv | `feature/shared-feedback-integration` | Pinned branch commit |
+| ai-feedback | `main` | Current `main` tip |
+| py-exercise | `main` | Current `main` tip |
+| math-exercise | `main` | Current `main` tip |
+| pyodide-interaktiv | `feature/shared-feedback-integration` | Temporary migration pin |
 
 The script records every resolved commit, local dirty-file list and copied
 extension file's SHA-256 in `resolved-repos.json`. That record is included in the
 rendered site and linked from `example.qmd`. External sources are downloaded as
 exact-commit archives. No upstream checkout is overwritten.
 
-Use the configured external branch tips instead of pins:
+Normal builds resolve current branch tips each time, while the temporary Pyodide
+migration pin remains fixed. The legacy `--refresh` flag is accepted and keeps
+that pin fixed too. Resolved commits are recorded without changing the manifest.
+For unmerged dependencies, explicitly select a review branch:
 
 ```sh
-python scripts/setup-feedback-integration.py --refresh --test
+python scripts/setup-feedback-integration.py --ref ai-feedback=my-review-branch --test
 ```
 
-This writes the resolved record, not a changed manifest. Update pins explicitly
-when a new tested baseline is accepted. To include local consumer branch work:
+The coordinated source/context PR's CI uses its unmerged feedback and mathematics
+branches only for that PR. Main builds and other PRs use the normal manifest.
+Merge the shared feature PRs before the assembly PR. To include local branch work:
 
 ```sh
 python scripts/setup-feedback-integration.py \
@@ -93,8 +97,8 @@ with GitHub Pages. Feature branches retain a `rendered-examples` artifact.
 
 ## Migration boundary
 
-Python tasks use shared Feedback and settings from the pinned
-`feature/shared-feedback-integration` branch, not the main runtime. Feedback
+Python tasks use shared Feedback and settings from the temporarily pinned
+`feature/shared-feedback-integration` branch until its AI migration is merged. Feedback
 reads current code without execution and includes only code-matched checker
 summaries and learner output. Edits and Reset invalidate that evidence.
 Mathematics uses shared settings, transport and rendering while retaining its four-step teaching policy. Feedback never runs its checker. Only matching prior Check evidence is sent; graph payloads, expected values and checker source stay local. Consumers load the single installed ai-feedback extension automatically; no runtime is bundled. The Pyodide tab now exercises its shared adapter with incomplete starters.
@@ -108,7 +112,7 @@ code for feedback. Validate them here before opening a consumer PR.
 
 The fourth tab includes `examples/_pyodide.qmd`: three incomplete programs for
 price, accumulation and circle area. `pyodide-interaktiv` is pinned to its shared
-feedback feature branch, alongside py-exercise and math-exercise. All consumers
+feedback feature branch. The other maintained components follow `main`. All consumers
 share settings, transport and LaTeX rendering. Pyodide retains three hints that
 never supply finished code, and feedback never executes Python.
 
