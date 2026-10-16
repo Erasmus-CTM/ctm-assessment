@@ -30,18 +30,7 @@ jobs:
         with:
           version: '1.8.27'
       - name: Render and exercise the examples
-        env:
-          CTM_REVIEW_DEPENDENCIES: ${{ github.event_name == 'pull_request' && github.head_ref == 'codex/clean-source-linked-applets' }}
-        run: |
-          # Only this coordinated PR needs the unmerged shared-feature branches.
-          # Main builds and other PRs follow the maintained branches in repos.json.
-          if [ "$CTM_REVIEW_DEPENDENCIES" = "true" ]; then
-            python scripts/setup-feedback-integration.py --test \
-              --ref ai-feedback=codex/example-visual-context \
-              --ref math-exercise=codex/example-starting-values-context
-          else
-            python scripts/setup-feedback-integration.py --test
-          fi
+        run: python scripts/setup-feedback-integration.py --test
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Test all five integration tabs

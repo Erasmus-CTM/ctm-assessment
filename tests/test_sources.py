@@ -1,5 +1,6 @@
 """Maintained dependencies advance; the temporary migration pin stays fixed."""
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -10,6 +11,17 @@ spec.loader.exec_module(builder)
 
 
 class SourceSelection(unittest.TestCase):
+    def test_manifest_only_pins_the_pyodide_migration(self):
+        repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
+        for name, source in repositories.items():
+            with self.subTest(repository=name):
+                if name == 'pyodide-interaktiv':
+                    self.assertEqual(source['branch'], 'feature/shared-feedback-integration')
+                    self.assertRegex(source['commit'], r'^[0-9a-f]{40}$')
+                else:
+                    self.assertEqual(source['branch'], 'main')
+                    self.assertNotIn('commit', source)
+
     def test_main_is_resolved_again_on_each_build(self):
         source = {'repository': 'Erasmus-CTM/ai-feedback', 'branch': 'main'}
         with patch.object(builder.subprocess, 'check_output', side_effect=[

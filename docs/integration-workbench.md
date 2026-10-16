@@ -52,9 +52,8 @@ For unmerged dependencies, explicitly select a review branch:
 python scripts/setup-feedback-integration.py --ref ai-feedback=my-review-branch --test
 ```
 
-The coordinated source/context PR's CI uses its unmerged feedback and mathematics
-branches only for that PR. Main builds and other PRs use the normal manifest.
-Merge the shared feature PRs before the assembly PR. To include local branch work:
+CI uses the normal manifest for every build, including pull requests. Merge
+required dependency changes into `main` before the assembly PR. To include local branch work:
 
 ```sh
 python scripts/setup-feedback-integration.py \
