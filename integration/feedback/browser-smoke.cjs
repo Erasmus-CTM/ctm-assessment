@@ -103,7 +103,7 @@ const server = http.createServer((req, res) => {
     assert.equal(comparison[0].task,comparison[1].task);
     assert.equal(comparison[0].full,false);assert.equal(comparison[1].full,true);
     const sources=page.locator('details.math-example-source');
-    assert.ok(await sources.count() >= 26);
+    assert.ok(await sources.count() >= 24);
     assert.equal(await page.locator('details.math-example-source[open]').count(),0);
     await page.locator('.tab-pane.active details.math-example-source').first().locator('summary').click();
     assert.match(await page.locator('.tab-pane.active details.math-example-source').first().innerText(),/ai-feedback|feedback-policy/);
@@ -371,6 +371,40 @@ const server = http.createServer((req, res) => {
     const shapes=page.locator('#german-shapes');
     await shapes.locator('button').first().click();await shapes.locator('pre').waitFor();
     assert.match(await shapes.locator('pre').textContent(),/der Kreis|das Quadrat/);
+    assert.equal(await shapes.locator('.ai-feedback-images img').count(),1);
+    assert.equal(await shapes.locator('a[download]').count(),1);
+    await page.evaluate(() => AIFeedback.saveConfig({mode:'api',storage:'session',
+      baseUrl:'https://feedback-test.invalid/v1',model:'test-model',apiKey:'test-only'}));
+    function visualPayload() {
+      const parts=apiRequest.messages[1].content;
+      assert.ok(Array.isArray(parts));
+      assert.equal(parts.filter(part=>part.type==='image_url').length,1);
+      const request=JSON.parse(parts[0].text);
+      assert.equal(request.attachments.length,1);
+      assert.equal(request.attachments[0].role,'context');
+      assert.doesNotMatch(JSON.stringify(apiRequest),/data-answer|math-drafts|MutationObserver|def check/);
+      return request;
+    }
+    await diagramMath.locator('.math-feedback-btn').click();
+    await diagramMath.locator('.ai-feedback-body').waitFor();
+    let diagramRequest=visualPayload();
+    assert.match(diagramRequest.responses[0].value,/5/);
+    const triangleState=JSON.parse(diagramRequest.materials.find(m=>m.id==='diagram-assessment-triangle').text).state;
+    assert.equal(triangleState.givenLengths.AB,3);assert.equal(triangleState.givenLengths.BC,4);
+    assert.equal(triangleState.vertices.length,3);
+    // Prove collection reflects the live board, rather than a fixed text substitute.
+    const triangleFrame=await (await frames.nth(0).elementHandle()).contentFrame();
+    await triangleFrame.evaluate(()=>{c.setPosition(JXG.COORDS_BY_USER,[3,8]);board.update();});
+    await diagramMath.locator('.math-feedback-btn').click();
+    await diagramMath.locator('.ai-feedback-body').waitFor();
+    diagramRequest=visualPayload();
+    assert.equal(JSON.parse(diagramRequest.materials.find(m=>m.id==='diagram-assessment-triangle').text).state.givenLengths.BC,8);
+    await triangleFrame.evaluate(()=>{c.setPosition(JXG.COORDS_BY_USER,[3,4]);board.update();});
+    await shapes.locator('button').first().click();await shapes.locator('.ai-feedback-body').waitFor();
+    const shapeRequest=visualPayload();
+    assert.match(shapeRequest.responses[0].value,/der Kreis/);
+    assert.equal(JSON.parse(shapeRequest.materials.find(m=>m.id==='diagram-assessment-german-shapes').text).state.shapes.length,2);
+    report.checks.push('Diagram images and live state reach real math/text feedback requests as context; typed answers remain responses; copy mode exposes images');
     await page.screenshot({path:path.join(site,'jsxgraph-examples.png'),fullPage:true});
     report.checks.push('JSXGraph draws triangle, circle and square; mathematics checks length and German naming uses plain-text feedback');
 

@@ -4,7 +4,7 @@
     "ai-feedback": {
       "repository": "Erasmus-CTM/ai-feedback",
       "branch": "main",
-      "commit": "bda67fbe515a3e5e2a2fa4b827c1bd918552fbac"
+      "commit": "aa1781226798340e125ce4ac38f6330116d5eb4e"
     },
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
@@ -14,7 +14,7 @@
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "c708e5e2a3a35829af229d2e28b5470bac5c31b7"
+      "commit": "dad8aab2ab97fec89db77279fc2d45e5ffcbf58d"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
