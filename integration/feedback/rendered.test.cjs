@@ -6,6 +6,7 @@ const { JSDOM } = require('jsdom');
 const site = process.env.CTM_INTEGRATION_SITE;
 assert.ok(site, 'Run scripts/setup-feedback-integration.py --test first.');
 const html = fs.readFileSync(path.join(site, 'example.html'), 'utf8');
+const sharedVersion = require(path.join(path.dirname(site), '_extensions/ai-feedback/feedback-core.js')).version;
 
 test('common page renders the active extensions and keeps local dependencies resolvable', () => {
   const dom = new JSDOM(html);
@@ -201,9 +202,9 @@ test('standalone math and both shared-filter orders load one usable runtime', as
     for (const [i, filters] of [['math-exercise'], ['ai-feedback', 'math-exercise'], ['math-exercise', 'ai-feedback'], ['ai-feedback', 'math-exercise'], ['math-exercise', 'ai-feedback']].entries()) {
       if (i === 3) {
         // Simulate the previously released explicit dependency and callback contract.
-        for (const name of ['ai-feedback.lua', 'feedback-core.js', 'ai-feedback.js']) {
+        for (const name of ['feedback-quarto.lua', 'feedback-core.js', 'ai-feedback.js']) {
           const file = path.join(dir, '_extensions/ai-feedback', name);
-          fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll('0.5.0', '0.1.0').replace('await getRequest({ hintLevel })', 'await getRequest()'));
+          fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll(sharedVersion, '0.1.0').replace('await getRequest({ hintLevel })', 'await getRequest()'));
         }
       }
       fs.writeFileSync(path.join(dir, `order-${i}.qmd`), `---\nformat: html\nfilters: [${filters.join(', ')}]\n---\n\n::: {#context .ai-context}\nUse $x^2$.\n:::\n\n\x60\x60\x60{math-exercise}\n#| label: order\n#| context: context\nCompute $2+2$: _[SECRET_ANSWER]\n\x60\x60\x60\n`);
@@ -217,7 +218,7 @@ test('standalone math and both shared-filter orders load one usable runtime', as
         assert.equal(scripts.length, 1, `${filters}: ${name}`);
         w.eval(fs.readFileSync(path.join(dir, scripts[0].getAttribute('src')), 'utf8'));
       }
-      if (i < 3) assert.equal(w.AIFeedback.version, '0.6.0');
+      assert.equal(w.AIFeedback.version, i < 3 ? sharedVersion : '0.1.0');
       w.AIFeedback.initialize();
       const math = [...w.document.scripts].find(s => s.textContent.includes('var ME_CFG ='));
       w.eval(math.textContent);
@@ -264,7 +265,7 @@ test('standalone Pyodide, both filter orders and disabled feedback render correc
         assert.equal(scripts.length,i===3?0:1);
         if(i!==3)w.eval(fs.readFileSync(path.join(dir,scripts[0].getAttribute('src')),'utf8'));
       }
-      if(i!==3){assert.equal(w.AIFeedback.version,'0.6.0');w.AIFeedback.openSettings();assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length,1);}
+      if(i!==3){assert.equal(w.AIFeedback.version,sharedVersion);w.AIFeedback.openSettings();assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length,1);}
       assert.equal(w.document.querySelectorAll('[id^="qpyodide-insertion-location-"]').length,3);
       const dataScript = [...w.document.scripts].find(s=>s.textContent.includes('globalThis.qpyodideCellDetails ='));
       assert.ok(dataScript); w.eval(dataScript.textContent);
