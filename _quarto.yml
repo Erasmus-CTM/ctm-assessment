@@ -4,6 +4,7 @@ project:
   output-dir: _site
   resources:
     - resolved-repos.json
+    - examples/math-drafts.js
   render:
     - index.qmd
     - example.qmd

@@ -1,5 +1,6 @@
 -- Documentation-only source panels, emitted before the exercise filters.
 local policyFiles = {}
+local draftSource = nil
 local summary, jsxSummary = 'Show source and policy YAML', 'Show JSXGraph source and policy YAML'
 local function escape(text)
   return text:gsub('&','&amp;'):gsub('<','&lt;'):gsub('>','&gt;'):gsub('"','&quot;')
@@ -14,6 +15,10 @@ local function panel(source, title)
 end
 local function meta(m)
   policyFiles = {}
+  draftSource = nil
+  local base=quarto.project.directory or pandoc.path.directory(quarto.doc.input_file)
+  local draftFile=io.open(pandoc.path.join({base,'examples/math-drafts.js'}),'r')
+  if draftFile then draftSource=draftFile:read('*a');draftFile:close() end
   local lang=pandoc.utils.stringify(m.lang or 'en'):lower():match('^(%a+)')
   if lang=='nb' or lang=='no' then summary,jsxSummary='Vis kildekode og policy-YAML','Vis JSXGraph-kildekode og policy-YAML'
   elseif lang=='de' then summary,jsxSummary='Quellcode und Policy-YAML anzeigen','JSXGraph-Quellcode und Policy-YAML anzeigen'
@@ -48,7 +53,12 @@ local function code(el)
     opening='{'..table.concat(args,' ')..'}'
   end
   if not opening then return end
-  return {el,panel('```'..opening..'\n'..el.text..'\n```',jsx and jsxSummary or summary)}
+  local source='```'..opening..'\n'..el.text..'\n```'
+  local label=el.text:match('#|%s*label:%s*([^\r\n]+)')
+  if opening=='{math-exercise}' and draftSource and label and draftSource:find("'"..label.."'",1,true) then
+    source=source..'\n\n<script>\n'..draftSource..'</script>'
+  end
+  return {el,panel(source,jsx and jsxSummary or summary)}
 end
 local function div(el)
   if not quarto.doc.is_format('html') or not el.classes:includes('ai-feedback') then return end

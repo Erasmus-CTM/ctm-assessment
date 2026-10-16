@@ -85,40 +85,19 @@ the columns form a basis. Check your work more than once if needed.
 #|   def check(response, symbols):
 #|       B = response["inputs"]["B"]["matrix"]
 #|       return assess_basis(B, axis="columns", target_dimension=2,
-#|           belongs=lambda v: v[0] + v[1] + v[2] == 0,
+#|           belongs=lambda v: all(value.is_real is True and value.is_finite is True for value in v)
+#|               and simplify(v[0] + v[1] + v[2]) == 0,
 #|           name="B", space_name="the plane")
+#| tests: |
+#|   def test(check, symbols):
+#|       assert check({"inputs": {"B": {"matrix": Matrix([[1,1],[-1,0],[0,-1]])}}}, symbols)["score"] == 1
+#|       assert check({"inputs": {"B": {"matrix": Matrix([[I,I],[-I,0],[0,-I]])}}}, symbols)["score"] < 1
 Find a basis for the plane $x+y+z=0$ in $\mathbb{R}^3$.
 Enter basis vectors as columns: mat{name=B,rows=3,cols=auto,min-cols=0,max-cols=3,initial-cols=1}
 ```
 :::
 
-```{=html}
-<script>
-// Demo drafts only: no answer keys or reviewer instructions are added here.
-document.addEventListener('DOMContentLoaded', function () {
-  const drafts = {
-    'integration-math': ['40'],
-    'practice-math-fields': ['5', ''],
-    'practice-math-vector': ['2*x', ''],
-    'practice-math-matrix': ['1', '', '', '4'],
-    'practice-math-basis': ['1', '-1', '']
-  };
-  function fillDrafts() {
-    for (const [label, values] of Object.entries(drafts)) {
-      const cell = document.querySelector('[data-label="' + label + '"]');
-      const fields = cell && cell.querySelectorAll('.math-input');
-      if (!fields || fields.length !== values.length || cell.dataset.draftLoaded) continue;
-      fields.forEach((field, i) => { field.value = values[i]; });
-      cell.dataset.draftLoaded = 'true';
-    }
-    if (Object.keys(drafts).every(label => document.querySelector('[data-label="' + label + '"]')?.dataset.draftLoaded)) observer.disconnect();
-  }
-  const observer = new MutationObserver(fillDrafts);
-  observer.observe(document.querySelector('#task-math-basis'), {childList: true, subtree: true});
-  fillDrafts();
-});
-</script>
-```
+<script src="examples/math-drafts.js"></script>
 
 ### Same problem, different feedback policies
 
@@ -148,12 +127,3 @@ Solve $3x+2=14$: $x=$ _[4].
 #| feedback-policy: worked-explanation
 Solve $3x+2=14$: $x=$ _[4].
 ```
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  for (const label of ['policy-question', 'policy-worked']) {
-    const input = document.querySelector('[data-label="' + label + '"] .math-input');
-    if (input) { input.value = '3'; input.dispatchEvent(new Event('input', {bubbles:true})); }
-  }
-});
-</script>
