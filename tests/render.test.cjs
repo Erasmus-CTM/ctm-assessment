@@ -6,7 +6,17 @@ const { JSDOM } = require('jsdom');
 const target = path.join(process.env.CTM_INTEGRATION_SITE || path.join(__dirname, '../.feedback-workspace/site/_site'), 'example.html');
 test('rendered examples load the runtime once and produce real copy prompts', { skip: !fs.existsSync(target) }, async () => {
   const dom = new JSDOM(fs.readFileSync(target, 'utf8'), { url: 'https://example.invalid/example.html', runScripts: 'outside-only' });
-  const w = dom.window; w.AbortController = AbortController;
+  const w = dom.window; w.AbortController = AbortController; w.TextEncoder = TextEncoder;
+  // JSDOM does not run the applet. Simulate its public bridge here; the browser
+  // smoke test exercises the real JSXGraph image export and current geometry.
+  const shapesFrame = w.document.getElementById('assessment-german-shapes');
+  shapesFrame.contentWindow.postMessage = request => {
+    setImmediate(() => w.dispatchEvent(new w.MessageEvent('message', {
+      source: shapesFrame.contentWindow,
+      data: {...request, type:'response', payload:{shapes:[{kind:'circle'},{kind:'polygon'}]},
+        ai:{image:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', summary:'Shapes A and B'}}
+    })));
+  };
   w.fetch = () => { throw new Error('Examples start without network calls.'); };
   w.__aiFeedbackConfig = { mode: 'copy', storage: 'session' };
   for (const file of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) {
@@ -73,6 +83,10 @@ test('rendered examples load the runtime once and produce real copy prompts', { 
   assert.match(multilingual, /\"language\":\"nb\"/);
   assert.match(multilingual, /explanations in en/);
   const handwriting = w.document.querySelector('#handwriting');
+  const shapePrompt = w.document.querySelector('#german-shapes pre').textContent;
+  assert.match(shapePrompt, /diagram-assessment-german-shapes/);
+  assert.match(shapePrompt, /\"role\":\"context\"/);
+  assert.equal(w.document.querySelectorAll('#german-shapes .ai-feedback-images img').length, 1);
   const upload = handwriting.querySelector('input[type=file]');
   Object.defineProperty(upload, 'files', { configurable: true, value: [new w.File([sample], 'spanish-handwriting.png', { type: 'image/png' })] });
   upload.dispatchEvent(new w.Event('change'));
