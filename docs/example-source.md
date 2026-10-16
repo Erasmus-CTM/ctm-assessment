@@ -30,5 +30,9 @@ starting point.
 
 You can instead copy one activity from a rendered source panel into your own
 course page. If it selects a named feedback policy, copy that policy's YAML too.
+Math source panels also include the example's draft-answer setup script. Copy
+that script with the exercise to reproduce its prefilled starting answers;
+omit it when you want empty fields. The answer keys inside the exercise markers
+are the correct answers, while these drafts intentionally contain mistakes.
 
 [Installation and setup](installation.md) · [Authoring guide](authoring.md)
