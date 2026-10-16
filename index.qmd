@@ -21,5 +21,5 @@ same mathematics problem in the examples.
 **Feedback** can prepare a message to paste into an AI chat you already use.
 If your course has an AI service set up, it can show the reply here instead.
 
-[Create your own activity](https://github.com/Erasmus-CTM/ctm-assessment/blob/feature/scoped-policies/docs/authoring.md) ·
-[Setup guide](https://github.com/Erasmus-CTM/ctm-assessment/blob/feature/scoped-policies/docs/installation.md)
+[Create your own activity](https://github.com/Erasmus-CTM/ctm-assessment/blob/main/docs/authoring.md) ·
+[Setup guide](https://github.com/Erasmus-CTM/ctm-assessment/blob/main/docs/installation.md)
