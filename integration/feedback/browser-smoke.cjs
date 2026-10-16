@@ -374,6 +374,7 @@ const server = http.createServer((req, res) => {
     assert.equal(await diagramMath.locator('.math-input').inputValue(), '');
     await diagramMath.locator('.math-input').fill('5');await diagramMath.locator('.math-check-btn').click();
     await diagramMath.locator('.math-fb-ok').waitFor();
+    await diagramMath.screenshot({path:path.join(site,'triangle-task.png')});
     const shapes=page.locator('#german-shapes');
     await shapes.locator('button').first().click();await shapes.locator('pre').waitFor();
     assert.match(await shapes.locator('pre').textContent(),/der Kreis|das Quadrat/);
@@ -394,6 +395,7 @@ const server = http.createServer((req, res) => {
     await diagramMath.locator('.math-feedback-btn').click();
     await diagramMath.locator('.ai-feedback-body').waitFor();
     let diagramRequest=visualPayload();
+    fs.writeFileSync(path.join(site,'triangle-feedback-context.png'),Buffer.from(apiRequest.messages[1].content.find(part=>part.type==='image_url').image_url.url.split(',')[1],'base64'));
     assert.match(diagramRequest.responses[0].value,/5/);
     const triangleState=JSON.parse(diagramRequest.materials.find(m=>m.id==='diagram-assessment-triangle').text).state;
     assert.equal(triangleState.givenLengths.AB,3);assert.equal(triangleState.givenLengths.BC,4);
@@ -408,6 +410,7 @@ const server = http.createServer((req, res) => {
     await triangleFrame.evaluate(()=>{c.setPosition(JXG.COORDS_BY_USER,[3,4]);board.update();});
     await shapes.locator('button').first().click();await shapes.locator('.ai-feedback-body').waitFor();
     const shapeRequest=visualPayload();
+    fs.writeFileSync(path.join(site,'shapes-feedback-context.png'),Buffer.from(apiRequest.messages[1].content.find(part=>part.type==='image_url').image_url.url.split(',')[1],'base64'));
     assert.match(shapeRequest.responses[0].value,/der Kreis/);
     assert.equal(JSON.parse(shapeRequest.materials.find(m=>m.id==='diagram-assessment-german-shapes').text).state.shapes.length,2);
     report.checks.push('Diagram images and live state reach real math/text feedback requests as context; typed answers remain responses; copy mode exposes images');
