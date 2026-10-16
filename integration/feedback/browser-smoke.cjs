@@ -329,7 +329,9 @@ const server = http.createServer((req, res) => {
       await page.waitForFunction(index => qpyodideCellContainer.cells[index].primaryUnit.feedbackEvidence !== null,index);
       assert.match(await cell.locator('.qpyodide-output-code-area').innerText(),new RegExp(example.result.replace('.', '\\.')));
       if(index===2)assert.match(JSON.stringify((await ask()).materials),/pi.*r/);
-      await cell.locator('.qpyodide-button-reset').click();
+      const confirmation=page.waitForEvent('dialog');
+      const resetClick=cell.locator('.qpyodide-button-reset').click();
+      const dialog=await confirmation;assert.equal(dialog.type(),'confirm');await dialog.accept();await resetClick;
       assert.equal(await cell.locator('.qpyodide-output-feedback-area').textContent(),'');
       assert.equal(await cell.locator('.qpyodide-output-code-area').textContent(),'');
       assert.ok(await page.evaluate(index => {const u=qpyodideCellContainer.cells[index].primaryUnit;return u.getCode()===u.code && u.getFeedbackEvidence().length===0;},index));
