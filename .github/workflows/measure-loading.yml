@@ -5,6 +5,7 @@ name: Measure loading times
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - integration/feedback/loading-timing.cjs
       - integration/feedback/timing/**
@@ -17,6 +18,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: measure-loading-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   measure:
