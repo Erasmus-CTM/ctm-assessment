@@ -3,23 +3,23 @@
   "repositories": {
     "ai-feedback": {
       "repository": "Erasmus-CTM/ai-feedback",
-      "branch": "audit/2026-10",
-      "commit": "12e42e67198ea6dba75f17519eef53cbb86d56f2"
+      "branch": "main",
+      "commit": "79103a6a829b9c5cf62f645857ca7f8330ff7be2"
     },
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
-      "branch": "audit/2026-10",
-      "commit": "49529de24eb4b5e1bc39925d1f2e4b44420bad46"
+      "branch": "main",
+      "commit": "c14c5f48144c44c410972a0ac7bc75506046fa9e"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
-      "branch": "audit/2026-10",
-      "commit": "9353fa8f5fd53c1055ebd4ed9221a9e023c232bf"
+      "branch": "main",
+      "commit": "bf6caf3c5666bdf1c12fc0530b52518bfc0cd62f"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
-      "branch": "audit/2026-10",
-      "commit": "58543b976b7cfbff90fb4a5b5718de5bbd2cd69f",
+      "branch": "feature/shared-feedback-integration",
+      "commit": "8a16aa73bc1eea241ee1407525d8657c4c8b287b",
       "ships-copies": [
         "ai-feedback"
       ]

@@ -93,9 +93,6 @@ git -C .private-extensions/ctm-assessment checkout -q --detach FETCH_HEAD
 python .private-extensions/ctm-assessment/scripts/install-project.py --project .
 ```
 
-The installer reaches `main` with pull request #11; until then, use the branch
-`audit/2026-10` or a full SHA from it instead of `main`.
-
 It builds the package with the components pinned in that ref's
 `integration/feedback/repos.json`. It replaces only the extensions the package
 owns, keeps the course's own extensions, and checks every installed file. If

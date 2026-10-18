@@ -635,7 +635,8 @@ stack-sympy was not changed. Checked against every change in this audit:
 | jsxgraph/jsxgraph-quarto (upstream) | https://github.com/jsxgraph/jsxgraph-quarto/pull/2 (opened by AC, 19 Oct) | `main` |
 
 **Release order** (also in the ctm-assessment PR):
-0. **JSXGraph:** upstream PR #2 is open. The umbrella pins the fork's commit, which upstream serves; after the merge, pin the merge commit and give math-exercise's CI the new release tag (`jsxgraph-ref`, default v1.1.0).
+0. **JSXGraph:** upstream PR #2 is open.
+   - **19 Oct:** AC merged ai-feedback #18, math-exercise #21 and py-exercise #6 into `main`, and pyodide-interaktiv #4 into `feature/shared-feedback-integration`, all with merge commits (the merged trees equal the tested heads). The umbrella pins those merge commits. The umbrella pins the fork's commit, which upstream serves; after the merge, pin the merge commit and give math-exercise's CI the new release tag (`jsxgraph-ref`, default v1.1.0).
 0. **ingmat3a stays as it is until this work is released (AC 18 Oct).** It installs math-exercise `main` and JSXGraph from math-exercise's `_extensions/jsxgraph` (F-70), so merging math-exercise into `main` changes ingmat3a's next build. Either merge math-exercise only together with ingmat3a's repointing, or first pin ingmat3a's two math-exercise entries to today's `main` commit. When ingmat3a is repointed, update `quarto-extensions.yml` and `scripts/setup.py`:
    - JSXGraph from `jsxgraph/jsxgraph-quarto`;
    - pyodide-interaktiv from the stacked branch below;

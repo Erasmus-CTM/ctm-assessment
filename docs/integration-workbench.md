@@ -32,18 +32,18 @@ Use an HTTP origin: Monaco and Pyodide workers do not work reliably with `file:/
 `repos.json` pins every component by full commit; `branch` names the branch
 that contains that commit and that `--update-pins` follows:
 
-| Component | Repository | Branch (during the October 2026 audit) | After the audit PRs are merged |
-|---|---|---|---|
-| ctm-assessment | this repository | this checkout, including local edits | — |
-| ai-feedback | Erasmus-CTM/ai-feedback | `audit/2026-10` | `main` |
-| py-exercise | Erasmus-CTM/py-exercise | `audit/2026-10` | `main` |
-| math-exercise | Erasmus-CTM/math-exercise | `audit/2026-10` | `main` |
-| pyodide-interaktiv | Erasmus-CTM/pyodide-interaktiv | `audit/2026-10` | `feature/shared-feedback-integration` |
-| jsxgraph | jsxgraph/jsxgraph-quarto (upstream) | `main` (extension folder `jsxgraph`) | `main` |
+| Component | Repository | Branch |
+|---|---|---|
+| ctm-assessment | this repository | this checkout, including local edits |
+| ai-feedback | Erasmus-CTM/ai-feedback | `main` |
+| py-exercise | Erasmus-CTM/py-exercise | `main` |
+| math-exercise | Erasmus-CTM/math-exercise | `main` |
+| pyodide-interaktiv | Erasmus-CTM/pyodide-interaktiv | `feature/shared-feedback-integration` |
+| jsxgraph | jsxgraph/jsxgraph-quarto (upstream) | `main` (extension folder `jsxgraph`); pinned to the commit of upstream pull request #2 until it is merged |
 
 **Release order.** Merge the component PRs first, keeping their commits (a
 merge commit or rebase; a squash creates new commits that do not contain the
-pins). Then set each `branch` back as in the last column, run
+pins). Then set each `branch` to the branch they were merged into, run
 `--update-pins` (it refuses a branch that does not contain the current pin),
 run `--test --browser`, commit `repos.json`, and merge the umbrella.
 
