@@ -4,22 +4,22 @@
     "ai-feedback": {
       "repository": "Erasmus-CTM/ai-feedback",
       "branch": "audit/2026-10",
-      "commit": "80db07bbdf7924388087fee40024117dcc91a035"
+      "commit": "e3c490af57fff852436d54de2539a314e375dbcc"
     },
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "audit/2026-10",
-      "commit": "c03c4e10ea648630f765d9577bbea14d604f9f3c"
+      "commit": "e0b7d0d78355a09197359ce8c5bf749785335911"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "audit/2026-10",
-      "commit": "24bfbc6c33a6a9801b93667e134c093f11dee998"
+      "commit": "70ad77fc6a9d3df75de9211c11fb41cb5a30c6e3"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "audit/2026-10",
-      "commit": "7a23d1e37b777ec1fa408e7868225d6557cb34fb"
+      "commit": "bfafc0d86a30dc8d97bde43c5b7dbef2abd60d85"
     },
     "jsxgraph": {
       "repository": "jsxgraph/jsxgraph-quarto",

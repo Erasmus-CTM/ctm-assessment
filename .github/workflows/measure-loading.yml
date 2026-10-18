@@ -48,11 +48,12 @@ jobs:
           mkdir -p "$work"
           cp -r .feedback-workspace/site/_extensions "$work/_extensions"
           cp integration/feedback/timing/*.qmd "$work/"
-          (cd "$work" && for page in timing-*.qmd; do quarto render "$page"; done)
+          (cd "$work" && for page in timing-*.qmd; do quarto render "$page" --metadata-file _extensions/ctm-assessment/jsxgraph-pins.yml; done)
           cp -r "$work"/timing-*.html "$work"/timing-*_files .feedback-workspace/site/_site/
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - name: Measure
+        timeout-minutes: 45
         env:
           CTM_INTEGRATION_SITE: ${{ github.workspace }}/.feedback-workspace/site/_site
         run: node integration/feedback/loading-timing.cjs "$RUNNER_TEMP/loading-timing.json"

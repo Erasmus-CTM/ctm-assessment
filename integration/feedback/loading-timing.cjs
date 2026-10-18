@@ -45,13 +45,21 @@ const round = (value, digits = 2) => value === null || value === undefined ? nul
 const short = error => String(error).split('\n')[0].slice(0, 200);
 function median(values) {
   const sorted = values.filter(v => typeof v === 'number' && Number.isFinite(v)).sort((a, b) => a - b);
-  return sorted.length ? sorted[Math.floor((sorted.length - 1) / 2)] : null;
+  if (!sorted.length) return null;
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+// Per-library downloads in MB; null where a service worker served responses
+// (their sizes are not reported to the page's context).
+function familyMegabytes(families, serviceWorkers) {
+  if (serviceWorkers === 'allow') return null;
+  return Object.fromEntries(Object.entries(families).map(([name, entry]) => [name, {requests: entry.requests, megabytes: round(entry.bytes / 1048576)}]));
 }
 
 async function newContext(browser, serviceWorkers = 'block') {
   const ctx = await browser.newContext({viewport: {width: 1280, height: 900}, serviceWorkers});
   ctx.__bytes = {total: 0, families: {}};
-  const families = [['pyodide', /pyodide/], ['jsxgraph', /jsxgraph/], ['mathjax', /mathjax/i], ['katex', /katex/], ['monaco', /monaco-editor/], ['font-awesome', /font-awesome/]];
+  const families = [['pyodide', /cdn\.jsdelivr\.net\/pyodide\//], ['jsxgraph', /jsxgraph/], ['mathjax', /mathjax/i], ['katex', /katex/], ['monaco', /monaco-editor/], ['font-awesome', /font-awesome/]];
   ctx.on('response', async response => {
     try {
       const s = await response.request().sizes();
@@ -59,8 +67,8 @@ async function newContext(browser, serviceWorkers = 'block') {
       ctx.__bytes.total += size;
       const family = families.find(([, pattern]) => pattern.test(response.url()));
       if (family) {
-        const entry = ctx.__bytes.families[family[0]] ||= {requests: 0, megabytes: 0};
-        entry.requests++; entry.megabytes = round(entry.megabytes + size / 1048576);
+        const entry = ctx.__bytes.families[family[0]] ||= {requests: 0, bytes: 0};
+        entry.requests++; entry.bytes += size;
       }
     } catch {}
   });
@@ -139,7 +147,9 @@ async function pageScenario(browser, name, url, kind, profile, {serviceWorkers =
           const t = await firstGradeable(page, kind);
           await page.waitForTimeout(3000); // let iframes (JSXGraph boards) finish loading
           record[cache] = {controls_s: round((t.controls - start) / 1000), graded_s: round((t.graded - start) / 1000), status: t.status,
-            reloads: Math.max(0, navigations - 1), megabytes: round((ctx.__bytes.total - before) / 1048576), families: ctx.__bytes.families};
+            reloads: Math.max(0, navigations - 1),
+            megabytes: serviceWorkers === 'allow' ? null : round((ctx.__bytes.total - before) / 1048576),
+            families: familyMegabytes(ctx.__bytes.families, serviceWorkers)};
         } catch (error) {
           record[cache] = {error: short(error)};
         }
@@ -148,6 +158,7 @@ async function pageScenario(browser, name, url, kind, profile, {serviceWorkers =
       // Offline after a warm visit: does the page still grade?
       if (offline && i === 0 && !record.cold?.error) {
         await ctx.setOffline(true);
+        ctx.__bytes.families = {};
         const page = await newPage(ctx, profile);
         const start = Date.now();
         try {

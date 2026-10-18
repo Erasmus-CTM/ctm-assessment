@@ -33,15 +33,10 @@ fetched when you render. `_extensions/ctm-assessment/resolved-repos.json`
 lists those commits and the SHA-256 of every installed file.
 
 In the browser, learners' pages load Pyodide, Monaco, KaTeX and JSXGraph from
-jsDelivr at fixed versions. Until the JSXGraph extension pins its library
-version itself, add the versions tested here to `_quarto.yml`:
-
-```yaml
-jsxgraph:
-  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.13.3/distrib/jsxgraphcore.js
-  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.13.3/distrib/jsxgraph.css
-  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js
-```
+jsDelivr at fixed versions. The package sets the JSXGraph and MathJax versions
+it was tested with (`_extensions/ctm-assessment/jsxgraph-pins.yml`) unless your
+project sets its own `jsxgraph: src_jxg/src_css/src_mjx`. Licence notices of the
+bundled components are installed in `_extensions/ctm-assessment/licenses/`.
 
 The single `ctm-assessment` filter runs the components in a tested order: ai-feedback,
 JSXGraph, math-exercise, py-exercise, pyodide-interaktiv. The archive contains
@@ -74,8 +69,15 @@ Each component uses the ai-feedback installed next to it, so `filters:
 exactly this situation). A short filter name such as `math-exercise` selects
 the umbrella's copy; use the qualified name (`Erasmus-CTM/math-exercise`) for a
 standalone copy. List either `ctm-assessment` or individual component filters
-on a page, not both. Installations of *different* ai-feedback versions in one
-project stop rendering with a message naming both.
+on a page, not both. The standalone copies may use a different ai-feedback
+version; only a page that combines filters from both sets with different
+ai-feedback versions stops, with a message naming both.
+
+**JSXGraph is part of the package.** Do not also run `quarto add
+jsxgraph/jsxgraph-quarto` in the same project: Quarto would place that copy
+inside the package's `_extensions/jsxgraph/`, where it is never used (rendering
+warns about it), and installing or updating the package replaces a JSXGraph
+added before it. Use the short filter name `jsxgraph`.
 
 Python exercises use the Pyodide runtime. Text/image feedback requires no Python
 execution. Resources initialize once even when the explicit ai-feedback filter

@@ -1,0 +1,7 @@
+# JSXGraph and MathJax versions tested with this package. ctm-assessment.lua
+# uses them unless the project sets its own `jsxgraph:` values. Remove once the
+# JSXGraph extension pins its library versions itself.
+jsxgraph:
+  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.13.3/distrib/jsxgraphcore.js
+  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.13.3/distrib/jsxgraph.css
+  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js

@@ -34,9 +34,3 @@ pyodide:
   feedback: true
   feedback-hints: true
 
-# JSXGraph loads its library in the browser; pin the versions tested here
-# (the same as the extension's bundled resources) until upstream pins them.
-jsxgraph:
-  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.13.3/distrib/jsxgraphcore.js
-  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.13.3/distrib/jsxgraph.css
-  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js

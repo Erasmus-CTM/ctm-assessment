@@ -137,7 +137,7 @@ def main():
         raise SystemExit('Refusing a nonempty workspace not created by this script.')
     marker.touch()
     (workspace / 'tmp').mkdir(exist_ok=True)
-    base_env = dict(os.environ, TMPDIR=str(workspace / 'tmp'))
+    base_env = dict(os.environ, TMPDIR=str(workspace / 'tmp'), PYTHONDONTWRITEBYTECODE='1')
     cache = workspace / 'repos'
     cache.mkdir(exist_ok=True)
     local = {'ctm-assessment': ROOT}
@@ -191,11 +191,35 @@ def main():
     shutil.copytree(ROOT / '_filters', site / '_filters')
     hashes = {}
     extensions = {name: spec.get('extension', name) for name, spec in config['repositories'].items()}
+    # Bytecode left by component tests in a reused workspace is not shipped.
+    build_files = shutil.ignore_patterns('__pycache__', '*.pyc')
     for name, source in sources.items():
         extension = source / '_extensions' / extensions[name]
         destination = site / '_extensions' / extensions[name]
-        shutil.copytree(extension, destination)
-        hashes[extensions[name]] = {str(p.relative_to(extension)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(extension.rglob('*')) if p.is_file()}
+        shutil.copytree(extension, destination, ignore=build_files)
+        hashes[extensions[name]] = {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(destination.rglob('*')) if p.is_file()}
+    # Deliberate shared copies must stay byte-identical across components.
+    shared_copies = {
+        'feedback-loader.lua': [('math-exercise', 'feedback-loader.lua'), ('py-exercise', 'feedback-loader.lua'), ('pyodide-interaktiv', 'feedback-loader.lua')],
+        'pyodide-runtime.js': [('math-exercise', 'shared/pyodide-runtime.js'), ('py-exercise', 'shared/pyodide-runtime.js')],
+    }
+    for label, copies in shared_copies.items():
+        digests = {f'{name}/{path}': hashes[extensions[name]].get(path) for name, path in copies}
+        if None in digests.values() or len(set(digests.values())) != 1:
+            raise SystemExit(f'Shared copies of {label} differ or are missing: ' + ', '.join(f'{k}={(v or "missing")[:12]}' for k, v in digests.items()))
+    # Licence notices travel with the package (`quarto add` installs only
+    # _extensions/): each component's repository licence, when its extension
+    # folder has none of its own.
+    notices = site / '_extensions' / 'ctm-assessment' / 'licenses'
+    for name, source in sources.items():
+        if any(p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING')) for p in (site / '_extensions' / extensions[name]).iterdir()):
+            continue
+        found = sorted(p for p in source.iterdir() if p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING')))
+        if not found:
+            raise SystemExit(f'{name} has no licence file to ship with the package.')
+        notices.mkdir(exist_ok=True)
+        shutil.copy2(found[0], notices / f'{name}.txt')
+        hashes['ctm-assessment'][f'licenses/{name}.txt'] = hashlib.sha256((notices / f'{name}.txt').read_bytes()).hexdigest()
     # One source per component: no repository may ship another component's
     # extension (a vendored copy would silently diverge from the pinned one).
     for name, source in sources.items():
