@@ -230,5 +230,15 @@ async function runtimeScenario(browser, version, profile, base) {
     await browser.close(); server.close();
     fs.writeFileSync(out, JSON.stringify(results, null, 2) + '\n');
     console.log('Wrote ' + out);
+    // Compact results as annotations, readable from the run page and the API.
+    if (process.env.GITHUB_ACTIONS) {
+      for (const profile of ['fast', 'slow']) {
+        const lines = results.scenarios.filter(r => r.profile === profile).map(r => r.name + ' | ' + JSON.stringify(r.summary));
+        for (let i = 0; i < lines.length; i += 3) {
+          const text = lines.slice(i, i + 3).join('\n').replace(/%/g, '%25').replace(/\n/g, '%0A');
+          console.log('::notice title=Loading ' + profile + ' ' + (i / 3 + 1) + '::' + text);
+        }
+      }
+    }
   }
 })().catch(error => { console.error(error); process.exit(1); });
