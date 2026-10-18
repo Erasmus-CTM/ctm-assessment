@@ -64,9 +64,11 @@ window.onload = function () {
 \`\`\`
 
 ## Units
-\`\`\`{.jsxgraph assessment_id="unitshidden" width="600" height="300" style="width:100%;max-width:600px;height:300px;border:0;"}
+\`\`\`{.jsxgraph assessment_id="unitshidden" width="900" height="300" style="width:100%;max-width:600px;height:300px;border:0;"}
+// Page code may declare BOARDID itself.
+const BOARDID = 'jxg_box';
 var b = JXG.JSXGraph.initBoard(BOARDID, {originX: 50, originY: 250, unitX: 40, unitY: 20, showNavigation: false, showCopyright: false});
-window.__probe = function () { return {bbox: b.getBoundingBox(), w: b.canvasWidth, h: b.canvasHeight}; };
+window.__probe = function () { return {bbox: b.getBoundingBox(), w: b.canvasWidth, h: b.canvasHeight, origin: [b.origin.scrCoords[1], b.origin.scrCoords[2]]}; };
 \`\`\`
 
 ## Editor
@@ -265,12 +267,18 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     const script = await probe('script');
     assert.deepEqual({ran: script.ran, lib: script.lib, used: script.used, nested: script.nested, cells: script.cells},
       {ran: true, lib: 42, used: 42, nested: true, cells: 2}, 'document.write: ' + JSON.stringify(script));
-    // A board set up with origin and units keeps its units after a hidden start.
+    // A board set up with origin and units keeps its origin and units after a
+    // hidden start at a provisional size different from its real one, also
+    // after a layout message that arrived while it was hidden.
+    await page.evaluate(() => document.getElementById('unitshidden').contentWindow.postMessage(
+      {protocol: 'jsxgraph-quarto-assessment', version: 1, type: 'layout', assessmentId: 'unitshidden'}, '*'));
+    await page.waitForTimeout(200);
     await page.getByRole('tab', {name: 'Units'}).click();
     await page.locator('iframe#unitshidden').scrollIntoViewIfNeeded(); await settle();
     const unitsHidden = await probe('unitshidden');
     assert.ok(Math.abs(unitsHidden.w / (unitsHidden.bbox[2] - unitsHidden.bbox[0]) - 40) < 0.01 &&
-      Math.abs(unitsHidden.h / (unitsHidden.bbox[1] - unitsHidden.bbox[3]) - 20) < 0.01, 'units after a hidden start: ' + JSON.stringify(unitsHidden));
+      Math.abs(unitsHidden.h / (unitsHidden.bbox[1] - unitsHidden.bbox[3]) - 20) < 0.01 &&
+      Math.abs(unitsHidden.origin[0] - 50) < 0.5 && Math.abs(unitsHidden.origin[1] - 250) < 0.5, 'units after a hidden start: ' + JSON.stringify(unitsHidden));
     // The editor started for the picture now has its real size and view, and
     // a click adds a vertex.
     await page.getByRole('tab', {name: 'Editor'}).click();
