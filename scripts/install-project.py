@@ -5,7 +5,8 @@ Course projects fetch ctm-assessment at the ref they want and call:
 
     python <ctm-assessment>/scripts/install-project.py --project DIR [--review-refs JSON]
 
-The package is built with setup-feedback-integration.py: every component at the
+The package is built with setup-feedback-integration.py --package-only (no
+example site, so no SymPy or Node are needed): every component at the
 commit pinned in integration/feedback/repos.json, or at the commits given in
 --review-refs for a coordinated review. The script replaces only the
 extensions the package owns, keeps the project's other extensions, checks every
@@ -50,7 +51,7 @@ def main():
     private.mkdir(exist_ok=True)
 
     run(sys.executable, ROOT / "scripts" / "setup-feedback-integration.py",
-        "--workspace", workspace, "--review-refs", json.dumps(review_refs),
+        "--workspace", workspace, "--review-refs", json.dumps(review_refs), "--package-only",
         *[option for source in args.source for option in ("--source", source)])
     distribution = workspace / "ctm-assessment"
     record = json.loads((distribution / "resolved-repos.json").read_text(encoding="utf-8"))

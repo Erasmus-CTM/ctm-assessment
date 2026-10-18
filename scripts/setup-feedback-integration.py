@@ -111,6 +111,7 @@ def main():
     parser.add_argument('--ref', action='append', default=[], metavar='NAME=BRANCH', help='Use a review branch for a dependency without changing normal build defaults')
     parser.add_argument('--review-refs', default='{}', help='Explicit JSON dependency SHA map for coordinated review builds; normal defaults stay unchanged')
     parser.add_argument('--source', action='append', default=[], metavar='NAME=PATH', help='Use a local Git checkout for a repository; record SHA and dirty files')
+    parser.add_argument('--package-only', action='store_true', help='Build the installable package only, without rendering the example site (course installs; used by install-project.py)')
     parser.add_argument('--test', action='store_true', help='Run repository and common-page tests after rendering')
     parser.add_argument('--browser', action='store_true', help='Also run real Chromium/Pyodide/Monaco smoke tests (requires Playwright browser)')
     args = parser.parse_args()
@@ -243,7 +244,10 @@ def main():
     result = {'quarto': quarto_version, 'quarto_required': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
     (workspace / 'resolved-repos.json').write_text(json.dumps(result, indent=2) + '\n')
     shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
-    run(['quarto', 'render'], cwd=site, env=base_env)
+    if args.package_only and (args.test or args.browser):
+        raise SystemExit('--package-only cannot be combined with --test or --browser (they test the rendered site).')
+    if not args.package_only:
+        run(['quarto', 'render'], cwd=site, env=base_env)
     # Build a single installable distribution with one copy of each dependency.
     distribution = workspace / 'ctm-assessment'
     if distribution.exists(): shutil.rmtree(distribution)
@@ -253,6 +257,10 @@ def main():
     shutil.copy2(workspace / 'resolved-repos.json', distribution / '_extensions' / 'ctm-assessment' / 'resolved-repos.json')
     shutil.copy2(ROOT / 'LICENSE', distribution / 'LICENSE')
     archive = shutil.make_archive(str(workspace / 'ctm-assessment'), 'gztar', root_dir=distribution)
+    if args.package_only:
+        print('Package:', distribution)
+        print('Revision and file record:', workspace / 'resolved-repos.json')
+        return
     shutil.copy2(archive, site / '_site' / 'ctm-assessment.tar.gz')
     if args.test or args.browser:
         env = dict(base_env, CTM_INTEGRATION_SITE=str(site / '_site'), CTM_INTEGRATION_RECORD=str(workspace / 'resolved-repos.json'), AI_FEEDBACK_EXTENSION=str(sources['ai-feedback'] / '_extensions' / 'ai-feedback'))
