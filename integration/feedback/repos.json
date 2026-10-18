@@ -9,12 +9,12 @@
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "main",
-      "commit": "159d9546cb0051f6269825c8fdc50f476c88832a"
+      "commit": "102d65357ca9e46d9e177ba32c6786ffafb7e218"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "211d469f16657e3d19f55e1a4a3638af2b713de3"
+      "commit": "15956db00be946898b0daaef0d3985018418b67c"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
