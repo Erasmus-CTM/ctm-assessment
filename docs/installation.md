@@ -77,6 +77,24 @@ installation command: the repository holds the manifest and tests, not
 component sources. Use the archive, a CI `ctm-assessment-package` artifact, or
 build locally and run `quarto add .feedback-workspace/ctm-assessment`.
 
+### Course repositories that build from source
+
+A course repository can install the package built from a ctm-assessment ref (a
+branch or a commit) instead of the published archive. Fetch ctm-assessment at
+that ref, then run its installer:
+
+```sh
+git clone --depth 1 --branch main https://github.com/Erasmus-CTM/ctm-assessment.git .private-extensions/ctm-assessment
+python .private-extensions/ctm-assessment/scripts/install-project.py --project .
+```
+
+It builds the package with the components pinned in that ref's
+`integration/feedback/repos.json`. It replaces only the extensions the package
+owns, keeps the course's own extensions, and checks every installed file. The
+component commits it used are written to `.private-extensions/resolved-repos.json`.
+For a coordinated review, `--review-refs '{"math-exercise": "<commit>"}'` builds
+with other component commits. Keep `.private-extensions/` out of Git.
+
 ## Install single components instead
 
 Each component also works on its own; see its installation guide for required

@@ -19,7 +19,7 @@
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "audit/2026-10",
-      "commit": "6bacabb4e8137b840408ffbb132adcf053a98aca",
+      "commit": "361d52bdbba2277eed7ef74bd524e6131dc3059f",
       "ships-copies": [
         "ai-feedback"
       ]
