@@ -14,7 +14,7 @@
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "15956db00be946898b0daaef0d3985018418b67c"
+      "commit": "387d0a5834a67d0975b81c877bb055835f2d44ad"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
