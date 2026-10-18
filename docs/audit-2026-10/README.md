@@ -508,7 +508,7 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
       - criteria, starters, teaching policies and AI context are **not written into the HTML**. That matters for exams, since criteria can reveal solutions.
     - A page that asks for feedback gets one build message, not an error, so the same source builds both sites.
     - A test checks that the built site contains no ai-feedback assets or data.
-  - **Where:** consolidation step 1 (§5b), where ai-feedback becomes one module of ctm-libs and the switch is one check there. If it is needed before that, it can be added to the four components now, additively.
+  - **Where (decided by AC, 18 Oct):** consolidation step 1 (§5b), where ai-feedback becomes one module of ctm-libs and the switch is one check there. Not in this round.
   - **BC:** none; off only when set.
 - **P10 — pyodide-interaktiv `error()` in top-level filters** and the remaining items for the members maintaining it (F-13, F-14): reported in its PR, not changed.
 
