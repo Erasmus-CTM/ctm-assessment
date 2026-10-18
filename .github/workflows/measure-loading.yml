@@ -4,6 +4,11 @@ name: Measure loading times
 # Pyodide runtime/package costs. On demand, and when the measurement changes.
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - integration/feedback/loading-timing.cjs
+      - integration/feedback/timing/**
+      - .github/workflows/measure-loading.yml
   pull_request:
     paths:
       - integration/feedback/loading-timing.cjs
@@ -38,7 +43,7 @@ jobs:
           mkdir -p "$work"
           cp -r .feedback-workspace/site/_extensions "$work/_extensions"
           cp integration/feedback/timing/*.qmd "$work/"
-          (cd "$work" && quarto render timing-math.qmd && quarto render timing-python.qmd)
+          (cd "$work" && for page in timing-*.qmd; do quarto render "$page"; done)
           cp -r "$work"/timing-*.html "$work"/timing-*_files .feedback-workspace/site/_site/
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium

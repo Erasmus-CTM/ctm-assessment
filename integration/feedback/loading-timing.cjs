@@ -41,9 +41,19 @@ function median(values) {
 
 async function context(browser, profile) {
   const ctx = await browser.newContext({viewport: {width: 1280, height: 900}});
-  const bytes = {total: 0};
+  const bytes = {total: 0, families: {}};
+  const families = [['pyodide', /pyodide/], ['jsxgraph', /jsxgraph/], ['mathjax', /mathjax/i], ['katex', /katex/], ['monaco', /monaco-editor/], ['font-awesome', /font-awesome/]];
   ctx.on('response', async response => {
-    try { const s = await response.request().sizes(); bytes.total += s.responseBodySize + s.responseHeadersSize; } catch {}
+    try {
+      const s = await response.request().sizes();
+      const size = s.responseBodySize + s.responseHeadersSize;
+      bytes.total += size;
+      const family = families.find(([, pattern]) => pattern.test(response.url()));
+      if (family) {
+        const entry = bytes.families[family[0]] ||= {requests: 0, megabytes: 0};
+        entry.requests++; entry.megabytes = +(entry.megabytes + size / 1048576).toFixed(2);
+      }
+    } catch {}
   });
   ctx.__bytes = bytes;
   if (profile === 'slow') {
@@ -102,13 +112,15 @@ async function pageScenario(browser, name, url, kind, profile) {
         const page = await ctx.newPage();
         page.setDefaultTimeout(300000);
         const before = ctx.__bytes.total;
+        ctx.__bytes.families = {};
         // The COI service worker reloads the page once on a first visit.
         let navigations = 0;
         page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
         await page.goto(url, {waitUntil: 'domcontentloaded'});
         try {
           const t = await firstGradeable(page, kind);
-          record[cache] = {...t, reloads: Math.max(0, navigations - 1), megabytes: +((ctx.__bytes.total - before) / 1048576).toFixed(2)};
+          await page.waitForTimeout(3000); // let iframes (JSXGraph boards) finish loading
+          record[cache] = {...t, reloads: Math.max(0, navigations - 1), megabytes: +((ctx.__bytes.total - before) / 1048576).toFixed(2), families: ctx.__bytes.families};
         } catch (error) {
           record[cache] = {error: String(error).slice(0, 200)};
         }
@@ -135,6 +147,7 @@ async function pageScenario(browser, name, url, kind, profile) {
       graded_s: median(runs.map(r => r[cache]?.graded)) / 1000,
       megabytes: median(runs.map(r => r[cache]?.megabytes)),
       reloads: median(runs.map(r => r[cache]?.reloads)),
+      families: runs[0]?.[cache]?.families,
       errors: runs.filter(r => r[cache]?.error || (r[cache]?.status && r[cache].status !== 'correct' && r[cache].status !== 'graded')).map(r => r[cache].error || r[cache].status),
     };
   }
@@ -200,8 +213,8 @@ async function runtimeScenario(browser, version, profile, base) {
       ['Combined example page (all components), mathematics', '/example.html', 'math'],
       ['Combined example page (all components), Python exercise', '/example.html', 'python'],
     ];
-    for (const extra of ['timing-math.html', 'timing-python.html']) {
-      if (fs.existsSync(path.join(site, extra))) pages.push([extra.includes('math') ? 'math-exercise alone' : 'py-exercise alone', '/' + extra, extra.includes('math') ? 'math' : 'python']);
+    for (const [file, name, kind] of [['timing-math.html', 'math-exercise alone', 'math'], ['timing-python.html', 'py-exercise alone', 'python'], ['timing-graphs.html', 'Four JSXGraph boards + one math exercise', 'math']]) {
+      if (fs.existsSync(path.join(site, file))) pages.push([name, '/' + file, kind]);
     }
     for (const profile of ['fast', 'slow']) {
       for (const [name, url, kind] of pages) {
