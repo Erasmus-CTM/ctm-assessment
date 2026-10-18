@@ -629,10 +629,10 @@ stack-sympy was not changed. Checked against every change in this audit:
 | Erasmus-CTM/ctm-assessment | https://github.com/Erasmus-CTM/ctm-assessment/pull/11 | `main` |
 | aacchhee/ctm-demo | https://github.com/aacchhee/ctm-demo/pull/6 | `main` |
 | aacchhee/ingmat3a_ntnu | https://github.com/aacchhee/ingmat3a_ntnu/pull/12 | `main` |
-| jsxgraph/jsxgraph-quarto (upstream) | **for AC to open:** https://github.com/jsxgraph/jsxgraph-quarto/compare/main...aacchhee:jsxgraph-quarto:audit/2026-10 | `main` |
+| jsxgraph/jsxgraph-quarto (upstream) | https://github.com/jsxgraph/jsxgraph-quarto/pull/2 (opened by AC, 19 Oct) | `main` |
 
 **Release order** (also in the ctm-assessment PR):
-0. **JSXGraph:** open the upstream PR (compare link above). The umbrella pins the fork's commit, which upstream serves; after the merge, pin the merge commit and give math-exercise's CI the new release tag (`jsxgraph-ref`, default v1.1.0).
+0. **JSXGraph:** upstream PR #2 is open. The umbrella pins the fork's commit, which upstream serves; after the merge, pin the merge commit and give math-exercise's CI the new release tag (`jsxgraph-ref`, default v1.1.0).
 0. **ingmat3a stays as it is until this work is released (AC 18 Oct).** It installs math-exercise `main` and JSXGraph from math-exercise's `_extensions/jsxgraph` (F-70), so merging math-exercise into `main` changes ingmat3a's next build. Either merge math-exercise only together with ingmat3a's repointing, or first pin ingmat3a's two math-exercise entries to today's `main` commit. When ingmat3a is repointed, update `quarto-extensions.yml` and `scripts/setup.py`:
    - JSXGraph from `jsxgraph/jsxgraph-quarto`;
    - pyodide-interaktiv from the stacked branch below;
