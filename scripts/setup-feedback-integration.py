@@ -46,22 +46,41 @@ def remote_revision(name, spec, review_ref=None, follow=False):
     return sha
 
 
+def without_root(member, destination):
+    """Extraction filter: drop the archive's top folder (`<repo>-<sha>/`) to keep paths short."""
+    rest = member.name.partition('/')[2]
+    if not rest:
+        return None  # the top folder itself
+    changes = {'name': rest}
+    if member.islnk():
+        changes['linkname'] = member.linkname.partition('/')[2]
+    return tarfile.data_filter(member.replace(**changes, deep=False), destination)
+
+
 def snapshot(repo, sha, cache):
-    target = cache / (repo.rsplit('/', 1)[1] + '-' + sha)
-    if (target / '.integration-source.json').exists():
+    # Short names: Windows paths are limited to about 260 characters, and the
+    # workspace often sits inside a course project.
+    target = cache / (repo.rsplit('/', 1)[1] + '-' + sha[:12])
+    marker = target / '.integration-source.json'
+    if marker.exists() and json.loads(marker.read_text()).get('commit') == sha:
         return target
-    with tempfile.TemporaryDirectory(dir=cache) as temp:
-        temp = Path(temp)
-        archive = temp / 'source.tar.gz'
+    if target.exists():
+        shutil.rmtree(target)  # A different commit with the same short name, or a partial copy.
+    temp = Path(tempfile.mkdtemp(prefix='t', dir=cache))
+    archive = cache / (temp.name + '.tgz')
+    try:
         download(f'https://codeload.github.com/{repo}/tar.gz/{sha}', archive)
         with tarfile.open(archive) as tar:
-            tar.extractall(temp / 'unpacked', filter='data')
-        roots = list((temp / 'unpacked').iterdir())
-        if len(roots) != 1 or not roots[0].is_dir():
-            raise RuntimeError('Unexpected repository archive structure')
+            if len({member.name.partition('/')[0] for member in tar.getmembers()}) != 1:
+                raise RuntimeError('Unexpected repository archive structure')
+            tar.extractall(temp, filter=without_root)
         # Do not treat generated metadata as part of upstream source.
-        (roots[0] / '.integration-source.json').write_text(json.dumps({'repository': repo, 'commit': sha}))
-        roots[0].rename(target)
+        (temp / '.integration-source.json').write_text(json.dumps({'repository': repo, 'commit': sha}))
+        temp.rename(target)
+    finally:
+        archive.unlink(missing_ok=True)
+        if temp.exists():
+            shutil.rmtree(temp)
     return target
 
 
@@ -115,6 +134,8 @@ def main():
     parser.add_argument('--test', action='store_true', help='Run repository and common-page tests after rendering')
     parser.add_argument('--browser', action='store_true', help='Also run real Chromium/Pyodide/Monaco smoke tests (requires Playwright browser)')
     args = parser.parse_args()
+    if args.package_only and (args.test or args.browser):
+        raise SystemExit('--package-only cannot be combined with --test or --browser (they test the rendered site).')
     config = json.loads((TEMPLATE / 'repos.json').read_text())
     if args.update_pins:
         for name, spec in config['repositories'].items():
@@ -145,7 +166,7 @@ def main():
     marker.touch()
     (workspace / 'tmp').mkdir(exist_ok=True)
     base_env = dict(os.environ, TMPDIR=str(workspace / 'tmp'), PYTHONDONTWRITEBYTECODE='1')
-    cache = workspace / 'repos'
+    cache = workspace / 'src'
     cache.mkdir(exist_ok=True)
     local = {'ctm-assessment': ROOT}
     for entry in args.source:
@@ -180,29 +201,39 @@ def main():
         revisions[name] = {'repository': spec['repository'], 'branch': spec['branch'], 'requested_ref': requested_ref, 'commit': sha, 'ref_override': name in review_refs, 'pinned': pinned, 'local_override': name in local, 'dirty_files': dirty}
         print(f'Resolved {name}: {requested_ref} @ {sha}', flush=True)
     site = workspace / 'site'
-    if site.exists():
-        shutil.rmtree(site)  # Generated site inside the marked workspace only.
-    site.mkdir()
-    for name in ['_quarto.yml', 'index.qmd', 'example.qmd', 'examples.qmd', 'feedback.yml']:
-        shutil.copy2(ROOT / name, site / name)
-    if (ROOT / 'feedback').is_dir():
-        shutil.copytree(ROOT / 'feedback', site / 'feedback')
-    shutil.copytree(ROOT / 'assets', site / 'assets')
-    for name, spec in json.loads((ROOT / 'assets/sources.json').read_text()).items():
-        asset = site / 'assets' / name
-        if not asset.exists():
-            download(spec['url'], asset)
-        if hashlib.sha256(asset.read_bytes()).hexdigest() != spec['sha256']:
-            raise SystemExit('Example asset checksum mismatch: ' + name)
-    shutil.copytree(ROOT / 'examples', site / 'examples')
-    shutil.copytree(ROOT / '_filters', site / '_filters')
+    distribution = workspace / 'ctm-assessment'
+    if distribution.exists():
+        shutil.rmtree(distribution)  # Generated package inside the marked workspace only.
+    if args.package_only:
+        # Course installs need only the extensions: no example site, no example
+        # assets to download. The files and their record are the same as in a
+        # full build, which copies the site's _extensions into the package.
+        extensions_root = distribution / '_extensions'
+    else:
+        if site.exists():
+            shutil.rmtree(site)  # Generated site inside the marked workspace only.
+        site.mkdir()
+        for name in ['_quarto.yml', 'index.qmd', 'example.qmd', 'examples.qmd', 'feedback.yml']:
+            shutil.copy2(ROOT / name, site / name)
+        if (ROOT / 'feedback').is_dir():
+            shutil.copytree(ROOT / 'feedback', site / 'feedback')
+        shutil.copytree(ROOT / 'assets', site / 'assets')
+        for name, spec in json.loads((ROOT / 'assets/sources.json').read_text()).items():
+            asset = site / 'assets' / name
+            if not asset.exists():
+                download(spec['url'], asset)
+            if hashlib.sha256(asset.read_bytes()).hexdigest() != spec['sha256']:
+                raise SystemExit('Example asset checksum mismatch: ' + name)
+        shutil.copytree(ROOT / 'examples', site / 'examples')
+        shutil.copytree(ROOT / '_filters', site / '_filters')
+        extensions_root = site / '_extensions'
     hashes = {}
     extensions = {name: spec.get('extension', name) for name, spec in config['repositories'].items()}
     # Bytecode left by component tests in a reused workspace is not shipped.
     build_files = shutil.ignore_patterns('__pycache__', '*.pyc')
     for name, source in sources.items():
         extension = source / '_extensions' / extensions[name]
-        destination = site / '_extensions' / extensions[name]
+        destination = extensions_root / extensions[name]
         shutil.copytree(extension, destination, ignore=build_files)
         hashes[extensions[name]] = {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(destination.rglob('*')) if p.is_file()}
     # Deliberate shared copies must stay byte-identical across components.
@@ -217,9 +248,9 @@ def main():
     # Licence notices travel with the package (`quarto add` installs only
     # _extensions/): each component's repository licence, when its extension
     # folder has none of its own.
-    notices = site / '_extensions' / 'ctm-assessment' / 'licenses'
+    notices = extensions_root / 'ctm-assessment' / 'licenses'
     for name, source in sources.items():
-        if any(p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING')) for p in (site / '_extensions' / extensions[name]).iterdir()):
+        if any(p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING')) for p in (extensions_root / extensions[name]).iterdir()):
             continue
         found = sorted(p for p in source.iterdir() if p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING')))
         if not found:
@@ -243,30 +274,26 @@ def main():
             raise SystemExit(f'{name} ships its own copy of {", ".join(foreign)}; use the pinned component instead.')
     result = {'quarto': quarto_version, 'quarto_required': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
     (workspace / 'resolved-repos.json').write_text(json.dumps(result, indent=2) + '\n')
-    shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
-    if args.package_only and (args.test or args.browser):
-        raise SystemExit('--package-only cannot be combined with --test or --browser (they test the rendered site).')
     if not args.package_only:
+        shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
         run(['quarto', 'render'], cwd=site, env=base_env)
-    # Build a single installable distribution with one copy of each dependency.
-    distribution = workspace / 'ctm-assessment'
-    if distribution.exists(): shutil.rmtree(distribution)
-    shutil.copytree(site / '_extensions', distribution / '_extensions', dirs_exist_ok=True)
+        # Build a single installable distribution with one copy of each dependency.
+        shutil.copytree(site / '_extensions', distribution / '_extensions')
     shutil.copy2(workspace / 'resolved-repos.json', distribution / 'resolved-repos.json')
     # `quarto add` installs only _extensions/: keep the record with the umbrella.
     shutil.copy2(workspace / 'resolved-repos.json', distribution / '_extensions' / 'ctm-assessment' / 'resolved-repos.json')
     shutil.copy2(ROOT / 'LICENSE', distribution / 'LICENSE')
-    archive = shutil.make_archive(str(workspace / 'ctm-assessment'), 'gztar', root_dir=distribution)
     if args.package_only:
         print('Package:', distribution)
         print('Revision and file record:', workspace / 'resolved-repos.json')
         return
+    archive = shutil.make_archive(str(workspace / 'ctm-assessment'), 'gztar', root_dir=distribution)
     shutil.copy2(archive, site / '_site' / 'ctm-assessment.tar.gz')
     if args.test or args.browser:
         env = dict(base_env, CTM_INTEGRATION_SITE=str(site / '_site'), CTM_INTEGRATION_RECORD=str(workspace / 'resolved-repos.json'), AI_FEEDBACK_EXTENSION=str(sources['ai-feedback'] / '_extensions' / 'ai-feedback'))
         run(['npm', 'ci', '--ignore-scripts'], cwd=ROOT)
         if args.test:
-            run(['python', '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_sources.py'], cwd=ROOT, env=env)
+            run(['python', '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'], cwd=ROOT, env=env)
             run(['python', ROOT / 'scripts/test-package.py', archive], env=env)
             run(['python', sources['ai-feedback'] / 'scripts/sync-feedback-defaults.py', '--check'], env=env)
             run(['npm', 'test'], cwd=ROOT, env=env)

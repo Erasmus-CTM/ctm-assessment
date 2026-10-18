@@ -81,6 +81,46 @@ class SourceSelection(unittest.TestCase):
             self.assertIn('does not contain the pinned', str(stop.exception))
             write.assert_not_called()
 
+    def test_snapshot_uses_short_names_and_drops_the_archive_root(self):
+        # A GitHub archive has one top folder, <repo>-<sha>/; the snapshot keeps
+        # only its contents under <repo>-<sha[:12]> (Windows path length).
+        import io, shutil, tarfile, tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            sha, other = 'ab' * 20, 'ab' * 6 + 'cd' * 14
+            def archive(commit):
+                data = io.BytesIO()
+                with tarfile.open(fileobj=data, mode='w:gz') as tar:
+                    for name, text in ((f'repo-{commit}/_extensions/x/_extension.yml', commit), (f'repo-{commit}/LICENSE', 'L')):
+                        info = tarfile.TarInfo(name)
+                        info.size = len(text)
+                        tar.addfile(info, io.BytesIO(text.encode()))
+                return data.getvalue()
+            archives = {sha: archive(sha), other: archive(other)}
+            fetched = []
+            def download(url, target):
+                fetched.append(url)
+                target.write_bytes(archives[url.rsplit('/', 1)[1]])
+            cache = root / 'src'
+            cache.mkdir()
+            with patch.object(builder, 'download', side_effect=download):
+                target = builder.snapshot('Org/repo', sha, cache)
+                self.assertEqual(target, cache / ('repo-' + sha[:12]))
+                self.assertEqual((target / '_extensions/x/_extension.yml').read_text(), sha)
+                self.assertEqual(json.loads((target / '.integration-source.json').read_text())['commit'], sha)
+                self.assertEqual(sorted(p.name for p in cache.iterdir()), [target.name])
+                builder.snapshot('Org/repo', sha, cache)
+                self.assertEqual(len(fetched), 1)  # cached
+                # Same short name, other commit: replaced, never reused.
+                self.assertEqual(builder.snapshot('Org/repo', other, cache), target)
+                self.assertEqual((target / '_extensions/x/_extension.yml').read_text(), other)
+                self.assertEqual(len(fetched), 2)
+            archives[sha] = archive(sha)[:-40]  # truncated download
+            shutil.rmtree(target)
+            with patch.object(builder, 'download', side_effect=download), self.assertRaises(Exception):
+                builder.snapshot('Org/repo', sha, cache)
+            self.assertEqual(list(cache.iterdir()), [])
+
 
 if __name__ == '__main__':
     unittest.main()
