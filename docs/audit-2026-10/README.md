@@ -560,6 +560,8 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
 - **B1 changed:** no grading switch, because grades are not used for anything yet. The grading changes B2, B3, B6, B8 and B9 become the default in ctm-checkers, each named in the changelog and tested. A switch can be added if grades come to matter.
 - **D2 (pyodide-interaktiv's extra packages):** the middle way. micropip, pyodide_http and matplotlib still load at start, because `pyodide_http.patch_all()` is what makes `requests` work in old cells. They load after the exercises' packages, so checks never wait behind them. Done in step 3.
 - **F1 (reveals):** own classes, so the look stays in ctm-libs and can be restyled without touching courses (`.reading-step`, `.solution`, `.hint`). F2 (lecture and learning modes) and F5 (course migration) build on this.
+- **Acceptance for the course migration (F5, AC 19 Oct):** the PR is tested in a browser against the version before it. The collapsed blocks ("Gå i dybden") must look good, and the lecture/learning buttons must hide and show them.
+- **Unattended work (AC 19 Oct):** after this round's merges and green builds, rename ai-feedback to ctm-libs and run steps 1–5 unattended, with the stack-sympy audit alongside step 2. Stop for: the STACK checker syntax (H1, proposed in its PR), the PR to pyodide-interaktiv's `main` (step 8), merging consolidation PRs, tagging 0.9.0, and anything on the courses' `main`.
 - **G5 (exercise text per language):** a separator line `#| lang: nb` in the exercise body. Answers, checker and tests are written once; each text is plain Markdown.
 
 **Order of work.** Each phase is one stacked PR per repository.
