@@ -1,0 +1,10 @@
+---
+title: "Timing: math-exercise alone"
+format: html
+filters: [math-exercise]
+---
+
+```{math-exercise}
+#| label: timing-sum
+Compute $2+2$: _[4]
+```

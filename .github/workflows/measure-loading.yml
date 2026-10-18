@@ -1,0 +1,53 @@
+name: Measure loading times
+
+# Time to the first graded exercise (cold/warm cache, fast/slow network) and
+# Pyodide runtime/package costs. On demand, and when the measurement changes.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - integration/feedback/loading-timing.cjs
+      - integration/feedback/timing/**
+      - .github/workflows/measure-loading.yml
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install sympy==1.13.3 networkx==3.4.2 PyYAML==6.0.2
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - name: Build the pinned example site
+        run: python scripts/setup-feedback-integration.py
+      - name: Render single-component pages with the same extensions
+        run: |
+          work="$RUNNER_TEMP/timing"
+          mkdir -p "$work"
+          cp -r .feedback-workspace/site/_extensions "$work/_extensions"
+          cp integration/feedback/timing/*.qmd "$work/"
+          (cd "$work" && quarto render timing-math.qmd && quarto render timing-python.qmd)
+          cp -r "$work"/timing-*.html "$work"/timing-*_files .feedback-workspace/site/_site/
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Measure
+        env:
+          CTM_INTEGRATION_SITE: ${{ github.workspace }}/.feedback-workspace/site/_site
+        run: node integration/feedback/loading-timing.cjs "$RUNNER_TEMP/loading-timing.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: loading-timing
+          path: ${{ runner.temp }}/loading-timing.json

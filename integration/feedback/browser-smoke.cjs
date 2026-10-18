@@ -448,6 +448,28 @@ const server = http.createServer((req, res) => {
       assert.ok(scoped.some(c => c.integration === integration && c.selection?.name === 'practice-feedback' && c.words === 160), integration + ': named page policy must reach the actual feedback request');
     }
     report.checks.push('All four integrations apply the selected YAML page policy to real feedback requests');
+    // Learner code shares the Pyodide interpreter; a restart (Stop) replaces it.
+    // Mathematics and Python checks must keep grading correctly in both cases.
+    await page.evaluate(() => mainPyodide.runPythonAsync('symbols = None\nSymbol = None\nsympify = None\nMatrix = None\nsqrt = None'));
+    await page.getByRole('tab', {name: 'Mathematics', exact: true}).click();
+    const productCell = page.locator('#task-math-product .math-exercise-cell');
+    async function checkProduct(value, expected) {
+      await productCell.locator('.math-feedback-area').evaluate(area => { area.innerHTML = ''; });
+      await page.locator('#task-math-product .math-input').fill(value);
+      await page.locator('#task-math-product .math-check-btn').click();
+      await productCell.locator(expected).first().waitFor();
+    }
+    await checkProduct('6*7', '.math-fb-ok');
+    report.checks.push('Learner rebinding sympy names in a Pyodide cell does not affect mathematics checks');
+    await page.evaluate(() => { const proxy = mainPyodide; proxy.restart('audit restart'); });
+    await page.waitForFunction(async () => !!(await globalThis.qpyodideInstance) && !!globalThis.mainPyodide);
+    await checkProduct('41', '.math-fb-wrong');
+    await checkProduct('42', '.math-fb-ok');
+    await page.getByRole('tab', {name: 'Python', exact: true}).click();
+    await addition.locator('.py-exercise-check').click();
+    await addition.locator('.py-test-fail').first().waitFor();
+    assert.equal(await addition.locator('.py-exercise-error').count(), 0);
+    report.checks.push('After a Pyodide restart, mathematics and Python checks grade again without reloading');
     assert.deepEqual(report.pageErrors, []);
     await page.screenshot({path: path.join(site, 'python-practice-desktop.png'), fullPage: true});
     await page.setViewportSize({width: 390, height: 844});

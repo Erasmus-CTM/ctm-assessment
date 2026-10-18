@@ -1,0 +1,12 @@
+---
+title: "Timing: py-exercise alone"
+format: html
+filters: [py-exercise]
+---
+
+```{py-exercise}
+def answer():
+    return 0
+## TESTS ##
+assert answer() == 4
+```
