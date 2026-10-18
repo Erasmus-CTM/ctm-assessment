@@ -89,6 +89,11 @@ def tracked_extensions(source, local, own):
     return shipped
 
 
+def version_tuple(text):
+    """'1.8.27' -> (1, 8, 27); pre-release suffixes are ignored."""
+    return tuple(int(part) for part in re.findall(r'\d+', text.split('-')[0])[:3])
+
+
 def descends(repository, ancestor, tip):
     """True if `tip` contains `ancestor` (GitHub compare API; public repositories)."""
     request = urllib.request.Request(f'https://api.github.com/repos/{repository}/compare/{ancestor}...{tip}',
@@ -108,6 +113,7 @@ def main():
     parser.add_argument('--source', action='append', default=[], metavar='NAME=PATH', help='Use a local Git checkout for a repository; record SHA and dirty files')
     parser.add_argument('--test', action='store_true', help='Run repository and common-page tests after rendering')
     parser.add_argument('--browser', action='store_true', help='Also run real Chromium/Pyodide/Monaco smoke tests (requires Playwright browser)')
+    parser.add_argument('--any-quarto', action='store_true', help='Measurement only (quarto-versions.yml): accept any Quarto and lift quarto-required inside the build workspace')
     args = parser.parse_args()
     config = json.loads((TEMPLATE / 'repos.json').read_text())
     if args.update_pins:
@@ -126,8 +132,9 @@ def main():
         (TEMPLATE / 'repos.json').write_text(json.dumps(config, indent=2) + '\n')
         print('Updated integration/feedback/repos.json. Now run: python scripts/setup-feedback-integration.py --test --browser')
         return
-    if subprocess.check_output(['quarto', '--version'], text=True).strip() != config['quarto']:
-        raise SystemExit('Use Quarto ' + config['quarto'] + ' to match this integration baseline.')
+    quarto_version = subprocess.check_output(['quarto', '--version'], text=True).strip()
+    if version_tuple(quarto_version) < version_tuple(config['quarto']) and not args.any_quarto:
+        raise SystemExit(f'Quarto {quarto_version} is older than the required {config["quarto"]} or later.')
     workspace = args.workspace.resolve()
     if workspace == ROOT or workspace in ROOT.parents:
         raise SystemExit('Workspace must not replace the project or its ancestors.')
@@ -228,12 +235,24 @@ def main():
         # Also a copy kept inside the component's own folder (old layout).
         foreign |= {other for other in extensions.values() if other != extensions[name]
                     and any(path.startswith(other + '/') for path in hashes[extensions[name]])}
+        # A declared distribution copy (pyodide-interaktiv ships ai-feedback for
+        # its existing projects) is allowed; the package never installs it.
+        foreign -= set(config['repositories'][name].get('ships-copies', []))
         foreign = sorted(foreign)
         if foreign:
             raise SystemExit(f'{name} ships its own copy of {", ".join(foreign)}; use the pinned component instead.')
-    result = {'quarto': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
+    result = {'quarto': quarto_version, 'quarto_required': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
     (workspace / 'resolved-repos.json').write_text(json.dumps(result, indent=2) + '\n')
     shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
+    if args.any_quarto:
+        # Measure what actually works: no declared minimum may stop the build.
+        # Only the workspace copies change (snapshots and the site).
+        for root in [site] + [source for name, source in sources.items() if name not in local]:
+            for manifest in root.rglob('_extension.yml'):
+                text = manifest.read_text()
+                lifted = re.sub(r'(?m)^quarto-required:.*$', 'quarto-required: ">=1.0.0"', text)
+                if lifted != text:
+                    manifest.write_text(lifted)
     run(['quarto', 'render'], cwd=site, env=base_env)
     # Build a single installable distribution with one copy of each dependency.
     distribution = workspace / 'ctm-assessment'

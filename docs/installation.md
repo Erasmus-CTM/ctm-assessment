@@ -38,6 +38,12 @@ it was tested with (`_extensions/ctm-assessment/jsxgraph-pins.yml`) unless your
 project sets its own `jsxgraph: src_jxg/src_css/src_mjx`. Licence notices of the
 bundled components are installed in `_extensions/ctm-assessment/licenses/`.
 
+The package gives the action buttons of all components (Check, Reset, Run,
+Feedback, Help, Export) one common size; set `--ctm-button-font-size`,
+`--ctm-button-padding-y`, `--ctm-button-padding-x`, `--ctm-button-line-height`
+or `--ctm-button-radius` in your project's CSS to change them together. Each
+component styles only its own elements, so one never changes another's look.
+
 The single `ctm-assessment` filter runs the components in a tested order: ai-feedback,
 JSXGraph, math-exercise, py-exercise, pyodide-interaktiv. The archive contains
 no API keys.

@@ -47,7 +47,7 @@ board.create('circle', [[0,0],1]);
 ''')
     subprocess.run(['quarto','render'],cwd=course,check=True)
     html=(course/'example.html').read_text()
-    for marker in ['ai-feedback-activity','math-exercise-cell','py-exercise-cell','qpyodide-insertion-location-','<iframe']:
+    for marker in ['ai-feedback-activity','math-exercise-cell','py-exercise-cell','qpyodide-insertion-location-','<iframe','ctm-assessment.css']:
         assert marker in html, marker+' missing after archive installation'
     for file in ['feedback-core.js','feedback-dom.js','ai-feedback.js']:
         assert html.count('/'+file+'"') == 1, file+' did not load exactly once'

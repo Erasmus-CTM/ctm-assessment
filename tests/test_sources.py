@@ -66,6 +66,11 @@ class SourceSelection(unittest.TestCase):
             shipped = builder.tracked_extensions(root, False, 'math-exercise')
             self.assertEqual(shipped - {'math-exercise'}, {'ai-feedback', 'jsxgraph', 'nested-_extensions-in-math-exercise'})
 
+    def test_only_declared_distribution_copies_are_allowed(self):
+        repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
+        declared = {name: spec['ships-copies'] for name, spec in repositories.items() if 'ships-copies' in spec}
+        self.assertEqual(declared, {'pyodide-interaktiv': ['ai-feedback']})
+
     def test_update_pins_refuses_a_tip_without_the_pinned_commit(self):
         with patch.object(builder, 'remote_revision', return_value='f' * 40), \
              patch.object(builder, 'descends', return_value=False), \
