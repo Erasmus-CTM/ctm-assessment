@@ -33,6 +33,8 @@ def main():
     parser.add_argument("--project", type=Path, required=True, help="Quarto project to install into")
     parser.add_argument("--review-refs", default="{}", help="JSON map of component commits for a coordinated review build")
     parser.add_argument("--workspace", type=Path, help="Build folder (default: PROJECT/.private-extensions/ctm-assessment-build)")
+    parser.add_argument("--source", action="append", default=[], metavar="NAME=PATH",
+                        help="Build a component from a local Git checkout (development); repeatable")
     args = parser.parse_args()
     project = args.project.resolve()
     if not project.is_dir():
@@ -48,7 +50,8 @@ def main():
     private.mkdir(exist_ok=True)
 
     run(sys.executable, ROOT / "scripts" / "setup-feedback-integration.py",
-        "--workspace", workspace, "--review-refs", json.dumps(review_refs))
+        "--workspace", workspace, "--review-refs", json.dumps(review_refs),
+        *[option for source in args.source for option in ("--source", source)])
     distribution = workspace / "ctm-assessment"
     record = json.loads((distribution / "resolved-repos.json").read_text(encoding="utf-8"))
 
