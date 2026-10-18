@@ -27,10 +27,23 @@ ai-feedback:
 component, at the exact commits pinned in
 [`integration/feedback/repos.json`](../integration/feedback/repos.json) and
 tested together (unit, render, integration and browser tests). Nothing is
-fetched when you render. The `resolved-repos.json` file inside the archive and
-on the [example site](https://erasmus-ctm.github.io/ctm-assessment/resolved-repos.json)
-lists those commits and the SHA-256 of every installed file. The single
-`ctm-assessment` filter runs the components in a tested order: ai-feedback,
+fetched when you render. `_extensions/ctm-assessment/resolved-repos.json`
+(installed with the package, also on the
+[example site](https://erasmus-ctm.github.io/ctm-assessment/resolved-repos.json))
+lists those commits and the SHA-256 of every installed file.
+
+In the browser, learners' pages load Pyodide, Monaco, KaTeX and JSXGraph from
+jsDelivr at fixed versions. Until the JSXGraph extension pins its library
+version itself, add the versions tested here to `_quarto.yml`:
+
+```yaml
+jsxgraph:
+  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.13.3/distrib/jsxgraphcore.js
+  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.13.3/distrib/jsxgraph.css
+  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js
+```
+
+The single `ctm-assessment` filter runs the components in a tested order: ai-feedback,
 JSXGraph, math-exercise, py-exercise, pyodide-interaktiv. The archive contains
 no API keys.
 
@@ -58,8 +71,11 @@ umbrella installs its components directly under `_extensions/`, while
 `quarto add Erasmus-CTM/<component>` installs under `_extensions/Erasmus-CTM/`.
 Each component uses the ai-feedback installed next to it, so `filters:
 [ctm-assessment]` keeps using the tested set (the installation test renders
-exactly this situation). List either `ctm-assessment` or the individual
-component filters on a page, not both.
+exactly this situation). A short filter name such as `math-exercise` selects
+the umbrella's copy; use the qualified name (`Erasmus-CTM/math-exercise`) for a
+standalone copy. List either `ctm-assessment` or individual component filters
+on a page, not both. Installations of *different* ai-feedback versions in one
+project stop rendering with a message naming both.
 
 Python exercises use the Pyodide runtime. Text/image feedback requires no Python
 execution. Resources initialize once even when the explicit ai-feedback filter

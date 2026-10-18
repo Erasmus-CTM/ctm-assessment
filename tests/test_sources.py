@@ -16,9 +16,9 @@ class SourceSelection(unittest.TestCase):
         self.assertEqual(set(repositories), {'ai-feedback', 'py-exercise', 'math-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'})
         self.assertEqual(repositories['jsxgraph']['repository'], 'jsxgraph/jsxgraph-quarto')
         self.assertEqual(repositories['jsxgraph']['extension'], 'jsxgraph')
-        self.assertEqual(repositories['pyodide-interaktiv']['branch'], 'feature/shared-feedback-integration')
         for name, source in repositories.items():
             with self.subTest(repository=name):
+                self.assertTrue(source['branch'])
                 if name == 'ctm-assessment':
                     self.assertNotIn('commit', source)
                 else:
@@ -53,6 +53,28 @@ class SourceSelection(unittest.TestCase):
             self.assertEqual(builder.remote_revision('ai-feedback', source, 'review'), 'd' * 40)
             self.assertEqual(remote.call_args.args[0][-1], 'refs/heads/review')
             self.assertEqual(source['branch'], 'main')
+
+    def test_vendored_copies_are_found_in_every_layout(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for path in ['_extensions/math-exercise/_extension.yml', '_extensions/math-exercise/math-exercise.lua',
+                         '_extensions/Erasmus-CTM/ai-feedback/_extension.yml', '_extensions/jsxgraph/_extension.yml',
+                         '_extensions/math-exercise/_extensions/jsxgraph/lua/jsxgraph.lua']:
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                (root / path).write_text('x')
+            shipped = builder.tracked_extensions(root, False, 'math-exercise')
+            self.assertEqual(shipped - {'math-exercise'}, {'ai-feedback', 'jsxgraph', 'nested-_extensions-in-math-exercise'})
+
+    def test_update_pins_refuses_a_tip_without_the_pinned_commit(self):
+        with patch.object(builder, 'remote_revision', return_value='f' * 40), \
+             patch.object(builder, 'descends', return_value=False), \
+             patch.object(builder.Path, 'write_text') as write, \
+             patch('sys.argv', ['setup', '--update-pins']):
+            with self.assertRaises(SystemExit) as stop:
+                builder.main()
+            self.assertIn('does not contain the pinned', str(stop.exception))
+            write.assert_not_called()
 
 
 if __name__ == '__main__':

@@ -28,23 +28,30 @@ Use an HTTP origin: Monaco and Pyodide workers do not work reliably with `file:/
 
 ## Repository selection
 
-`repos.json` pins every component by full commit; the branch says where
-updates come from:
+`repos.json` pins every component by full commit; `branch` names the branch
+that contains that commit and that `--update-pins` follows:
 
-| Component | Repository | Branch followed for updates |
-|---|---|---|
-| ctm-assessment | this repository | this checkout, including local edits |
-| ai-feedback | Erasmus-CTM/ai-feedback | `main` |
-| py-exercise | Erasmus-CTM/py-exercise | `main` |
-| math-exercise | Erasmus-CTM/math-exercise | `main` |
-| pyodide-interaktiv | Erasmus-CTM/pyodide-interaktiv | `feature/shared-feedback-integration` |
-| jsxgraph | jsxgraph/jsxgraph-quarto (upstream) | `main` (extension folder `jsxgraph`) |
+| Component | Repository | Branch (during the October 2026 audit) | After the audit PRs are merged |
+|---|---|---|---|
+| ctm-assessment | this repository | this checkout, including local edits | — |
+| ai-feedback | Erasmus-CTM/ai-feedback | `audit/2026-10` | `main` |
+| py-exercise | Erasmus-CTM/py-exercise | `audit/2026-10` | `main` |
+| math-exercise | Erasmus-CTM/math-exercise | `audit/2026-10` | `main` |
+| pyodide-interaktiv | Erasmus-CTM/pyodide-interaktiv | `audit/2026-10` | `feature/shared-feedback-integration` |
+| jsxgraph | jsxgraph/jsxgraph-quarto (upstream) | `main` (extension folder `jsxgraph`) | `main` |
+
+**Release order.** Merge the component PRs first, keeping their commits (a
+merge commit or rebase; a squash creates new commits that do not contain the
+pins). Then set each `branch` back as in the last column, run
+`--update-pins` (it refuses a branch that does not contain the current pin),
+run `--test --browser`, commit `repos.json`, and merge the umbrella.
 
 The script records every resolved commit, local dirty-file list and copied
 extension file's SHA-256 in `resolved-repos.json`. That record is included in the
 rendered site and the archive. External sources are downloaded as exact-commit
 archives. No upstream checkout is overwritten. A component repository that
-ships another component's extension folder (a vendored copy) fails the build.
+ships another component's extension folder in any layout (`_extensions/<x>`,
+`_extensions/<owner>/<x>`, or nested inside its own folder) fails the build.
 
 Normal builds use the pins, so a merge in a component never changes the umbrella
 by itself. To move to newer components:
@@ -131,7 +138,7 @@ feedback feature branch; the other components from `main`; all are pinned by com
 share settings, transport and LaTeX rendering. Pyodide retains three hints that
 never supply finished code, and feedback never executes Python.
 
-The builder rejects consumer runtime copies and installs the shared
+The builder rejects vendored copies of other components and installs the shared
 runtime byte for byte. Tests cover fresh stdout evidence, edit/reset/run/restart
 invalidation, no raw stderr, standalone documents and both filter orders.
 Consumer PRs remain deferred until this common page is accepted.

@@ -6,6 +6,9 @@ archive = Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix='ctm-install-', dir=archive.parent) as temp:
     course = Path(temp)
     subprocess.run(['quarto', 'add', str(archive), '--no-prompt'], cwd=course, check=True)
+    import json
+    record = json.loads((course / '_extensions' / 'ctm-assessment' / 'resolved-repos.json').read_text())
+    assert set(record['repositories']) >= {'ai-feedback', 'math-exercise', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph'}, 'installed record incomplete'
     (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [example.qmd]\nfilters: [ctm-assessment]\npy-exercise:\n  feedback: true\npyodide:\n  feedback: true\n')
     (course / 'example.qmd').write_text('''---
 format: html

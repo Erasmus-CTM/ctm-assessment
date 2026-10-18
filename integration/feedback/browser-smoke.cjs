@@ -462,7 +462,9 @@ const server = http.createServer((req, res) => {
     await checkProduct('6*7', '.math-fb-ok');
     report.checks.push('Learner rebinding sympy names in a Pyodide cell does not affect mathematics checks');
     await page.evaluate(() => { const proxy = mainPyodide; proxy.restart('audit restart'); });
-    await page.waitForFunction(async () => !!(await globalThis.qpyodideInstance) && !!globalThis.mainPyodide);
+    // waitForFunction does not await a returned promise; await the restart first.
+    await page.evaluate(async () => { await globalThis.qpyodideInstance; return true; });
+    await page.waitForFunction(() => !!globalThis.mainPyodide);
     await checkProduct('41', '.math-fb-wrong');
     await checkProduct('42', '.math-fb-ok');
     await page.getByRole('tab', {name: 'Python', exact: true}).click();

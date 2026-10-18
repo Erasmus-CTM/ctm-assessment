@@ -17,7 +17,7 @@ python -m http.server 8000 --directory .feedback-workspace/site/_site
 The builder renders one `example.html` from `example.qmd` and topic includes,
 using the components pinned in `integration/feedback/repos.json` (JSXGraph is
 the upstream jsxgraph/jsxgraph-quarto extension). It records
-revisions and hashes, rejects consumer runtime copies and tests installed shared
+revisions and hashes, rejects any vendored copy of another component and tests installed shared
 loading, filter order, context reuse and browser behavior. Consumer tests receive
 `AI_FEEDBACK_EXTENSION` pointing to this checkout; running them independently
 requires that environment variable. See the [workbench guide](../integration/feedback/README.md)

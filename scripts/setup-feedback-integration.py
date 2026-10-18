@@ -65,13 +65,36 @@ def snapshot(repo, sha, cache):
     return target
 
 
-def tracked_extensions(source, local):
-    """Names of extension directories a repository ships (tracked files only)."""
+def tracked_extensions(source, local, own):
+    """Extension names a repository ships (tracked files only).
+
+    `_extensions/<x>` and `_extensions/<owner>/<x>` both ship `<x>`; anything
+    inside the repository's own extension folder that is itself an extension
+    folder (`<own>/<x>/_extension.yml`) or an `_extensions` tree is reported
+    as `<x>` too, so nested copies cannot slip into the distribution.
+    """
     if local:
         files = subprocess.check_output(['git', '-C', str(source), 'ls-files', '_extensions'], text=True).splitlines()
     else:
         files = [str(p.relative_to(source)) for p in (source / '_extensions').rglob('*') if p.is_file()] if (source / '_extensions').is_dir() else []
-    return {Path(f).parts[1] for f in files if len(Path(f).parts) > 2}
+    shipped = set()
+    for name in files:
+        parts = Path(name).parts
+        if parts[-1] in ('_extension.yml', '_extension.yaml'):
+            folders = parts[1:-1]
+            if folders:
+                shipped.add(folders[-1])
+        if own in parts[1:3] and '_extensions' in parts[2:]:
+            shipped.add('nested-_extensions-in-' + own)
+    return shipped
+
+
+def descends(repository, ancestor, tip):
+    """True if `tip` contains `ancestor` (GitHub compare API; public repositories)."""
+    request = urllib.request.Request(f'https://api.github.com/repos/{repository}/compare/{ancestor}...{tip}',
+                                     headers={'User-Agent': 'CTM-feedback-integration', 'Accept': 'application/vnd.github+json'})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.load(response)['status'] in ('ahead', 'identical')
 
 
 def main():
@@ -87,6 +110,22 @@ def main():
     parser.add_argument('--browser', action='store_true', help='Also run real Chromium/Pyodide/Monaco smoke tests (requires Playwright browser)')
     args = parser.parse_args()
     config = json.loads((TEMPLATE / 'repos.json').read_text())
+    if args.update_pins:
+        for name, spec in config['repositories'].items():
+            if name == 'ctm-assessment':
+                continue
+            sha = remote_revision(name, spec, follow=True)
+            old = spec.get('commit')
+            # Never move a pin backwards or sideways (e.g. to a branch that does
+            # not yet contain the pinned commit).
+            if old and old != sha and not descends(spec['repository'], old, sha):
+                raise SystemExit(f'{name}: {spec["branch"]} @ {sha} does not contain the pinned {old}; '
+                                 'merge the pinned work first or change the branch in repos.json.')
+            print(f'{name}: {old or "unpinned"} -> {sha}')
+            spec['commit'] = sha
+        (TEMPLATE / 'repos.json').write_text(json.dumps(config, indent=2) + '\n')
+        print('Updated integration/feedback/repos.json. Now run: python scripts/setup-feedback-integration.py --test --browser')
+        return
     if subprocess.check_output(['quarto', '--version'], text=True).strip() != config['quarto']:
         raise SystemExit('Use Quarto ' + config['quarto'] + ' to match this integration baseline.')
     workspace = args.workspace.resolve()
@@ -107,16 +146,6 @@ def main():
         if name not in config['repositories']:
             raise SystemExit('Unknown repository: ' + name)
         local[name] = Path(path).resolve()
-    if args.update_pins:
-        for name, spec in config['repositories'].items():
-            if name == 'ctm-assessment':
-                continue
-            sha = remote_revision(name, spec, follow=True)
-            print(f'{name}: {spec.get("commit", "unpinned")} -> {sha}')
-            spec['commit'] = sha
-        (TEMPLATE / 'repos.json').write_text(json.dumps(config, indent=2) + '\n')
-        print('Updated integration/feedback/repos.json. Now run: python scripts/setup-feedback-integration.py --test --browser')
-        return
     review_refs = json.loads(args.review_refs)
     if not isinstance(review_refs, dict) or any(name not in config['repositories'] or not re.fullmatch(r'[0-9a-f]{40}', str(ref)) for name,ref in review_refs.items()):
         raise SystemExit('Review refs must map known repositories to full SHAs')
@@ -170,11 +199,15 @@ def main():
     # One source per component: no repository may ship another component's
     # extension (a vendored copy would silently diverge from the pinned one).
     for name, source in sources.items():
-        shipped = tracked_extensions(source, name in local)
-        foreign = sorted(shipped & (set(extensions.values()) - {extensions[name]}))
+        shipped = tracked_extensions(source, name in local, extensions[name])
+        foreign = shipped - {extensions[name]}
+        # Also a copy kept inside the component's own folder (old layout).
+        foreign |= {other for other in extensions.values() if other != extensions[name]
+                    and any(path.startswith(other + '/') for path in hashes[extensions[name]])}
+        foreign = sorted(foreign)
         if foreign:
             raise SystemExit(f'{name} ships its own copy of {", ".join(foreign)}; use the pinned component instead.')
-    result = {'quarto': config['quarto'], 'refresh': args.refresh, 'repositories': revisions, 'extension_sha256': hashes}
+    result = {'quarto': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
     (workspace / 'resolved-repos.json').write_text(json.dumps(result, indent=2) + '\n')
     shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
     run(['quarto', 'render'], cwd=site, env=base_env)
@@ -183,6 +216,8 @@ def main():
     if distribution.exists(): shutil.rmtree(distribution)
     shutil.copytree(site / '_extensions', distribution / '_extensions', dirs_exist_ok=True)
     shutil.copy2(workspace / 'resolved-repos.json', distribution / 'resolved-repos.json')
+    # `quarto add` installs only _extensions/: keep the record with the umbrella.
+    shutil.copy2(workspace / 'resolved-repos.json', distribution / '_extensions' / 'ctm-assessment' / 'resolved-repos.json')
     shutil.copy2(ROOT / 'LICENSE', distribution / 'LICENSE')
     archive = shutil.make_archive(str(workspace / 'ctm-assessment'), 'gztar', root_dir=distribution)
     shutil.copy2(archive, site / '_site' / 'ctm-assessment.tar.gz')
@@ -195,7 +230,7 @@ def main():
             run(['python', sources['ai-feedback'] / 'scripts/sync-feedback-defaults.py', '--check'], env=env)
             run(['npm', 'test'], cwd=ROOT, env=env)
             env['JSXGRAPH_EXTENSION'] = str(site / '_extensions' / 'jsxgraph')
-            for consumer in ('ai-feedback', 'math-exercise', 'pyodide-interaktiv'):
+            for consumer in ('ai-feedback', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'):
                 run(['npm', 'ci', '--ignore-scripts'], cwd=sources[consumer])
                 run(['npm', 'test'], cwd=sources[consumer], env=env)
             run(['python', '-m', 'unittest', 'discover', '-s', 'tests'], cwd=sources['py-exercise'], env=env)

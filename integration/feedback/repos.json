@@ -3,23 +3,23 @@
   "repositories": {
     "ai-feedback": {
       "repository": "Erasmus-CTM/ai-feedback",
-      "branch": "main",
-      "commit": "456b5cf1de59cbf821439b18a71b2a9e2ad7c547"
+      "branch": "audit/2026-10",
+      "commit": "80db07bbdf7924388087fee40024117dcc91a035"
     },
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
-      "branch": "main",
-      "commit": "102d65357ca9e46d9e177ba32c6786ffafb7e218"
+      "branch": "audit/2026-10",
+      "commit": "c03c4e10ea648630f765d9577bbea14d604f9f3c"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
-      "branch": "main",
-      "commit": "387d0a5834a67d0975b81c877bb055835f2d44ad"
+      "branch": "audit/2026-10",
+      "commit": "24bfbc6c33a6a9801b93667e134c093f11dee998"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
-      "branch": "feature/shared-feedback-integration",
-      "commit": "134c8944faad05f5646ca57939c859934c3ea4c7"
+      "branch": "audit/2026-10",
+      "commit": "7a23d1e37b777ec1fa408e7868225d6557cb34fb"
     },
     "jsxgraph": {
       "repository": "jsxgraph/jsxgraph-quarto",

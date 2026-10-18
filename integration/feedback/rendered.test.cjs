@@ -66,8 +66,10 @@ test('common page renders the active extensions and keeps local dependencies res
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'repos.json'), 'utf8'));
   for (const [name, source] of Object.entries(record.repositories)) {
     assert.equal(source.branch, manifest.repositories[name].branch);
-    if (!source.local_override && !source.ref_override && manifest.repositories[name].commit) {
+    // A --follow-branches build (Track component branches) records branch tips.
+    if (!record.follow_branches && !source.local_override && !source.ref_override && manifest.repositories[name].commit) {
       assert.equal(source.commit, manifest.repositories[name].commit);
+      assert.equal(source.pinned, true, name);
     }
     if (!source.local_override && !source.ref_override && !manifest.repositories[name].commit) {
       assert.equal(source.requested_ref, manifest.repositories[name].branch);
