@@ -107,6 +107,7 @@ Severity: **critical** = wrong grading or broken install/release on the main pat
 | F-76 | Review round 7 on the inline-Markdown change: `\*` closed emphasis; emphasis could not contain math; `$` in a code span became math; `***x***` was wrong; the closing search was cubic (an 8000-character line rendered in 27 s); `{{` before markup or at a line end started a Quarto shortcode that swallowed the exercise. On the timer change: a SymPy reload during a retry ran under stop-after, and a pyodide-interaktiv worker that never finished starting left Check pending forever | math-exercise, py-exercise, shared runtime | fixed, with tests that fail on the previous code; Lua and JS agree on 1400 random texts; real exercises in three repositories render unchanged |
 | F-77 | Backwards compatibility: after webagg, projects that pin `pyodide: base-url: …/v0.27.2/` (the old README's example) got no interactive plots, because WebAgg needs Pyodide 0.28. Separately, an old bug: `build-variant: full` produced `…/v0.27.2/fullpyodide.mjs` and broke the worker | pyodide-interaktiv | fixed: the canvas engine picks the backend from the loaded Pyodide (old frozen backend below 0.28, WebAgg from 0.28); a trailing slash is added; docs and 14 tests |
 | F-78 | Course installer: `quarto add` failing left the course without its extensions; a `ctm-assessment` review ref was silently ignored; `--package-only` still assembled the example site and downloaded an asset; build paths were long for Windows; PowerShell 5.1 mangled the JSON review refs | ctm-assessment | fixed: atomic replace with restore, `NAME=SHA` refs, a rejected key, short cache names, docs on full SHAs and `--workspace`; 11 + 9 tests |
+| F-79 | A page's own component options replace the project's instead of merging: with `math-exercise: {feedback: false}` in `_quarto.yml` (or a profile), a page with `math-exercise: {lang: nb}` still shows Feedback (measured, Quarto 1.8.27). Every ctm-demo page with exercises sets `math-exercise: lang`, so project-level `feedback`/`stop-after` never reach them | all components (Quarto's metadata merge) | reported; P22 and the P20 configuration read shared keys from one place that pages do not replace |
 | F-18 | Internal checker errors were shown to students as input-spelling hints with „…" quotes in English | resolved by F-02/F-04 |
 | PY-7…18, MATH-14…24 | see appendices | mostly fixed; runtime items proposed |
 
@@ -427,7 +428,11 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
     - one command, one filter (`filters: [ctm-assessment]`), one version number;
     - the internal libraries (`ctm-libs`: Pyodide runtime, dependency locator, shared UI, and **ai-feedback folded in**; `ctm-checkers`: the Python checker library) are bundled and never named in an author's project;
     - standalone component installs stay possible for advanced use.
-  - **Configuration:** shared options under `ctm-assessment:` (stop-after, python-preload, save, progress, feedback defaults, language); component keys only for component-specific options. `ai-feedback:`, `pyodide: feedback`, `math-exercise: stop-after` etc. keep working as aliases with a deprecation note.
+  - **Configuration:**
+    - `ctm-assessment:` holds only cross-component options: stop-after, python-preload, save, progress and language.
+    - **`ai-feedback:` stays the section for everything about feedback (AC 18 Oct):** mode, models, teaching policies and policy files, languages of the feedback, and the switch that turns feedback off for a build (P22). It is not renamed and not an alias.
+    - Component keys hold only component-specific options. `pyodide: feedback`, `math-exercise: stop-after` etc. keep working as aliases with a deprecation note.
+    - Shared keys are read key by key from project, profile, `_metadata.yml` and page, so a page's own map does not drop project settings (F-79).
   - **Documentation:** one guide with one reference; components' pages become sections. The functions available in `#| checker:` are documented as the visible part of `ctm-checkers`.
   - **One look and vocabulary:** ctm-ui (P17/P18); en/de/nb everywhere, including py-exercise; the same words for Check, Stop and Feedback.
   - **Maintainer side (not visible to authors):**
@@ -445,7 +450,7 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
       - `.ai-feedback` activities and per-exercise options;
       - the settings dialog and its browser storage keys (students keep their API setup; legacy settings stay importable);
       - teaching-policy files and the build-time policy reader;
-      - `ai-feedback:` options, read as an alias under `ctm-assessment:`.
+      - the `ai-feedback:` section in YAML, unchanged in name (AC 18 Oct).
     - **Removed:**
       - the repository (archived, with a pointer) and its install command;
       - the version-mix and minimum-version machinery;
@@ -486,6 +491,25 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
       - **New: one exercise with text per language.** Answers, checker, parameters and tests are written once; the block holds a text section per language. The build checks that each profile's language has text.
       - Saved answers and progress (P17) are keyed by exercise label, not language, so switching language keeps them.
       - A ctm-ui language switch in the navbar opens the same page in the other build.
+- **P22 — Build a site without AI feedback (AC 18 Oct).** Use cases: an exam or test site, a public copy without AI, a course whose institution does not allow it.
+  - **Today it cannot be done reliably** (tested on ctm-demo with a profile that sets `feedback: false` for math-exercise, py-exercise and pyodide-interaktiv):
+    - pages that set any `math-exercise:` option keep their Feedback buttons (F-79): 156 buttons remained;
+    - `.ai-feedback` activities always render with their answer box and button (4 on `stack-oppgaver`);
+    - the ai-feedback script still loads on pages without exercises;
+    - stack-sympy has no switch.
+  - **Proposal:** one switch for the build, which no page can turn back on.
+    - `ai-feedback: enabled: false` in `_quarto.yml` or in a profile, so one source builds both sites: `quarto render --profile no-ai` with `_quarto-no-ai.yml`. It sits under `ai-feedback:` with the other feedback settings (AC 18 Oct).
+    - Read key by key, not as a whole map (F-79): a page that sets other `ai-feedback:` keys does not drop it, and a page cannot turn feedback back on when the project turned it off.
+    - Also the environment variable `CTM_FEEDBACK=off`, read by the filters, for CI jobs that publish two sites. It does not depend on metadata merging at all.
+    - **Effect:**
+      - no Feedback buttons in any component;
+      - no ai-feedback script, styles or settings gear;
+      - `.ai-feedback` activities keep their visible task text but lose the answer box and button;
+      - criteria, starters, teaching policies and AI context are **not written into the HTML**. That matters for exams, since criteria can reveal solutions.
+    - A page that asks for feedback gets one build message, not an error, so the same source builds both sites.
+    - A test checks that the built site contains no ai-feedback assets or data.
+  - **Where:** consolidation step 1 (§5b), where ai-feedback becomes one module of ctm-libs and the switch is one check there. If it is needed before that, it can be added to the four components now, additively.
+  - **BC:** none; off only when set.
 - **P10 — pyodide-interaktiv `error()` in top-level filters** and the remaining items for the members maintaining it (F-13, F-14): reported in its PR, not changed.
 
 ## 5b. Implementation plan after AC's decision on P20 (18 Oct)
@@ -497,7 +521,7 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
 | Proposal | Before | Now |
 |---|---|---|
 | P4 (packages) | four new packages: `ctm-runtime`, `ctm-docs`, `ctm-ci`, `ctm_checkers` | **superseded.** Steps 1, 2, 4 and the UI go to ctm-libs. Step 5 is ctm-checkers. Steps 3 and 7 become folders in ctm-assessment. Step 6 (the bridge client) goes upstream to jsxgraph-quarto next to its server half, or to ctm-libs if upstream declines |
-| P2, P3 (ai-feedback config, key storage) | an ai-feedback release | done **during the fold**. The configuration is redefined once, under `ctm-assessment:` with `ai-feedback:` as an alias, so these land with it rather than after it |
+| P2, P3 (ai-feedback config, key storage) | an ai-feedback release | done **during the fold**. The policy and feedback settings stay under `ai-feedback:` (AC 18 Oct). P2(b) simplifies the policy keys there, and the fold is the one moment to change them |
 | P14 (pyodide-interaktiv's shipped ai-feedback) | goes when the fold is done | **changes subject; it does not go.** pyodide-interaktiv's own users install only pyodide-interaktiv, so their projects must keep building. The generated, CI-checked copy becomes a copy of ctm-libs (or of its alias extension, below). Needs the pyodide-interaktiv members' agreement |
 | P12 (stack-sympy loader) | copy the shared `feedback-loader.lua` | stack-sympy moves onto ctm-libs (locator, runtime, feedback) and ctm-checkers. Its vendored `pyodide-runtime.js` and `assess_basis` go. Needs stack-sympy's own audit first |
 | P13, P16 (worker, preload and lamp) | in the shared runtime | in ctm-libs. P13 is a prerequisite for P16's `idle` default |
@@ -505,6 +529,7 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
 | P8 (Pyodide upgrade) | in `ctm-runtime` | one constant in ctm-libs. Gated by ctm-checkers' tests run in Pyodide |
 | P5, P15, P21.3 (grading changes) | per component | **ctm-checkers releases.** Each change sits behind an option first. The STACK answer tests are their own module, so math-exercise changes never move STACK grades |
 | P7 (loading) | separate items | mostly solved by ctm-libs: one set of cacheable files instead of ~330 KB inlined per page, one icon set |
+| P22 (site without AI feedback) | — | one check in ctm-libs' feedback module, in step 1 |
 | P1, P6, P9, P10, P11, P19 | — | unchanged. P1 needs a footnote (next table) |
 
 **New decisions the plan needs:**
@@ -522,7 +547,7 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
    - Rename the repository and add the alias extension.
    - Move in the runtime (`pyodide-runtime.js` with its Stop helpers and load limit, the Pyodide constant, Monaco and KaTeX loaders, `escapeHtml`), the dependency locator (`feedback-loader.lua`) and the locale resolver with one message catalogue (P21.1).
    - math-exercise and py-exercise switch to it. The byte-identical copies disappear (`feedback-loader.lua` ×3, `pyodide-runtime.js` ×2).
-   - With the fold, P2, P3 and P19.
+   - With the fold, P2, P3, P19 and P22 (the build switch without AI feedback).
    - No visible change except py-exercise gaining `nb`.
 2. **ctm-checkers.**
    - Extract math-exercise's embedded ~345-line library and the authored-test runner. `question-tests.py` then imports it instead of extracting it with regexes.
