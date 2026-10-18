@@ -100,14 +100,26 @@ async function firstGradeable(page, kind, wait = WAIT_MS) {
     };
     const result = {};
     if (kind === 'math') {
-      result.controls = await until(() => document.querySelector('.math-exercise-cell .math-check-btn') && document.querySelector('.math-exercise-cell')?.mathExercise);
+      // The Check button is in the static HTML; its handler is attached only
+      // after KaTeX has loaded. "Controls" is the first click that takes
+      // effect (the button is disabled while a check runs).
+      await until(() => document.querySelector('.math-exercise-cell .math-check-btn'));
       const cell = [...document.querySelectorAll('.math-exercise-cell')].find(c => {
         const inputs = c.querySelectorAll('.math-input[data-answer]');
         return inputs.length && [...inputs].every(i => i.dataset.answer) && c.dataset.mode !== 'custom';
       });
       if (!cell) throw new Error('no math exercise with stored answers on the page');
-      cell.querySelectorAll('.math-input[data-answer]').forEach(i => { i.value = i.dataset.answer; });
-      cell.querySelector('.math-check-btn').click();
+      const button = cell.querySelector('.math-check-btn');
+      let lastClick = 0;
+      result.controls = await until(() => {
+        if (button.disabled || cell.querySelector('.math-fb-checking, .math-fb-ok, .math-fb-wrong, .math-fb-err, .math-fb-partial')) return true;
+        if (Date.now() - lastClick > 100) {
+          cell.querySelectorAll('.math-input[data-answer]').forEach(i => { i.value = i.dataset.answer; });
+          button.click();
+          lastClick = Date.now();
+        }
+        return false;
+      });
       result.graded = await until(() => cell.querySelector('.math-fb-ok, .math-fb-wrong, .math-fb-err, .math-fb-partial'));
       result.status = cell.querySelector('.math-fb-ok') ? 'graded' : 'not graded: ' + cell.querySelector('[class^="math-fb-"]')?.textContent.trim().slice(0, 120);
     } else {
