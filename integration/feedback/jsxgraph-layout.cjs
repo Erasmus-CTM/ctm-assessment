@@ -147,9 +147,11 @@ window.__probe = function () { return {w: b.canvasWidth, cw: b.containerObj.clie
 \`\`\`
 
 \`\`\`{.jsxgraph assessment_id="named" width="400" height="200" style="width:100%;max-width:400px;height:200px;border:0;"}
+'use strict';
+window.__strict = (function () { return this === undefined; })();
 var box = document.getElementById(BOARDID);
 var b = JXG.JSXGraph.initBoard(BOARDID, {boundingbox:[-5,5,5,-5], showNavigation:false, showCopyright:false});
-window.__probe = function () { return {found: !!box && box === b.containerObj, w: b.canvasWidth}; };
+window.__probe = function () { return {found: !!box && box === b.containerObj, strict: window.__strict, w: b.canvasWidth}; };
 \`\`\`
 `;
 
@@ -189,7 +191,7 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     // The visible board has started; it finds its container through BOARDID.
     await page.waitForFunction(() => document.querySelectorAll('iframe').length === 16);
     await (await frame('named')).waitForFunction(() => typeof window.__probe === 'function');
-    assert.deepEqual(await probe('named'), {found: true, w: 400});
+    assert.deepEqual(await probe('named'), {found: true, strict: true, w: 400}, "BOARDID everywhere; a leading 'use strict' stays a directive");
     // Visible boards whose code waits for DOMContentLoaded or uses document.write
     // run as before; the parent page finishes loading.
     for (const id of ['ready', 'written']) await (await frame(id)).waitForFunction(() => typeof window.__probe === 'function');
