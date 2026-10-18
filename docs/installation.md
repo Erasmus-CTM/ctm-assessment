@@ -80,23 +80,51 @@ build locally and run `quarto add .feedback-workspace/ctm-assessment`.
 
 ### Course repositories that build from source
 
-A course repository can install the package built from a ctm-assessment ref (a
-branch or a commit) instead of the published archive. Fetch ctm-assessment at
-that ref, then run its installer:
+A course repository can install the package built from a ctm-assessment ref
+instead of the published archive. The ref is a branch name or a full
+40-character commit SHA: `git fetch` cannot fetch an abbreviated SHA such as
+`c565cf3`. Fetch ctm-assessment at that ref, then run its installer:
 
 ```sh
 git init -q .private-extensions/ctm-assessment
-git -C .private-extensions/ctm-assessment fetch --depth 1 https://github.com/Erasmus-CTM/ctm-assessment.git main   # or a commit
+git -C .private-extensions/ctm-assessment fetch --depth 1 https://github.com/Erasmus-CTM/ctm-assessment.git main   # or a full commit SHA
 git -C .private-extensions/ctm-assessment checkout -q --detach FETCH_HEAD
 python .private-extensions/ctm-assessment/scripts/install-project.py --project .
 ```
 
+The installer reaches `main` with pull request #11; until then, use the branch
+`audit/2026-10` or a full SHA from it instead of `main`.
+
 It builds the package with the components pinned in that ref's
 `integration/feedback/repos.json`. It replaces only the extensions the package
-owns, keeps the course's own extensions, and checks every installed file. The
-component commits it used are written to `.private-extensions/resolved-repos.json`.
-For a coordinated review, `--review-refs '{"math-exercise": "<commit>"}'` builds
-with other component commits. Keep `.private-extensions/` out of Git.
+owns, keeps the course's own extensions, and checks every installed file. If
+`quarto add` or that check fails, the previously installed extensions are put
+back and the installer stops with a one-line message. The component commits it
+used are written to `.private-extensions/resolved-repos.json`. Keep
+`.private-extensions/` out of Git.
+
+For a coordinated review, `--review-refs` builds with other component commits,
+each a full 40-character SHA, given as `NAME=SHA[,NAME=SHA...]` or as a JSON
+object:
+
+```sh
+python .private-extensions/ctm-assessment/scripts/install-project.py --project . --review-refs math-exercise=7bc409d12ce3b740040191453e6dd2467aea5ca6,py-exercise=a97443195d354c4aa6fbe514c092dec7c91faa39
+python .private-extensions/ctm-assessment/scripts/install-project.py --project . --review-refs '{"math-exercise": "7bc409d12ce3b740040191453e6dd2467aea5ca6"}'
+```
+
+Use the `NAME=SHA` form in Windows PowerShell 5.1, which removes the inner
+quotes of the JSON form. ctm-assessment itself cannot be set this way: the
+installer always builds the checkout it is part of, so fetch the ref you want.
+
+**Windows paths.** The build folder defaults to
+`.private-extensions/ctm-assessment-build` inside the course, and component
+files sit several folders deeper. With a long course path (for example under
+OneDrive) this can pass Windows' 260-character path limit. Build in a short
+folder instead:
+
+```powershell
+python .private-extensions\ctm-assessment\scripts\install-project.py --project . --workspace C:\ctm-build
+```
 
 ## Install single components instead
 
