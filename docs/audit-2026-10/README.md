@@ -455,6 +455,37 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
   - **stack-sympy:** authors already mix it with math-exercise and py-exercise on one page (shared interpreter, feedback, lamp, progress), so it becomes a component of the product, on ctm-libs and ctm-checkers.
     - Its STACK semantics (answer tests, any Moodle STACK compatibility) live in ctm-checkers as their own module, so shared code never changes how a STACK question grades.
     - Whether math-exercise and stack-sympy merge into one math-question component, with STACK compatibility as a mode, is decided after stack-sympy's own audit (with P12).
+- **P21 — Locale policy and bilingual courses (AC 18 Oct; part of ctm-ui / ctm-libs, P20).**
+  - **Today** (three copies of the same Lua resolver: component option → Quarto `lang:` → `en`):
+
+    | Component | UI languages | `nb` / `no` |
+    |---|---|---|
+    | math-exercise | en, de, nb | both → nb |
+    | py-exercise | en, de | **falls back to English** (ingmat3a shows Check/Reset on Norwegian pages) |
+    | pyodide-interaktiv | en, de, no/nb, sv, da | both |
+    | ai-feedback | en, de, nb, es | both → nb |
+
+    Consequences: a Swedish page gets Swedish Python cells and English exercises, and `nn` exists nowhere.
+  - **Policy:**
+    1. **One resolver and one message catalogue in ctm-libs.**
+       - Language choice: component option → `ctm-assessment: lang` → Quarto `lang:` → `en`.
+       - Tags are normalised (`no`, `nb`, `nb-NO` → `nb`), with fallback chains (`nn` → `nb` → `en`; `de-CH` → `de` → `en`).
+       - A language is supported only when every component has all its strings. CI reports missing keys; a missing key falls back to English with a build warning.
+    2. **Four roles kept apart:**
+       - UI language: buttons and messages, from the page language.
+       - Content language: the author's text, never translated automatically.
+       - Feedback language: the AI's answer, defaulting to the page language (`feedback-language`).
+       - Response language: the language the student answers in (`response-language`, for language courses).
+    3. **Number input per locale:** a decimal comma is accepted in single-number fields for locales that use it, never in vectors or function arguments. The input help states the rule. This changes grading, so it starts behind an option (P5).
+    4. **Messages:** author-facing build messages stay English; everything students see follows the page language. The page's `lang` attribute is always set; code and other-language fragments can carry their own `lang`.
+  - **Bilingual course (e.g. EN and NO at once):**
+    - Rejected: separate source trees (every exercise, key and checker twice, and they drift apart).
+    - Rejected: one page with both languages and a runtime switch (Quarto's page texts, search and `lang` are per page).
+    - **Recommended:** one source with one Quarto profile per language (`_quarto-en.yml`, `_quarto-nb.yml`: `lang:` and `output-dir`).
+      - Language-specific prose in `when-profile` blocks or per-language include files.
+      - **New: one exercise with text per language.** Answers, checker, parameters and tests are written once; the block holds a text section per language. The build checks that each profile's language has text.
+      - Saved answers and progress (P17) are keyed by exercise label, not language, so switching language keeps them.
+      - A ctm-ui language switch in the navbar opens the same page in the other build.
 - **P10 — pyodide-interaktiv `error()` in top-level filters** and the remaining items for the members maintaining it (F-13, F-14): reported in its PR, not changed.
 
 ## 6. stack-sympy impact
