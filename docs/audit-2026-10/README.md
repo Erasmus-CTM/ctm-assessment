@@ -455,7 +455,7 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
       - the repository (archived, with a pointer) and its install command;
       - the version-mix and minimum-version machinery;
       - the "install ai-feedback" messages.
-    - **Timing:** fold before pyodide-interaktiv's stacked PR is reviewed, so that team integrates once, with ctm-libs; P14's shipped copy then becomes a copy of ctm-libs (§5b).
+    - **Timing (changed by AC, 18 Oct):** pyodide-interaktiv joins later. Its current PR is reviewed as it is, and ctm-libs keeps the ai-feedback interface it uses until then (§5b). P14's shipped copy becomes a copy of ctm-libs when it joins.
     - **Migration:** a project listing `ai-feedback` in `filters` gets one clear message to remove it.
   - **stack-sympy:** authors already mix it with math-exercise and py-exercise on one page (shared interpreter, feedback, lamp, progress), so it becomes a component of the product, on ctm-libs and ctm-checkers.
     - Its STACK semantics (answer tests, any Moodle STACK compatibility) live in ctm-checkers as their own module, so shared code never changes how a STACK question grades.
@@ -543,14 +543,20 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
 **AC's answers on the consolidation design (18 Oct):**
 1. **ctm-libs:** AC renames the ai-feedback repository to `ctm-libs`. A thin `ai-feedback` alias extension stays for one release.
 2. **Project and page settings (F-79):** the same rule as ai-feedback's settings today. ai-feedback's reader (`read-policies.ts`) already combines its keys one by one across `_quarto.yml`, profiles, `_quarto.yml.local`, `_metadata.yml` and front matter. It moves into ctm-libs and is used for every CTM setting. A page then overrides only the keys it names.
-3. **Standalone installs of math-exercise and py-exercise:** under discussion (below).
+3. **Standalone installs:** CTM Assessment is the only install for authors (option C). A component found without the package stops the render with the install command. The component repositories keep their own tests and example builds for development. pyodide-interaktiv is the exception (5).
 4. **`feedback: auto`:** agreed. On when the exercise has a task. Standalone pages gain the button, and P22 turns it off for a build.
 5. **pyodide-interaktiv depends on ctm-libs**, delivered like ai-feedback today: a generated, CI-checked copy shipped with it, which the package ignores.
 6. **ctm-checkers:** a new repository. Python versions mark grading changes, which land behind options first.
 7. **stack-sympy's audit** runs alongside step 2.
 8. **One repository for the own components:** not now.
 
-**Order of work.** Each phase is one stacked PR per repository, merged into the working branch, then offered to the pyodide-interaktiv members for review as AC planned.
+**Order of work.** Each phase is one stacked PR per repository. pyodide-interaktiv joins later (AC 18 Oct): its current PR (WebAgg and the shared-feedback integration) goes to its members for review now, and its move onto ctm-libs is a separate, later step.
+
+**While pyodide-interaktiv is outside, ctm-libs keeps two contracts unchanged, so that pyodide-interaktiv 1.8 works inside the package without changes:**
+- the ai-feedback JavaScript and Lua interface that pyodide-interaktiv's feedback code calls, found under the name `ai-feedback` (the alias extension);
+- the shared-interpreter globals (`mainPyodide`, `qpyodideInstance`, `__qExercisePyodide`).
+
+The umbrella's mixed-page tests check both.
 
 0. **Release the current campaign.** JSXGraph upstream PR first, then the pins. ingmat3a's ref goes to main.
 1. **ctm-libs skeleton.**
@@ -558,25 +564,29 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
    - Move in the runtime (`pyodide-runtime.js` with its Stop helpers and load limit, the Pyodide constant, Monaco and KaTeX loaders, `escapeHtml`), the dependency locator (`feedback-loader.lua`) and the locale resolver with one message catalogue (P21.1).
    - math-exercise and py-exercise switch to it. The byte-identical copies disappear (`feedback-loader.lua` ×3, `pyodide-runtime.js` ×2).
    - With the fold, P2, P3, P19 and P22 (the build switch without AI feedback).
+   - Versioned releases: each release is a GitHub release asset, and the site URL stays as "latest". Course repositories' `setup.py` accepts a release tag. A component found without the package stops the render with the install command (decision 3).
    - No visible change except py-exercise gaining `nb`.
 2. **ctm-checkers.**
    - Extract math-exercise's embedded ~345-line library and the authored-test runner. `question-tests.py` then imports it instead of extracting it with regexes.
    - Add the rounding helpers (`.15g` with half-up), the graph and basis checkers, and the result contract.
    - math-exercise loads the bundle. CI installs it natively at the same version.
    - No grading change: the existing tests must pass unchanged.
-3. **pyodide-interaktiv onto ctm-libs** (with its members). This is the point where P20 asked for the fold: the team integrates once. Its shipped copy becomes ctm-libs (P14). Its worker RPC moves into ctm-libs for step 4.
-4. **Runtime behaviour.**
+3. **UI.**
+   - P17: store, progress, quizzes. pyodide-interaktiv keeps its own `local-storage` until step 4.
+   - P18: reveals, modes, tab links, figure slots, with the two course migrations.
+   - The rest of P21: bilingual exercise text, profiles, language switch.
+4. **pyodide-interaktiv onto ctm-libs** (with its members, when they are ready).
+   - Its shipped copy becomes ctm-libs (P14).
+   - Its status line shows the shared lamp, and its saved cells move into the store.
+   - Its worker RPC moves into ctm-libs. That is the one code move step 5 waits for, so there is no second worker implementation.
+5. **Runtime behaviour.**
    - P13: a worker for standalone pages.
    - Then P16: preload and the lamp, with the measurement first.
    - Then P8 when wanted.
-5. **UI.**
-   - P17: store, progress, quizzes.
-   - P18: reveals, modes, tab links, figure slots, with the two course migrations.
-   - The rest of P21: bilingual exercise text, profiles, language switch.
-6. **stack-sympy** (after its audit). It moves onto ctm-libs and ctm-checkers (P12) with its STACK module. Whether math-exercise and stack-sympy merge is decided then.
+6. **stack-sympy** (after its audit, which runs alongside step 2). It moves onto ctm-libs and ctm-checkers (P12) with its STACK module. Whether math-exercise and stack-sympy merge is decided then.
 7. **Grading options** in ctm-checkers releases: P5, P15, P21.3, P6's PY-10. Each lands behind an option, and the default changes in a later major release.
 
-Steps 1–3 change no grade and no author syntax. Steps 4–5 add opt-in features. Only step 7 changes grading, and only behind options.
+Steps 1, 2 and 4 change no grade and no author syntax. Steps 3 and 5 add opt-in features. Only step 7 changes grading, and only behind options.
 
 ## 6. stack-sympy impact
 
