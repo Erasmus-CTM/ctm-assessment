@@ -90,6 +90,7 @@ def with_tax(price):
     return price  # finish this
 ## TESTS ##
 assert with_tax(80) == 100
+assert with_tax(40) == 50
 ```
 
 ```{pyodide-python}

@@ -39,6 +39,7 @@ def price_with_tax(price, rate):
 assert price_with_tax(100, 0.25) == 125, "100 plus 25% tax should be 125"
 assert price_with_tax(80, 0) == 80, "A zero rate should leave the price unchanged"
 assert abs(price_with_tax(19.5, 0.2) - 23.4) < 1e-9, "Check a decimal price and rate"
+assert abs(price_with_tax(10.01, 0.125) - 11.26125) < 1e-9, "Do not round the result"
 ```
 :::
 
@@ -176,6 +177,7 @@ assert is_palindrome("Madam") is True, "Ignore differences in letter case"
 assert is_palindrome("hello") is False, "Not every lowercase word is a palindrome"
 assert is_palindrome("") is True, "The empty string is a palindrome"
 assert is_palindrome("a!") is False, "Keep punctuation in the comparison"
+assert is_palindrome("abca") is False, "Compare every character, not only the ends"
 ```
 :::
 
@@ -191,7 +193,7 @@ After correcting it, Reset lets students revisit the original mistake.
 **Your task**
 
 Implement addition, then choose **Check**. The starter deliberately subtracts.
-Use **Reset** to restore the starter.
+Importing `os` is not allowed in this exercise. Use **Reset** to restore the starter.
 
 ```{py-exercise}
 #| label: integration-add

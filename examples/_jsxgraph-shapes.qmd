@@ -28,8 +28,8 @@ JXG.QuartoAssessment.register({
 ::: {.ai-feedback #german-shapes profile="language-quality" response-language="de" feedback-language="en" learner-level="German course 1" context="jsxgraph:assessment-german-shapes"}
 **Your task**
 
-Wie heißen die Formen A und B auf Deutsch? Schreibe den Namen mit dem bestimmten
-Artikel. Complete or correct the two German names in the draft.
+Wie heißen die Formen A und B auf Deutsch? Schreibe die Namen jeweils mit dem
+bestimmten Artikel. Complete or correct the two German names in the draft.
 
 ::: {.feedback-starter}
 A: der Kreis
