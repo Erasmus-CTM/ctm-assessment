@@ -540,6 +540,16 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
 | Where does ctm-checkers live? | **Its own repository with a Python version** (`pip install` for native CI and the course repos' tests; a Pyodide bundle built like stack-sympy's `bundle_runtime.py`) | grading semantics need their own version and changelog. stack-sympy can pin it if it keeps its own release cycle |
 | What does math-exercise's `feedback: auto` mean once ai-feedback is always present? | **On when the exercise has a task, as today with ai-feedback installed.** The release note names the change | today `auto` means "on when ai-feedback is installed". After the fold it is always installed, so standalone math-exercise pages without ai-feedback gain a Feedback button (copy mode, no key needed). Three users; the alternative (`auto` = off unless the project configures feedback) would turn feedback off for ctm-demo and ingmat3a |
 
+**AC's answers on the consolidation design (18 Oct):**
+1. **ctm-libs:** AC renames the ai-feedback repository to `ctm-libs`. A thin `ai-feedback` alias extension stays for one release.
+2. **Project and page settings (F-79):** the same rule as ai-feedback's settings today. ai-feedback's reader (`read-policies.ts`) already combines its keys one by one across `_quarto.yml`, profiles, `_quarto.yml.local`, `_metadata.yml` and front matter. It moves into ctm-libs and is used for every CTM setting. A page then overrides only the keys it names.
+3. **Standalone installs of math-exercise and py-exercise:** under discussion (below).
+4. **`feedback: auto`:** agreed. On when the exercise has a task. Standalone pages gain the button, and P22 turns it off for a build.
+5. **pyodide-interaktiv depends on ctm-libs**, delivered like ai-feedback today: a generated, CI-checked copy shipped with it, which the package ignores.
+6. **ctm-checkers:** a new repository. Python versions mark grading changes, which land behind options first.
+7. **stack-sympy's audit** runs alongside step 2.
+8. **One repository for the own components:** not now.
+
 **Order of work.** Each phase is one stacked PR per repository, merged into the working branch, then offered to the pyodide-interaktiv members for review as AC planned.
 
 0. **Release the current campaign.** JSXGraph upstream PR first, then the pins. ingmat3a's ref goes to main.
