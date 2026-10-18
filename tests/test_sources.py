@@ -1,4 +1,4 @@
-"""Maintained dependencies advance; the temporary migration pin stays fixed."""
+"""Every component is pinned by commit; branch tips are only an explicit choice."""
 import importlib.util
 import json
 from pathlib import Path
@@ -11,24 +11,28 @@ spec.loader.exec_module(builder)
 
 
 class SourceSelection(unittest.TestCase):
-    def test_manifest_only_pins_the_pyodide_migration(self):
+    def test_manifest_pins_every_component_by_commit(self):
         repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
+        self.assertEqual(set(repositories), {'ai-feedback', 'py-exercise', 'math-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'})
+        self.assertEqual(repositories['jsxgraph']['repository'], 'jsxgraph/jsxgraph-quarto')
+        self.assertEqual(repositories['jsxgraph']['extension'], 'jsxgraph')
         for name, source in repositories.items():
             with self.subTest(repository=name):
-                if name == 'pyodide-interaktiv':
-                    self.assertEqual(source['branch'], 'feature/shared-feedback-integration')
-                    self.assertRegex(source['commit'], r'^[0-9a-f]{40}$')
-                else:
-                    self.assertEqual(source['branch'], 'main')
+                self.assertTrue(source['branch'])
+                if name == 'ctm-assessment':
                     self.assertNotIn('commit', source)
+                else:
+                    self.assertRegex(source['commit'], r'^[0-9a-f]{40}$')
 
-    def test_main_is_resolved_again_on_each_build(self):
-        source = {'repository': 'Erasmus-CTM/ai-feedback', 'branch': 'main'}
+    def test_branch_tips_are_resolved_only_when_following_branches(self):
+        source = {'repository': 'Erasmus-CTM/ai-feedback', 'branch': 'main', 'commit': 'c' * 40}
         with patch.object(builder.subprocess, 'check_output', side_effect=[
             'a' * 40 + '\trefs/heads/main\n', 'b' * 40 + '\trefs/heads/main\n'
         ]) as remote:
-            self.assertEqual(builder.remote_revision('ai-feedback', source), 'a' * 40)
-            self.assertEqual(builder.remote_revision('ai-feedback', source), 'b' * 40)
+            self.assertEqual(builder.remote_revision('ai-feedback', source), 'c' * 40)
+            remote.assert_not_called()
+            self.assertEqual(builder.remote_revision('ai-feedback', source, follow=True), 'a' * 40)
+            self.assertEqual(builder.remote_revision('ai-feedback', source, follow=True), 'b' * 40)
             self.assertEqual(remote.call_count, 2)
 
     def test_migration_pin_does_not_follow_its_branch(self):
@@ -49,6 +53,73 @@ class SourceSelection(unittest.TestCase):
             self.assertEqual(builder.remote_revision('ai-feedback', source, 'review'), 'd' * 40)
             self.assertEqual(remote.call_args.args[0][-1], 'refs/heads/review')
             self.assertEqual(source['branch'], 'main')
+
+    def test_vendored_copies_are_found_in_every_layout(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for path in ['_extensions/math-exercise/_extension.yml', '_extensions/math-exercise/math-exercise.lua',
+                         '_extensions/Erasmus-CTM/ai-feedback/_extension.yml', '_extensions/jsxgraph/_extension.yml',
+                         '_extensions/math-exercise/_extensions/jsxgraph/lua/jsxgraph.lua']:
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                (root / path).write_text('x')
+            shipped = builder.tracked_extensions(root, False, 'math-exercise')
+            self.assertEqual(shipped - {'math-exercise'}, {'ai-feedback', 'jsxgraph', 'nested-_extensions-in-math-exercise'})
+
+    def test_only_declared_distribution_copies_are_allowed(self):
+        repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
+        declared = {name: spec['ships-copies'] for name, spec in repositories.items() if 'ships-copies' in spec}
+        self.assertEqual(declared, {'pyodide-interaktiv': ['ai-feedback']})
+
+    def test_update_pins_refuses_a_tip_without_the_pinned_commit(self):
+        with patch.object(builder, 'remote_revision', return_value='f' * 40), \
+             patch.object(builder, 'descends', return_value=False), \
+             patch.object(builder.Path, 'write_text') as write, \
+             patch('sys.argv', ['setup', '--update-pins']):
+            with self.assertRaises(SystemExit) as stop:
+                builder.main()
+            self.assertIn('does not contain the pinned', str(stop.exception))
+            write.assert_not_called()
+
+    def test_snapshot_uses_short_names_and_drops_the_archive_root(self):
+        # A GitHub archive has one top folder, <repo>-<sha>/; the snapshot keeps
+        # only its contents under <repo>-<sha[:12]> (Windows path length).
+        import io, shutil, tarfile, tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            sha, other = 'ab' * 20, 'ab' * 6 + 'cd' * 14
+            def archive(commit):
+                data = io.BytesIO()
+                with tarfile.open(fileobj=data, mode='w:gz') as tar:
+                    for name, text in ((f'repo-{commit}/_extensions/x/_extension.yml', commit), (f'repo-{commit}/LICENSE', 'L')):
+                        info = tarfile.TarInfo(name)
+                        info.size = len(text)
+                        tar.addfile(info, io.BytesIO(text.encode()))
+                return data.getvalue()
+            archives = {sha: archive(sha), other: archive(other)}
+            fetched = []
+            def download(url, target):
+                fetched.append(url)
+                target.write_bytes(archives[url.rsplit('/', 1)[1]])
+            cache = root / 'src'
+            cache.mkdir()
+            with patch.object(builder, 'download', side_effect=download):
+                target = builder.snapshot('Org/repo', sha, cache)
+                self.assertEqual(target, cache / ('repo-' + sha[:12]))
+                self.assertEqual((target / '_extensions/x/_extension.yml').read_text(), sha)
+                self.assertEqual(json.loads((target / '.integration-source.json').read_text())['commit'], sha)
+                self.assertEqual(sorted(p.name for p in cache.iterdir()), [target.name])
+                builder.snapshot('Org/repo', sha, cache)
+                self.assertEqual(len(fetched), 1)  # cached
+                # Same short name, other commit: replaced, never reused.
+                self.assertEqual(builder.snapshot('Org/repo', other, cache), target)
+                self.assertEqual((target / '_extensions/x/_extension.yml').read_text(), other)
+                self.assertEqual(len(fetched), 2)
+            archives[sha] = archive(sha)[:-40]  # truncated download
+            shutil.rmtree(target)
+            with patch.object(builder, 'download', side_effect=download), self.assertRaises(Exception):
+                builder.snapshot('Org/repo', sha, cache)
+            self.assertEqual(list(cache.iterdir()), [])
 
 
 if __name__ == '__main__':

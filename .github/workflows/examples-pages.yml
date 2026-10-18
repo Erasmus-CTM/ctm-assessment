@@ -32,18 +32,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install sympy==1.14.0 networkx==3.4.2 PyYAML==6.0.2
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'  # SymPy: the version Pyodide 0.27.2 ships
       - uses: quarto-dev/quarto-actions/setup@v2
         with:
           version: '1.8.27'
       - name: Render and exercise the examples
-        run: python scripts/setup-feedback-integration.py --review-refs "$CTM_REVIEW_REFS" --test
+        run: |
+          set -o pipefail
+          python scripts/setup-feedback-integration.py --review-refs "$CTM_REVIEW_REFS" --test 2>&1 | tee "$RUNNER_TEMP/build.log"
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Test all five integration tabs
         env:
           CTM_INTEGRATION_SITE: ${{ github.workspace }}/.feedback-workspace/site/_site
-        run: npm run test:browser
+        run: |
+          set -o pipefail
+          npm run test:browser 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Report failure details as an annotation
+        if: failure()
+        run: |
+          printf '::error title=Last build output::%s\n' "$(grep -v '^\s*$' "$RUNNER_TEMP/build.log" | tail -40 | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

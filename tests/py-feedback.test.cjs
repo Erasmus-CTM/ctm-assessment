@@ -12,7 +12,7 @@ test('Python adapter sends current code and allowlisted code-matched evidence wi
   w.AbortController = AbortController;
   w.fetch = () => { throw new Error('Copy feedback must not call a provider'); };
   w.mainPyodide = {runPythonAsync() { throw new Error('Feedback must not execute Python'); }};
-  for (const name of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) w.eval(fs.readFileSync(path.join(process.env.AI_FEEDBACK_EXTENSION, name), 'utf8'));
+  for (const name of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) w.eval(fs.readFileSync(path.join(process.env.AI_FEEDBACK_EXTENSION || path.join(__dirname, '../.feedback-workspace/site/_extensions/ai-feedback'), name), 'utf8'));
   w.eval(fs.readFileSync(adapterFile, 'utf8'));
   let code = 'def total(values):\n    return 0';
   let assessment = null;

@@ -10,3 +10,4 @@ Start with the [authoring guide](authoring.md) to adapt an activity to your teac
 [Back to the project](../README.md)
 
 - [Public example audit: findings and validation, 16 October 2026](audit-2026-10-16.md)
+- [Pre-release audit of the stack, 18 October 2026: findings, proposals, release order](audit-2026-10/README.md)

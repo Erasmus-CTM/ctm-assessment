@@ -21,7 +21,7 @@ test('rendered examples load the runtime once and produce real copy prompts', { 
   w.__aiFeedbackConfig = { mode: 'copy', storage: 'session' };
   for (const file of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) {
     assert.equal([...w.document.scripts].filter(s => s.src.endsWith('/' + file)).length, 1);
-    w.eval(fs.readFileSync(path.join(process.env.AI_FEEDBACK_EXTENSION, file), 'utf8'));
+    w.eval(fs.readFileSync(path.join(process.env.AI_FEEDBACK_EXTENSION || path.join(__dirname, '../.feedback-workspace/site/_extensions/ai-feedback'), file), 'utf8'));
   }
   for (const script of w.document.scripts) if (script.textContent.includes('window.__aiFeedbackPolicies =')) w.eval(script.textContent);
   w.AIFeedback.initialize();

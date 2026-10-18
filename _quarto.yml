@@ -33,3 +33,4 @@ py-exercise:
 pyodide:
   feedback: true
   feedback-hints: true
+

@@ -1,5 +1,7 @@
 ---
 title: "Working feedback examples"
+# Quarto 1.10 would otherwise send the exercise blocks to Jupyter (docs/installation.md).
+engine: markdown
 filters: [_filters/example-source.lua, ctm-assessment]
 ai-feedback:
   page-policy: practice-feedback

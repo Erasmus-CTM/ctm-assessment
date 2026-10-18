@@ -83,7 +83,9 @@ Check your work more than once if needed.
 #| mode: custom
 #| checker: |
 #|   def check(response, symbols):
-#|       B = response["inputs"]["B"]["matrix"]
+#|       # Typed decimals are exact: 0.1 + 0.2 - 0.3 is zero.
+#|       exact = lambda value: value.xreplace({f: Rational(str(f)) for f in value.atoms(Float)})
+#|       B = response["inputs"]["B"]["matrix"].applyfunc(exact)
 #|       return assess_basis(B, axis="columns", target_dimension=2,
 #|           belongs=lambda v: all(value.is_real is True and value.is_finite is True for value in v)
 #|               and simplify(v[0] + v[1] + v[2]) == 0,
@@ -92,6 +94,9 @@ Check your work more than once if needed.
 #|   def test(check, symbols):
 #|       assert check({"inputs": {"B": {"matrix": Matrix([[1,1],[-1,0],[0,-1]])}}}, symbols)["score"] == 1
 #|       assert check({"inputs": {"B": {"matrix": Matrix([[I,I],[-I,0],[0,-I]])}}}, symbols)["score"] < 1
+#|       decimal = Matrix([[Float("0.1"), 1], [Float("0.2"), 0], [Float("-0.3"), -1]])
+#|       assert check({"inputs": {"B": {"matrix": decimal}}}, symbols)["score"] == 1
+#|       assert check({"inputs": {"B": {"matrix": Matrix([[1,1],[-1,0],[0,Float("-0.9")]])}}}, symbols)["score"] < 1
 Find a basis for the plane $x+y+z=0$ in $\mathbb{R}^3$.
 Enter basis vectors as columns: mat{name=B,rows=3,cols=auto,min-cols=0,max-cols=3,initial-cols=1}
 ```

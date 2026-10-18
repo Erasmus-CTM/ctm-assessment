@@ -60,8 +60,8 @@ Developed by the **CTM team** for the Erasmus+ project
 
 ## Coordinated dependency reviews
 
-Normal builds follow the maintained `main` sources and the umbrella's explicit
-Pyodide migration pin. A non-main review commit can declare exact dependency
+Normal builds use the component commits pinned in
+`integration/feedback/repos.json`. A non-main review commit can declare exact dependency
 SHAs in a `CTM-Review-Refs: {"ai-feedback":"<40-character SHA>"}` commit trailer.
 The visibly named workflow step prints those refs; the umbrella records them in
 `resolved-repos.json`. Main ignores review trailers. Merge upstream changes

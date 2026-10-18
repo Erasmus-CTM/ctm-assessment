@@ -52,14 +52,18 @@ test('one shared installation supplies identical context across integrations, or
   assert.equal(pyodide[3].mode,'explicit');assert.equal(pyodide[3].refs,'shared');assert.equal(pyodide[4].mode,'none');
   assert.match(python[3].text,/NESTED_LEAD/);assert.match(pyodide[5].text,/NESTED_TAGGED_PROSE/);
   w.close();
-  // Missing installation fails early with an actionable render error.
+  // Without the installation: feedback: true fails early with an actionable
+  // render error; the default (auto) renders without feedback and says why.
   fs.rmSync(path.join(dir,'_extensions',...(qualified?['Erasmus-CTM']:[]),'ai-feedback'),{recursive:true});
-  fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\n  render: [chapter/context.qmd]\nfilters: [math-exercise]\n');
-  fs.writeFileSync(path.join(dir,'chapter/context.qmd'),fixture([]));
-  fs.rmSync(path.join(dir,'_site'),{recursive:true,force:true});
-  fs.rmSync(path.join(dir,'.quarto'),{recursive:true,force:true});
-  const missing=spawnSync(process.env.QUARTO_BIN||'quarto',['render'],{cwd:dir,encoding:'utf8',timeout:120000});
-  assert.notEqual(missing.status,0);assert.match(missing.stderr,/quarto add Erasmus-CTM\/ai-feedback/);
+  for(const required of [true,false]){
+   fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\n  render: [chapter/context.qmd]\nfilters: [math-exercise]\n'+(required?'math-exercise:\n  feedback: true\n':''));
+   fs.writeFileSync(path.join(dir,'chapter/context.qmd'),fixture([]).replace(/::: \{\.ai-feedback[\s\S]*?\n:::\n/g,''));
+   fs.rmSync(path.join(dir,'_site'),{recursive:true,force:true});
+   fs.rmSync(path.join(dir,'.quarto'),{recursive:true,force:true});
+   const missing=spawnSync(process.env.QUARTO_BIN||'quarto',['render'],{cwd:dir,encoding:'utf8',timeout:120000});
+   assert.match(missing.stderr,/quarto add Erasmus-CTM\/ai-feedback/);
+   if(required)assert.notEqual(missing.status,0);else assert.equal(missing.status,0,missing.stderr);
+  }
  }finally{if(!process.env.KEEP_CONTEXT)fs.rmSync(dir,{recursive:true,force:true});else console.log('Fixture:',dir);}
  }
 });
