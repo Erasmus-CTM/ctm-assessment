@@ -48,4 +48,13 @@ board.create('circle', [[0,0],1]);
         assert marker in html, marker+' missing after archive installation'
     for file in ['feedback-core.js','feedback-dom.js','ai-feedback.js']:
         assert html.count('/'+file+'"') == 1, file+' did not load exactly once'
-print('Installable archive passed: all five components render from a fresh course.')
+    # A course may also hold separately added copies (`quarto add Erasmus-CTM/...`
+    # installs under an owner folder). The umbrella keeps using its own set.
+    import shutil
+    for name in ['ai-feedback', 'math-exercise', 'py-exercise']:
+        shutil.copytree(course / '_extensions' / name, course / '_extensions' / 'Erasmus-CTM' / name)
+    subprocess.run(['quarto','render'],cwd=course,check=True)
+    html=(course/'example.html').read_text()
+    for file in ['feedback-core.js','feedback-dom.js','ai-feedback.js']:
+        assert html.count('/'+file+'"') == 1, file+' did not load exactly once next to standalone copies'
+print('Installable archive passed: all five components render from a fresh course, also next to standalone copies.')

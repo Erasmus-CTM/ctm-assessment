@@ -61,7 +61,7 @@ test('common page renders the active extensions and keeps local dependencies res
     assert.ok(fs.existsSync(path.resolve(site, resource.split('?')[0])), 'Missing ' + resource);
   }
   const record = JSON.parse(fs.readFileSync(path.join(site, 'resolved-repos.json'), 'utf8'));
-  assert.deepEqual(Object.keys(record.repositories).sort(), ['ai-feedback', 'ctm-assessment', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
+  assert.deepEqual(Object.keys(record.repositories).sort(), ['ai-feedback', 'ctm-assessment', 'jsxgraph', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
   assert.equal(panels[2].querySelectorAll('.math-exercise-cell').length, 7);
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'repos.json'), 'utf8'));
   for (const [name, source] of Object.entries(record.repositories)) {
@@ -80,8 +80,11 @@ test('common page renders the active extensions and keeps local dependencies res
   }
   for (const [name, source] of Object.entries(record.repositories)) {
     assert.match(source.commit, /^[0-9a-f]{40}$/);
-    assert.ok(Object.keys(record.extension_sha256[name]).length > 0);
+    assert.ok(Object.keys(record.extension_sha256[manifest.repositories[name].extension || name]).length > 0);
   }
+  // JSXGraph is the upstream extension, not a copy from another component.
+  assert.ok(record.extension_sha256.jsxgraph['lua/jsxgraph.lua']);
+  assert.ok(record.extension_sha256.jsxgraph['resources/js/jsxgraphcore.js']);
   dom.window.close();
 });
 
@@ -155,6 +158,8 @@ test('copied examples reproduce only their declared drafts, with complete linked
       w.eval(fs.readFileSync(path.join(dir,'_extensions/ai-feedback',name),'utf8'));
     const math = path.join(dir,'_extensions/math-exercise');
     w.eval(fs.readFileSync(path.join(math,'shared/pyodide-runtime.js'),'utf8'));
+    // math-exercise.lua inlines matrix-input.js before math-exercise.js; load them in the same order.
+    if (fs.existsSync(path.join(math,'matrix-input.js'))) w.eval(fs.readFileSync(path.join(math,'matrix-input.js'),'utf8'));
     w.eval(fs.readFileSync(path.join(math,'math-exercise.js'),'utf8'));
     for (const cell of w.document.querySelectorAll('.math-exercise-cell')) {
       w.__mathExerciseTestApi.setupCell(cell);

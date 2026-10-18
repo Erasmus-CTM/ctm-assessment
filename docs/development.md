@@ -7,7 +7,7 @@
 Requirements: Quarto 1.8.27, Node 22/npm, Git and Python 3.12+.
 
 ```sh
-python -m pip install sympy==1.14.0 networkx==3.4.2 PyYAML==6.0.2
+python -m pip install sympy==1.13.3 networkx==3.4.2 PyYAML==6.0.2
 python scripts/setup-feedback-integration.py --test
 npx playwright install chromium
 python scripts/setup-feedback-integration.py --browser
@@ -15,8 +15,8 @@ python -m http.server 8000 --directory .feedback-workspace/site/_site
 ```
 
 The builder renders one `example.html` from `example.qmd` and topic includes,
-using the maintained branches in `integration/feedback/repos.json`. Only
-pyodide-interaktiv stays pinned until its shared-feedback migration is merged. It records
+using the components pinned in `integration/feedback/repos.json` (JSXGraph is
+the upstream jsxgraph/jsxgraph-quarto extension). It records
 revisions and hashes, rejects consumer runtime copies and tests installed shared
 loading, filter order, context reuse and browser behavior. Consumer tests receive
 `AI_FEEDBACK_EXTENSION` pointing to this checkout; running them independently
@@ -32,11 +32,14 @@ original restructuring; this README describes the current integration branches.
 ## Automatic builds and Pages deployment
 
 The workflow runs on pull requests, feature-branch pushes and pushes to `main`.
-Every build resolves current dependency branches and the temporary Pyodide pin, renders all five topic tabs, runs unit
+Every build uses the pinned component commits, renders all five topic tabs, runs unit
 and cross-integration tests, then tests real Python/JSXGraph behavior in Chromium.
 It uploads the rendered site and installable archive as artifacts. A successful
 **main** build deploys both examples and archive to GitHub Pages; PRs never deploy.
 Concurrent deploys are serialized. Failed tests prevent deployment.
+The separate **Track component branches** workflow (weekly and on demand) builds
+and tests against the components' branch tips with `--follow-branches`; it never
+deploys. A red run there means `repos.json` cannot be advanced yet.
 
 One repository setting is required: **Settings → Pages → Build and deployment →
 Source: GitHub Actions**. The deployment job uses only `pages: write` and

@@ -1,0 +1,44 @@
+name: Track component branches
+
+# Early warning: build and test the combined examples against the branch tips
+# named in integration/feedback/repos.json instead of the pinned commits.
+# Never deploys. A failure means the pins cannot be advanced yet.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ctm-assessment-track-components
+  cancel-in-progress: true
+
+jobs:
+  follow-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install sympy==1.13.3 networkx==3.4.2 PyYAML==6.0.2
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - name: Render and test against component branch tips
+        run: python scripts/setup-feedback-integration.py --follow-branches --test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test all five integration tabs
+        env:
+          CTM_INTEGRATION_SITE: ${{ github.workspace }}/.feedback-workspace/site/_site
+        run: npm run test:browser
+      - name: Record resolved branch tips
+        if: always()
+        run: cat .feedback-workspace/resolved-repos.json || true

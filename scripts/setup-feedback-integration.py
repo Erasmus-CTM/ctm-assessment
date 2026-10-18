@@ -31,10 +31,10 @@ def download(url, target):
         shutil.copyfileobj(response, out)
 
 
-def remote_revision(name, spec, review_ref=None):
+def remote_revision(name, spec, review_ref=None, follow=False):
     if review_ref and re.fullmatch(r'[0-9a-f]{40}', review_ref):
         return review_ref
-    sha = spec.get('commit')
+    sha = None if follow else spec.get('commit')
     if not sha or review_ref:
         branch = review_ref or spec['branch']
         refs = subprocess.check_output(['git', 'ls-remote', f'https://github.com/{spec["repository"]}.git', 'refs/heads/' + branch], text=True).split()
@@ -65,10 +65,21 @@ def snapshot(repo, sha, cache):
     return target
 
 
+def tracked_extensions(source, local):
+    """Names of extension directories a repository ships (tracked files only)."""
+    if local:
+        files = subprocess.check_output(['git', '-C', str(source), 'ls-files', '_extensions'], text=True).splitlines()
+    else:
+        files = [str(p.relative_to(source)) for p in (source / '_extensions').rglob('*') if p.is_file()] if (source / '_extensions').is_dir() else []
+    return {Path(f).parts[1] for f in files if len(Path(f).parts) > 2}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--workspace', type=Path, default=ROOT / '.feedback-workspace')
-    parser.add_argument('--refresh', action='store_true', help='Compatibility option: branches are always refreshed; explicit migration pins stay pinned')
+    parser.add_argument('--refresh', action='store_true', help='Compatibility option without effect: every component is pinned by commit')
+    parser.add_argument('--follow-branches', action='store_true', help='Resolve each component\'s branch tip instead of its pinned commit (early warning; not a release build)')
+    parser.add_argument('--update-pins', action='store_true', help='Write the current branch tips into repos.json and stop; then run --test')
     parser.add_argument('--ref', action='append', default=[], metavar='NAME=BRANCH', help='Use a review branch for a dependency without changing normal build defaults')
     parser.add_argument('--review-refs', default='{}', help='Explicit JSON dependency SHA map for coordinated review builds; normal defaults stay unchanged')
     parser.add_argument('--source', action='append', default=[], metavar='NAME=PATH', help='Use a local Git checkout for a repository; record SHA and dirty files')
@@ -96,6 +107,16 @@ def main():
         if name not in config['repositories']:
             raise SystemExit('Unknown repository: ' + name)
         local[name] = Path(path).resolve()
+    if args.update_pins:
+        for name, spec in config['repositories'].items():
+            if name == 'ctm-assessment':
+                continue
+            sha = remote_revision(name, spec, follow=True)
+            print(f'{name}: {spec.get("commit", "unpinned")} -> {sha}')
+            spec['commit'] = sha
+        (TEMPLATE / 'repos.json').write_text(json.dumps(config, indent=2) + '\n')
+        print('Updated integration/feedback/repos.json. Now run: python scripts/setup-feedback-integration.py --test --browser')
+        return
     review_refs = json.loads(args.review_refs)
     if not isinstance(review_refs, dict) or any(name not in config['repositories'] or not re.fullmatch(r'[0-9a-f]{40}', str(ref)) for name,ref in review_refs.items()):
         raise SystemExit('Review refs must map known repositories to full SHAs')
@@ -116,10 +137,11 @@ def main():
             sha = git(source, 'rev-parse', 'HEAD')
             dirty = git(source, 'status', '--porcelain', '--untracked-files=all').splitlines()
         else:
-            sha = remote_revision(name, spec, review_refs.get(name))
+            sha = remote_revision(name, spec, review_refs.get(name), args.follow_branches)
             source = snapshot(spec['repository'], sha, cache)
         sources[name] = source
-        revisions[name] = {'repository': spec['repository'], 'branch': spec['branch'], 'requested_ref': requested_ref, 'commit': sha, 'ref_override': name in review_refs, 'pinned': bool(spec.get('commit')), 'local_override': name in local, 'dirty_files': dirty}
+        pinned = bool(spec.get('commit')) and not args.follow_branches and name not in review_refs and name not in local
+        revisions[name] = {'repository': spec['repository'], 'branch': spec['branch'], 'requested_ref': requested_ref, 'commit': sha, 'ref_override': name in review_refs, 'pinned': pinned, 'local_override': name in local, 'dirty_files': dirty}
         print(f'Resolved {name}: {requested_ref} @ {sha}', flush=True)
     site = workspace / 'site'
     if site.exists():
@@ -139,17 +161,19 @@ def main():
     shutil.copytree(ROOT / 'examples', site / 'examples')
     shutil.copytree(ROOT / '_filters', site / '_filters')
     hashes = {}
+    extensions = {name: spec.get('extension', name) for name, spec in config['repositories'].items()}
     for name, source in sources.items():
-        extension = source / '_extensions' / name
-        destination = site / '_extensions' / name
+        extension = source / '_extensions' / extensions[name]
+        destination = site / '_extensions' / extensions[name]
         shutil.copytree(extension, destination)
-        hashes[name] = {str(p.relative_to(extension)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(extension.rglob('*')) if p.is_file()}
-    for consumer in ('math-exercise', 'pyodide-interaktiv', 'py-exercise'):
-        if any(path.startswith('ai-feedback/') for path in hashes[consumer]):
-            raise SystemExit(consumer + ' must use the installed shared extension, not a bundled copy.')
-    jsx = sources['math-exercise'] / '_extensions' / 'jsxgraph'
-    shutil.copytree(jsx, site / '_extensions' / 'jsxgraph')
-    hashes['jsxgraph'] = {str(p.relative_to(jsx)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(jsx.rglob('*')) if p.is_file()}
+        hashes[extensions[name]] = {str(p.relative_to(extension)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(extension.rglob('*')) if p.is_file()}
+    # One source per component: no repository may ship another component's
+    # extension (a vendored copy would silently diverge from the pinned one).
+    for name, source in sources.items():
+        shipped = tracked_extensions(source, name in local)
+        foreign = sorted(shipped & (set(extensions.values()) - {extensions[name]}))
+        if foreign:
+            raise SystemExit(f'{name} ships its own copy of {", ".join(foreign)}; use the pinned component instead.')
     result = {'quarto': config['quarto'], 'refresh': args.refresh, 'repositories': revisions, 'extension_sha256': hashes}
     (workspace / 'resolved-repos.json').write_text(json.dumps(result, indent=2) + '\n')
     shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
@@ -170,9 +194,11 @@ def main():
             run(['python', ROOT / 'scripts/test-package.py', archive], env=env)
             run(['python', sources['ai-feedback'] / 'scripts/sync-feedback-defaults.py', '--check'], env=env)
             run(['npm', 'test'], cwd=ROOT, env=env)
+            env['JSXGRAPH_EXTENSION'] = str(site / '_extensions' / 'jsxgraph')
             for consumer in ('ai-feedback', 'math-exercise', 'pyodide-interaktiv'):
                 run(['npm', 'ci', '--ignore-scripts'], cwd=sources[consumer])
                 run(['npm', 'test'], cwd=sources[consumer], env=env)
+            run(['python', '-m', 'unittest', 'discover', '-s', 'tests'], cwd=sources['py-exercise'], env=env)
             run(['npm', 'run', 'test:integration'], cwd=ROOT, env=env)
         if args.browser:
             run(['npm', 'run', 'test:browser'], cwd=ROOT, env=env)

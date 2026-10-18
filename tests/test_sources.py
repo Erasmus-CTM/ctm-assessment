@@ -1,4 +1,4 @@
-"""Maintained dependencies advance; the temporary migration pin stays fixed."""
+"""Every component is pinned by commit; branch tips are only an explicit choice."""
 import importlib.util
 import json
 from pathlib import Path
@@ -11,24 +11,28 @@ spec.loader.exec_module(builder)
 
 
 class SourceSelection(unittest.TestCase):
-    def test_manifest_only_pins_the_pyodide_migration(self):
+    def test_manifest_pins_every_component_by_commit(self):
         repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
+        self.assertEqual(set(repositories), {'ai-feedback', 'py-exercise', 'math-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'})
+        self.assertEqual(repositories['jsxgraph']['repository'], 'jsxgraph/jsxgraph-quarto')
+        self.assertEqual(repositories['jsxgraph']['extension'], 'jsxgraph')
+        self.assertEqual(repositories['pyodide-interaktiv']['branch'], 'feature/shared-feedback-integration')
         for name, source in repositories.items():
             with self.subTest(repository=name):
-                if name == 'pyodide-interaktiv':
-                    self.assertEqual(source['branch'], 'feature/shared-feedback-integration')
-                    self.assertRegex(source['commit'], r'^[0-9a-f]{40}$')
-                else:
-                    self.assertEqual(source['branch'], 'main')
+                if name == 'ctm-assessment':
                     self.assertNotIn('commit', source)
+                else:
+                    self.assertRegex(source['commit'], r'^[0-9a-f]{40}$')
 
-    def test_main_is_resolved_again_on_each_build(self):
-        source = {'repository': 'Erasmus-CTM/ai-feedback', 'branch': 'main'}
+    def test_branch_tips_are_resolved_only_when_following_branches(self):
+        source = {'repository': 'Erasmus-CTM/ai-feedback', 'branch': 'main', 'commit': 'c' * 40}
         with patch.object(builder.subprocess, 'check_output', side_effect=[
             'a' * 40 + '\trefs/heads/main\n', 'b' * 40 + '\trefs/heads/main\n'
         ]) as remote:
-            self.assertEqual(builder.remote_revision('ai-feedback', source), 'a' * 40)
-            self.assertEqual(builder.remote_revision('ai-feedback', source), 'b' * 40)
+            self.assertEqual(builder.remote_revision('ai-feedback', source), 'c' * 40)
+            remote.assert_not_called()
+            self.assertEqual(builder.remote_revision('ai-feedback', source, follow=True), 'a' * 40)
+            self.assertEqual(builder.remote_revision('ai-feedback', source, follow=True), 'b' * 40)
             self.assertEqual(remote.call_count, 2)
 
     def test_migration_pin_does_not_follow_its_branch(self):

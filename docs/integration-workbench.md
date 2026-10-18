@@ -5,7 +5,7 @@ The source is the root **`example.qmd`**: six text/image activities plus
 Python unit-test, mathematics and Pyodide exercises.
 The entry page uses topic includes in `examples/` to render one HTML page with
 **Plain text**, **Python**, **Mathematics**, **Pyodide** and **JSXGraph** tabs. The Python tab includes five
-partially completed functions, with separate author notes and learner tasks.
+partially completed practice functions and an addition exercise, with separate author notes and learner tasks.
 Add a sibling tab and topic include for each new integration.
 Develop and validate each shared adapter here first; only then open consumer PRs.
 The current adapters are py-exercise, math-exercise and pyodide-interaktiv.
@@ -13,7 +13,7 @@ The current adapters are py-exercise, math-exercise and pyodide-interaktiv.
 ## Set up and serve
 
 Requirements: Python 3.12+, Git, Node 22/npm and Quarto **1.8.27**. Install
-`PyYAML==6.0.2`, `sympy==1.14.0` and `networkx==3.4.2` in the Python used by `python`, or set
+`PyYAML==6.0.2`, `sympy==1.13.3` and `networkx==3.4.2` in the Python used by `python`, or set
 `PYTHON` to that interpreter for the mathematics tests.
 
 ```sh
@@ -28,24 +28,37 @@ Use an HTTP origin: Monaco and Pyodide workers do not work reliably with `file:/
 
 ## Repository selection
 
-`repos.json` is the branch/pin manifest:
+`repos.json` pins every component by full commit; the branch says where
+updates come from:
 
-| Repository | Branch | Default source |
+| Component | Repository | Branch followed for updates |
 |---|---|---|
-| ctm-assessment | `main` | This checkout, including local edits |
-| ai-feedback | `main` | Current `main` tip |
-| py-exercise | `main` | Current `main` tip |
-| math-exercise | `main` | Current `main` tip |
-| pyodide-interaktiv | `feature/shared-feedback-integration` | Temporary migration pin |
+| ctm-assessment | this repository | this checkout, including local edits |
+| ai-feedback | Erasmus-CTM/ai-feedback | `main` |
+| py-exercise | Erasmus-CTM/py-exercise | `main` |
+| math-exercise | Erasmus-CTM/math-exercise | `main` |
+| pyodide-interaktiv | Erasmus-CTM/pyodide-interaktiv | `feature/shared-feedback-integration` |
+| jsxgraph | jsxgraph/jsxgraph-quarto (upstream) | `main` (extension folder `jsxgraph`) |
 
 The script records every resolved commit, local dirty-file list and copied
 extension file's SHA-256 in `resolved-repos.json`. That record is included in the
-rendered site and linked from `example.qmd`. External sources are downloaded as
-exact-commit archives. No upstream checkout is overwritten.
+rendered site and the archive. External sources are downloaded as exact-commit
+archives. No upstream checkout is overwritten. A component repository that
+ships another component's extension folder (a vendored copy) fails the build.
 
-Normal builds resolve current branch tips each time, while the temporary Pyodide
-migration pin remains fixed. The legacy `--refresh` flag is accepted and keeps
-that pin fixed too. Resolved commits are recorded without changing the manifest.
+Normal builds use the pins, so a merge in a component never changes the umbrella
+by itself. To move to newer components:
+
+```sh
+python scripts/setup-feedback-integration.py --update-pins   # writes branch tips into repos.json
+python scripts/setup-feedback-integration.py --test --browser
+```
+
+Commit the updated `repos.json` with the passing run. `--follow-branches`
+builds against the branch tips without changing the manifest; the scheduled
+**Track component branches** workflow does this weekly and fails early when a
+component change breaks the combined page. The legacy `--refresh` flag has no
+effect.
 For unmerged dependencies, explicitly select a review branch:
 
 ```sh
@@ -99,7 +112,7 @@ with GitHub Pages. Feature branches retain a `rendered-examples` artifact.
 
 ## Migration boundary
 
-Python tasks use shared Feedback and settings from the temporarily pinned
+Python tasks (py-exercise) use shared Feedback and settings; the Pyodide tab uses pyodide-interaktiv's
 `feature/shared-feedback-integration` branch until its AI migration is merged. Feedback
 reads current code without execution and includes only code-matched checker
 summaries and learner output. Edits and Reset invalidate that evidence.
@@ -113,8 +126,8 @@ code for feedback. Validate them here before opening a consumer PR.
 ## Pyodide integration
 
 The fourth tab includes `examples/_pyodide.qmd`: three incomplete programs for
-price, accumulation and circle area. `pyodide-interaktiv` is pinned to its shared
-feedback feature branch. The other maintained components follow `main`. All consumers
+price, accumulation and circle area. `pyodide-interaktiv` comes from its shared
+feedback feature branch; the other components from `main`; all are pinned by commit. All consumers
 share settings, transport and LaTeX rendering. Pyodide retains three hints that
 never supply finished code, and feedback never executes Python.
 
