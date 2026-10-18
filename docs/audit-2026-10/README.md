@@ -548,7 +548,10 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
 4. **`feedback: auto`:** agreed. On when the exercise has a task. Standalone pages gain the button, and P22 turns it off for a build.
 5. **pyodide-interaktiv depends on ctm-libs**, delivered like ai-feedback today: a generated, CI-checked copy shipped with it, which the package ignores.
 6. **ctm-checkers:** a new repository. Python versions mark grading changes, which land behind options first.
-7. **stack-sympy's audit** runs alongside step 2.
+7. **stack-sympy's audit** runs alongside step 2. stack-sympy is experimental and has no users yet (AC 18 Oct), so its code may be rewritten where needed.
+   - It provides its own STACK checkers as unit-tested modules of ctm-checkers, as they are.
+   - It shares assessment logic with math-exercise where the semantics agree.
+   - STACK questions get a cheap way to add the author's own Python checker, with the same `check(response)` contract as math-exercise's `#| checker:`.
 8. **One repository for the own components:** not now.
 
 **Order of work.** Each phase is one stacked PR per repository.
