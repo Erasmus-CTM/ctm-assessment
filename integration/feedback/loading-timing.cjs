@@ -14,7 +14,7 @@ const { chromium } = require('playwright');
 const site = process.env.CTM_INTEGRATION_SITE;
 if (!site) throw new Error('Set CTM_INTEGRATION_SITE to the rendered site.');
 const out = process.argv[2] || path.join(site, 'loading-timing.json');
-const RUNS = Number(process.env.CTM_TIMING_RUNS || 3);
+const RUNS = Number(process.env.CTM_TIMING_RUNS || 2);
 const SLOW_RUNS = Number(process.env.CTM_TIMING_SLOW_RUNS || 1);
 const VERSIONS = (process.env.CTM_PYODIDE_VERSIONS || '0.27.2,0.28.3').split(',');
 const types = {'.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.png': 'image/png'};
@@ -109,6 +109,7 @@ async function pageScenario(browser, name, url, kind, profile) {
     try {
       const record = {};
       for (const cache of ['cold', 'warm']) {
+        console.log(`[${new Date().toISOString().slice(11, 19)}] ${name} · ${profile} · run ${i + 1} · ${cache}`);
         const page = await ctx.newPage();
         page.setDefaultTimeout(300000);
         const before = ctx.__bytes.total;
@@ -163,6 +164,7 @@ async function runtimeScenario(browser, version, profile, base) {
     try {
       const record = {};
       for (const cache of ['cold', 'warm']) {
+        console.log(`[${new Date().toISOString().slice(11, 19)}] Pyodide ${version} runtime · ${profile} · run ${i + 1} · ${cache}`);
         const page = await ctx.newPage();
         page.setDefaultTimeout(600000);
         await page.goto(base + '/blank.html');
@@ -216,12 +218,15 @@ async function runtimeScenario(browser, version, profile, base) {
     for (const [file, name, kind] of [['timing-math.html', 'math-exercise alone', 'math'], ['timing-python.html', 'py-exercise alone', 'python'], ['timing-graphs.html', 'Four JSXGraph boards + one math exercise', 'math']]) {
       if (fs.existsSync(path.join(site, file))) pages.push([name, '/' + file, kind]);
     }
+    // The slow profile is expensive; by default it covers one page and one runtime.
+    const slowPages = (process.env.CTM_TIMING_SLOW_PAGES || 'math-exercise alone').split(',');
     for (const profile of ['fast', 'slow']) {
       for (const [name, url, kind] of pages) {
+        if (profile === 'slow' && !slowPages.includes(name)) continue;
         const r = await pageScenario(browser, name, base + url, kind, profile);
         results.scenarios.push(r); console.log(JSON.stringify({name, profile, summary: r.summary}));
       }
-      for (const version of VERSIONS) {
+      for (const version of profile === 'slow' ? VERSIONS.slice(0, 1) : VERSIONS) {
         const r = await runtimeScenario(browser, version, profile, base);
         results.scenarios.push(r); console.log(JSON.stringify({name: r.name, profile, summary: r.summary}));
       }
