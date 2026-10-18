@@ -9,17 +9,17 @@
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "audit/2026-10",
-      "commit": "a97443195d354c4aa6fbe514c092dec7c91faa39"
+      "commit": "49529de24eb4b5e1bc39925d1f2e4b44420bad46"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "audit/2026-10",
-      "commit": "7bc409d12ce3b740040191453e6dd2467aea5ca6"
+      "commit": "3126da36286348e7c20dd1aa9572b3a57b5d1705"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "audit/2026-10",
-      "commit": "361d52bdbba2277eed7ef74bd524e6131dc3059f",
+      "commit": "58543b976b7cfbff90fb4a5b5718de5bbd2cd69f",
       "ships-copies": [
         "ai-feedback"
       ]

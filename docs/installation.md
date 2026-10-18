@@ -50,7 +50,8 @@ one never changes another's look.
 
 A check that runs longer than 20 s offers **Stop** when Python runs in a worker
 (pages with Pyodide cells); loading Python and packages is not counted, but a
-load that has not finished after 180 s also offers Stop. Change the time for all components with
+load that has not finished after 180 s offers Stop, or ends with a message while
+Python is still starting. Change the time for all components with
 `ctm-assessment: {stop-after: 30}` (seconds), or per component
 (`math-exercise: {stop-after: ...}`, `py-exercise: {stop-after: ...}`).
 
