@@ -53,7 +53,7 @@ Severity: **critical** = wrong grading or broken install/release on the main pat
 | F-24 | First render of a task (Lua) turned `Price \$5 or \$7` into math; the JS redraw did not | math-exercise `math-exercise.lua` | fixed + Lua/JS parity test |
 | F-13 | pyodide-interaktiv loads micropip, pyodide_http and **matplotlib** into its worker on every page with a Pyodide cell, before any cell runs; on mixed pages the first maths/Python check waits behind it | pyodide-interaktiv `qpyodide-document-engine-initialization.js` | proposed (§5 P7; measurements §3) |
 | F-14 | pyodide-interaktiv's interactive plots start a **second** Pyodide on the main thread | `qpyodide-canvas-plots.js` | proposed |
-| F-38 | JSXGraph defaults loaded unversioned `jsxgraph` and `mathjax@4` from jsDelivr: JSXGraph 1.14.0 (5 Oct) has been served to published pages while static exports use the bundled 1.13.3 | upstream `jsxgraph.lua` | fixed on fork branch for an upstream PR (pinned to bundled 1.13.3 and MathJax 4.1.3) |
+| F-38 | JSXGraph defaults loaded unversioned `jsxgraph` and `mathjax@4` from jsDelivr: JSXGraph 1.14.0 (5 Oct) has been served to published pages while static exports use the bundled 1.13.3 | upstream `jsxgraph.lua` | fixed on fork branch for an upstream PR: release lines `jsxgraph@1` and `mathjax@4` (P9), so a published page and a static export use the same major versions |
 | F-34 | Authoring errors (`error()` in the Lua filters) were only logged by Quarto 1.8.27: the render succeeded and published a broken exercise | math-exercise, py-exercise | fixed (`assert`); authors now get a failed render — see Info |
 | F-41 | ai-feedback always emitted `storage: local`, so `pyodide: feedback-storage: session` was ignored. Learners' personal API keys were then saved to localStorage on shared machines | ai-feedback `feedback-quarto.lua` | fixed: storage emitted only when set (review round 2) |
 | F-42 | A failed Pyodide WebAssembly download left `loadPyodide()` pending forever: every Check and the export hung with no message | shared `pyodide-runtime.js` (math-exercise, py-exercise) | fixed: 180 s timeout, localized message, the next Check retries |
@@ -103,7 +103,7 @@ Severity: **critical** = wrong grading or broken install/release on the main pat
 | F-72 | math-exercise `deb5956` (main, 16 Oct, unreleased) escapes all exercise text, so TeX `a<b<c` survives. But Markdown authors already write (`**bold**`, backticks: 2 in math-exercise, 15 in ctm-demo, 7 in ingmat3a) was shown literally, and the HTML in 35 ingmat3a exercises (`<strong>`, `&nbsp;`, `<br>`, `<code>`) showed as tags | math-exercise → ctm-demo, ingmat3a | AC (18 Oct): no HTML in Markdown, allow some inline Markdown. Fixed: `**bold**`, `*italic*`, backticks and `\*` outside math in the Lua and JS renderers, with a parity test; HTML stays text; ingmat3a's exercise text rewritten in Markdown |
 | F-73 | The new course installer rendered the package's own example site, which runs math-exercise author tests and so needs SymPy; ingmat3a's CI has none and its setup failed | ctm-assessment | fixed: `--package-only` build for course installs (2 s, stdlib + PyYAML) |
 | F-74 | Review round 6: after the Stop-timer move, a SymPy or package download that never finished in pyodide-interaktiv's worker left Check disabled with no Stop; computed keys such as `1.05*1.9` rounded on binary noise; `variants.py` rounded half to even, so a displayed solution (1/8 → 0.12) could be graded wrong | math-exercise, py-exercise | fixed: timer at the load limit (180 s) during loading; `.15g` decimal rounding; `round`/`sigfig`/`{{x:.Nf}}` round like the checker (no existing variant changes in ctm-demo or the examples); tests |
-| F-75 | JSXGraph boards in hidden Quarto tabs or collapsed blocks started in a 0×0 iframe (NaN bounding box); `resizeContainer(w, h)` fixed the container's pixel width, so on a 390 px window boards kept their desktop width and were cut off; keep-aspect boards could be cropped (x −1…13 shown as 2…10) and drifted after desktop → mobile → desktop; `BOARDID` worked only inside `initBoard` (reported from ctm-demo's solenoid figure; reproduced in Chromium) | jsxgraph-quarto (upstream) | fixed on the fork's PR branch: the board code starts when the iframe has a size (an assessment request starts it at once); resizing follows the board's container without fixing it, fits keep-aspect boards with one scale, centred, and keeps views set by board code or the user; JSXGraph's own resize observer off by default; `var BOARDID`. Browser test `integration/feedback/jsxgraph-layout.cjs` (nested tabs, collapsed callout, mobile and back, user view, variant and legacy page code, a board beside a toolbar, hidden assessment); all 38 ctm-demo boards checked; ctm-demo's solenoid workaround removed |
+| F-75 | JSXGraph boards in hidden Quarto tabs or collapsed blocks started in a 0×0 iframe (NaN bounding box); `resizeContainer(w, h)` fixed the container's pixel width, so on a 390 px window boards kept their desktop width and were cut off; keep-aspect boards could be cropped (x −1…13 shown as 2…10) and drifted after desktop → mobile → desktop; `BOARDID` worked only inside `initBoard` (reported from ctm-demo's solenoid figure; reproduced in Chromium) | jsxgraph-quarto (upstream) | fixed on the fork's PR branch: the board code starts when the iframe has a size, inline if it is visible while the page parses (an assessment request starts it at once); a late start replays the page's `DOMContentLoaded`/`load` listeners and `window.onload` once and turns `document.write` into an insert; resizing follows the board's container without fixing it, fits keep-aspect boards with one scale, centred, and keeps views set by board code or the user (boards set by `unitX`/`unitY` keep their units); JSXGraph's own resize observer off by default; `var BOARDID`. Browser test `integration/feedback/jsxgraph-layout.cjs` (12 boards: nested tabs, collapsed callout, mobile and back, user view, variant and legacy page code, `DOMContentLoaded`, `window.onload` and `document.write` in a hidden tab, unit boards, a container that changes width, hidden assessment; it fails on the previous fork commit); all 38 ctm-demo boards checked; ctm-demo's solenoid workaround removed |
 | F-76 | Review round 7 on the inline-Markdown change: `\*` closed emphasis; emphasis could not contain math; `$` in a code span became math; `***x***` was wrong; the closing search was cubic (an 8000-character line rendered in 27 s); `{{` before markup or at a line end started a Quarto shortcode that swallowed the exercise. On the timer change: a SymPy reload during a retry ran under stop-after, and a pyodide-interaktiv worker that never finished starting left Check pending forever | math-exercise, py-exercise, shared runtime | fixed, with tests that fail on the previous code; Lua and JS agree on 1400 random texts; real exercises in three repositories render unchanged |
 | F-77 | Backwards compatibility: after webagg, projects that pin `pyodide: base-url: …/v0.27.2/` (the old README's example) got no interactive plots, because WebAgg needs Pyodide 0.28. Separately, an old bug: `build-variant: full` produced `…/v0.27.2/fullpyodide.mjs` and broke the worker | pyodide-interaktiv | fixed: the canvas engine picks the backend from the loaded Pyodide (old frozen backend below 0.28, WebAgg from 0.28); a trailing slash is added; docs and 14 tests |
 | F-78 | Course installer: `quarto add` failing left the course without its extensions; a `ctm-assessment` review ref was silently ignored; `--package-only` still assembled the example site and downloaded an asset; build paths were long for Windows; PowerShell 5.1 mangled the JSON review refs | ctm-assessment | fixed: atomic replace with restore, `NAME=SHA` refs, a rejected key, short cache names, docs on full SHAs and `--workspace`; 11 + 9 tests |
@@ -167,7 +167,7 @@ Severity: **critical** = wrong grading or broken install/release on the main pat
 | **math-exercise** | — | Feedback → ai-feedback (`feedback: auto` default); graphical answers / diagram context → jsxgraph/jsxgraph-quarto ≥1.1.0 | Pyodide 0.27.2 (preloaded at page load), SymPy 1.13.3 (first Check), KaTeX 0.16.11; `packages:` e.g. networkx 3.4.2 (pulls numpy + matplotlib in Pyodide 0.27.2) | ≥1.4.549 (tested 1.8.27) | **now** renders without ai-feedback (message), fails with an install message for JSXGraph references |
 | **py-exercise** | — | `feedback: true` → ai-feedback; shared runtime with pyodide-interaktiv | Pyodide 0.27.2, Monaco 0.46.0 | ≥1.4.549 (tested 1.8.27) | works; `feedback: true` without ai-feedback stops with an install message |
 | **pyodide-interaktiv** (feature branch) | ai-feedback **unless** `pyodide: feedback: false` (default true) | — | Pyodide 0.27.2 in a worker + micropip, pyodide_http, matplotlib at start; Monaco 0.46.0; Font Awesome 6.5.1 JS kit (cdnjs); coi-serviceworker | ≥1.4.549 | needs ai-feedback by default (clear message) — proposal P1 makes it auto |
-| **JSXGraph** (upstream) | — | Node + puppeteer/playwright only for static SVG export | jsxgraphcore + css (now pinned 1.13.3 on the fork branch), MathJax 4 in every board iframe | ≥1.3.0 | works |
+| **JSXGraph** (upstream) | — | Node + puppeteer/playwright only for static SVG export | jsxgraphcore + css (release line 1 on the fork branch), MathJax 4 in every board iframe | ≥1.3.0 | works |
 | **ctm-assessment** (umbrella) | bundles all of the above at pinned commits | — | — | ≥1.8.27 | n/a |
 
 How the umbrella delivers components: it **bundles** one copy of each in `ctm-assessment.tar.gz` (published on the example site), at the commits pinned in `integration/feedback/repos.json`, tested together; `resolved-repos.json` inside the archive records commits and per-file SHA-256. Filter order: ai-feedback, JSXGraph, math-exercise, py-exercise, pyodide-interaktiv. Standalone installs go under `_extensions/Erasmus-CTM/…` and the umbrella keeps using its own set (tested). Python-side build dependencies: PyYAML (variants, defaults sync), SymPy 1.13.3 + NetworkX 3.4.2 for authored checker tests. CI coverage: umbrella install (archive test incl. side-by-side copies); math-exercise standalone with and without ai-feedback/JSXGraph (`tests/standalone-dependencies.test.mjs`); py-exercise with/without feedback (verified locally; py-exercise CI renders with ai-feedback installed); ai-feedback alone.
@@ -450,7 +450,7 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
       - the repository (archived, with a pointer) and its install command;
       - the version-mix and minimum-version machinery;
       - the "install ai-feedback" messages.
-    - **Timing:** fold before pyodide-interaktiv's stacked PR is reviewed, so that team integrates once, with ctm-libs; P14's shipped copy then goes.
+    - **Timing:** fold before pyodide-interaktiv's stacked PR is reviewed, so that team integrates once, with ctm-libs; P14's shipped copy then becomes a copy of ctm-libs (§5b).
     - **Migration:** a project listing `ai-feedback` in `filters` gets one clear message to remove it.
   - **stack-sympy:** authors already mix it with math-exercise and py-exercise on one page (shared interpreter, feedback, lamp, progress), so it becomes a component of the product, on ctm-libs and ctm-checkers.
     - Its STACK semantics (answer tests, any Moodle STACK compatibility) live in ctm-checkers as their own module, so shared code never changes how a STACK question grades.
@@ -487,6 +487,61 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
       - Saved answers and progress (P17) are keyed by exercise label, not language, so switching language keeps them.
       - A ctm-ui language switch in the navbar opens the same page in the other build.
 - **P10 — pyodide-interaktiv `error()` in top-level filters** and the remaining items for the members maintaining it (F-13, F-14): reported in its PR, not changed.
+
+## 5b. Implementation plan after AC's decision on P20 (18 Oct)
+
+**Decision (AC):** two internal libraries. **`ctm-libs`** is one Quarto extension with ai-feedback folded in. **`ctm-checkers`** is the Python checker library, shared by math-exercise and stack-sympy. Authors still install one product, CTM Assessment.
+
+**What the decision changes in the proposals:**
+
+| Proposal | Before | Now |
+|---|---|---|
+| P4 (packages) | four new packages: `ctm-runtime`, `ctm-docs`, `ctm-ci`, `ctm_checkers` | **superseded.** Steps 1, 2, 4 and the UI go to ctm-libs. Step 5 is ctm-checkers. Steps 3 and 7 become folders in ctm-assessment. Step 6 (the bridge client) goes upstream to jsxgraph-quarto next to its server half, or to ctm-libs if upstream declines |
+| P2, P3 (ai-feedback config, key storage) | an ai-feedback release | done **during the fold**. The configuration is redefined once, under `ctm-assessment:` with `ai-feedback:` as an alias, so these land with it rather than after it |
+| P14 (pyodide-interaktiv's shipped ai-feedback) | goes when the fold is done | **changes subject; it does not go.** pyodide-interaktiv's own users install only pyodide-interaktiv, so their projects must keep building. The generated, CI-checked copy becomes a copy of ctm-libs (or of its alias extension, below). Needs the pyodide-interaktiv members' agreement |
+| P12 (stack-sympy loader) | copy the shared `feedback-loader.lua` | stack-sympy moves onto ctm-libs (locator, runtime, feedback) and ctm-checkers. Its vendored `pyodide-runtime.js` and `assess_basis` go. Needs stack-sympy's own audit first |
+| P13, P16 (worker, preload and lamp) | in the shared runtime | in ctm-libs. P13 is a prerequisite for P16's `idle` default |
+| P17, P18, P21 (UI, Markdown features, locale) | `ctm-ui` | a part of ctm-libs, not a separate package |
+| P8 (Pyodide upgrade) | in `ctm-runtime` | one constant in ctm-libs. Gated by ctm-checkers' tests run in Pyodide |
+| P5, P15, P21.3 (grading changes) | per component | **ctm-checkers releases.** Each change sits behind an option first. The STACK answer tests are their own module, so math-exercise changes never move STACK grades |
+| P7 (loading) | separate items | mostly solved by ctm-libs: one set of cacheable files instead of ~330 KB inlined per page, one icon set |
+| P1, P6, P9, P10, P11, P19 | — | unchanged. P1 needs a footnote (next table) |
+
+**New decisions the plan needs:**
+
+| Question | Recommendation | Why |
+|---|---|---|
+| Where does ctm-libs live? | **Rename the ai-feedback repository to `ctm-libs`.** GitHub redirects the old URL. The repository keeps a thin `_extensions/ai-feedback` alias extension for one release, so `quarto add Erasmus-CTM/ai-feedback` and `filters: [ai-feedback]` keep working | keeps history, issues and links. The alias gives the quiet retirement AC asked for without a break |
+| Where does ctm-checkers live? | **Its own repository with a Python version** (`pip install` for native CI and the course repos' tests; a Pyodide bundle built like stack-sympy's `bundle_runtime.py`) | grading semantics need their own version and changelog. stack-sympy can pin it if it keeps its own release cycle |
+| What does math-exercise's `feedback: auto` mean once ai-feedback is always present? | **On when the exercise has a task, as today with ai-feedback installed.** The release note names the change | today `auto` means "on when ai-feedback is installed". After the fold it is always installed, so standalone math-exercise pages without ai-feedback gain a Feedback button (copy mode, no key needed). Three users; the alternative (`auto` = off unless the project configures feedback) would turn feedback off for ctm-demo and ingmat3a |
+
+**Order of work.** Each phase is one stacked PR per repository, merged into the working branch, then offered to the pyodide-interaktiv members for review as AC planned.
+
+0. **Release the current campaign.** JSXGraph upstream PR first, then the pins. ingmat3a's ref goes to main.
+1. **ctm-libs skeleton.**
+   - Rename the repository and add the alias extension.
+   - Move in the runtime (`pyodide-runtime.js` with its Stop helpers and load limit, the Pyodide constant, Monaco and KaTeX loaders, `escapeHtml`), the dependency locator (`feedback-loader.lua`) and the locale resolver with one message catalogue (P21.1).
+   - math-exercise and py-exercise switch to it. The byte-identical copies disappear (`feedback-loader.lua` ×3, `pyodide-runtime.js` ×2).
+   - With the fold, P2, P3 and P19.
+   - No visible change except py-exercise gaining `nb`.
+2. **ctm-checkers.**
+   - Extract math-exercise's embedded ~345-line library and the authored-test runner. `question-tests.py` then imports it instead of extracting it with regexes.
+   - Add the rounding helpers (`.15g` with half-up), the graph and basis checkers, and the result contract.
+   - math-exercise loads the bundle. CI installs it natively at the same version.
+   - No grading change: the existing tests must pass unchanged.
+3. **pyodide-interaktiv onto ctm-libs** (with its members). This is the point where P20 asked for the fold: the team integrates once. Its shipped copy becomes ctm-libs (P14). Its worker RPC moves into ctm-libs for step 4.
+4. **Runtime behaviour.**
+   - P13: a worker for standalone pages.
+   - Then P16: preload and the lamp, with the measurement first.
+   - Then P8 when wanted.
+5. **UI.**
+   - P17: store, progress, quizzes.
+   - P18: reveals, modes, tab links, figure slots, with the two course migrations.
+   - The rest of P21: bilingual exercise text, profiles, language switch.
+6. **stack-sympy** (after its audit). It moves onto ctm-libs and ctm-checkers (P12) with its STACK module. Whether math-exercise and stack-sympy merge is decided then.
+7. **Grading options** in ctm-checkers releases: P5, P15, P21.3, P6's PY-10. Each lands behind an option, and the default changes in a later major release.
+
+Steps 1–3 change no grade and no author syntax. Steps 4–5 add opt-in features. Only step 7 changes grading, and only behind options.
 
 ## 6. stack-sympy impact
 

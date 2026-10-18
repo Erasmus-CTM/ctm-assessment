@@ -39,6 +39,15 @@ Nothing here.
 ${board('assessment_id="tabbed" width="760" height="320" style="width:100%;max-width:760px;height:320px;border:0;"', [-1, 3, 14, -3], false)}
 :::
 
+## Onload
+\`\`\`{.jsxgraph assessment_id="onload" width="400" height="200" style="width:100%;max-width:400px;height:200px;border:0;"}
+// Older board code waits for the page's load event.
+window.onload = function () {
+  var b = JXG.JSXGraph.initBoard(BOARDID, {boundingbox: [0, 4, 8, 0], showNavigation: false, showCopyright: false});
+  window.__probe = function () { return {bbox: b.getBoundingBox(), w: b.canvasWidth}; };
+};
+\`\`\`
+
 ## Assessed
 ${board('assessment_id="assessed" width="500" height="250" style="width:100%;max-width:500px;height:250px;border:0;"', [-2, 2, 2, -2], false,
   'JXG.QuartoAssessment.register({response: function () { return {width: b.canvasWidth, started: true}; }});\n')}
@@ -71,6 +80,30 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fitBoard).observe(
 window.addEventListener('resize', fitBoard);
 fitBoard();
 window.__probe = function () { return b ? {bbox: b.getBoundingBox(), w: b.canvasWidth, vw: innerWidth} : null; };
+\`\`\`
+
+\`\`\`{.jsxgraph assessment_id="ready" width="400" height="200" style="width:100%;max-width:400px;height:200px;border:0;"}
+document.addEventListener('DOMContentLoaded', function () {
+  var b = JXG.JSXGraph.initBoard(BOARDID, {boundingbox: [0, 4, 8, 0], showNavigation: false, showCopyright: false});
+  window.__probe = function () { return {bbox: b.getBoundingBox(), w: b.canvasWidth}; };
+});
+\`\`\`
+
+\`\`\`{.jsxgraph assessment_id="written" width="400" height="200" style="width:100%;max-width:400px;height:200px;border:0;"}
+document.write('<p id="note">written</p>');
+var b = JXG.JSXGraph.initBoard(BOARDID, {boundingbox: [0, 4, 8, 0], showNavigation: false, showCopyright: false});
+window.__probe = function () { return {note: !!document.getElementById('note'), w: b.canvasWidth}; };
+\`\`\`
+
+\`\`\`{.jsxgraph assessment_id="units" width="600" height="300" style="width:100%;max-width:600px;height:300px;border:0;"}
+var b = JXG.JSXGraph.initBoard(BOARDID, {originX: 50, originY: 250, unitX: 40, unitY: 20, showNavigation: false, showCopyright: false});
+window.__probe = function () { return {bbox: b.getBoundingBox(), w: b.canvasWidth, vw: b.containerObj.clientWidth}; };
+\`\`\`
+
+\`\`\`{.jsxgraph assessment_id="panel" width="600" height="300" style="width:100%;max-width:600px;height:300px;border:0;"}
+var b = JXG.JSXGraph.initBoard(BOARDID, {boundingbox: [0, 4, 8, 0], showNavigation: false, showCopyright: false});
+window.__half = function () { b.containerObj.style.width = '50%'; };
+window.__probe = function () { return {w: b.canvasWidth, cw: b.containerObj.clientWidth}; };
 \`\`\`
 
 \`\`\`{.jsxgraph assessment_id="named" width="400" height="200" style="width:100%;max-width:400px;height:200px;border:0;"}
@@ -114,9 +147,21 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     const probe = async id => (await frame(id)).evaluate(() => window.__probe ? window.__probe() : null);
     const settle = () => page.waitForTimeout(400);
     // The visible board has started; it finds its container through BOARDID.
-    await page.waitForFunction(() => document.querySelectorAll('iframe').length === 7);
+    await page.waitForFunction(() => document.querySelectorAll('iframe').length === 12);
     await (await frame('named')).waitForFunction(() => typeof window.__probe === 'function');
     assert.deepEqual(await probe('named'), {found: true, w: 400});
+    // Visible boards whose code waits for DOMContentLoaded or uses document.write
+    // run as before; the parent page finishes loading.
+    for (const id of ['ready', 'written']) await (await frame(id)).waitForFunction(() => typeof window.__probe === 'function');
+    assert.equal((await probe('written')).note, true);
+    await page.waitForFunction(() => document.readyState === 'complete');
+    // A container resized by the board code (a side panel) is followed.
+    // (Chromium pauses rendering of off-screen cross-origin iframes: bring it into view.)
+    await page.locator('iframe#panel').scrollIntoViewIfNeeded();
+    await (await frame('panel')).evaluate(() => window.__half());
+    await page.waitForTimeout(400);
+    const panel = await probe('panel');
+    assert.ok(panel.w === panel.cw && panel.cw > 0, 'panel: ' + JSON.stringify(panel));
     // Hidden boards have not run their code yet (no zero-size start).
     for (const id of ['tabbed', 'collapsed']) assert.equal(await probe(id), null, id + ' started while hidden');
 
@@ -132,6 +177,11 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     }));
     assert.equal(reply.error, undefined, reply.error);
     assert.equal(reply.payload.started, true);
+
+    // A hidden board whose code waits for the page's load event starts when shown.
+    await page.getByRole('tab', {name: 'Onload'}).click();
+    await (await frame('onload')).waitForFunction(() => typeof window.__probe === 'function');
+    assert.ok(close((await probe('onload')).bbox, [0, 4, 8, 0]), 'onload board');
 
     // Shown: the intended bounding box at the full width.
     await page.getByRole('tab', {name: 'Outer'}).click();
@@ -152,8 +202,10 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     assert.ok(close(variant.bbox, [10, 14, 18, 10]), 'variant: ' + JSON.stringify(variant));
     assert.ok(contains(legacy.bbox, [0, 10, 10, 0]) && legacy.w === legacy.vw, 'legacy: ' + JSON.stringify(legacy));
 
+    const unitsWide = await probe('units');
     // Mobile width: the boards follow the iframe and keep the intended view.
     await page.setViewportSize({width: 390, height: 800}); await settle();
+    const units = await probe('units');
     const narrow = await probe('tabbed'), narrowCollapsed = await probe('collapsed');
     assert.ok(narrow.w < 400 && narrow.w === narrow.vw, 'narrow width: ' + JSON.stringify(narrow));
     assert.ok(close(narrow.bbox, [-1, 3, 14, -3]), 'narrow tabbed: ' + JSON.stringify(narrow));
@@ -164,6 +216,9 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     assert.ok(close((await probe('tabbed')).bbox, tabbed.bbox));
     assert.ok(close((await probe('collapsed')).bbox, collapsed.bbox), 'collapsed drifted');
     assert.ok(close((await probe('variant')).bbox, [10, 14, 18, 10]), 'variant view lost');
+    // A board set up with origin and units keeps that view (no default box).
+    assert.ok(units.w === units.vw && Math.abs(units.bbox[1] - unitsWide.bbox[1]) < 1e-6 && units.bbox[0] === unitsWide.bbox[0], 'units narrow: ' + JSON.stringify([unitsWide, units]));
+    assert.ok(close((await probe('units')).bbox, unitsWide.bbox), 'units drifted: ' + JSON.stringify(await probe('units')));
     assert.ok(close((await probe('padded')).bbox, padded.bbox), 'padded drifted');
     assert.ok(close((await probe('legacy')).bbox, legacy.bbox), 'legacy drifted: ' + JSON.stringify(await probe('legacy')));
 
