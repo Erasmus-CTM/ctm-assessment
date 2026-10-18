@@ -84,7 +84,9 @@ branch or a commit) instead of the published archive. Fetch ctm-assessment at
 that ref, then run its installer:
 
 ```sh
-git clone --depth 1 --branch main https://github.com/Erasmus-CTM/ctm-assessment.git .private-extensions/ctm-assessment
+git init -q .private-extensions/ctm-assessment
+git -C .private-extensions/ctm-assessment fetch --depth 1 https://github.com/Erasmus-CTM/ctm-assessment.git main   # or a commit
+git -C .private-extensions/ctm-assessment checkout -q --detach FETCH_HEAD
 python .private-extensions/ctm-assessment/scripts/install-project.py --project .
 ```
 
