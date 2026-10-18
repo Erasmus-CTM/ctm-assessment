@@ -108,6 +108,7 @@ Severity: **critical** = wrong grading or broken install/release on the main pat
 | F-77 | Backwards compatibility: after webagg, projects that pin `pyodide: base-url: …/v0.27.2/` (the old README's example) got no interactive plots, because WebAgg needs Pyodide 0.28. Separately, an old bug: `build-variant: full` produced `…/v0.27.2/fullpyodide.mjs` and broke the worker | pyodide-interaktiv | fixed: the canvas engine picks the backend from the loaded Pyodide (old frozen backend below 0.28, WebAgg from 0.28); a trailing slash is added; docs and 14 tests |
 | F-78 | Course installer: `quarto add` failing left the course without its extensions; a `ctm-assessment` review ref was silently ignored; `--package-only` still assembled the example site and downloaded an asset; build paths were long for Windows; PowerShell 5.1 mangled the JSON review refs | ctm-assessment | fixed: atomic replace with restore, `NAME=SHA` refs, a rejected key, short cache names, docs on full SHAs and `--workspace`; 11 + 9 tests |
 | F-79 | A page's own component options replace the project's instead of merging: with `math-exercise: {feedback: false}` in `_quarto.yml` (or a profile), a page with `math-exercise: {lang: nb}` still shows Feedback (measured, Quarto 1.8.27). Every ctm-demo page with exercises sets `math-exercise: lang`, so project-level `feedback`/`stop-after` never reach them | all components (Quarto's metadata merge) | reported; P22 and the P20 configuration read shared keys from one place that pages do not replace |
+| F-80 | Review round 9 of the last fixes. **JSXGraph:** a board started late (hidden, or by an assessment request) dropped scripts written with `document.write`, and mangled markup written in parts. An assessment request to a still-hidden board sent a blank picture as AI context, and its graph editor ignored clicks once shown. Boards created again added resize observers. **math-exercise:** Stop pressed during the reload after a restart showed an input error. One check finishing its reload switched another, still reloading, check to stop-after. A loading Stop note stayed while the check ran | jsxgraph-quarto (fork), math-exercise | fixed. JSXGraph: written content is collected and added once (scripts run, external ones load before the replayed load handlers, an assessment waits for them); a hidden forced start gets a provisional pixel size; the editor reads the view at click time; one shared observer. math-exercise: stop re-checked after the reload; one reload count for all checks; a phase change takes back the previous Stop note. Browser test cases added (inline start, written scripts, hidden picture, editor after a hidden start); they fail on the previous fork commit; 3 jsdom tests |
 | F-18 | Internal checker errors were shown to students as input-spelling hints with „…" quotes in English | resolved by F-02/F-04 |
 | PY-7…18, MATH-14…24 | see appendices | mostly fixed; runtime items proposed |
 
@@ -455,7 +456,7 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
       - the repository (archived, with a pointer) and its install command;
       - the version-mix and minimum-version machinery;
       - the "install ai-feedback" messages.
-    - **Timing (changed by AC, 18 Oct):** pyodide-interaktiv joins later. Its current PR is reviewed as it is, and ctm-libs keeps the ai-feedback interface it uses until then (§5b). P14's shipped copy becomes a copy of ctm-libs when it joins.
+    - **Timing (AC 18 Oct):** pyodide-interaktiv takes part in the consolidation on its working branch, which AC's courses pin. Its PR to `main` follows the consolidation and ships ctm-libs (P14), with the open question of joining CTM Assessment (§5b).
     - **Migration:** a project listing `ai-feedback` in `filters` gets one clear message to remove it.
   - **stack-sympy:** authors already mix it with math-exercise and py-exercise on one page (shared interpreter, feedback, lamp, progress), so it becomes a component of the product, on ctm-libs and ctm-checkers.
     - Its STACK semantics (answer tests, any Moodle STACK compatibility) live in ctm-checkers as their own module, so shared code never changes how a STACK question grades.
@@ -550,13 +551,13 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
 7. **stack-sympy's audit** runs alongside step 2.
 8. **One repository for the own components:** not now.
 
-**Order of work.** Each phase is one stacked PR per repository. pyodide-interaktiv joins later (AC 18 Oct): its current PR (WebAgg and the shared-feedback integration) goes to its members for review now, and its move onto ctm-libs is a separate, later step.
+**Order of work.** Each phase is one stacked PR per repository.
 
-**While pyodide-interaktiv is outside, ctm-libs keeps two contracts unchanged, so that pyodide-interaktiv 1.8 works inside the package without changes:**
-- the ai-feedback JavaScript and Lua interface that pyodide-interaktiv's feedback code calls, found under the name `ai-feedback` (the alias extension);
-- the shared-interpreter globals (`mainPyodide`, `qpyodideInstance`, `__qExercisePyodide`).
+**pyodide-interaktiv (AC 18 Oct)** has two user groups:
+- users of its `main` (prompts built into the core, before WebAgg and before shared feedback), whose projects must keep building;
+- AC's courses, which pin the unmerged working branch and have no need for ai-feedback as a separate extension.
 
-The umbrella's mixed-page tests check both.
+So pyodide-interaktiv takes part in the consolidation on its working branch like the other components. Only after the consolidation does a PR to its `main` go to the members who maintain it. That PR ships ctm-libs, as it ships ai-feedback today, and asks one open question: does pyodide-interaktiv become a part of CTM Assessment?
 
 0. **Release the current campaign.** JSXGraph upstream PR first, then the pins. ingmat3a's ref goes to main.
 1. **ctm-libs skeleton.**
@@ -571,22 +572,25 @@ The umbrella's mixed-page tests check both.
    - Add the rounding helpers (`.15g` with half-up), the graph and basis checkers, and the result contract.
    - math-exercise loads the bundle. CI installs it natively at the same version.
    - No grading change: the existing tests must pass unchanged.
-3. **UI.**
-   - P17: store, progress, quizzes. pyodide-interaktiv keeps its own `local-storage` until step 4.
+3. **pyodide-interaktiv onto ctm-libs** (working branch).
+   - Its shipped copy becomes ctm-libs (P14).
+   - Its worker RPC moves into ctm-libs, so the worker for standalone pages (step 5) has one implementation.
+4. **UI.**
+   - P17: store, progress, quizzes, with pyodide-interaktiv's saved cells in the store.
    - P18: reveals, modes, tab links, figure slots, with the two course migrations.
    - The rest of P21: bilingual exercise text, profiles, language switch.
-4. **pyodide-interaktiv onto ctm-libs** (with its members, when they are ready).
-   - Its shipped copy becomes ctm-libs (P14).
-   - Its status line shows the shared lamp, and its saved cells move into the store.
-   - Its worker RPC moves into ctm-libs. That is the one code move step 5 waits for, so there is no second worker implementation.
 5. **Runtime behaviour.**
    - P13: a worker for standalone pages.
    - Then P16: preload and the lamp, with the measurement first.
    - Then P8 when wanted.
 6. **stack-sympy** (after its audit, which runs alongside step 2). It moves onto ctm-libs and ctm-checkers (P12) with its STACK module. Whether math-exercise and stack-sympy merge is decided then.
 7. **Grading options** in ctm-checkers releases: P5, P15, P21.3, P6's PY-10. Each lands behind an option, and the default changes in a later major release.
+8. **PR to pyodide-interaktiv's `main`** for its members.
+   - It ships ctm-libs, so `quarto add Erasmus-CTM/pyodide-interaktiv` keeps working.
+   - The BC proposals for its old users go with it: prompts built into the core, `feedback` defaults, Quarto ≥ 1.8.27.
+   - It asks whether pyodide-interaktiv joins CTM Assessment.
 
-Steps 1, 2 and 4 change no grade and no author syntax. Steps 3 and 5 add opt-in features. Only step 7 changes grading, and only behind options.
+Steps 1–3 change no grade and no author syntax. Steps 4 and 5 add opt-in features. Only step 7 changes grading, and only behind options.
 
 ## 6. stack-sympy impact
 

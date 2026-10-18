@@ -30,6 +30,13 @@ filters: [jsxgraph]
 ## Start
 Visible tab.
 
+\`\`\`{.jsxgraph assessment_id="inline" width="300" height="150" style="width:100%;max-width:300px;height:150px;border:0;"}
+// Visible while the page is parsed: the code runs inline, as before.
+window.__state = document.readyState;
+var b = JXG.JSXGraph.initBoard(BOARDID, {boundingbox: [0, 4, 8, 0], showNavigation: false, showCopyright: false});
+window.__probe = function () { return {state: window.__state, w: b.canvasWidth}; };
+\`\`\`
+
 ## Outer
 ::: {.panel-tabset}
 ## Inner one
@@ -37,6 +44,26 @@ Nothing here.
 
 ## Inner two
 ${board('assessment_id="tabbed" width="760" height="320" style="width:100%;max-width:760px;height:320px;border:0;"', [-1, 3, 14, -3], false)}
+
+## Script
+\`\`\`{.jsxgraph assessment_id="script" width="400" height="200" style="width:100%;max-width:400px;height:200px;border:0;"}
+// Older board code: document.write loads a library and writes markup in parts.
+document.write('<script>window.__ran = true;<\\/script>');
+document.write('<script src="data:text/javascript,window.__lib=42"><\\/script>');
+document.write('<table id="written-table"><tr><td>1</td>');
+document.write('<td>2</td></tr></table>');
+window.onload = function () {
+  var b = JXG.JSXGraph.initBoard(BOARDID, {boundingbox: [0, 4, 8, 0], showNavigation: false, showCopyright: false});
+  window.__probe = function () { return {ran: window.__ran === true, lib: window.__lib, cells: document.querySelectorAll('#written-table td').length, w: b.canvasWidth}; };
+};
+\`\`\`
+
+## Editor
+\`\`\`{.jsxgraph assessment_id="editor" width="500" height="400" style="width:100%;max-width:500px;height:400px;border:0;"}
+var graphEditor = JXG.QuartoGraphEditor.createBoard();
+graphEditor.register({ai: {render: true, summary: function () { return 'graph'; }}});
+window.__probe = function () { var b = graphEditor.board; return {bbox: b.getBoundingBox(), w: b.canvasWidth, vw: b.containerObj.clientWidth, nodes: graphEditor.response().nodes.length}; };
+\`\`\`
 :::
 
 ## Onload
@@ -147,13 +174,15 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     const probe = async id => (await frame(id)).evaluate(() => window.__probe ? window.__probe() : null);
     const settle = () => page.waitForTimeout(400);
     // The visible board has started; it finds its container through BOARDID.
-    await page.waitForFunction(() => document.querySelectorAll('iframe').length === 12);
+    await page.waitForFunction(() => document.querySelectorAll('iframe').length === 15);
     await (await frame('named')).waitForFunction(() => typeof window.__probe === 'function');
     assert.deepEqual(await probe('named'), {found: true, w: 400});
     // Visible boards whose code waits for DOMContentLoaded or uses document.write
     // run as before; the parent page finishes loading.
     for (const id of ['ready', 'written']) await (await frame(id)).waitForFunction(() => typeof window.__probe === 'function');
     assert.equal((await probe('written')).note, true);
+    await (await frame('inline')).waitForFunction(() => typeof window.__probe === 'function');
+    assert.equal((await probe('inline')).state, 'loading', 'a visible board must start inline, while the page is parsed');
     await page.waitForFunction(() => document.readyState === 'complete');
     // A container resized by the board code (a side panel) is followed.
     // (Chromium pauses rendering of off-screen cross-origin iframes: bring it into view.)
@@ -178,6 +207,35 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     assert.equal(reply.error, undefined, reply.error);
     assert.equal(reply.payload.started, true);
 
+    // A hidden board asked for its picture (AI context) draws at a provisional
+    // size, not blank; its graph editor still works once shown.
+    const pictured = await page.evaluate(() => new Promise((resolve, reject) => {
+      const target = document.getElementById('editor').contentWindow;
+      const listener = async event => {
+        if (event.source !== target || !event.data || event.data.type !== 'response') return;
+        window.removeEventListener('message', listener);
+        const data = event.data;
+        if (data.error || !data.ai || !data.ai.image) { resolve({error: data.error || 'no image'}); return; }
+        const image = new Image();
+        image.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width; canvas.height = image.height;
+          const context = canvas.getContext('2d'); context.drawImage(image, 0, 0);
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          let inked = 0;
+          for (let i = 0; i < pixels.length; i += 4) if (pixels[i] < 200 || pixels[i + 1] < 200 || pixels[i + 2] < 200) inked++;
+          resolve({width: image.width, height: image.height, inked});
+        };
+        image.onerror = () => resolve({error: 'image did not load'});
+        image.src = data.ai.image;
+      };
+      window.addEventListener('message', listener);
+      target.postMessage({protocol: 'jsxgraph-quarto-assessment', version: 1, type: 'request', assessmentId: 'editor', requestId: 2, includeAI: true}, '*');
+      setTimeout(() => reject(new Error('no picture from a hidden board')), 10000);
+    }));
+    assert.equal(pictured.error, undefined, pictured.error);
+    assert.ok(pictured.width > 100 && pictured.inked > 100, 'hidden picture: ' + JSON.stringify(pictured));
+
     // A hidden board whose code waits for the page's load event starts when shown.
     await page.getByRole('tab', {name: 'Onload'}).click();
     await (await frame('onload')).waitForFunction(() => typeof window.__probe === 'function');
@@ -185,6 +243,22 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
 
     // Shown: the intended bounding box at the full width.
     await page.getByRole('tab', {name: 'Outer'}).click();
+    // Scripts the board wrote run before its load handler, and markup written
+    // in parts arrives whole.
+    await page.getByRole('tab', {name: 'Script'}).click();
+    await (await frame('script')).waitForFunction(() => typeof window.__probe === 'function');
+    const script = await probe('script');
+    assert.deepEqual({ran: script.ran, lib: script.lib, cells: script.cells}, {ran: true, lib: 42, cells: 2}, 'document.write: ' + JSON.stringify(script));
+    // The editor started for the picture now has its real size and view, and
+    // a click adds a vertex.
+    await page.getByRole('tab', {name: 'Editor'}).click();
+    await page.locator('iframe#editor').scrollIntoViewIfNeeded(); await settle();
+    const editor = await probe('editor');
+    assert.ok(editor.w === editor.vw && editor.w > 0 && close(editor.bbox, [-5, 4, 5, -4]), 'editor view: ' + JSON.stringify(editor));
+    const editorBox = await page.locator('iframe#editor').boundingBox();
+    await page.mouse.click(editorBox.x + editorBox.width / 2, editorBox.y + editorBox.height / 3);
+    await settle();
+    assert.equal((await probe('editor')).nodes, 1, 'a click on the editor adds a vertex');
     await page.getByRole('tab', {name: 'Inner two'}).click();
     await page.locator('.callout-header').filter({hasText: 'Collapsed'}).first().click();
     await settle();
