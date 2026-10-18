@@ -47,15 +47,26 @@ ${board('assessment_id="tabbed" width="760" height="320" style="width:100%;max-w
 
 ## Script
 \`\`\`{.jsxgraph assessment_id="script" width="400" height="200" style="width:100%;max-width:400px;height:200px;border:0;"}
-// Older board code: document.write loads a library and writes markup in parts.
+// Older board code: document.write adds controls, loads a library and writes markup in parts.
+document.write('<button id="reset">reset</button>');
+document.getElementById('reset').onclick = function () {};
+document.write('<script type="text/x-template" src="data:text/plain,x"><\\/script>');
+document.write('<script>document.write("<p id=nested>nested</p>");<\\/script>');
 document.write('<script>window.__ran = true;<\\/script>');
 document.write('<script src="data:text/javascript,window.__lib=42"><\\/script>');
+document.write('<script>window.__used = window.__lib;<\\/script>');
 document.write('<table id="written-table"><tr><td>1</td>');
 document.write('<td>2</td></tr></table>');
 window.onload = function () {
   var b = JXG.JSXGraph.initBoard(BOARDID, {boundingbox: [0, 4, 8, 0], showNavigation: false, showCopyright: false});
-  window.__probe = function () { return {ran: window.__ran === true, lib: window.__lib, cells: document.querySelectorAll('#written-table td').length, w: b.canvasWidth}; };
+  window.__probe = function () { return {ran: window.__ran === true, lib: window.__lib, used: window.__used, nested: !!document.getElementById('nested'), cells: document.querySelectorAll('#written-table td').length, w: b.canvasWidth}; };
 };
+\`\`\`
+
+## Units
+\`\`\`{.jsxgraph assessment_id="unitshidden" width="600" height="300" style="width:100%;max-width:600px;height:300px;border:0;"}
+var b = JXG.JSXGraph.initBoard(BOARDID, {originX: 50, originY: 250, unitX: 40, unitY: 20, showNavigation: false, showCopyright: false});
+window.__probe = function () { return {bbox: b.getBoundingBox(), w: b.canvasWidth, h: b.canvasHeight}; };
 \`\`\`
 
 ## Editor
@@ -174,7 +185,7 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     const probe = async id => (await frame(id)).evaluate(() => window.__probe ? window.__probe() : null);
     const settle = () => page.waitForTimeout(400);
     // The visible board has started; it finds its container through BOARDID.
-    await page.waitForFunction(() => document.querySelectorAll('iframe').length === 15);
+    await page.waitForFunction(() => document.querySelectorAll('iframe').length === 16);
     await (await frame('named')).waitForFunction(() => typeof window.__probe === 'function');
     assert.deepEqual(await probe('named'), {found: true, w: 400});
     // Visible boards whose code waits for DOMContentLoaded or uses document.write
@@ -191,8 +202,12 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     await page.waitForTimeout(400);
     const panel = await probe('panel');
     assert.ok(panel.w === panel.cw && panel.cw > 0, 'panel: ' + JSON.stringify(panel));
-    // Hidden boards have not run their code yet (no zero-size start).
-    for (const id of ['tabbed', 'collapsed']) assert.equal(await probe(id), null, id + ' started while hidden');
+    // Hidden boards run while the page is parsed, as upstream, at a provisional
+    // pixel size instead of a zero-size, invalid one.
+    for (const id of ['tabbed', 'collapsed']) {
+      const hidden = await probe(id);
+      assert.ok(hidden && hidden.w > 0 && hidden.bbox.every(Number.isFinite), id + ' hidden start: ' + JSON.stringify(hidden));
+    }
 
     // An assessment request starts a hidden board and is answered.
     const reply = await page.evaluate(() => new Promise((resolve, reject) => {
@@ -248,7 +263,14 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     await page.getByRole('tab', {name: 'Script'}).click();
     await (await frame('script')).waitForFunction(() => typeof window.__probe === 'function');
     const script = await probe('script');
-    assert.deepEqual({ran: script.ran, lib: script.lib, cells: script.cells}, {ran: true, lib: 42, cells: 2}, 'document.write: ' + JSON.stringify(script));
+    assert.deepEqual({ran: script.ran, lib: script.lib, used: script.used, nested: script.nested, cells: script.cells},
+      {ran: true, lib: 42, used: 42, nested: true, cells: 2}, 'document.write: ' + JSON.stringify(script));
+    // A board set up with origin and units keeps its units after a hidden start.
+    await page.getByRole('tab', {name: 'Units'}).click();
+    await page.locator('iframe#unitshidden').scrollIntoViewIfNeeded(); await settle();
+    const unitsHidden = await probe('unitshidden');
+    assert.ok(Math.abs(unitsHidden.w / (unitsHidden.bbox[2] - unitsHidden.bbox[0]) - 40) < 0.01 &&
+      Math.abs(unitsHidden.h / (unitsHidden.bbox[1] - unitsHidden.bbox[3]) - 20) < 0.01, 'units after a hidden start: ' + JSON.stringify(unitsHidden));
     // The editor started for the picture now has its real size and view, and
     // a click adds a vertex.
     await page.getByRole('tab', {name: 'Editor'}).click();

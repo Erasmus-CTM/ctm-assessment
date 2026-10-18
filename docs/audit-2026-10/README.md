@@ -554,6 +554,14 @@ Not implemented. Each needs a decision; bold where I recommend acting before the
    - STACK questions get a cheap way to add the author's own Python checker, with the same `check(response)` contract as math-exercise's `#| checker:`.
 8. **One repository for the own components:** not now.
 
+**AC's decision sheet (18 Oct; the sheet is a shared document):**
+- **Yes to the recommendation:** all rows except those below.
+- **A4 changed:** "Remember on this device" stays **on** by default, as today.
+- **B1 changed:** no grading switch, because grades are not used for anything yet. The grading changes B2, B3, B6, B8 and B9 become the default in ctm-checkers, each named in the changelog and tested. A switch can be added if grades come to matter.
+- **D2 (pyodide-interaktiv's extra packages):** the middle way. micropip, pyodide_http and matplotlib still load at start, because `pyodide_http.patch_all()` is what makes `requests` work in old cells. They load after the exercises' packages, so checks never wait behind them. Done in step 3.
+- **F1 (reveals):** own classes, so the look stays in ctm-libs and can be restyled without touching courses (`.reading-step`, `.solution`, `.hint`). F2 (lecture and learning modes) and F5 (course migration) build on this.
+- **G5 (exercise text per language):** a separator line `#| lang: nb` in the exercise body. Answers, checker and tests are written once; each text is plain Markdown.
+
 **Order of work.** Each phase is one stacked PR per repository.
 
 **pyodide-interaktiv (AC 18 Oct)** has two user groups:

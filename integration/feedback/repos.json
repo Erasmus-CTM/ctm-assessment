@@ -14,7 +14,7 @@
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "audit/2026-10",
-      "commit": "c590de1f04a1d222b1442a87815823053966924d"
+      "commit": "9353fa8f5fd53c1055ebd4ed9221a9e023c232bf"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
@@ -27,7 +27,7 @@
     "jsxgraph": {
       "repository": "jsxgraph/jsxgraph-quarto",
       "branch": "main",
-      "commit": "cee3a734fc1187a04b26755c019e6257d6b81523",
+      "commit": "9a5e162ba4f7008bf9d8100a941deb5e07eff6a1",
       "extension": "jsxgraph"
     },
     "ctm-assessment": {
