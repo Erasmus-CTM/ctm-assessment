@@ -4,7 +4,8 @@
 
 ## Development and validation
 
-Requirements: Quarto 1.8.27 or later, Node 22/npm, Git and Python 3.12+.
+Requirements: Quarto 1.8.27 or later (with Quarto 1.10, pages with exercise blocks need
+`engine: markdown` in their front matter; see [installation](installation.md)), Node 22/npm, Git and Python 3.12+.
 
 ```sh
 python -m pip install 'sympy>=1.13' 'networkx>=3.4' 'PyYAML>=6'

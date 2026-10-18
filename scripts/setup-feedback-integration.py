@@ -230,13 +230,13 @@ def main():
     # extension (a vendored copy would silently diverge from the pinned one).
     for name, source in sources.items():
         shipped = tracked_extensions(source, name in local, extensions[name])
-        foreign = shipped - {extensions[name]}
-        # Also a copy kept inside the component's own folder (old layout).
+        # A declared distribution copy next to the component (pyodide-interaktiv
+        # ships ai-feedback for its existing projects) is allowed; the package
+        # copies only the component's own folder, so it never installs it.
+        foreign = shipped - {extensions[name]} - set(config['repositories'][name].get('ships-copies', []))
+        # A copy inside the component's own folder would be shipped: never allowed.
         foreign |= {other for other in extensions.values() if other != extensions[name]
                     and any(path.startswith(other + '/') for path in hashes[extensions[name]])}
-        # A declared distribution copy (pyodide-interaktiv ships ai-feedback for
-        # its existing projects) is allowed; the package never installs it.
-        foreign -= set(config['repositories'][name].get('ships-copies', []))
         foreign = sorted(foreign)
         if foreign:
             raise SystemExit(f'{name} ships its own copy of {", ".join(foreign)}; use the pinned component instead.')

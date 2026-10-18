@@ -4,22 +4,22 @@
     "ai-feedback": {
       "repository": "Erasmus-CTM/ai-feedback",
       "branch": "audit/2026-10",
-      "commit": "4cce631b838f029ca76c367a7dc2a1c91731e1ef"
+      "commit": "fbc134443b86d98abbca34a8ea323080016743a0"
     },
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "audit/2026-10",
-      "commit": "282f0f99838fb8eb63a55a81e4760ecac9b632d9"
+      "commit": "d2e2cda045f638f46e4e80a48d3d2b3cd774913d"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "audit/2026-10",
-      "commit": "d2b6af4512c973bb1cb0db19dc6f7b5454d64e27"
+      "commit": "e0ba878fa6bc0e07ac026bf5f99e42ef74bed058"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "audit/2026-10",
-      "commit": "69acfb06aaf2a3980dce58999c9a09ab4cc03ae5",
+      "commit": "82604bda05785468427bb9c5483ff0c4e6ec898e",
       "ships-copies": [
         "ai-feedback"
       ]

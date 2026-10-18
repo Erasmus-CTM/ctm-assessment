@@ -47,7 +47,7 @@ board.create('circle', [[0,0],1]);
 ''')
     subprocess.run(['quarto','render'],cwd=course,check=True)
     html=(course/'example.html').read_text()
-    for marker in ['ai-feedback-activity','math-exercise-cell','py-exercise-cell','qpyodide-insertion-location-','<iframe','ctm-assessment.css']:
+    for marker in ['ai-feedback-activity','math-exercise-cell','py-exercise-cell','qpyodide-insertion-location-','<iframe']:
         assert marker in html, marker+' missing after archive installation'
     for file in ['feedback-core.js','feedback-dom.js','ai-feedback.js']:
         assert html.count('/'+file+'"') == 1, file+' did not load exactly once'
@@ -63,8 +63,11 @@ board.create('circle', [[0,0],1]);
     import base64, re
     frames = ' '.join(base64.b64decode(m).decode('utf8', 'replace') for m in re.findall(r'data:text/html;base64,([A-Za-z0-9+/=]+)', html))
     assert 'jsxgraph@1/distrib/jsxgraphcore.js' in frames, 'JSXGraph boards do not load the package library versions'
+    folders = {'jsxgraph': 'jsxgraph'}
     for name in ['ai-feedback', 'math-exercise', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment']:
-        assert (course / '_extensions' / 'ctm-assessment' / 'licenses' / (name + '.txt')).is_file(), name + ' licence notice not installed'
+        own = course / '_extensions' / folders.get(name, name)
+        notice = (course / '_extensions' / 'ctm-assessment' / 'licenses' / (name + '.txt')).is_file()
+        assert notice or any(p.name.upper().startswith(('LICENSE', 'COPYING')) for p in own.iterdir() if p.is_file()), name + ' licence not installed'
     # Standalone copies may follow a newer ai-feedback than the package.
     standalone = course / '_extensions' / 'Erasmus-CTM' / 'ai-feedback' / '_extension.yml'
     standalone.write_text(re.sub(r'(?m)^version:.*$', 'version: 9.9.9', standalone.read_text()))
@@ -74,6 +77,9 @@ board.create('circle', [[0,0],1]);
     result = subprocess.run(['quarto','render'], cwd=course, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert 'separately added JSXGraph extension was installed inside' in result.stderr, result.stderr
+    html = (course / 'example.html').read_text()
+    own_version = re.search(r'(?m)^version:\s*(\S+)', (course / '_extensions' / 'ai-feedback' / '_extension.yml').read_text()).group(1)
+    assert 'ai-feedback-9.9.9' not in html and 'ai-feedback-' + own_version + '/' in html, 'the package must keep its own ai-feedback'
     shutil.rmtree(nested)
     # One page combining filters bound to different ai-feedback versions stops clearly.
     (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [mixed.qmd]\nfilters: [Erasmus-CTM/math-exercise, py-exercise]\npy-exercise:\n  feedback: true\n')

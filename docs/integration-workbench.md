@@ -12,7 +12,8 @@ The current adapters are py-exercise, math-exercise and pyodide-interaktiv.
 
 ## Set up and serve
 
-Requirements: Python 3.12+, Git, Node 22/npm and Quarto 1.8.27 or later. Install
+Requirements: Python 3.12+, Git, Node 22/npm and Quarto 1.8.27 or later (with Quarto 1.10, pages with exercise blocks need
+`engine: markdown` in their front matter; see [installation](installation.md)). Install
 `PyYAML>=6`, `sympy>=1.13` and `networkx>=3.4` in the Python used by `python`, or set
 `PYTHON` to that interpreter for the mathematics tests.
 

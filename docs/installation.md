@@ -35,16 +35,29 @@ lists those commits and the SHA-256 of every installed file.
 In the browser, learners' pages load Pyodide, Monaco, KaTeX and JSXGraph from
 jsDelivr: each library at its tested release line or a later release within it
 (for example KaTeX 0.16.x, JSXGraph 1.x, MathJax 4.x), Pyodide at the version
-named in the component (a CDN path needs one). The package sets JSXGraph's
-(`_extensions/ctm-assessment/jsxgraph-pins.yml`) unless your project sets its
-own `jsxgraph: src_jxg/src_css/src_mjx`. Licence notices of the
-bundled components are installed in `_extensions/ctm-assessment/licenses/`.
+named in the component (a CDN path needs one). The `ctm-assessment` filter
+sets JSXGraph's (`_extensions/ctm-assessment/jsxgraph-pins.yml`) unless your
+project sets its own `jsxgraph: src_jxg/src_css/src_mjx`. Licence notices are
+installed with each component, or in `_extensions/ctm-assessment/licenses/`
+where the component's folder has none.
 
-The package gives the action buttons of all components (Check, Reset, Run,
-Feedback, Help, Export) one common size; set `--ctm-button-font-size`,
+All components give their action buttons (Check, Reset, Run, Feedback, Help,
+Export) one common size, from the same `--ctm-button-font-size`,
 `--ctm-button-padding-y`, `--ctm-button-padding-x`, `--ctm-button-line-height`
-or `--ctm-button-radius` in your project's CSS to change them together. Each
-component styles only its own elements, so one never changes another's look.
+and `--ctm-button-radius` variables; set them in your project's CSS or theme to
+change all of them together. Each component styles only its own elements, so
+one never changes another's look.
+
+A check that runs longer than 20 s offers **Stop** when Python runs in a worker
+(pages with Pyodide cells). Change the time for all components with
+`ctm-assessment: {stop-after: 30}` (seconds), or per component
+(`math-exercise: {stop-after: ...}`, `py-exercise: {stop-after: ...}`).
+
+The JSXGraph versions and the warning about a nested JSXGraph come with the
+`ctm-assessment` filter. A page that lists individual component filters
+instead (for example `filters: [jsxgraph, math-exercise]`) gets the versions by
+adding `metadata-files: [_extensions/ctm-assessment/jsxgraph-pins.yml]` to
+`_quarto.yml`.
 
 **Quarto 1.10:** this release sends pages with blocks such as
 `{math-exercise}`, `{py-exercise}` or `{pyodide-python}` to Jupyter (an
