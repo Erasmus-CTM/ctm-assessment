@@ -10,8 +10,8 @@
     "test:browser": "node integration/feedback/browser-smoke.cjs"
   },
   "devDependencies": {
-    "jsdom": "26.1.0",
-    "katex": "0.16.11",
-    "playwright": "1.55.1"
+    "jsdom": "^26.1.0",
+    "katex": "^0.16.11",
+    "playwright": "^1.55.1"
   }
 }

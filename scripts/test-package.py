@@ -62,7 +62,7 @@ board.create('circle', [[0,0],1]);
         assert html.count('/'+file+'"') == 1, file+' did not load exactly once next to standalone copies'
     import base64, re
     frames = ' '.join(base64.b64decode(m).decode('utf8', 'replace') for m in re.findall(r'data:text/html;base64,([A-Za-z0-9+/=]+)', html))
-    assert 'jsxgraph@1.13.3/distrib/jsxgraphcore.js' in frames, 'JSXGraph boards do not load the pinned library version'
+    assert 'jsxgraph@1/distrib/jsxgraphcore.js' in frames, 'JSXGraph boards do not load the package library versions'
     for name in ['ai-feedback', 'math-exercise', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment']:
         assert (course / '_extensions' / 'ctm-assessment' / 'licenses' / (name + '.txt')).is_file(), name + ' licence notice not installed'
     # Standalone copies may follow a newer ai-feedback than the package.
@@ -97,4 +97,4 @@ assert answer() == 2
     result = subprocess.run(['quarto','render'], cwd=course, capture_output=True, text=True)
     assert result.returncode != 0 and 'combines filters that use different ai-feedback versions' in result.stderr, result.stderr
 print('Installable archive passed: all five components render from a fresh course, also next to standalone copies '
-      '(including a newer ai-feedback), with pinned JSXGraph and licence notices.')
+      '(including a newer ai-feedback), with the JSXGraph release line and licence notices.')

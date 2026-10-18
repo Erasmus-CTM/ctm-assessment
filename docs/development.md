@@ -4,15 +4,17 @@
 
 ## Development and validation
 
-Requirements: Quarto 1.8.27, Node 22/npm, Git and Python 3.12+.
+Requirements: Quarto 1.8.27 or later, Node 22/npm, Git and Python 3.12+.
 
 ```sh
-python -m pip install sympy==1.13.3 networkx==3.4.2 PyYAML==6.0.2
+python -m pip install 'sympy>=1.13' 'networkx>=3.4' 'PyYAML>=6'
 python scripts/setup-feedback-integration.py --test
 npx playwright install chromium
 python scripts/setup-feedback-integration.py --browser
 python -m http.server 8000 --directory .feedback-workspace/site/_site
 ```
+
+In VS Code, **Terminal → Run Task…** offers the same commands (`.vscode/tasks.json`): the default test task runs the tests, the default build task builds the package and runs every test.
 
 The builder renders one `example.html` from `example.qmd` and topic includes,
 using the components pinned in `integration/feedback/repos.json` (JSXGraph is

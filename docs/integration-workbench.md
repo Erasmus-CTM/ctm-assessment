@@ -12,8 +12,8 @@ The current adapters are py-exercise, math-exercise and pyodide-interaktiv.
 
 ## Set up and serve
 
-Requirements: Python 3.12+, Git, Node 22/npm and Quarto **1.8.27**. Install
-`PyYAML==6.0.2`, `sympy==1.13.3` and `networkx==3.4.2` in the Python used by `python`, or set
+Requirements: Python 3.12+, Git, Node 22/npm and Quarto 1.8.27 or later. Install
+`PyYAML>=6`, `sympy>=1.13` and `networkx>=3.4` in the Python used by `python`, or set
 `PYTHON` to that interpreter for the mathematics tests.
 
 ```sh

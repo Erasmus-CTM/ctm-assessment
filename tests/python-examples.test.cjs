@@ -1,5 +1,5 @@
 // Challenges the combined page's Python exercises with correct and plausible wrong programs.
-// The Python that the browser runs (CHECKER_PY, RUNNER_PY) is taken from the installed
+// The Python that the browser runs (MODULE_PY) is taken from the installed
 // py-exercise.js and executed with python3, one top-level test statement at a time.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -33,23 +33,19 @@ function exercises(file) {
 }
 
 const RUN = String.raw`
-import contextlib, io, json, sys
+import contextlib, io, json, sys, types
 job = json.load(sys.stdin)
-messages = {'_msg_forbidden_import': "Forbidden import: '{}'", '_msg_forbidden_function': "Forbidden function: '{}'",
-            '_msg_forbidden_method': "Forbidden method: '.{}'", '_msg_forbidden_keyword': "Forbidden keyword: '{}'",
-            '_msg_assertion_failed': 'Assertion failed', '_msg_test_error': 'Error: {}', '_msg_syntax_error': 'Syntax error in tests: {}'}
-def snippet(code, ns):
-    body, last = code.rstrip().rsplit('\n', 1)
-    exec(compile(body, '<pyodide>', 'exec'), ns)
-    return eval(compile(last, '<pyodide>', 'eval'), ns)
+messages = {'forbidden_import': "Forbidden import: '{}'", 'forbidden_function': "Forbidden function: '{}'",
+            'forbidden_method': "Forbidden method: '.{}'", 'forbidden_keyword': "Forbidden keyword: '{}'",
+            'assertion_failed': 'Assertion failed', 'test_error': 'Error: {}', 'syntax_error': 'Syntax error in tests: {}'}
+module = types.ModuleType('_ctm_py_exercise')
+exec(job['module'], module.__dict__)
 verdicts = []
 for case in job['cases']:
-    ns = dict(messages, __name__='__main__', _exercise_student_code=case['code'], _exercise_test_code=case['tests'],
-              _exercise_forbidden_imports=case['forbiddenImports'], _exercise_forbidden_keywords=case['forbiddenKeywords'])
-    if (case['forbiddenImports'] or case['forbiddenKeywords']) and json.loads(snippet(job['checker'], ns)):
+    if (case['forbiddenImports'] or case['forbiddenKeywords']) and module.violations(case['code'], case['forbiddenImports'], case['forbiddenKeywords'], messages):
         verdicts.append('blocked'); continue
     with contextlib.redirect_stdout(io.StringIO()):
-        result = json.loads(snippet(job['runner'], ns))
+        result = module.run(case['code'], case['tests'], messages)
     tests = result['tests']
     verdicts.append('error' if result['student_error'] else 'pass' if tests and all(t['passed'] for t in tests) else 'fail')
 print(json.dumps(verdicts))
@@ -108,7 +104,7 @@ test('Python examples accept correct programs and reject plausible mistakes', {s
     for (const [name, code, expected] of variants)
       cases.push({label, name, expected, code: code ?? found[label].starter, ...found[label]});
   const python = spawnSync('python3', ['-c', RUN], {encoding: 'utf8',
-    input: JSON.stringify({checker: browserPython(source, 'CHECKER_PY'), runner: browserPython(source, 'RUNNER_PY'),
+    input: JSON.stringify({module: browserPython(source, 'MODULE_PY'),
       cases: cases.map(({code, tests, forbiddenImports, forbiddenKeywords}) => ({code, tests, forbiddenImports, forbiddenKeywords}))})});
   assert.equal(python.status, 0, python.stderr);
   const verdicts = JSON.parse(python.stdout);

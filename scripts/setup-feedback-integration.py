@@ -113,7 +113,6 @@ def main():
     parser.add_argument('--source', action='append', default=[], metavar='NAME=PATH', help='Use a local Git checkout for a repository; record SHA and dirty files')
     parser.add_argument('--test', action='store_true', help='Run repository and common-page tests after rendering')
     parser.add_argument('--browser', action='store_true', help='Also run real Chromium/Pyodide/Monaco smoke tests (requires Playwright browser)')
-    parser.add_argument('--any-quarto', action='store_true', help='Measurement only (quarto-versions.yml): accept any Quarto and lift quarto-required inside the build workspace')
     args = parser.parse_args()
     config = json.loads((TEMPLATE / 'repos.json').read_text())
     if args.update_pins:
@@ -133,7 +132,7 @@ def main():
         print('Updated integration/feedback/repos.json. Now run: python scripts/setup-feedback-integration.py --test --browser')
         return
     quarto_version = subprocess.check_output(['quarto', '--version'], text=True).strip()
-    if version_tuple(quarto_version) < version_tuple(config['quarto']) and not args.any_quarto:
+    if version_tuple(quarto_version) < version_tuple(config['quarto']):
         raise SystemExit(f'Quarto {quarto_version} is older than the required {config["quarto"]} or later.')
     workspace = args.workspace.resolve()
     if workspace == ROOT or workspace in ROOT.parents:
@@ -244,15 +243,6 @@ def main():
     result = {'quarto': quarto_version, 'quarto_required': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
     (workspace / 'resolved-repos.json').write_text(json.dumps(result, indent=2) + '\n')
     shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
-    if args.any_quarto:
-        # Measure what actually works: no declared minimum may stop the build.
-        # Only the workspace copies change (snapshots and the site).
-        for root in [site] + [source for name, source in sources.items() if name not in local]:
-            for manifest in root.rglob('_extension.yml'):
-                text = manifest.read_text()
-                lifted = re.sub(r'(?m)^quarto-required:.*$', 'quarto-required: ">=1.0.0"', text)
-                if lifted != text:
-                    manifest.write_text(lifted)
     run(['quarto', 'render'], cwd=site, env=base_env)
     # Build a single installable distribution with one copy of each dependency.
     distribution = workspace / 'ctm-assessment'

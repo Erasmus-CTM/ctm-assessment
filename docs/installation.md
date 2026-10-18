@@ -33,9 +33,11 @@ fetched when you render. `_extensions/ctm-assessment/resolved-repos.json`
 lists those commits and the SHA-256 of every installed file.
 
 In the browser, learners' pages load Pyodide, Monaco, KaTeX and JSXGraph from
-jsDelivr at fixed versions. The package sets the JSXGraph and MathJax versions
-it was tested with (`_extensions/ctm-assessment/jsxgraph-pins.yml`) unless your
-project sets its own `jsxgraph: src_jxg/src_css/src_mjx`. Licence notices of the
+jsDelivr: each library at its tested release line or a later release within it
+(for example KaTeX 0.16.x, JSXGraph 1.x, MathJax 4.x), Pyodide at the version
+named in the component (a CDN path needs one). The package sets JSXGraph's
+(`_extensions/ctm-assessment/jsxgraph-pins.yml`) unless your project sets its
+own `jsxgraph: src_jxg/src_css/src_mjx`. Licence notices of the
 bundled components are installed in `_extensions/ctm-assessment/licenses/`.
 
 The package gives the action buttons of all components (Check, Reset, Run,
@@ -43,6 +45,12 @@ Feedback, Help, Export) one common size; set `--ctm-button-font-size`,
 `--ctm-button-padding-y`, `--ctm-button-padding-x`, `--ctm-button-line-height`
 or `--ctm-button-radius` in your project's CSS to change them together. Each
 component styles only its own elements, so one never changes another's look.
+
+**Quarto 1.10:** this release sends pages with blocks such as
+`{math-exercise}`, `{py-exercise}` or `{pyodide-python}` to Jupyter (an
+upstream regression, reported). Until it is fixed, add `engine: markdown` to
+the front matter of each such page (in `_quarto.yml` it has no effect), or use
+Quarto 1.8.
 
 The single `ctm-assessment` filter runs the components in a tested order: ai-feedback,
 JSXGraph, math-exercise, py-exercise, pyodide-interaktiv. The archive contains
