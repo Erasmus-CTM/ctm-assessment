@@ -49,6 +49,27 @@ ${board('assessment_id="assessed" width="500" height="250" style="width:100%;max
 ${board('assessment_id="collapsed" width="600" height="300" style="width:100%;max-width:600px;height:300px;border:0;"', [0, 10, 10, 0], true)}
 :::
 
+${board('assessment_id="variant" width="500" height="250" style="width:100%;max-width:500px;height:250px;border:0;"', [0, 4, 4, 0], false,
+  'b.setBoundingBox([10, 14, 18, 10], false);\n')}
+
+\`\`\`{.jsxgraph assessment_id="legacy" width="600" height="300" style="width:100%;max-width:600px;height:300px;border:0;"}
+// Page-level workaround written before the extension handled layout (ctm-demo).
+var box = document.querySelector('.jxgbox'), bounds = [0, 10, 10, 0], b = null;
+function fitBoard() {
+  var w = box.clientWidth, h = box.clientHeight;
+  if (!(w > 0 && h > 0)) return;
+  if (!b) b = JXG.JSXGraph.initBoard(box.id, {boundingbox: bounds.slice(), axis: false, keepaspectratio: true, showNavigation: false, showCopyright: false, resize: {enabled: false}});
+  if (b.canvasWidth !== w || b.canvasHeight !== h) b.resizeContainer(w, h, true);
+  var scale = Math.min(w / 10, h / 10);
+  b.setBoundingBox([5 - w / (2 * scale), 5 + h / (2 * scale), 5 + w / (2 * scale), 5 - h / (2 * scale)], true);
+  b.fullUpdate();
+}
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fitBoard).observe(box);
+window.addEventListener('resize', fitBoard);
+fitBoard();
+window.__probe = function () { return b ? {bbox: b.getBoundingBox(), w: b.canvasWidth, vw: innerWidth} : null; };
+\`\`\`
+
 \`\`\`{.jsxgraph assessment_id="named" width="400" height="200" style="width:100%;max-width:400px;height:200px;border:0;"}
 var box = document.getElementById(BOARDID);
 var b = JXG.JSXGraph.initBoard(BOARDID, {boundingbox:[-5,5,5,-5], showNavigation:false, showCopyright:false});
@@ -90,7 +111,7 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     const probe = async id => (await frame(id)).evaluate(() => window.__probe ? window.__probe() : null);
     const settle = () => page.waitForTimeout(400);
     // The visible board has started; it finds its container through BOARDID.
-    await page.waitForFunction(() => document.querySelectorAll('iframe').length === 4);
+    await page.waitForFunction(() => document.querySelectorAll('iframe').length === 6);
     await (await frame('named')).waitForFunction(() => typeof window.__probe === 'function');
     assert.deepEqual(await probe('named'), {found: true, w: 400});
     // Hidden boards have not run their code yet (no zero-size start).
@@ -120,6 +141,12 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     assert.ok(contains(collapsed.bbox, [0, 10, 10, 0]), 'collapsed: ' + JSON.stringify(collapsed));
     assert.equal(collapsed.w, collapsed.vw);
 
+    // A view the board's code set after initBoard is the one kept; page code that
+    // still fits the board itself keeps working.
+    const variant = await probe('variant'), legacy = await probe('legacy');
+    assert.ok(close(variant.bbox, [10, 14, 18, 10]), 'variant: ' + JSON.stringify(variant));
+    assert.ok(contains(legacy.bbox, [0, 10, 10, 0]) && legacy.w === legacy.vw, 'legacy: ' + JSON.stringify(legacy));
+
     // Mobile width: the boards follow the iframe and keep the intended view.
     await page.setViewportSize({width: 390, height: 800}); await settle();
     const narrow = await probe('tabbed'), narrowCollapsed = await probe('collapsed');
@@ -131,6 +158,8 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     await page.setViewportSize({width: 1100, height: 900}); await settle();
     assert.ok(close((await probe('tabbed')).bbox, tabbed.bbox));
     assert.ok(close((await probe('collapsed')).bbox, collapsed.bbox), 'collapsed drifted');
+    assert.ok(close((await probe('variant')).bbox, [10, 14, 18, 10]), 'variant view lost');
+    assert.ok(close((await probe('legacy')).bbox, legacy.bbox), 'legacy drifted: ' + JSON.stringify(await probe('legacy')));
 
     // A view the user chose survives a resize.
     await (await frame('tabbed')).evaluate(() => window.__zoom([2, 1, 6, -1]));

@@ -27,7 +27,7 @@
     "jsxgraph": {
       "repository": "jsxgraph/jsxgraph-quarto",
       "branch": "main",
-      "commit": "a5011b3e0a2cb0ad889b75095911c30824459817",
+      "commit": "1ce432f0df9f237d538dccee07afef49fc7aa985",
       "extension": "jsxgraph"
     },
     "ctm-assessment": {
