@@ -310,7 +310,11 @@ function buildJob(run, options, wheels, authoredResponses, corpora) {
       const relative = site.name + '/' + file.split(path.sep).join('/');
       const {cases, skipped, cells, unshaped, misfits} = pageCases(path.join(root, file), relative, authoredResponses[corpus] || {}, answersOf(corpus, corpora));
       const signature = casesSignature(cases);
-      if (cases.length && seen.has(signature)) { job.duplicates.push({page: relative, same: seen.get(signature)}); continue; }
+      if (cases.length && seen.has(signature)) {
+        // Graded once, as the earlier page; its teacher answers count as found for this corpus too.
+        job.duplicates.push({page: relative, same: seen.get(signature), corpus, answered: [...new Set(cases.filter(c => c.source === 'answer').map(c => c.label))]});
+        continue;
+      }
       if (cases.length) seen.set(signature, relative);
       job.pages[relative] = {root, file};
       job.cases.push(...cases.map(c => ({...c, corpus})));
@@ -383,8 +387,10 @@ async function main() {
   // (in the head of a build comparison: the base may predate an answer).
   const misfitsAll = job.misfits.map(m => ({corpus: m.corpus, text: `${m.page} cell ${m.position} (${m.label}, ${m.variant}), answers.json entry ${m.entry}: ${m.problem}`}));
   const runCorpora = new Set(options.site.map(s => siteCorpus(s, options, corpora)));
+  const answered = (corpus, label) => job.cases.some(c => c.corpus === corpus && c.source === 'answer' && c.label === label)
+    || job.duplicates.some(d => d.corpus === corpus && d.answered.includes(label));
   const unusedAll = [...runCorpora].flatMap(corpus => Object.keys(answersOf(corpus, corpora))
-    .filter(label => !job.cases.some(c => c.corpus === corpus && c.source === 'answer' && c.label === label)).map(label => ({corpus, text: corpus + ': ' + label})));
+    .filter(label => !answered(corpus, label)).map(label => ({corpus, text: corpus + ': ' + label})));
   // Enforced for pinned corpora; for a course that follows its branch, reported.
   const enforced = item => !followsBranch(item.corpus, corpora);
   const answersMisfit = misfitsAll.filter(enforced).map(m => m.text), answersUnused = unusedAll.filter(enforced).map(u => u.text);
