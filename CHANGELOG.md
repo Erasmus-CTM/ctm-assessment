@@ -62,6 +62,11 @@ commits recorded in `_extensions/ctm-assessment/resolved-repos.json`.
   `CTM_COMPONENT_DEV=1`).
 - **`filters: [ai-feedback]` is deprecated**: it keeps working in 0.9 with
   one build warning. Use `filters: [ctm-assessment]`.
+- **Fixed: `</script>` in an exercise or a setting no longer breaks the
+  page.** py-exercise (exercise data: starter and test code, captions; its
+  settings) and math-exercise (its settings) write the JSON in the page's
+  scripts with `<`, `>` and `&` escaped, as ctm-libs does for feedback data.
+  Before, a starter or test containing `</script>` broke the page.
 
 ### Unchanged
 
@@ -94,7 +99,9 @@ pyodide-interaktiv).
   `bootstrap/ctm-bootstrap.lua` and that no component but pyodide-interaktiv
   still ships `feedback-loader.lua` or `shared/pyodide-runtime.js`; tests get
   `CTM_LIBS_EXTENSION`; `--update-pins --only NAME[,NAME]` re-pins only those
-  repositories; the record names the package version.
+  repositories; `--follow-branches` keeps a pin that its branch does not
+  contain (the JSXGraph fork pin), with a log line; the record names the
+  package version.
 - New checks: the Pyodide parity harness (`integration/pyodide-parity`, a job
   of the examples workflow), the rendered-page comparison
   (`tools/compare-rendered.mjs`, workflow "Compare rendered courses"), a

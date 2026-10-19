@@ -68,18 +68,20 @@ pyodide-interaktiv may still ship `feedback-loader.lua` or
 `shared/pyodide-runtime.js`, which ctm-libs provides.
 
 Normal builds use the pins, so a merge in a component never changes the umbrella
-by itself. To move to newer components:
+by itself. To move to newer components, name them (a bare `--update-pins`
+stops at the JSXGraph pin, which upstream `main` does not contain):
 
 ```sh
-python scripts/setup-feedback-integration.py --update-pins   # writes branch tips into repos.json
+python scripts/setup-feedback-integration.py --update-pins --only ctm-libs,math-exercise,py-exercise   # writes their branch tips into repos.json
 python scripts/setup-feedback-integration.py --test --browser
 ```
 
 Commit the updated `repos.json` with the passing run. `--follow-branches`
 builds against the branch tips without changing the manifest; the scheduled
 **Track component branches** workflow does this weekly and fails early when a
-component change breaks the combined page. The legacy `--refresh` flag has no
-effect.
+component change breaks the combined page. A pin that its branch does not
+contain (the JSXGraph pin) stays, with a log line saying so. The legacy
+`--refresh` flag has no effect.
 For unmerged dependencies, explicitly select a review branch:
 
 ```sh
