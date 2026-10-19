@@ -63,7 +63,7 @@ jobs:
       COURSE_REF: ${{ matrix.ref }}
       PROFILE: ${{ matrix.profile }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check out ctm-assessment before and after
         run: |
           for side in before after; do
@@ -73,11 +73,11 @@ jobs:
             git -C "$RUNNER_TEMP/$side" checkout -q --detach FETCH_HEAD
             echo "$side: $ref = $(git -C "$RUNNER_TEMP/$side" rev-parse HEAD), CTM Assessment $(sed -n 's/^version: *//p' "$RUNNER_TEMP/$side/_extensions/ctm-assessment/_extension.yml")"
           done
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       # SymPy: the version Pyodide ships (native build-time checks); Jupyter as the courses' builds install it.
@@ -124,7 +124,7 @@ jobs:
           text=$(cat "$RUNNER_TEMP"/reports/*.md 2>/dev/null | head -c 6000 || echo 'no report')
           level=notice; [ "${{ job.status }}" = success ] || level=error
           printf '::%s title=Compare %s::%s\n' "$level" "$COURSE" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: compare-${{ strategy.job-index }}
