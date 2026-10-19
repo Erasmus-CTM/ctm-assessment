@@ -228,7 +228,10 @@ class Run {
 
   async run() {
     // CHROMIUM_EXECUTABLE: a local Chromium; CTM_BROWSER_PROXY: a proxy for the CDNs (as browser-smoke.cjs).
+    // Chromium draws text with coloured (LCD) edges except on a composited
+    // layer: grayscale everywhere, so a moved element is drawn alike.
     this.browser = await playwright[this.browserName].launch({headless: true,
+      ...(this.browserName === 'chromium' ? {args: ['--disable-lcd-text']} : {}),
       ...(this.browserName === 'chromium' && process.env.CHROMIUM_EXECUTABLE ? {executablePath: process.env.CHROMIUM_EXECUTABLE} : {}),
       ...(process.env.CTM_BROWSER_PROXY ? {proxy: {server: process.env.CTM_BROWSER_PROXY, bypass: '127.0.0.1,localhost'}} : {})});
     try {
@@ -668,6 +671,7 @@ class Run {
           // differently: both sides are moved to whole pixels.
           await element.evaluate(el => {
             const r = el.getBoundingClientRect();
+            el.style.willChange = 'transform';
             el.style.translate = `${Math.round(r.left) - r.left}px ${Math.round(r.top) - r.top}px`;
           });
           images[side] = await element.screenshot({animations: 'disabled', timeout: 15000}).catch(() => null);
@@ -693,11 +697,15 @@ class Run {
             return false;
           };
           let differ = 0;
+          const box = [w, h, -1, -1];
           for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
             const i = 4 * (py * w + px);
-            if (!close(p, i, q, i) && !(near(p, q, px, py) && near(q, p, px, py))) differ++;
+            if (!close(p, i, q, i) && !(near(p, q, px, py) && near(q, p, px, py))) {
+              differ++;
+              box[0] = Math.min(box[0], px); box[1] = Math.min(box[1], py); box[2] = Math.max(box[2], px); box[3] = Math.max(box[3], py);
+            }
           }
-          return {old: [x.width, x.height], new: [y.width, y.height], ratio: w * h ? differ / (w * h) : 1};
+          return {old: [x.width, x.height], new: [y.width, y.height], ratio: w * h ? differ / (w * h) : 1, box: differ ? box : null};
         }, [images.old.toString('base64'), images.new.toString('base64')]);
         if (this.o.shots) {
           fs.mkdirSync(this.o.shots, {recursive: true});
@@ -709,7 +717,7 @@ class Run {
         if (dw !== 0) problems.push(`width ${result.old[0]} -> ${result.new[0]} px`);
         const heightAllowed = rule?.height === 'any' || (Array.isArray(rule?.height) && dh >= rule.height[0] && dh <= rule.height[1]);
         if (dh !== 0 && !heightAllowed) problems.push(`height ${result.old[1]} -> ${result.new[1]} px`);
-        if (result.ratio > 0.005 && rule?.pixels !== 'any') problems.push(`${(100 * result.ratio).toFixed(2)} % of the pixels differ`);
+        if (result.ratio > 0.005 && rule?.pixels !== 'any') problems.push(`${(100 * result.ratio).toFixed(2)} % of the pixels differ (in x ${result.box[0]}-${result.box[2]}, y ${result.box[1]}-${result.box[3]} of ${result.new[0]} x ${result.new[1]})`);
         const expected = !!rule && (dh !== 0 || result.ratio > 0.005);
         this.record('look', name, !problems.length, {expected: expected || undefined, rule: rule?.id,
           note: problems.join('; ') || `${(100 * result.ratio).toFixed(2)} % of the pixels differ, height ${dh >= 0 ? '+' : ''}${dh} px${expected ? ' (expected: ' + rule.id + ')' : ''}`});
