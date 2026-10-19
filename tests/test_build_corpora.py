@@ -59,6 +59,22 @@ class BuildCorpora(unittest.TestCase):
         self.assertEqual([(m['course'], m['ref']) for m in matrix],
                          [('examples', ''), ('aacchhee/ctm-demo', 'main'), ('aacchhee/ingmat3a_ntnu', 'main')])
 
+    def test_the_blocking_jobs_build_the_pinned_courses_and_a_followed_branch_is_informational(self):
+        self.assertEqual(list(self.module.selection('pinned')), ['ctm-demo', 'ingmat3a'])
+        self.assertEqual(list(self.module.selection('following')), ['ingmat3a-linalg'])
+        self.tips['linalg-branch'] = 'b' * 40
+        refs, _ = self.run_quietly(self.module.resolve, {'ingmat3a-linalg': 'abcdef1'}, self.module.selection('pinned'))
+        self.assertEqual(set(refs), {'ctm-demo', 'ingmat3a'}, 'an override for a course outside the set is ignored')
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / 'output'
+            os.environ['GITHUB_OUTPUT'] = str(output)
+            try:
+                self.run_quietly(self.module.course_matrix)
+            finally:
+                del os.environ['GITHUB_OUTPUT']
+            matrix = json.loads(output.read_text().removeprefix('matrix='))
+        self.assertEqual([m.get('informational') for m in matrix], [None, False, False, True])
+
     def test_a_course_that_is_not_optional_fails_when_its_branch_is_gone(self):
         self.module.COURSES['ingmat3a-linalg'] = dict(self.module.COURSES['ingmat3a-linalg'], course={'branch': 'linalg-branch'})
         with self.assertRaises(SystemExit):

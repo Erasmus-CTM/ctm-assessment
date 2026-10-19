@@ -167,15 +167,19 @@ The courses are listed once, in `integration/pyodide-parity/corpora.json`
 workflow and for **Compare rendered courses**. `build-corpora.py` builds the
 corpora with one umbrella checkout and writes `corpora-built.json`, which
 `run.cjs --corpora` reads (sites, source trees, package, Python programs).
-A course with a pinned `commit` (ctm-demo, ingmat3a) is built there; the pins
-are bumped by hand, in a pull request of their own that updates
-`answers.json` with them. A course without one follows its branch: ingmat3a's
-`linalg-branch`, where the linear-algebra work happens, is built at its tip
-(resolved once per job, so the two builds of a comparison get the same
-commit), graded with ingmat3a's teacher answers, whose expectations are
-reported there, not enforced (the branch moves), and skipped with a notice
-once the branch is gone (`optional`). The course comparison builds every
-course at its branch. Locally:
+A course with a pinned `commit` (ctm-demo, ingmat3a) is built there, in the
+blocking jobs; the pins are bumped by hand, in a pull request of their own
+that updates `answers.json` with them. A course without one follows its
+branch: ingmat3a's `linalg-branch`, where the linear-algebra work happens, is
+built at its tip (resolved once per job, so the two builds of a comparison
+get the same commit) and graded only in a job of its own, **following**
+(`build-corpora.py --courses following`), with ingmat3a's teacher answers,
+whose expectations are reported, not enforced. That job reports its result as
+a notice or a warning and never fails, so work in progress on the branch
+cannot turn `main` or a pull request red; once the branch is gone it is
+skipped with a notice (`optional`). The course comparison builds every course
+at its branch; its entry for a course that follows its branch is
+informational in the same way. Locally:
 
 ```sh
 (cd integration/pyodide-parity && npm ci)
@@ -219,9 +223,9 @@ reported too (area `context`). The workflow
 through their own installers and compares them: on pull requests that change
 the package (the example site and every course of
 `integration/pyodide-parity/corpora.json` at its branch: ctm-demo with its
-review build, ingmat3a's `main` and its `linalg-branch`, which is skipped
-with a notice once it no longer exists), and on demand for any course,
-course ref and pair of refs.
+review build, ingmat3a's `main`, and its `linalg-branch` as an informational
+entry that never fails and is skipped with a notice once the branch no longer
+exists), and on demand for any course, course ref and pair of refs.
 
 ### Releases
 

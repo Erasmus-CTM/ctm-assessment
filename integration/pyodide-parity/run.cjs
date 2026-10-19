@@ -96,7 +96,7 @@ function withCorpora(options) {
   return {...options, courseCommits: built.courses || {},
     site: [...built.sites.map(s => ({name: s.name, dir: join(s.dir), corpus: s.corpus})), ...options.site],
     sources: [...built.sources.map(s => ({name: s.name, dir: join(s.dir)})), ...options.sources],
-    extensions: options.extensions || join(built.extensions), python: options.python || (built.python ? join(built.python) : null)};
+    extensions: options.extensions || (built.extensions ? join(built.extensions) : null), python: options.python || (built.python ? join(built.python) : null)};
 }
 
 // The runs: two Pyodide versions over one build, or two builds under one version.
@@ -351,6 +351,11 @@ function buildJob(run, options, wheels, authoredResponses, corpora) {
 
 async function main() {
   const options = parse(process.argv.slice(2));
+  if (!options.site.length && !options.sources.length && !options.python) {
+    // build-corpora.py --courses following when no course follows a branch (or its branch is gone).
+    console.log('Nothing to grade: no sites, source trees or Python programs.');
+    process.exit(0);
+  }
   const out = path.resolve(options.out);
   fs.mkdirSync(out, {recursive: true});
   const log = line => console.log(line);

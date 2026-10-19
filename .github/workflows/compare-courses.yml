@@ -10,7 +10,10 @@ name: Compare rendered courses
 # site and every course of integration/pyodide-parity/corpora.json (the one
 # course list) at its branch (ctm-demo with its STACK review build, ingmat3a's
 # main and its linalg-branch; a branch that no longer exists is skipped with
-# a notice); before = the pull request's base, after = its head.
+# a notice); before = the pull request's base, after = its head. A course that
+# follows its branch (no pinned commit: linalg-branch) is informational: its
+# build and comparison never fail the job, a problem is a warning (round-2
+# review N1).
 on:
   workflow_dispatch:
     inputs:
@@ -75,6 +78,7 @@ jobs:
 
   compare:
     needs: courses
+    name: compare ${{ matrix.course }}${{ matrix.ref && format(' @ {0}', matrix.ref) || '' }}${{ matrix.informational && ' (informational)' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -112,6 +116,8 @@ jobs:
           version: '1.8.27'
       - run: npm ci --ignore-scripts
       - name: Build ${{ matrix.course }} with both refs
+        id: build
+        continue-on-error: ${{ matrix.informational == true }}
         run: |
           set -e
           for side in before after; do
@@ -126,6 +132,8 @@ jobs:
             fi
           done
       - name: Compare the rendered pages
+        id: compare
+        continue-on-error: ${{ matrix.informational == true }}
         run: |
           name=$(basename "$COURSE")
           expect=(--expect tools/compare-rendered/expect/step1.yml)
@@ -145,9 +153,16 @@ jobs:
           exit $status
       - name: Report the result as an annotation
         if: always()
+        env:
+          INFORMATIONAL: ${{ matrix.informational == true }}
+          BUILD: ${{ steps.build.outcome }}
+          COMPARE: ${{ steps.compare.outcome }}
         run: |
           text=$(cat "$RUNNER_TEMP"/reports/*.md 2>/dev/null | head -c 6000 || echo 'no report')
           level=notice; [ "${{ job.status }}" = success ] || level=error
+          if [ "$INFORMATIONAL" = true ] && { [ "$BUILD" = failure ] || [ "$COMPARE" = failure ]; }; then
+            level=warning; text="Informational (the course follows its branch): build $BUILD, comparison ${COMPARE:-skipped}."$'\n'"$text"
+          fi
           printf '::%s title=Compare %s::%s\n' "$level" "$COURSE${COURSE_REF:+@$COURSE_REF}" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
       - uses: actions/upload-artifact@v7
         if: always()

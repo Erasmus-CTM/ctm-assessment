@@ -2,8 +2,7 @@ name: Pyodide parity and goldens
 
 # The parity harness (integration/pyodide-parity) over the example site,
 # math-exercise's example site and the courses of corpora.json (the one course
-# list: ctm-demo with its review build and ingmat3a at their pinned commits,
-# ingmat3a's linalg-branch at its tip, skipped with a notice once it is gone):
+# list) with a pinned commit (ctm-demo with its review build, ingmat3a):
 # - parity: every exercise graded under Pyodide 0.27.2 and 0.28.3 (D4 gate;
 #   any difference in status or score fails), with the golden capture for
 #   ctm-checkers (step-2 design §6, §13): artifact goldens-export (the rows
@@ -17,6 +16,11 @@ name: Pyodide parity and goldens
 #   number>.json lists it.
 # Either job fails when a case has no result, times out or ends in a harness
 # error, or when a teacher answer (answers.json) gets another verdict.
+# - following (informational, never fails): the courses that follow a branch
+#   (ingmat3a's linalg-branch at its tip; skipped with a notice once the branch
+#   is gone) graded the same way, and on pull requests compared with the base;
+#   a problem there is a warning, so work in progress on a course branch never
+#   turns main or a pull request red (round-2 review N1).
 # Runs when the harness, the pins, the package or the example site change; in
 # full every Monday; on demand (also with other course commits) once on the
 # default branch.
@@ -131,7 +135,7 @@ jobs:
       - name: Build the corpora with the package
         run: |
           refs=(); for course in $COURSES; do refs+=(--ref "$course"); done
-          python integration/pyodide-parity/build-corpora.py --umbrella . --out "$RUNNER_TEMP/corpora" --review-refs "$CTM_REVIEW_REFS" "${refs[@]}"
+          python integration/pyodide-parity/build-corpora.py --courses pinned --umbrella . --out "$RUNNER_TEMP/corpora" --review-refs "$CTM_REVIEW_REFS" "${refs[@]}"
       - run: npm ci --ignore-scripts
       - run: npm ci --ignore-scripts
         working-directory: integration/pyodide-parity
@@ -236,11 +240,11 @@ jobs:
           git rev-parse --verify "$ref^{commit}"
           git worktree add --detach "$RUNNER_TEMP/base-umbrella" "$ref"
           # The base keeps its own pins; review refs belong to this commit only.
-          # One set of course commits for both builds (a course that follows its branch could move between them).
+          # One set of course commits for both builds.
           refs=(); for course in $COURSES; do refs+=(--ref "$course"); done
-          python integration/pyodide-parity/build-corpora.py --resolve "$RUNNER_TEMP/course-commits.json" "${refs[@]}"
-          python integration/pyodide-parity/build-corpora.py --umbrella "$RUNNER_TEMP/base-umbrella" --out "$RUNNER_TEMP/builds/base" --refs "$RUNNER_TEMP/course-commits.json"
-          python integration/pyodide-parity/build-corpora.py --umbrella . --out "$RUNNER_TEMP/builds/head" --review-refs "$CTM_REVIEW_REFS" --refs "$RUNNER_TEMP/course-commits.json"
+          python integration/pyodide-parity/build-corpora.py --courses pinned --resolve "$RUNNER_TEMP/course-commits.json" "${refs[@]}"
+          python integration/pyodide-parity/build-corpora.py --courses pinned --umbrella "$RUNNER_TEMP/base-umbrella" --out "$RUNNER_TEMP/builds/base" --refs "$RUNNER_TEMP/course-commits.json"
+          python integration/pyodide-parity/build-corpora.py --courses pinned --umbrella . --out "$RUNNER_TEMP/builds/head" --review-refs "$CTM_REVIEW_REFS" --refs "$RUNNER_TEMP/course-commits.json"
       - run: npm ci --ignore-scripts
       - run: npm ci --ignore-scripts
         working-directory: integration/pyodide-parity
@@ -267,3 +271,95 @@ jobs:
           path: |
             ${{ runner.temp }}/builds-report/report.*
             ${{ runner.temp }}/builds-report/results-*.jsonl
+
+  following:
+    name: following (courses that follow a branch; informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Check the inputs of a run on demand
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          for course in $COURSES; do
+            [[ "$course" =~ ^[a-z0-9][a-z0-9-]*=[0-9a-f]{7,40}$ ]] || { echo "::error::courses takes NAME=COMMIT (7 to 40 hex digits): $course"; exit 1; }
+          done
+      - name: Select explicit review dependencies (main keeps normal defaults)
+        env:
+          REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 tools/ci/review-dependencies.py
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            integration/pyodide-parity/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6' jupyter nbformat
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - run: npm ci --ignore-scripts
+      - run: npm ci --ignore-scripts
+        working-directory: integration/pyodide-parity
+      # Every step that can fail on the course branch's own work continues; the last step reports.
+      - name: Build the courses that follow a branch (on pull requests also with the base)
+        id: build
+        continue-on-error: true
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -e
+          refs=(); for course in $COURSES; do refs+=(--ref "$course"); done
+          python integration/pyodide-parity/build-corpora.py --courses following --resolve "$RUNNER_TEMP/following-commits.json" "${refs[@]}"
+          python integration/pyodide-parity/build-corpora.py --courses following --umbrella . --out "$RUNNER_TEMP/following/head" --review-refs "$CTM_REVIEW_REFS" --refs "$RUNNER_TEMP/following-commits.json"
+          if [ -n "$BASE" ]; then
+            git worktree add --detach "$RUNNER_TEMP/base-umbrella" "$BASE"
+            python integration/pyodide-parity/build-corpora.py --courses following --umbrella "$RUNNER_TEMP/base-umbrella" --out "$RUNNER_TEMP/following/base" --refs "$RUNNER_TEMP/following-commits.json"
+          fi
+      - name: Grade them under Pyodide 0.27.2 and 0.28.3
+        id: parity
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node integration/pyodide-parity/run.cjs --corpora "$RUNNER_TEMP/following/head/corpora-built.json" --out "$RUNNER_TEMP/following-parity" 2>&1 | tee "$RUNNER_TEMP/following-parity.log"
+      - name: Compare the base build with this one under Pyodide 0.28.3
+        id: builds
+        if: steps.build.outcome == 'success' && github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node integration/pyodide-parity/run.cjs --builds base="$RUNNER_TEMP/following/base",head="$RUNNER_TEMP/following/head" \
+            --corpora corpora-built.json --out "$RUNNER_TEMP/following-builds" 2>&1 | tee "$RUNNER_TEMP/following-builds.log"
+      - name: Report the result (a warning, never a failure)
+        if: always()
+        env:
+          BUILD: ${{ steps.build.outcome }}
+          PARITY: ${{ steps.parity.outcome }}
+          BUILDS: ${{ steps.builds.outcome }}
+        run: |
+          commits=$(cat "$RUNNER_TEMP/following-commits.json" 2>/dev/null | tr -d '\n ' || echo '?')
+          text="Courses that follow a branch: $commits. Build: $BUILD; parity: ${PARITY:-skipped}; build comparison: ${BUILDS:-skipped}."
+          for report in following-parity following-builds; do
+            if [ -f "$RUNNER_TEMP/$report/report.md" ]; then text="$text"$'\n\n'"$(head -c 2800 "$RUNNER_TEMP/$report/report.md")"; fi
+          done
+          level=notice
+          for outcome in "$BUILD" "$PARITY" "$BUILDS"; do if [ "$outcome" = failure ]; then level=warning; fi; done
+          printf '%s\n' "$text" >> "$GITHUB_STEP_SUMMARY"
+          printf '::%s title=Courses that follow a branch (informational)::%s\n' "$level" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+          exit 0
+      - uses: actions/upload-artifact@v7
+        if: always()
+        continue-on-error: true
+        with:
+          name: following-branch
+          path: |
+            ${{ runner.temp }}/following-parity/report.*
+            ${{ runner.temp }}/following-builds/report.*
+          if-no-files-found: ignore
