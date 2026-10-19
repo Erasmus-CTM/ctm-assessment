@@ -45,6 +45,8 @@ commits recorded in `_extensions/ctm-assessment/resolved-repos.json`.
   become errors in 1.0 (A3); `version:` is not an option (A7). Values that
   were accepted loosely (`py-exercise: submission`, `show-test-hints`,
   `feedback`; a component section that is not a mapping) warn likewise.
+- **`py-exercise: show-test-hints: false`** written as a YAML boolean now
+  hides the test hints; it was ignored before.
 - **Explicit context also sends the section's prose** (A5): with
   `context: <block ids>`, feedback requests hold the listed blocks and then
   the prose of the exercise's own section, without those blocks.
