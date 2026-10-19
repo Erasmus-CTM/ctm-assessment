@@ -8,11 +8,17 @@ name: Pyodide parity and goldens
 #   ctm-checkers (step-2 design §6, §13): artifact goldens-export (the rows
 #   ctm-checkers may commit: math-exercise's own examples) and goldens-umbrella
 #   (rows from the courses and the umbrella's examples, which stay here).
+#   The capture runs with PYTHONHASHSEED 0 and is repeated with seed 1 for
+#   the umbrella's and math-exercise's corpora: any row that differs fails.
 # - builds (L2): the same corpora built with the pull request's base and with
 #   its head, graded under 0.28.3; any difference (status, score, details,
-#   feedback) fails.
-# Runs when the harness, the pins or the package change; in full every
-# Monday; on demand (also with other course commits) once on the default branch.
+#   feedback, cases) fails unless integration/pyodide-parity/expected/<PR
+#   number>.json lists it.
+# Either job fails when a case has no result, times out or ends in a harness
+# error, or when a teacher answer (answers.json) gets another verdict.
+# Runs when the harness, the pins, the package or the example site change; in
+# full every Monday; on demand (also with other course commits) once on the
+# default branch.
 on:
   pull_request:
     paths:
@@ -28,6 +34,14 @@ on:
       - _filters/**
       - examples/**
       - example.qmd
+      - examples.qmd
+      - index.qmd
+      - _quarto.yml
+      - feedback.yml
+      - feedback/**
+      - assets/**
+      - package.json
+      - package-lock.json
       - .github/workflows/pyodide-parity.yml
   push:
     branches: [main]
@@ -44,6 +58,14 @@ on:
       - _filters/**
       - examples/**
       - example.qmd
+      - examples.qmd
+      - index.qmd
+      - _quarto.yml
+      - feedback.yml
+      - feedback/**
+      - assets/**
+      - package.json
+      - package-lock.json
       - .github/workflows/pyodide-parity.yml
   schedule:
     - cron: '23 3 * * 1'
@@ -56,15 +78,17 @@ on:
         description: 'ingmat3a_ntnu commit (empty: the commit in corpora.json)'
         default: ''
       base:
-        description: 'Umbrella ref built as the base of the build comparison (empty: skip it)'
+        description: 'Umbrella commit, tag or branch built as the base of the build comparison (a branch means origin/<branch>; empty: no comparison)'
         default: ''
 
 permissions:
   contents: read
 
+# The weekly run and runs on demand have groups of their own: a push to main
+# does not cancel them, nor they it.
 concurrency:
-  group: ctm-assessment-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ctm-assessment-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 env:
   COURSE_REFS: >-
@@ -79,6 +103,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
+      - name: Check the inputs of a run on demand
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          CTM_DEMO: ${{ github.event.inputs.ctm-demo }}
+          INGMAT3A: ${{ github.event.inputs.ingmat3a }}
+          BASE: ${{ github.event.inputs.base }}
+        run: |
+          for value in "$CTM_DEMO" "$INGMAT3A"; do
+            [ -z "$value" ] || [[ "$value" =~ ^[0-9a-f]{7,40}$ ]] || { echo "::error::A course commit is 7 to 40 hex digits: $value"; exit 1; }
+          done
+          [ -z "$BASE" ] || [[ "$BASE" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || { echo "::error::base is a commit, tag or branch name: $BASE"; exit 1; }
       - name: Select explicit review dependencies (main keeps normal defaults)
         env:
           REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -112,6 +147,26 @@ jobs:
             --site ctm-demo="$c/sites/ctm-demo/_site" --site ctm-demo-review="$c/sites/ctm-demo/_review-site" --site ingmat3a="$c/sites/ingmat3a/_site" \
             --sources umbrella=. --sources math-exercise="$c/sites/math-exercise" --sources ctm-demo="$c/sites/ctm-demo" --sources ingmat3a="$c/sites/ingmat3a" \
             --python . --extensions "$c/ws/site/_extensions" --out "$RUNNER_TEMP/parity" --capture "$RUNNER_TEMP/goldens" 2>&1 | tee "$RUNNER_TEMP/parity.log"
+      - name: Capture the umbrella's and math-exercise's corpora again with PYTHONHASHSEED 1; every row must be the same
+        run: |
+          c="$RUNNER_TEMP/corpora"
+          node integration/pyodide-parity/run.cjs --hash-seed 1 \
+            --site umbrella="$c/ws/site/_site" --site math-exercise="$c/sites/math-exercise/_site" \
+            --sources umbrella=. --sources math-exercise="$c/sites/math-exercise" \
+            --extensions "$c/ws/site/_extensions" --out "$RUNNER_TEMP/parity-seed1" --capture "$RUNNER_TEMP/goldens-seed1" \
+            > "$RUNNER_TEMP/parity-seed1.log" 2>&1 || { tail -80 "$RUNNER_TEMP/parity-seed1.log"; exit 1; }
+          cd "$RUNNER_TEMP/goldens-seed1"
+          files=$(find export umbrella -name '*.jsonl' | sort)
+          status=0
+          for f in $files; do
+            if ! cmp -s "$f" "$RUNNER_TEMP/goldens/$f"; then
+              echo "::error title=Golden capture depends on PYTHONHASHSEED::$f"
+              diff "$RUNNER_TEMP/goldens/$f" "$f" | head -20 || true
+              status=1
+            fi
+          done
+          echo "$(echo "$files" | wc -w) files compared with the capture under PYTHONHASHSEED 0"
+          exit $status
       - name: Report the result as an annotation
         if: always()
         run: |
@@ -126,13 +181,12 @@ jobs:
             ${{ runner.temp }}/parity/report.*
             ${{ runner.temp }}/parity/results-*.jsonl
             ${{ runner.temp }}/parity/job-*.json
+      # export/ holds its own manifest and notice: nothing of the umbrella's side.
       - uses: actions/upload-artifact@v7
         if: success()
         with:
           name: goldens-export
-          path: |
-            ${{ runner.temp }}/goldens/export
-            ${{ runner.temp }}/goldens/manifest.json
+          path: ${{ runner.temp }}/goldens/export
       - uses: actions/upload-artifact@v7
         if: success()
         with:
@@ -150,6 +204,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Check the inputs of a run on demand
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          CTM_DEMO: ${{ github.event.inputs.ctm-demo }}
+          INGMAT3A: ${{ github.event.inputs.ingmat3a }}
+          BASE: ${{ github.event.inputs.base }}
+        run: |
+          for value in "$CTM_DEMO" "$INGMAT3A"; do
+            [ -z "$value" ] || [[ "$value" =~ ^[0-9a-f]{7,40}$ ]] || { echo "::error::A course commit is 7 to 40 hex digits: $value"; exit 1; }
+          done
+          [ -z "$BASE" ] || [[ "$BASE" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || { echo "::error::base is a commit, tag or branch name: $BASE"; exit 1; }
       - name: Select explicit review dependencies (main keeps normal defaults)
         env:
           REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -173,7 +238,11 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha || github.event.inputs.base }}
         run: |
           set -e
-          git worktree add --detach "$RUNNER_TEMP/base-umbrella" "$BASE"
+          # A commit or tag as it is; a branch name as fetched (origin/<branch>).
+          ref="$BASE"
+          git rev-parse --verify --quiet "$ref^{commit}" > /dev/null || ref="origin/$BASE"
+          git rev-parse --verify "$ref^{commit}"
+          git worktree add --detach "$RUNNER_TEMP/base-umbrella" "$ref"
           # The base keeps its own pins; review refs belong to this commit only.
           python integration/pyodide-parity/build-corpora.py --umbrella "$RUNNER_TEMP/base-umbrella" --out "$RUNNER_TEMP/builds/base" $COURSE_REFS
           python integration/pyodide-parity/build-corpora.py --umbrella . --out "$RUNNER_TEMP/builds/head" --review-refs "$CTM_REVIEW_REFS" $COURSE_REFS
@@ -181,9 +250,14 @@ jobs:
       - run: npm ci --ignore-scripts
         working-directory: integration/pyodide-parity
       - name: Grade every exercise of both builds under Pyodide 0.28.3
+        env:
+          # The differences this pull request causes on purpose, if any (docs/development.md).
+          EXPECTED: ${{ github.event.pull_request.number && format('integration/pyodide-parity/expected/{0}.json', github.event.pull_request.number) || '' }}
         run: |
           set -o pipefail
-          node integration/pyodide-parity/run.cjs --builds base="$RUNNER_TEMP/builds/base",head="$RUNNER_TEMP/builds/head" \
+          expected=()
+          if [ -n "$EXPECTED" ] && [ -f "$EXPECTED" ]; then expected=(--expected "$EXPECTED"); echo "Expected differences: $EXPECTED"; fi
+          node integration/pyodide-parity/run.cjs --builds base="$RUNNER_TEMP/builds/base",head="$RUNNER_TEMP/builds/head" "${expected[@]}" \
             --site umbrella=ws/site/_site --site math-exercise=sites/math-exercise/_site \
             --site ctm-demo=sites/ctm-demo/_site --site ctm-demo-review=sites/ctm-demo/_review-site --site ingmat3a=sites/ingmat3a/_site \
             --sources umbrella=umbrella --sources math-exercise=sites/math-exercise --sources ctm-demo=sites/ctm-demo --sources ingmat3a=sites/ingmat3a \

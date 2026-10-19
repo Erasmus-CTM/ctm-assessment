@@ -1,5 +1,5 @@
 {
-  "comment": "The parity harness's corpora: where each comes from, its licence, and whether its captured golden rows may go to ctm-checkers (step-2 design §13 item 7: only math-exercise's own examples; course-derived rows and the umbrella's example site stay in the umbrella). Courses are built at the pinned commit in CI (pyodide-parity.yml); math-exercise's example site at the component's pin in integration/feedback/repos.json.",
+  "comment": "The parity harness's corpora: where each comes from, its licence, and whether its captured golden rows may go to ctm-checkers (step-2 design §13 item 7: only math-exercise's own examples; course-derived rows and the umbrella's example site stay in the umbrella). Courses are built at the pinned commit in CI (pyodide-parity.yml); math-exercise's example site at the component's pin in integration/feedback/repos.json. The course commits are bumped by hand, in a pull request of their own that also updates answers.json (track-components does not touch them); a run on demand grades other course commits.",
   "corpora": {
     "umbrella": {
       "repository": "Erasmus-CTM/ctm-assessment",

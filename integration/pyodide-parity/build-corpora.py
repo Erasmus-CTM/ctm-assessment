@@ -16,6 +16,7 @@ commits in this checkout's corpora.json, or at --ref NAME=COMMIT.
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -43,8 +44,8 @@ def main():
     refs = {name: corpora[name]['commit'] for name in COURSES}
     for entry in args.ref:
         name, _, commit = entry.partition('=')
-        if name not in COURSES or not commit.strip():
-            raise SystemExit(f'--ref takes {", ".join(COURSES)}=COMMIT')
+        if name not in COURSES or not re.fullmatch(r'[0-9a-f]{7,40}', commit.strip()):
+            raise SystemExit(f'--ref takes {", ".join(COURSES)}=COMMIT (7 to 40 hex digits)')
         refs[name] = commit.strip()
     out.mkdir(parents=True, exist_ok=True)
     link = out / 'umbrella'
