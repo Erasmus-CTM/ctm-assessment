@@ -16,12 +16,12 @@ categories:
       - {area: inline, change: removed, what: '^(math-exercise|py-exercise|runtime) bundle$'}
 
   # Only when the new context is exactly the prose of the exercise's own
-  # section (innermost tab with its label, heading section, <details> block or
-  # collapsed callout) without context blocks, and keeps all of it that the old
-  # context had: no text from <details> blocks or collapsed callouts the
-  # exercise is not in, other tabs, other sections, code or other exercises
-  # (`context`, computed by the tool on the after page; anything else is
-  # unexplained, and so is an unchanged context that fails the check).
+  # section (innermost tab with its label, or heading section) without context
+  # blocks, and keeps all of it that the old context had: no text from
+  # <details> blocks or collapsed callouts the exercise is not in, other tabs,
+  # other sections, code or other exercises (`context`, computed by the tool
+  # on the after page; anything else is unexplained, and so is an unchanged
+  # context that fails the check).
   - id: A5
     title: Explicit context also sends the exercise's own section prose, without context blocks
     match:

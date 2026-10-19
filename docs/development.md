@@ -78,10 +78,10 @@ belong to a category of the expectation files in
 Assessment 0.9; one file per course or site where needed). A changed feedback
 context is checked against the after page itself (`context:` in a rule): it
 must be prose of the exercise's own section (the innermost tab with its label,
-heading section, `<details>` block or collapsed callout), without `<details>`
-blocks and collapsed callouts the exercise is not in (solutions, hints), other
-tabs, other sections, code or other exercises, for an explicit context also
-without context blocks, and keep all of that prose the old context had. Every
+or heading section), without `<details>` blocks and collapsed callouts the
+exercise is not in (solutions, hints), other tabs, other sections, code or
+other exercises, for an explicit context also without context blocks, and
+keep all of that prose the old context had. Every
 unchanged context of the after page gets the same check; one that fails it is
 reported too (area `context`). The workflow
 **Compare rendered courses** builds a course with two ctm-assessment refs
