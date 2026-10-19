@@ -1,0 +1,203 @@
+name: Pyodide parity and goldens
+
+# The parity harness (integration/pyodide-parity) over the example site,
+# math-exercise's example site and the courses (ctm-demo with its review
+# build, ingmat3a; at the commits in corpora.json):
+# - parity: every exercise graded under Pyodide 0.27.2 and 0.28.3 (D4 gate;
+#   any difference in status or score fails), with the golden capture for
+#   ctm-checkers (step-2 design §6, §13): artifact goldens-export (the rows
+#   ctm-checkers may commit: math-exercise's own examples) and goldens-umbrella
+#   (rows from the courses and the umbrella's examples, which stay here).
+# - builds (L2): the same corpora built with the pull request's base and with
+#   its head, graded under 0.28.3; any difference (status, score, details,
+#   feedback) fails.
+# Runs when the harness, the pins or the package change; in full every
+# Monday; on demand (also with other course commits) once on the default branch.
+on:
+  pull_request:
+    paths:
+      - integration/pyodide-parity/**
+      - integration/feedback/repos.json
+      - integration/feedback/page-scripts.cjs
+      - tests/python-examples.cases.cjs
+      - scripts/setup-feedback-integration.py
+      - scripts/install-project.py
+      - scripts/build-course.py
+      - tools/ci/review-dependencies.py
+      - _extensions/**
+      - _filters/**
+      - examples/**
+      - example.qmd
+      - .github/workflows/pyodide-parity.yml
+  push:
+    branches: [main]
+    paths:
+      - integration/pyodide-parity/**
+      - integration/feedback/repos.json
+      - integration/feedback/page-scripts.cjs
+      - tests/python-examples.cases.cjs
+      - scripts/setup-feedback-integration.py
+      - scripts/install-project.py
+      - scripts/build-course.py
+      - tools/ci/review-dependencies.py
+      - _extensions/**
+      - _filters/**
+      - examples/**
+      - example.qmd
+      - .github/workflows/pyodide-parity.yml
+  schedule:
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      ctm-demo:
+        description: 'ctm-demo commit (empty: the commit in corpora.json)'
+        default: ''
+      ingmat3a:
+        description: 'ingmat3a_ntnu commit (empty: the commit in corpora.json)'
+        default: ''
+      base:
+        description: 'Umbrella ref built as the base of the build comparison (empty: skip it)'
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ctm-assessment-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COURSE_REFS: >-
+    ${{ github.event.inputs.ctm-demo && format('--ref ctm-demo={0}', github.event.inputs.ctm-demo) || '' }}
+    ${{ github.event.inputs.ingmat3a && format('--ref ingmat3a={0}', github.event.inputs.ingmat3a) || '' }}
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Select explicit review dependencies (main keeps normal defaults)
+        env:
+          REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 tools/ci/review-dependencies.py
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            integration/pyodide-parity/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      # SymPy: the version Pyodide ships (native build-time checks); Jupyter as the courses' builds install it.
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6' jupyter nbformat
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - name: Build the corpora with the package
+        run: python integration/pyodide-parity/build-corpora.py --umbrella . --out "$RUNNER_TEMP/corpora" --review-refs "$CTM_REVIEW_REFS" $COURSE_REFS
+      - run: npm ci --ignore-scripts
+      - run: npm ci --ignore-scripts
+        working-directory: integration/pyodide-parity
+      - name: Grade every exercise under Pyodide 0.27.2 and 0.28.3, and capture the goldens
+        run: |
+          set -o pipefail
+          c="$RUNNER_TEMP/corpora"
+          node integration/pyodide-parity/run.cjs \
+            --site umbrella="$c/ws/site/_site" --site math-exercise="$c/sites/math-exercise/_site" \
+            --site ctm-demo="$c/sites/ctm-demo/_site" --site ctm-demo-review="$c/sites/ctm-demo/_review-site" --site ingmat3a="$c/sites/ingmat3a/_site" \
+            --sources umbrella=. --sources math-exercise="$c/sites/math-exercise" --sources ctm-demo="$c/sites/ctm-demo" --sources ingmat3a="$c/sites/ingmat3a" \
+            --python . --extensions "$c/ws/site/_extensions" --out "$RUNNER_TEMP/parity" --capture "$RUNNER_TEMP/goldens" 2>&1 | tee "$RUNNER_TEMP/parity.log"
+      - name: Report the result as an annotation
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/parity/report.md" ]; then text=$(head -c 6000 "$RUNNER_TEMP/parity/report.md"); else text=$(tail -40 "$RUNNER_TEMP/parity.log" 2>/dev/null || echo 'no output'); fi
+          level=notice; [ "${{ job.status }}" = success ] || level=error
+          printf '::%s title=Pyodide parity::%s\n' "$level" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pyodide-parity
+          path: |
+            ${{ runner.temp }}/parity/report.*
+            ${{ runner.temp }}/parity/results-*.jsonl
+            ${{ runner.temp }}/parity/job-*.json
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: goldens-export
+          path: |
+            ${{ runner.temp }}/goldens/export
+            ${{ runner.temp }}/goldens/manifest.json
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: goldens-umbrella
+          path: |
+            ${{ runner.temp }}/goldens/umbrella
+            ${{ runner.temp }}/goldens/manifest.json
+            ${{ runner.temp }}/goldens/PROVENANCE.md
+
+  builds:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.base != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Select explicit review dependencies (main keeps normal defaults)
+        env:
+          REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 tools/ci/review-dependencies.py
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            integration/pyodide-parity/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6' jupyter nbformat
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - name: Build the corpora with the base and with this commit
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.inputs.base }}
+        run: |
+          set -e
+          git worktree add --detach "$RUNNER_TEMP/base-umbrella" "$BASE"
+          # The base keeps its own pins; review refs belong to this commit only.
+          python integration/pyodide-parity/build-corpora.py --umbrella "$RUNNER_TEMP/base-umbrella" --out "$RUNNER_TEMP/builds/base" $COURSE_REFS
+          python integration/pyodide-parity/build-corpora.py --umbrella . --out "$RUNNER_TEMP/builds/head" --review-refs "$CTM_REVIEW_REFS" $COURSE_REFS
+      - run: npm ci --ignore-scripts
+      - run: npm ci --ignore-scripts
+        working-directory: integration/pyodide-parity
+      - name: Grade every exercise of both builds under Pyodide 0.28.3
+        run: |
+          set -o pipefail
+          node integration/pyodide-parity/run.cjs --builds base="$RUNNER_TEMP/builds/base",head="$RUNNER_TEMP/builds/head" \
+            --site umbrella=ws/site/_site --site math-exercise=sites/math-exercise/_site \
+            --site ctm-demo=sites/ctm-demo/_site --site ctm-demo-review=sites/ctm-demo/_review-site --site ingmat3a=sites/ingmat3a/_site \
+            --sources umbrella=umbrella --sources math-exercise=sites/math-exercise --sources ctm-demo=sites/ctm-demo --sources ingmat3a=sites/ingmat3a \
+            --python umbrella --extensions ws/site/_extensions --out "$RUNNER_TEMP/builds-report" 2>&1 | tee "$RUNNER_TEMP/builds.log"
+      - name: Report the result as an annotation
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/builds-report/report.md" ]; then text=$(head -c 6000 "$RUNNER_TEMP/builds-report/report.md"); else text=$(tail -40 "$RUNNER_TEMP/builds.log" 2>/dev/null || echo 'no output'); fi
+          level=notice; [ "${{ job.status }}" = success ] || level=error
+          printf '::%s title=Build comparison::%s\n' "$level" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: build-comparison
+          path: |
+            ${{ runner.temp }}/builds-report/report.*
+            ${{ runner.temp }}/builds-report/results-*.jsonl

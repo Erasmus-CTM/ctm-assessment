@@ -17,7 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - name: Select explicit review dependencies (main keeps normal defaults)
@@ -25,11 +25,11 @@ jobs:
         env:
           REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: python3 tools/ci/review-dependencies.py
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'  # SymPy: the version Pyodide 0.28.3 ships
@@ -55,89 +55,19 @@ jobs:
           if grep -q 'not ok' "$RUNNER_TEMP/build.log"; then
             printf '::error title=Failing tests::%s\n' "$(grep -B2 -A22 'not ok' "$RUNNER_TEMP/build.log" | grep -v 'duration_ms\|^\s*$' | head -c 6000 | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: rendered-examples
           path: .feedback-workspace/site/_site
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ctm-assessment-package
           path: .feedback-workspace/ctm-assessment.tar.gz
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           path: .feedback-workspace/site/_site
-
-  pyodide-parity:
-    # D4 gate (design §7, §13 A6): every exercise of the example sites and the
-    # courses (ctm-demo with its STACK review build, ingmat3a), every variant,
-    # graded under the previous Pyodide (0.27.2) and the runtime's (0.28.3);
-    # authored question tests and the umbrella's Python programs too. Any
-    # difference in status or score fails.
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Select explicit review dependencies (main keeps normal defaults)
-        id: review
-        env:
-          REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: python3 tools/ci/review-dependencies.py
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            integration/pyodide-parity/package-lock.json
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      # SymPy: the version Pyodide ships (native build-time checks); Jupyter as the courses' builds install it.
-      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6' jupyter nbformat
-      - uses: quarto-dev/quarto-actions/setup@v2
-        with:
-          version: '1.8.27'
-      - name: Build the package and the example site
-        run: python scripts/setup-feedback-integration.py --review-refs "$CTM_REVIEW_REFS"
-      - name: Build math-exercise's example site and the courses with the package
-        run: |
-          set -e
-          sites="$RUNNER_TEMP/sites"
-          math=$(python -c "import json; print(json.load(open('.feedback-workspace/resolved-repos.json'))['repositories']['math-exercise']['commit'])")
-          python scripts/build-course.py --repo https://github.com/Erasmus-CTM/math-exercise.git --ref "$math" --dest "$sites/math-exercise" --workspace "$RUNNER_TEMP/ws" --review-refs "$CTM_REVIEW_REFS"
-          python scripts/build-course.py --repo https://github.com/aacchhee/ctm-demo.git --ref main --dest "$sites/ctm-demo" --workspace "$RUNNER_TEMP/ws" --review-refs "$CTM_REVIEW_REFS" --profile review
-          (cd "$sites/ctm-demo" && quarto render)
-          python scripts/build-course.py --repo https://github.com/aacchhee/ingmat3a_ntnu.git --ref main --dest "$sites/ingmat3a" --workspace "$RUNNER_TEMP/ws" --review-refs "$CTM_REVIEW_REFS"
-      - run: npm ci --ignore-scripts
-      - run: npm ci --ignore-scripts
-        working-directory: integration/pyodide-parity
-      - name: Grade every exercise under Pyodide 0.27.2 and 0.28.3
-        run: |
-          set -o pipefail
-          sites="$RUNNER_TEMP/sites"
-          node integration/pyodide-parity/run.cjs \
-            --site umbrella=.feedback-workspace/site/_site --site math-exercise="$sites/math-exercise/_site" \
-            --site ctm-demo="$sites/ctm-demo/_site" --site ctm-demo-review="$sites/ctm-demo/_review-site" --site ingmat3a="$sites/ingmat3a/_site" \
-            --sources umbrella=. --sources math-exercise="$sites/math-exercise" --sources ctm-demo="$sites/ctm-demo" --sources ingmat3a="$sites/ingmat3a" \
-            --python . --extensions .feedback-workspace/site/_extensions --out "$RUNNER_TEMP/parity" 2>&1 | tee "$RUNNER_TEMP/parity.log"
-      - name: Report the result as an annotation
-        if: always()
-        run: |
-          if [ -f "$RUNNER_TEMP/parity/report.md" ]; then text=$(head -c 6000 "$RUNNER_TEMP/parity/report.md"); else text=$(tail -40 "$RUNNER_TEMP/parity.log" 2>/dev/null || echo 'no output'); fi
-          level=notice; [ "${{ job.status }}" = success ] || level=error
-          printf '::%s title=Pyodide parity::%s\n' "$level" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pyodide-parity
-          path: |
-            ${{ runner.temp }}/parity/report.*
-            ${{ runner.temp }}/parity/results-*.jsonl
-            ${{ runner.temp }}/parity/job.json
 
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -155,4 +85,4 @@ jobs:
     steps:
       - name: Deploy examples
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
