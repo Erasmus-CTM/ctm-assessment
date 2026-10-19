@@ -44,21 +44,60 @@ built with `--profile no-ai` and `CTM_FEEDBACK=off`). `scripts/test-package.py`
 installs the archive in a fresh course, also next to separately added copies
 and an old ai-feedback 0.8.1.
 
-### Pyodide parity (the gate for a Pyodide upgrade)
+### Pyodide parity, build comparison and golden capture
 
 `integration/pyodide-parity` grades every exercise of the example sites and
-courses under two Pyodide versions (today 0.27.2 and ctm-libs' 0.28.3) with
-the pages' own math-exercise.js in jsdom: answer keys, perturbations, the
-audit's challenge answers, every variant's fixtures, the authored question
-tests and the umbrella's Python programs. Any difference in status or score
-fails. The examples workflow runs it (job `pyodide-parity`) on the example
-site, math-exercise's example site, ctm-demo (with its review build) and
-ingmat3a, each built with the package by `scripts/build-course.py`. Locally:
+courses with the pages' own math-exercise.js in jsdom: answer keys,
+perturbations, the audit's challenge answers, every variant's fixtures, the
+authored question tests and the umbrella's Python programs. Cells that decide
+without answer keys (custom checkers) and cells whose response comes from a
+diagram (`data-response`) get probes too (step-2 review finding 1): a field
+without a key takes a fixed probe set (`PROBES` in `cases.cjs`: numbers,
+symbols, expressions, collections, a matrix, invalid input, a dunder), rotated
+across the cell's keyless fields, plus the challenge answers and the
+`expressions` responses its authored tests give the checker; a diagram cell
+gets the JSON responses its authored tests give the checker (answered through
+the page's JSXGraph response protocol) and its variants' fixtures. What stays
+uncovered: a diagram cell without authored tests or fixtures (the report counts
+it under "nothing to grade"), checker branches that neither the probes nor the
+authored responses reach, matrix inputs at shapes other than the default, and
+authored responses that are not JSON (they are left out).
+
+Two runs are compared. **Versions** (default): the same sites under two
+Pyodide versions (0.27.2 and ctm-libs' 0.28.3); any difference in status or
+score fails, other differences are reported. **Builds** (`--builds
+base=DIR,head=DIR`, one version, 0.28.3 by default): two builds of the same
+sites, with site, source and extension paths relative to each build's folder;
+the case lists must be identical and any difference — status, score, details
+or feedback text — fails (layer L2 of the step-2 design).
+
+`--capture DIR` writes the golden suites for ctm-checkers (`capture.cjs`): every
+grading call at the runtime boundary — the `_math_*` values the page set and
+the JSON the checker returned, or the error raised — one row per distinct
+request (`math_exercise/requests-<corpus>`, `custom-probes-<corpus>`,
+`authored-<corpus>`, with checker and test sources once in
+`sources-<corpus>.jsonl`). Rows are canonical JSON with Python's number
+spelling; an output with a Python error message, or one that differs between
+the versions, is kept per Python minor version (`by_python`). The capture is
+split by provenance (step-2 design §13 item 7; `corpora.json`): `export/` holds
+only math-exercise's own examples (AGPL-3.0-or-later), which ctm-checkers may
+commit; the courses' rows and the umbrella's example site stay in `umbrella/`,
+generated in CI from the pinned repositories. `manifest.json` names the
+commits, runtimes and files; `PROVENANCE.md` the licence of each file.
+
+The workflow **Pyodide parity and goldens** runs both: the parity run with the
+capture (artifacts `goldens-export` and `goldens-umbrella`) and, on pull
+requests, the build comparison against the base branch. It runs when the
+harness, the pins or the package change, in full every Monday, and on demand
+(with other course commits, or a base ref for the build comparison).
+`build-corpora.py` builds the corpora with one umbrella checkout (courses at the
+commits in `corpora.json`). Locally:
 
 ```sh
 (cd integration/pyodide-parity && npm ci)
-node integration/pyodide-parity/run.cjs --site umbrella=.feedback-workspace/site/_site \
-  --sources umbrella=. --python . --extensions .feedback-workspace/site/_extensions --out /tmp/parity
+python integration/pyodide-parity/build-corpora.py --umbrella . --out /tmp/corpora
+node integration/pyodide-parity/run.cjs --site umbrella=/tmp/corpora/ws/site/_site \
+  --sources umbrella=. --python . --extensions /tmp/corpora/ws/site/_extensions --out /tmp/parity --capture /tmp/goldens
 ```
 
 The SymPy, mpmath and NetworkX wheels come from jsDelivr, checked against each
@@ -66,7 +105,14 @@ version's `pyodide-lock.json`; `PYODIDE_PARITY_WHEELS=<dir>` serves them from
 `<dir>/<version>/` instead (for example extracted from Pyodide's release
 archive). A new Pyodide version changes `indexURL` in ctm-libs'
 `runtime/pyodide-runtime.js` in a commit of its own; set the two versions with
-`--versions` and update the job.
+`--versions` and update the workflow.
+
+### Review refs in CI
+
+`tools/ci/review-dependencies.py` is the one copy every CTM repository's CI
+uses (fetched from this repository at a pinned commit): a head commit's
+trailer `CTM-Review-Refs: {"ctm-libs": "<sha>", "ctm-checkers": "<sha>"}`
+selects dependency commits for a coordinated review; `main` ignores it.
 
 ### Comparing rendered pages
 
@@ -111,7 +157,7 @@ original restructuring; this README describes the current integration branches.
 The workflow runs on pull requests, feature-branch pushes and pushes to `main`.
 Every build uses the pinned component commits, renders all five topic tabs, runs unit
 and cross-integration tests, then tests real Python/JSXGraph behavior in Chromium.
-A second job runs the Pyodide parity harness.
+The Pyodide parity harness and the build comparison have a workflow of their own (above).
 It uploads the rendered site and installable archive as artifacts. A successful
 **main** build deploys both examples and archive to GitHub Pages; PRs never deploy.
 Concurrent deploys are serialized. Failed tests prevent deployment.
