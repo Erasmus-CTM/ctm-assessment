@@ -142,11 +142,15 @@ function canonicalRow(value) {
 
 // Writes the suites under DIR/export and DIR/umbrella by provenance, with a
 // manifest and a provenance notice for all of them, and for export/ its own
-// (paths relative to export/, only the exported corpora).
-function write(dir, suites, corpora, manifest) {
+// (paths relative to export/, only the exported corpora). `withhold` (the
+// reason: an incomplete run, rows with two outputs) writes no export/ at all
+// and names the reason in the manifest, so an incomplete capture cannot pass
+// for a complete one (round-2 review N3).
+function write(dir, suites, corpora, manifest, {withhold = null} = {}) {
   const written = {};
   for (const [name, files] of Object.entries(suites)) {
     const info = corpora[name] || {};
+    if (info.export && withhold) continue;
     const side = info.export ? 'export' : 'umbrella';
     for (const [kind, lines] of Object.entries(files)) {
       if (!lines.length) continue;
@@ -156,7 +160,7 @@ function write(dir, suites, corpora, manifest) {
       written[file.split(path.sep).join('/')] = {corpus: name, kind, rows: lines.length, export: Boolean(info.export), licence: info.licence || null};
     }
   }
-  const full = {...manifest, files: written};
+  const full = {...manifest, ...(withhold ? {exportWithheld: withhold} : {}), files: written};
   fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(full, null, 1) + '\n');
   fs.writeFileSync(path.join(dir, 'PROVENANCE.md'), provenance(corpora, written));
   if (fs.existsSync(path.join(dir, 'export'))) {
@@ -164,7 +168,7 @@ function write(dir, suites, corpora, manifest) {
     const only = {...manifest, corpora: Object.fromEntries(exported.map(name => [name, corpora[name]])),
       conflicts: (manifest.conflicts || []).filter(c => exported.includes(c.corpus)),
       files: Object.fromEntries(Object.entries(written).filter(([, info]) => info.export).map(([file, info]) => [file.replace(/^export\//, ''), info]))};
-    delete only.incomplete;   // a capture is exported only from a complete run
+    delete only.incomplete;   // empty: an incomplete run writes no export/
     fs.writeFileSync(path.join(dir, 'export', 'manifest.json'), JSON.stringify(only, null, 1) + '\n');
     fs.writeFileSync(path.join(dir, 'export', 'PROVENANCE.md'), provenance(corpora, written, 'export'));
   }

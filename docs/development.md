@@ -130,9 +130,11 @@ split by provenance (step-2 design §13 item 7; `corpora.json`): `export/`
 holds only math-exercise's own examples (AGPL-3.0-or-later), which
 ctm-checkers may commit, with a `manifest.json` and `PROVENANCE.md` of its own;
 the courses' rows and the umbrella's example site stay in `umbrella/`,
-generated in CI from the pinned repositories. The top-level `manifest.json`
-names the commits (the harness's checkout and the package the sites were
-built with), runtimes, files and anything incomplete; `PROVENANCE.md` the
+generated in CI from the pinned repositories. A run with cases that are
+incomplete, or with rows that got two outputs in one runtime, writes no
+`export/` at all (`exportWithheld` in the manifest says why). The top-level
+`manifest.json` names the commits (the harness's checkout and the package the
+sites were built with), runtimes, files and anything incomplete; `PROVENANCE.md` the
 licence of each file and the inputs written in the umbrella (probe sets,
 challenge and teacher answers). Authored questions are recorded by
 `integration/pyodide-parity/authored_record.py` (standard library only), the

@@ -215,3 +215,18 @@ test('--corpora reads the sites, source trees and package build-corpora.py built
     assert.equal(builds.python, 'umbrella');
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
 });
+
+test('an incomplete run writes no export/ and says why in the manifest', () => {
+  const collect = capture.collector();
+  const call = {call: 'check', input: {_math_student: '1'}, text: '{"status": "correct", "score": 1.0}'};
+  for (const corpus of ['math-exercise', 'umbrella']) collect.request(corpus, false, 'keys', [call], '3.13');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctm-withheld-'));
+  try {
+    const corpora = {'math-exercise': {export: true, licence: 'AGPL-3.0-or-later'}, umbrella: {export: false}};
+    const manifest = capture.write(dir, collect.suites().suites, corpora, {format: 1, incomplete: [{id: 'x', why: 'timeout'}]},
+      {withhold: '1 cases without a result, timed out or with a harness error'});
+    assert.equal(fs.existsSync(path.join(dir, 'export')), false);
+    assert.deepEqual(Object.keys(manifest.files), ['umbrella/math_exercise/requests-umbrella.jsonl']);
+    assert.match(JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')).exportWithheld, /harness error/);
+  } finally { fs.rmSync(dir, {recursive: true, force: true}); }
+});

@@ -493,12 +493,16 @@ async function main() {
     const umbrella = commitOf(process.cwd());
     const pkg = record && record.repositories && record.repositories['ctm-assessment'] ? record.repositories['ctm-assessment'].commit || null : null;
     if (umbrella && pkg && umbrella !== pkg) log(`Note: the harness runs from ${umbrella.slice(0, 12)}, the sites were built with the package of ${pkg.slice(0, 12)}`);
+    // An incomplete run, or rows with two outputs in one runtime, writes no export/ (round-2 review N3).
+    const withhold = incomplete.length ? `${incomplete.length} cases without a result, timed out or with a harness error`
+      : conflicts.length ? `${conflicts.length} rows with different outputs in one runtime` : null;
     captured = capture.write(dir, suites, corporaInfo, {format: 1, harness: 'ctm-assessment integration/pyodide-parity/run.cjs --capture',
       umbrella, package: pkg, pythonHashSeed: options.hashSeed, runs: summary.runs, components: record && record.repositories
         ? Object.fromEntries(Object.entries(record.repositories).map(([name, r]) => [name, r.commit || null])) : null,
-      corpora: corporaInfo, conflicts, incomplete});
+      corpora: corporaInfo, conflicts, incomplete}, {withhold});
     summary.capture = Object.fromEntries(Object.entries(captured.files).map(([file, info]) => [file, info.rows]));
     summary.captureConflicts = conflicts.length;
+    summary.exportWithheld = withhold;
   }
 
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify({summary, differences, expectedDifferences: accepted, staleExpectations: stale, notes, incomplete,
@@ -529,7 +533,7 @@ async function main() {
     + `Python programs graded unlike their expectation: ${pythonExpectations.length}. Answer keys not graded correct (generated variants whose checker `
     + `decides, or keys that are examples): ${keysNotCorrect.length}. Cells or variants with nothing to grade: ${summary.skipped}.`];
   if (captured) md.push('', `Golden capture (PYTHONHASHSEED ${options.hashSeed}): ${Object.entries(captured.files).map(([file, info]) => `\`${file}\` ${info.rows}`).join(', ')}; `
-    + `rows with different outputs in one runtime: ${summary.captureConflicts}.`);
+    + `rows with different outputs in one runtime: ${summary.captureConflicts}.` + (summary.exportWithheld ? ` **export/ withheld: ${summary.exportWithheld}.**` : ''));
   const list = (heading, items, text) => { if (items.length) md.push('', heading, ...items.slice(0, 50).map(text)); };
   list('Incomplete:', incomplete, i => `- ${i.run}: \`${i.id}\`: ${i.why}`);
   list('Teacher answers graded unlike their expectation:', answersUnexpected, a => `- ${a.run}: \`${a.id}\`: expected ${a.expected}, got ${a.got}`);
