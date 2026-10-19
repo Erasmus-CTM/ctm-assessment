@@ -2,12 +2,15 @@
 // serves SymPy, mpmath and NetworkX from that version's verified wheels, and
 // every grading call (math-exercise's _math_check / _math_check_custom) is
 // recorded at the runtime boundary: the values set before it (the request)
-// and the JSON text it returned, or the error it raised.
+// and the JSON text it returned, or the error it raised. The interpreter runs
+// with a fixed PYTHONHASHSEED (set and dict orders do not vary between
+// processes), and `random` is seeded before each grading call.
 'use strict';
 
-async function boot(version, wheels) {
+async function boot(version, wheels, hashSeed = 0) {
   const {loadPyodide} = require(`pyodide-${version}`);
-  const py = await loadPyodide({stdout: () => {}, stderr: () => {}});
+  const py = await loadPyodide({stdout: () => {}, stderr: () => {}, env: {PYTHONHASHSEED: String(hashSeed)}});
+  if (py.runPython('import sys; sys.flags.hash_randomization') !== (hashSeed ? 1 : 0)) throw new Error('PYTHONHASHSEED did not reach Python');
   const load = py.loadPackage.bind(py);
   const loaded = new Set();
   const needs = {sympy: ['mpmath', 'sympy'], mpmath: ['mpmath'], networkx: ['networkx']};
@@ -63,6 +66,7 @@ function recording(py, calls) {
           if (!match) return run(code, options);
           const call = match[1].replace(/^_math_/, ''), input = pending;
           pending = {};
+          target.runPython('__import__("random").seed(0)');
           try {
             const text = await run(code, options);
             calls.push({call, input, text});
