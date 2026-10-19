@@ -2,9 +2,14 @@
 // Compares two renders of a site page by page (design §13 A1): which script and
 // style files a page loads, its inline scripts (configuration objects compared
 // as JSON, code by kind), and its body DOM (canonical: sorted attributes,
-// normalized whitespace, render noise removed). Every difference is classified
-// by the expectation files (YAML, tools/compare-rendered/expect/); a difference
-// that no category explains fails the run.
+// normalized whitespace, render noise removed; an end tag names its element's
+// class and id). Every difference is classified by the expectation files
+// (YAML, tools/compare-rendered/expect/); a difference that no category
+// explains fails the run. Besides the difference itself, an item says where a
+// DOM difference sits (`ancestors`), what an added or removed element holds
+// (`content`), what a changed text lost and gained word by word (`lost`,
+// `gained`), and what the after page has (`tabsets`, `reveals`, `embeds`,
+// `modes`); an element removed and added unchanged elsewhere is "moved".
 //
 //   node tools/compare-rendered.mjs --before DIR --after DIR [--expect FILE ...] \
 //     [--name LABEL] [--report OUT.json] [--summary OUT.md] [--pages a.html,b.html]
@@ -299,8 +304,8 @@ function samePolicies(coreFile, before, after, selections) {
   return 'equal';
 }
 
-// The body as lines; `nodes` gets the element of each line (start tags and
-// text: their element; end tags: null), so a difference can find its element.
+// The body as lines; `nodes` gets the element of each line (start and end
+// tags: their element; text: its parent), so a difference can find its element.
 function canonical(node, nodes = []) {
   if (node.nodeType === 3) {
     const t = node.textContent.replace(/\s+/g, ' ').trim();
@@ -315,8 +320,10 @@ function canonical(node, nodes = []) {
   const lines = ['<' + tag + attrs.map(([n, v]) => ` ${n}=${JSON.stringify(v)}`).join('') + '>'];
   nodes.push(node);
   for (const child of node.childNodes) lines.push(...canonical(child, nodes));
-  lines.push('</' + tag + '>');
-  nodes.push(null);
+  // The end tag names the element's class and id, so that a wrapper that is
+  // added or removed is told apart from the elements it holds.
+  lines.push('</' + tag + attrs.filter(([n]) => n === 'class' || n === 'id').map(([n, v]) => ` ${n}=${JSON.stringify(v)}`).join('') + '>');
+  nodes.push(node);
   return lines;
 }
 
@@ -343,19 +350,48 @@ function diffLines(a, b) {
   return hunks;
 }
 const ATTRIBUTE = / ([\w:.@-]+)=("(?:[^"\\]|\\.)*")/g;
-function parseTag(line) {
-  const m = /^<([\w-]+)((?: [\w:.@-]+="(?:[^"\\]|\\.)*")*)>$/.exec(line);
+function parseTag(line, end = false) {
+  const m = (end ? /^<\/([\w-]+)((?: [\w:.@-]+="(?:[^"\\]|\\.)*")*)>$/ : /^<([\w-]+)((?: [\w:.@-]+="(?:[^"\\]|\\.)*")*)>$/).exec(line);
   if (!m) return null;
   const attrs = {};
   for (const [, name, value] of m[2].matchAll(ATTRIBUTE)) attrs[name] = JSON.parse(value);
   return {tag: m[1], attrs};
 }
+// Where an element sits ("main > section#x.level2 > div.tab-pane"), and what it holds.
+const describe = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + [...el.classList].map(c => '.' + c).join('');
+function ancestorsOf(node) {
+  const chain = [];
+  for (let el = node?.parentElement; el && el.tagName !== 'BODY' && el.tagName !== 'HTML'; el = el.parentElement) chain.unshift(describe(el));
+  return chain.join(' > ');
+}
+const contentOf = node => node?.children ? [...node.children].map(child => child.tagName.toLowerCase()).join(' ') : '';
+// The words one string lost and gained against another (a word-level LCS).
+function wordChanges(before, after) {
+  if (typeof before !== 'string' || typeof after !== 'string') return {};
+  const a = before.split(/\s+/).filter(Boolean), b = after.split(/\s+/).filter(Boolean);
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let endA = a.length, endB = b.length;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
+  const x = a.slice(start, endA), y = b.slice(start, endB);
+  if (x.length * y.length > 4e6) return {lost: x.join(' '), gained: y.join(' ')};
+  const dp = Array.from({length: x.length + 1}, () => new Uint32Array(y.length + 1));
+  for (let i = x.length - 1; i >= 0; i--) for (let j = y.length - 1; j >= 0; j--) dp[i][j] = x[i] === y[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const lost = [], gained = [];
+  let i = 0, j = 0;
+  while (i < x.length || j < y.length) {
+    if (i < x.length && j < y.length && x[i] === y[j]) { i++; j++; }
+    else if (j >= y.length || (i < x.length && dp[i + 1][j] >= dp[i][j + 1])) lost.push(x[i++]);
+    else gained.push(y[j++]);
+  }
+  return {lost: lost.join(' '), gained: gained.join(' ')};
+}
 // DOM hunks -> items: element lines paired by tag and identity give attribute
 // changes; text lines paired in order give text changes; the rest is added or removed.
 function domItems(page, hunk, nodesBefore = [], nodesAfter = []) {
   // A hunk's removed lines are consecutive from `at`; `addedAt` indexes the after lines.
-  const items = [], removed = hunk.removed.map((line, k) => ({line, tag: parseTag(line), node: nodesBefore[hunk.at + k]}));
-  const added = hunk.added.map((line, k) => ({line, tag: parseTag(line), node: nodesAfter[hunk.addedAt?.[k]]}));
+  const items = [], removed = hunk.removed.map((line, k) => ({line, tag: parseTag(line), end: parseTag(line, true), node: nodesBefore[hunk.at + k]}));
+  const added = hunk.added.map((line, k) => ({line, tag: parseTag(line), end: parseTag(line, true), node: nodesAfter[hunk.addedAt?.[k]]}));
   const identity = t => t.tag + '|' + (t.attrs.id ?? t.attrs['data-label'] ?? t.attrs['data-id'] ?? '');
   for (const r of removed) {
     if (!r.tag) continue;
@@ -365,17 +401,70 @@ function domItems(page, hunk, nodesBefore = [], nodesAfter = []) {
     for (const name of new Set([...Object.keys(r.tag.attrs), ...Object.keys(a.tag.attrs)]))
       if (r.tag.attrs[name] !== a.tag.attrs[name])
         items.push({page, area: 'dom', change: r.tag.attrs[name] === undefined ? 'attribute added' : a.tag.attrs[name] === undefined ? 'attribute removed' : 'attribute changed',
-          tag: r.tag.tag, element: identity(r.tag), attribute: name, before: r.tag.attrs[name] ?? null, after: a.tag.attrs[name] ?? null, attrs: a.tag.attrs, node: a.node, beforeNode: r.node});
+          tag: r.tag.tag, element: identity(r.tag), attribute: name, before: r.tag.attrs[name] ?? null, after: a.tag.attrs[name] ?? null, attrs: a.tag.attrs, node: a.node, beforeNode: r.node,
+          ancestors: ancestorsOf(a.node)});
+  }
+  // End tags of elements whose start tags pair (or differ only in class or
+  // id) say nothing more; the start tag's items report the change.
+  for (const r of removed) {
+    if (!r.end) continue;
+    const a = added.find(x => x.end && !x.used && x.end.tag === r.end.tag && (x.end.attrs.id ?? '') === (r.end.attrs.id ?? ''))
+      || added.find(x => x.end && !x.used && x.end.tag === r.end.tag);
+    if (a) r.used = a.used = true;
   }
   const texts = side => side.filter(x => !x.used && x.line.startsWith('text: '));
   const [rt, at] = [texts(removed), texts(added)];
   for (let k = 0; k < Math.min(rt.length, at.length); k++) {
     rt[k].used = at[k].used = true;
-    items.push({page, area: 'dom', change: 'text changed', before: rt[k].line.slice(6), after: at[k].line.slice(6)});
+    items.push({page, area: 'dom', change: 'text changed', before: rt[k].line.slice(6), after: at[k].line.slice(6), ancestors: ancestorsOf(at[k].node) + ' > ' + describe(at[k].node)});
   }
-  for (const r of removed) if (!r.used) items.push({page, area: 'dom', change: 'removed', line: r.line});
-  for (const a of added) if (!a.used) items.push({page, area: 'dom', change: 'added', line: a.line});
+  removed.forEach((r, k) => { if (!r.used) items.push({page, area: 'dom', change: 'removed', line: r.line, index: hunk.at + k, ancestors: ancestorsOf(r.node), content: r.line.startsWith('text: ') ? '' : contentOf(r.node)}); });
+  added.forEach((a, k) => { if (!a.used) items.push({page, area: 'dom', change: 'added', line: a.line, index: hunk.addedAt?.[k], ancestors: ancestorsOf(a.node), content: a.line.startsWith('text: ') ? '' : contentOf(a.node)}); });
   return items;
+}
+// Elements that moved: an element removed whole (its start tag, content and
+// end tag) and added whole, unchanged, elsewhere becomes one item "moved"
+// (outermost elements first).
+function movedElements(page, items, A, B) {
+  const sides = {removed: new Map(), added: new Map()};
+  for (const item of items) if (item.area === 'dom' && item.index !== undefined && sides[item.change]) sides[item.change].set(item.index, item);
+  const end = (lines, start) => {
+    let depth = 0;
+    for (let i = start; i < lines.length; i++) {
+      if (/^<[\w-]/.test(lines[i])) depth++;
+      else if (lines[i].startsWith('</') && --depth === 0) return i;
+    }
+    return -1;
+  };
+  const whole = (lines, map, start) => {
+    if (!map.has(start) || !/^<[\w-]/.test(lines[start])) return null;
+    const last = end(lines, start);
+    if (last < 0) return null;
+    for (let i = start; i <= last; i++) if (!map.has(i)) return null;
+    return last;
+  };
+  const added = new Map();
+  for (const start of [...sides.added.keys()].sort((a, b) => a - b)) {
+    const last = whole(B.dom, sides.added, start);
+    if (last === null) continue;
+    const key = B.dom.slice(start, last + 1).join('\n');
+    if (!added.has(key)) added.set(key, []);
+    added.get(key).push([start, last]);
+  }
+  const gone = new Set(), moved = [];
+  for (const start of [...sides.removed.keys()].sort((a, b) => a - b)) {
+    if (gone.has(sides.removed.get(start))) continue;
+    const last = whole(A.dom, sides.removed, start);
+    if (last === null) continue;
+    const found = added.get(A.dom.slice(start, last + 1).join('\n'));
+    const place = found && found.find(([from]) => !gone.has(sides.added.get(from)));
+    if (!place) continue;
+    for (let i = start; i <= last; i++) gone.add(sides.removed.get(i));
+    for (let i = place[0]; i <= place[1]; i++) gone.add(sides.added.get(i));
+    moved.push({page, area: 'dom', change: 'moved', line: A.dom[start], lines: last - start + 1,
+      ancestors: ancestorsOf(A.domNodes[start]), content: contentOf(A.domNodes[start]), to: ancestorsOf(B.domNodes[place[0]])});
+  }
+  return [...items.filter(item => !gone.has(item)), ...moved];
 }
 function jsonDiff(a, b, at = '') {
   if (JSON.stringify(a) === JSON.stringify(b)) return [];
@@ -416,7 +505,17 @@ function comparePage(page, before, after) {
       ? samePolicies(Object.entries(B.sources).find(([url]) => url.endsWith('/feedback-core.js'))?.[1], a[0], b[0], B.selections) : undefined;
     for (const d of differences) items.push({page, area: 'config', change: 'changed', object, ...d, effective, item: (b[d.path.split('/')[1]] ?? a[d.path.split('/')[1]])});
   }
-  for (const hunk of diffLines(A.dom, B.dom)) items.push(...domItems(page, hunk, A.domNodes, B.domNodes));
+  const dom = [];
+  for (const hunk of diffLines(A.dom, B.dom)) dom.push(...domItems(page, hunk, A.domNodes, B.domNodes));
+  items.push(...movedElements(page, dom, A, B));
+  // What a changed text lost and gained, word by word; what the page has.
+  const count = selector => String(B.doc.querySelectorAll(selector).length);
+  const features = {tabsets: count('.panel-tabset'), reveals: count('details.ctm-reveal'), embeds: count('iframe.ctm-embed'), modes: count('.ctm-modes')};
+  for (const item of items) {
+    if (item.change === 'changed' || item.change === 'text changed' || item.change === 'attribute changed') Object.assign(item, wordChanges(item.before, item.after));
+    Object.assign(item, features);
+    delete item.index;
+  }
   return contextItems(items, B, page);
 }
 
@@ -438,7 +537,8 @@ function test(pattern, value) {
 // __pyExercises, ai-feedback-data, qpyodideCellDetails).
 function matches(rule, item) {
   if (rule.area && rule.area !== item.area) return false;
-  for (const field of ['change', 'what', 'object', 'path', 'tag', 'element', 'attribute', 'before', 'after', 'line', 'page', 'effective', 'context'])
+  for (const field of ['change', 'what', 'object', 'path', 'tag', 'element', 'attribute', 'before', 'after', 'line', 'page', 'effective', 'context',
+    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes'])
     if (rule[field] !== undefined && !test(rule[field], item[field])) return false;
   for (const [field, pattern] of Object.entries(rule.where || {})) {
     const value = field.split('.').reduce((v, k) => (v == null ? v : v[k]), item.item ?? item.attrs);
