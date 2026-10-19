@@ -159,7 +159,9 @@ async function pythonCases(py) {
 
 (async () => {
   const {py, python} = await boot(version, job.wheels[version]);
-  process.stdout.write(`ready Pyodide ${version} (Python ${python})\n`);
+  await py.loadPackage('sympy');
+  const sympy = py.runPython('import sympy; sympy.__version__');
+  process.stdout.write(`ready Pyodide ${version} (Python ${python}, SymPy ${sympy})\n`);
   await pythonCases(py);
   await authoredCases(py);
   await mathCases(py);

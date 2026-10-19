@@ -36,6 +36,9 @@ function parse(argv) {
   return {...options, site: pairs(options.site), sources: pairs(options.sources)};
 }
 
+// The runtimes as the workers report them: "Pyodide <v> (Python <v>, SymPy <v>)".
+const runtimes = {};
+
 // Runs one version's worker; restarts it after a case that does not finish.
 function grade(version, jobFile, results, timeout, log) {
   return new Promise((resolve, reject) => {
@@ -59,7 +62,10 @@ function grade(version, jobFile, results, timeout, log) {
           const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
           last = Date.now();
           if (line.startsWith('case ')) current = line.slice(5);
-          else log(`${version}: ${line}`);
+          else {
+            if (line.startsWith('ready ')) runtimes[version] = line.slice(6);
+            log(`${version}: ${line}`);
+          }
         }
       });
       child.stderr.on('data', chunk => { stderr += chunk; if (stderr.length > 20000) stderr = stderr.slice(-20000); });
@@ -162,7 +168,9 @@ function read(file) {
   const statuses = {};
   for (const [id, record] of last) {
     if (id.endsWith(':all')) continue;
-    const kind = kindOf(id), status = kind === 'responses' || kind === 'fixtures' ? record.results.map(r => r.status).sort().filter((s, i, a) => a.indexOf(s) === i).join('+') : record.results[0].status.split(':')[0];
+    const kind = kindOf(id), status = kind === 'responses' || kind === 'fixtures'
+      ? (record.results.map(r => r.status).sort().filter((s, i, a) => a.indexOf(s) === i).join('+') || 'empty fields (graded without Python)')
+      : record.results[0].status.split(':')[0];
     (statuses[kind] ||= {})[status] = (statuses[kind][status] || 0) + 1;
   }
   const keysNotCorrect = job.cases.filter(c => c.source === 'keys' && !(last.get(c.id)?.results || []).every(r => r.status === 'correct')).map(c => c.id);
@@ -173,7 +181,7 @@ function read(file) {
   const authored = [...last.keys()].filter(id => id.startsWith('authored:') && id !== 'authored:all');
   const authoredFailing = authored.filter(id => last.get(id).results[0].status !== 'pass');
   const timeouts = options.versions.map(v => [...results[v].values()].filter(r => r.results.some(x => x.status === 'timeout')).length);
-  const summary = {versions: options.versions, minutes: Math.round((Date.now() - started) / 600) / 100,
+  const summary = {versions: options.versions, runtimes, minutes: Math.round((Date.now() - started) / 600) / 100,
     sites: options.site.map(s => s.name), sources: options.sources.map(s => s.name),
     pages: Object.keys(job.pages).length, duplicatePages: job.duplicates.length, cells: new Set(job.cases.map(c => c.page + '#' + c.position)).size,
     variants: new Set(job.cases.map(c => c.page + '#' + c.position + '|' + c.variantKey)).size,
@@ -183,7 +191,7 @@ function read(file) {
     statuses, keysNotCorrect: keysNotCorrect.length, fixturesUnexpected: fixtureMismatch.length, differences: differences.length, notes: notes.length};
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify({summary, differences, notes, skipped: job.skipped, duplicates: job.duplicates, keysNotCorrect, fixtureMismatch,
     authoredNotPassing: authoredFailing.map(id => ({id, outcome: last.get(id).results[0].status})), pythonUnexpected: pythonExpectations}, null, 1));
-  const md = [`## Pyodide parity: ${options.versions[0]} vs ${options.versions[1]}`, '',
+  const md = [`## Pyodide parity: ${options.versions.map(v => runtimes[v] || 'Pyodide ' + v).join(' vs ')}`, '',
     `${summary.pages} pages (and ${summary.duplicatePages} with the same exercises), ${summary.cells} exercises, ${summary.variants} exercise variants: ${summary.responses} graded responses and ${summary.fixtures} variant fixtures; `
     + `${summary.authoredTests} authored question tests; ${summary.pythonPrograms} Python programs. ${summary.minutes} min.`, '',
     `**Differences in status or score: ${differences.length}.** Other differences (messages, feedback text): ${notes.length}. `
