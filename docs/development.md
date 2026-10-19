@@ -72,6 +72,18 @@ courses with the pages' own math-exercise.js in jsdom (`cases.cjs`):
 - every variant's fixtures, the authored question tests and the umbrella's
   Python programs.
 
+math-exercise 0.10 (its own checker module, called through `_math_run`) and
+0.11 (ctm-checkers, called through ctm-libs' `MathExerciseRuntime.callCheckers`
+with one `_ctm_request`) are graded alike: math pages load ctm-checkers' page
+script with the other math scripts (`integration/feedback/page-scripts.cjs`),
+the runtime view records both call paths, a ctm-checkers request under the
+`_math_*` names of the values 0.10 set (so both give the same rows), and the
+authored question tests run through `ctm_checkers.math_exercise.authored`
+when the build has ctm-checkers next to math-exercise (its wheel), else
+through `question-tests.py` (`authored.cjs`). A build comparison of
+math-exercise's example site built with 0.10 (base) and 0.11 (head) is thus
+the L2 check of the move (math-exercise's CI runs it).
+
 The report counts coverage by cell: every rendered cell with a custom
 checker, without keys or with a diagram response, and whether its cases
 reached a correct, a partial and a wrong verdict. The step-2 design's 78
