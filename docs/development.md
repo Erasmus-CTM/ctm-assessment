@@ -77,10 +77,10 @@ belong to a category of the expectation files in
 `tools/compare-rendered/expect/` (`step1.yml` for the changes of CTM
 Assessment 0.9; one file per course or site where needed). A changed feedback
 context is checked against the after page itself (`context:` in a rule): it
-must be prose of the exercise's own section (the innermost tab or heading
-section), without the blocks the exercise lists, raw `<details>` blocks
-(solutions), other tabs, other sections or other exercises, and keep all of
-that prose the old context had. The workflow
+must be prose of the exercise's own section (the innermost tab with its label,
+or heading section), without raw `<details>` blocks (solutions), other tabs,
+other sections, code or other exercises, for an explicit context also without
+context blocks, and keep all of that prose the old context had. The workflow
 **Compare rendered courses** builds a course with two ctm-assessment refs
 through their own installers and compares them: on pull requests that change
 the package (the example site, ctm-demo with its review build, ingmat3a), and

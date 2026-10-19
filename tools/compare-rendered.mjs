@@ -119,16 +119,19 @@ function extract(file) {
   return {doc, files, inline, configs, sources, selections, dom: canonical(doc.body)};
 }
 
-// Feedback context (A5): the prose an exercise sends is that of its own
-// section, the innermost tab or heading section around it, without raw
-// <details> blocks, other tabs, nested sections, other exercises, code blocks
-// and the blocks the exercise lists itself (those are sent on their own).
-// `contextVerdict` gives "own-section" when the after page's context text is
-// exactly that, and every piece of the section's prose that the before page
-// sent is still sent; otherwise it names the first piece that is not and where
-// it comes from. Text is compared as letters and digits only, so markup, math
-// delimiters, punctuation and the spacing of table cells do not matter.
+// Feedback context: the prose an exercise sends is that of its own section,
+// the innermost tab (with its label) or heading section around it, without raw
+// <details> blocks, other tabs, nested sections, other exercises and code
+// blocks; an explicit context (A5) also leaves out every context block with an
+// id (the listed ones are sent on their own, the others belong to other
+// exercises). `contextVerdict` gives "own-section" when the after page's
+// context text is exactly that, and every piece of the section's prose that
+// the before page sent is still sent; otherwise it names the first piece that
+// is not and where it comes from. Text is compared as letters and digits only,
+// so markup, math delimiters, punctuation and the spacing of table cells do
+// not matter.
 const EXERCISES = '.math-exercise-cell, .py-exercise-cell, [id^="qpyodide-insertion-location-"], .ai-feedback-activity, .ai-feedback-task';
+const CONTEXT_BLOCKS = '.ai-context[id], .ai-feedback-context[id], .math-exercise-context[id]';
 const NOT_TEXT = 'script, style, noscript, template';
 const NOT_PROSE = NOT_TEXT + ', pre, details';
 const squash = value => String(value ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
@@ -142,12 +145,13 @@ function textOf(root, skip = node => node.matches(NOT_TEXT)) {
   })(root);
   return parts.join(' ');
 }
-function contextVerdict(doc, element, after, before, refs) {
+function contextVerdict(doc, element, after, before, refs, explicit) {
   if (!element) return 'no exercise element';
   const scope = element.parentElement?.closest('.tab-pane, section') || doc.body;
   const listed = String(refs ?? '').split(',').map(id => id.trim())
     .filter(id => id && id !== 'auto' && id !== 'none' && !id.startsWith('jsxgraph:')).map(id => doc.getElementById(id)).filter(Boolean);
-  const skip = node => node.matches(NOT_PROSE) || node.matches(EXERCISES) || node.matches('.tab-pane, section, .nav') || listed.includes(node);
+  const skip = node => node.matches(NOT_PROSE) || node.matches(EXERCISES) || node.matches('.tab-pane, section, .nav') || listed.includes(node)
+    || (explicit && node.matches(CONTEXT_BLOCKS));
   const label = scope.matches('.tab-pane') && doc.getElementById(scope.getAttribute('aria-labelledby') || '');
   const own = squash((label ? label.textContent + ' ' : '') + textOf(scope, skip));
   for (const piece of pieces(after)) {
@@ -173,6 +177,7 @@ function origin(doc, element, scope, listed, piece) {
   const places = [
     ['a <details> block', [...doc.querySelectorAll('details')]],
     ['a listed block', listed],
+    ['a context block', [...doc.querySelectorAll(CONTEXT_BLOCKS)]],
     ['the exercise itself', [element]],
     ['another exercise', [...doc.querySelectorAll(EXERCISES)].filter(el => el !== element)],
     ['another tab', [...otherTabs, ...otherLabels]],
@@ -187,20 +192,20 @@ function origin(doc, element, scope, listed, piece) {
 function contextItems(items, B) {
   const json = value => { try { return typeof value === 'string' && value.startsWith('"') ? JSON.parse(value) : value; } catch (_) { return value; } };
   for (const item of items) {
-    let m, element, refs;
+    let m, element, refs, mode;
     if (item.area === 'config' && /^ai-feedback-data/.test(item.object) && (m = /^\/(\d+)\/context$/.exec(item.path))) {
       const data = B.configs[item.object]?.[m[1]];
-      element = data && B.doc.getElementById(data.id); refs = data?.contextRefs;
+      element = data && B.doc.getElementById(data.id); refs = data?.contextRefs; mode = data?.contextMode;
     } else if (item.area === 'config' && item.object === 'qpyodideCellDetails' && (m = /^\/(\d+)\/options\/feedbackContext\/text$/.exec(item.path))) {
       const cell = B.configs.qpyodideCellDetails?.[m[1]];
-      element = cell && B.doc.getElementById('qpyodide-insertion-location-' + cell.id); refs = cell?.options?.feedbackContext?.refs;
+      element = cell && B.doc.getElementById('qpyodide-insertion-location-' + cell.id); refs = cell?.options?.feedbackContext?.refs; mode = cell?.options?.feedbackContext?.mode;
     } else if (item.area === 'config' && item.object === '__pyExercises' && (m = /^\/(\d+)\/feedbackContext\/text$/.exec(item.path))) {
       const exercise = B.configs.__pyExercises?.[m[1]];
-      element = exercise && B.doc.getElementById('py-exercise-' + exercise.id); refs = exercise?.feedbackContext?.refs;
+      element = exercise && B.doc.getElementById('py-exercise-' + exercise.id); refs = exercise?.feedbackContext?.refs; mode = exercise?.feedbackContext?.mode;
     } else if (item.area === 'dom' && item.attribute === 'data-context' && item.attrs?.id) {
-      element = B.doc.getElementById(item.attrs.id); refs = item.attrs['data-context-refs'];
+      element = B.doc.getElementById(item.attrs.id); refs = item.attrs['data-context-refs']; mode = item.attrs['data-context-mode'];
     } else continue;
-    item.context = contextVerdict(B.doc, element, json(item.after), json(item.before), refs);
+    item.context = contextVerdict(B.doc, element, json(item.after), json(item.before), refs, mode === 'explicit');
   }
   return items;
 }
