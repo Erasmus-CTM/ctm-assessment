@@ -2,7 +2,8 @@
 // own math-exercise.js and ctm-libs files (test mode, nothing starts by
 // itself); every .math-exercise-cell is set up once per variant (pool task or
 // generated variant) and gets responses:
-// - cells with answer keys: the keys, perturbations of each key, the audit's
+// - cells with answer keys: the keys, perturbations of each key (for a custom
+//   checker also of all keys at once), the audit's
 //   challenge answers for its label, for numeric cells with decimal places,
 //   significant figures or a tolerance boundary probes in their first two
 //   variants (half-way values, answers at the tolerance; step-2 review S7),
@@ -307,6 +308,9 @@ function pageCases(file, relative, authored = {}, answers = {}) {
           keys.slice(0, PERTURBED_FIELDS).forEach((answer, i) => {
             for (const value of perturbations(answer)) add('response', {values: keys.map((a, j) => j === i ? value : a), source: 'perturbation'});
           });
+          // A custom checker with keys gets every field wrong at once too (one
+          // wrong field mostly earns partial credit).
+          if (mode === 'custom' && keys.length > 1) add('response', {values: keys.map(answer => `(${answer})+1`), source: 'perturbation'});
           for (const values of CHALLENGES[label] || [])
             if (values.length === keys.length) add('response', {values, source: 'challenge'});
           if (mode === 'numeric' && boundaryVariants < BOUNDARY_VARIANTS) {
