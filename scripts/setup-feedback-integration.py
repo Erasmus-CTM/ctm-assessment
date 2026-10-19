@@ -199,18 +199,36 @@ def version_tuple(text):
 
 
 def descends(repository, ancestor, tip):
-    """True if `tip` contains `ancestor` (GitHub compare API; public repositories)."""
-    request = urllib.request.Request(f'https://api.github.com/repos/{repository}/compare/{ancestor}...{tip}',
-                                     headers={'User-Agent': 'CTM-feedback-integration', 'Accept': 'application/vnd.github+json'})
+    """True if `tip` contains `ancestor` (GitHub compare API; public repositories).
+    GITHUB_TOKEN or GH_TOKEN, when set, only raises the API's rate limit."""
+    headers = {'User-Agent': 'CTM-feedback-integration', 'Accept': 'application/vnd.github+json'}
+    token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+    if token:
+        headers['Authorization'] = 'Bearer ' + token
+    request = urllib.request.Request(f'https://api.github.com/repos/{repository}/compare/{ancestor}...{tip}', headers=headers)
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.load(response)['status'] in ('ahead', 'identical')
+
+
+def followed_revision(name, spec):
+    """--follow-branches: the branch tip, or the pin when the branch does not
+    contain it. Such a pin lies outside its branch (the JSXGraph pin is the fork
+    commit of upstream pull request #2, not on upstream main): the tip would be
+    other code, not newer code. Returns (commit, pin kept)."""
+    tip = remote_revision(name, spec, follow=True)
+    pin = spec.get('commit')
+    if pin and tip != pin and not descends(spec['repository'], pin, tip):
+        print(f'{name}: {spec["branch"]} @ {tip} does not contain the pinned {pin}; '
+              'following keeps the pin (a commit outside its branch, such as an upstream pull request).', flush=True)
+        return pin, True
+    return tip, False
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--workspace', type=Path, default=ROOT / '.feedback-workspace')
     parser.add_argument('--refresh', action='store_true', help='Compatibility option without effect: every component is pinned by commit')
-    parser.add_argument('--follow-branches', action='store_true', help='Resolve each component\'s branch tip instead of its pinned commit (early warning; not a release build)')
+    parser.add_argument('--follow-branches', action='store_true', help='Resolve each component\'s branch tip instead of its pinned commit (early warning; not a release build); a pin its branch does not contain is kept')
     parser.add_argument('--update-pins', action='store_true', help='Write the current branch tips into repos.json and stop; then run --test')
     parser.add_argument('--only', metavar='NAME[,NAME]', help='With --update-pins: re-pin only these repositories (others, such as the JSXGraph fork pin, stay as they are)')
     parser.add_argument('--ref', action='append', default=[], metavar='NAME=BRANCH', help='Use a review branch for a dependency without changing normal build defaults')
@@ -293,16 +311,19 @@ def main():
     for name, spec in config['repositories'].items():
         sha = spec.get('commit')
         requested_ref = review_refs.get(name, spec['branch'])
-        dirty = []
+        dirty, kept = [], False
         if name in local:
             source = local[name]
             sha = git(source, 'rev-parse', 'HEAD')
             dirty = git(source, 'status', '--porcelain', '--untracked-files=all').splitlines()
         else:
-            sha = remote_revision(name, spec, review_refs.get(name), args.follow_branches)
+            if args.follow_branches and name not in review_refs:
+                sha, kept = followed_revision(name, spec)
+            else:
+                sha = remote_revision(name, spec, review_refs.get(name), args.follow_branches)
             source = snapshot(spec['repository'], sha, cache)
         sources[name] = source
-        pinned = bool(spec.get('commit')) and not args.follow_branches and name not in review_refs and name not in local
+        pinned = bool(spec.get('commit')) and (not args.follow_branches or kept) and name not in review_refs and name not in local
         revisions[name] = {'repository': spec['repository'], 'branch': spec['branch'], 'requested_ref': requested_ref, 'commit': sha, 'ref_override': name in review_refs, 'pinned': pinned, 'local_override': name in local, 'dirty_files': dirty, 'extensions': extensions[name]}
         print(f'Resolved {name}: {requested_ref} @ {sha}', flush=True)
     site = workspace / 'site'

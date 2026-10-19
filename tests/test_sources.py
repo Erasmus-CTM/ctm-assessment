@@ -108,6 +108,54 @@ class SourceSelection(unittest.TestCase):
                 self.assertEqual({k: v for k, v in written[name].items() if k != 'commit'},
                                  {k: v for k, v in spec.items() if k != 'commit'})
 
+    def test_following_branches_keeps_a_pin_outside_its_branch(self):
+        # The JSXGraph pin is the fork commit of upstream pull request #2, not
+        # on upstream main: the weekly tracking build keeps it, with a log line.
+        import contextlib, io
+        spec = {'repository': 'jsxgraph/jsxgraph-quarto', 'branch': 'main', 'commit': 'c' * 40}
+        out = io.StringIO()
+        with patch.object(builder, 'remote_revision', return_value='a' * 40) as remote, \
+             patch.object(builder, 'descends', return_value=False) as descends, contextlib.redirect_stdout(out):
+            self.assertEqual(builder.followed_revision('jsxgraph', spec), ('c' * 40, True))
+        remote.assert_called_once_with('jsxgraph', spec, follow=True)
+        descends.assert_called_once_with('jsxgraph/jsxgraph-quarto', 'c' * 40, 'a' * 40)
+        self.assertIn(f'jsxgraph: main @ {"a" * 40} does not contain the pinned {"c" * 40}; following keeps the pin', out.getvalue())
+        # A branch that contains its pin is followed; a tip equal to the pin needs no check.
+        with patch.object(builder, 'remote_revision', return_value='a' * 40), patch.object(builder, 'descends', return_value=True):
+            self.assertEqual(builder.followed_revision('ctm-libs', dict(spec, repository='Erasmus-CTM/ctm-libs')), ('a' * 40, False))
+        with patch.object(builder, 'remote_revision', return_value='c' * 40), patch.object(builder, 'descends') as descends:
+            self.assertEqual(builder.followed_revision('jsxgraph', spec), ('c' * 40, False))
+            descends.assert_not_called()
+
+    def test_follow_branches_builds_the_tips_and_the_kept_pin(self):
+        import tempfile
+        config = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
+        built = {}
+
+        class Resolved(Exception):
+            pass
+
+        def followed(name, spec):
+            return (spec['commit'], True) if name == 'jsxgraph' else ('a' * 40, False)
+
+        def snapshot(repository, sha, cache):
+            built[repository] = sha
+            if len(built) == len(config) - 1:  # every repository but this checkout
+                raise Resolved()
+            return Path(cache)
+        with tempfile.TemporaryDirectory() as temp, \
+             patch.object(builder, 'followed_revision', side_effect=followed) as follow, \
+             patch.object(builder, 'remote_revision') as remote, \
+             patch.object(builder, 'snapshot', side_effect=snapshot), \
+             patch.object(builder.subprocess, 'check_output', return_value='1.8.27'), \
+             patch('sys.argv', ['setup', '--follow-branches', '--workspace', temp]):
+            with self.assertRaises(Resolved):
+                builder.main()
+        remote.assert_not_called()
+        self.assertEqual(sorted(call.args[0] for call in follow.call_args_list), sorted(set(config) - {'ctm-assessment'}))
+        self.assertEqual(built['jsxgraph/jsxgraph-quarto'], config['jsxgraph']['commit'])
+        self.assertEqual(built['Erasmus-CTM/ctm-libs'], 'a' * 40)
+
     def test_only_needs_update_pins_and_known_names(self):
         for argv, message in ((['--only', 'ctm-libs'], 'use it with --update-pins'),
                               (['--update-pins', '--only', 'jsxgraph-fork'], 'jsxgraph-fork'),

@@ -114,7 +114,9 @@ It uploads the rendered site and installable archive as artifacts. A successful
 Concurrent deploys are serialized. Failed tests prevent deployment.
 The separate **Track component branches** workflow (weekly and on demand) builds
 and tests against the components' branch tips with `--follow-branches`; it never
-deploys. A red run there means `repos.json` cannot be advanced yet.
+deploys. A red run there means `repos.json` cannot be advanced yet. A pin that
+its branch does not contain stays, with a log line: the JSXGraph pin is the
+fork commit of upstream pull request #2, which upstream `main` lacks.
 
 One repository setting is required: **Settings → Pages → Build and deployment →
 Source: GitHub Actions**. The deployment job uses only `pages: write` and

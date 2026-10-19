@@ -2,7 +2,9 @@ name: Track component branches
 
 # Early warning: build and test the combined examples against the branch tips
 # named in integration/feedback/repos.json instead of the pinned commits.
-# Never deploys. A failure means the pins cannot be advanced yet.
+# Never deploys. A failure means the pins cannot be advanced yet. A pin that
+# its branch does not contain stays (the log says so): the JSXGraph pin is the
+# fork commit of upstream pull request #2, which upstream main lacks.
 on:
   schedule:
     - cron: '17 5 * * 1'
@@ -32,6 +34,8 @@ jobs:
         with:
           version: '1.8.27'
       - name: Render and test against component branch tips
+        env:
+          GITHUB_TOKEN: ${{ github.token }}  # compare API: does a branch contain its pin?
         run: python scripts/setup-feedback-integration.py --follow-branches --test
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
