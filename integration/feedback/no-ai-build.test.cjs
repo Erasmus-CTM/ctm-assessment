@@ -72,7 +72,9 @@ function checkWithout(dir, pages, reason, stderr) {
   const found = messages(stderr);
   assert.equal(found['all.qmd'].length, 1, stderr);
   assert.equal(found['all.qmd'][0].reason, reason);
-  assert.match(found['all.qmd'][0].items, /AI feedback activity/);
+  // The activity only AI feedback can assess: named and shown as text (without-ai: text);
+  // ctm-libs before that rule counts it as one AI feedback activity left out.
+  assert.match(found['all.qmd'][0].items, /only AI feedback can assess, shown as text|1 AI feedback activity/);
   assert.match(found['all.qmd'][0].items, /py-exercise feedback/);
   assert.equal(found['asks.qmd'].length, 1, stderr);
   assert.match(found['asks.qmd'][0].items, /ai-feedback: enabled: true \(asks\.qmd\)/);
@@ -103,7 +105,7 @@ test('the example site builds without AI feedback: no policy panels, criteria or
   // The builder's site folder holds the example sources and the package.
   const dir = project(path.dirname(site));
   try {
-    fs.writeFileSync(path.join(dir, '_quarto-no-ai.yml'), 'ai-feedback:\n  enabled: false\n');
+    fs.writeFileSync(path.join(dir, '_quarto-no-ai.yml'), 'ai-feedback:\n  enabled: false\n  without-ai: text\n');
     const stderr = render(dir, ['--profile', 'no-ai']);
     assert.match(stderr, /AI feedback is off for this build \(ai-feedback: enabled: false \(_quarto-no-ai\.yml\)\)/);
     assert.deepEqual(output(dir).filter(name => FILES.test(name)), []);
