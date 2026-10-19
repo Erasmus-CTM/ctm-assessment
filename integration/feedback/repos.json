@@ -3,8 +3,8 @@
   "repositories": {
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
-      "branch": "consolidation/2026-10",
-      "commit": "840752f02b2ea2f9653fda360befa3e878257dff",
+      "branch": "main",
+      "commit": "df4799ea87ac07d24f81545355a40413a7f7a83e",
       "extensions": [
         "ctm-libs",
         "ai-feedback"
@@ -15,13 +15,13 @@
     },
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
-      "branch": "consolidation/2026-10",
-      "commit": "d1da5d9019c067f2a39e6dbe54aeb22cc3b34222"
+      "branch": "main",
+      "commit": "2b24df65deacfe405f07c17409b2d70eb3d7622b"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
-      "branch": "consolidation/2026-10",
-      "commit": "c5b57cc1170dcb4e8464346f455f4ffb5ce3d1ee"
+      "branch": "main",
+      "commit": "8ab1b253d8d49f7a02753f1a33c6fc578352bc7f"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
