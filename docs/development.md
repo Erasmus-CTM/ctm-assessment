@@ -134,7 +134,10 @@ generated in CI from the pinned repositories. The top-level `manifest.json`
 names the commits (the harness's checkout and the package the sites were
 built with), runtimes, files and anything incomplete; `PROVENANCE.md` the
 licence of each file and the inputs written in the umbrella (probe sets,
-challenge and teacher answers).
+challenge and teacher answers). Authored questions are recorded by
+`integration/pyodide-parity/authored_record.py` (standard library only), the
+one copy: the worker runs it in Pyodide, and ctm-checkers imports it from the
+umbrella commit it pins, so both record authored rows the same way.
 
 Python runs with a fixed `PYTHONHASHSEED` (`--hash-seed`, default 0; the
 worker checks that it reached the interpreter), and `random` is seeded before

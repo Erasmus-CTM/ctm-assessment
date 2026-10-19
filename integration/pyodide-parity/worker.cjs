@@ -116,100 +116,29 @@ async function mathCases(py) {
   }
 }
 
-// question-tests.py, run in Pyodide on the authored tests of a source tree:
-// every check() call of the tests is recorded with its result and with the
-// response it was given, as the page would send it (SymPy values as text;
-// a response that is not JSON then is left out); `random` is seeded per
-// question. Each question comes back as canonical JSON written by Python
-// (sorted keys, compact), so numbers keep Python's spelling.
+// question-tests.py, run in Pyodide on the authored tests of a source tree,
+// each question through authored_record.py (the recorder ctm-checkers imports
+// as well): every check() call of the tests is recorded with its result and
+// with the response it was given, as the page would send it. Each question
+// comes back as canonical JSON written by Python (sorted keys, compact), so
+// numbers keep Python's spelling.
 const AUTHORED = String.raw`
-import json, os, random, runpy
+import importlib.util, json, os, runpy
 from pathlib import Path
 _qt = runpy.run_path('/ctm-parity/question-tests.py')
-_WRAP = '''
-_ctm_parity_check = check
-def check(*args, **kwargs):
-    # The response as it is now: a test may change its matrix after the call.
-    _ctm_parity_responses.append(_ctm_parity_page(args[0] if args else kwargs.get('response')))
-    result = _ctm_parity_check(*args, **kwargs)
-    _ctm_parity_calls.append(result)
-    return result
-'''
-def _ctm_plain(value):
-    # A checker result as JSON: Python's bool, int, float and str as they are;
-    # any other number keeps its type ({"$type": "Rational", "value": "1/3"}),
-    # so a change of the returned type shows in the goldens.
-    if isinstance(value, dict):
-        return {str(k): _ctm_plain(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_ctm_plain(v) for v in value]
-    if value is None or isinstance(value, (bool, str)) or type(value) is int:
-        return value
-    if type(value) is float:   # NaN and infinities tagged as in the requests ({"$float": "NaN"})
-        return value if value == value and abs(value) != float('inf') else {'$float': 'NaN' if value != value else ('Infinity' if value > 0 else '-Infinity')}
-    return {'$type': type(value).__name__, 'value': str(value)}
-def _ctm_text(value):
-    return value if isinstance(value, str) else str(value)
-def _ctm_response(value):
-    # The response as the page sends it: what the learner types, as text.
-    # Tests pass parsed values (SymPy expressions, matrices); the page sends
-    # strings ("raw", and per dynamic matrix its shape and entries) and parses
-    # them itself. A response that is not JSON then is left out (None); the
-    # test itself goes on either way.
-    try:
-        return _ctm_page_shaped(value)
-    except Exception:
-        return None
-def _ctm_page_shaped(value):
-    if isinstance(value, dict):
-        page = {k: v for k, v in value.items() if k not in ('expressions', 'raw', 'inputs')}
-        if 'raw' in value:
-            page['raw'] = value['raw']
-        elif isinstance(value.get('expressions'), (list, tuple)):
-            page['raw'] = [_ctm_text(e) for e in value['expressions']]
-        if isinstance(value.get('inputs'), dict):
-            inputs = {}
-            for name, item in value['inputs'].items():
-                if isinstance(item, dict) and 'raw' not in item and item.get('matrix') is not None:
-                    rows, cols = item['matrix'].shape
-                    inputs[name] = {'type': 'matrix', 'rows': int(rows), 'cols': int(cols), 'raw': [_ctm_text(e) for e in item['matrix']]}
-                elif isinstance(item, dict):
-                    inputs[name] = {k: v for k, v in item.items() if k not in ('expressions', 'matrix')}
-                else:
-                    inputs[name] = item
-            page['inputs'] = inputs
-        if 'raw' in page or 'inputs' in page:
-            page.setdefault('kind', 'expressions')
-            page.setdefault('raw', [])
-            page.setdefault('inputs', {})
-        value = page
-    try:
-        return json.loads(json.dumps(value, allow_nan=False))
-    except (TypeError, ValueError):
-        return None
+_spec = importlib.util.spec_from_file_location('_ctm_parity_authored_record', '/ctm-parity/authored_record.py')
+_ar = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_ar)
 def _ctm_authored(root, files):
     os.chdir(root)
     runtime = _qt['runtime_namespace']()
+    run = lambda options, base: _qt['run_question'](options, runtime, Path(base))
     found = []
     for name in files:
         for options in _qt['authored_questions'](Path(root) / name):
             if not options.get('tests', '').strip():
                 continue
-            calls, responses = [], []
-            runtime['_ctm_parity_calls'] = calls
-            runtime['_ctm_parity_responses'] = responses
-            runtime['_ctm_parity_page'] = _ctm_response
-            wrapped = dict(options, checker=options.get('checker', '') + _WRAP)
-            random.seed(0)
-            try:
-                _qt['run_question'](wrapped, runtime, Path(root))
-                result = 'pass'
-            except AssertionError as error:
-                result = 'assertion failed: ' + str(error)
-            except Exception as error:
-                result = 'error: ' + type(error).__name__ + ': ' + str(error)
-            record = {'file': name, 'label': options.get('label', ''), 'options': options, 'outcome': result,
-                      'calls': _ctm_plain(calls), 'responses': [r for r in responses if r is not None]}
+            record = dict(_ar.record(run, options, root), file=name, label=options.get('label', ''), options=options)
             found.append(json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(',', ':')))
     return json.dumps(found)
 `;
@@ -219,6 +148,7 @@ async function authoredCases(py) {
   process.stdout.write('case authored:all\n');
   py.FS.mkdirTree('/ctm-parity');
   for (const name of ['question-tests.py', 'math-exercise.js']) py.FS.writeFile('/ctm-parity/' + name, fs.readFileSync(path.join(job.mathExtension, name)));
+  py.FS.writeFile('/ctm-parity/authored_record.py', fs.readFileSync(path.join(__dirname, 'authored_record.py')));
   await py.loadPackage('sympy');
   await py.loadPackage('networkx');
   py.runPython(AUTHORED);
