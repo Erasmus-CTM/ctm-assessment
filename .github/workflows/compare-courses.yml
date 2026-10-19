@@ -6,9 +6,11 @@ name: Compare rendered courses
 # (tools/compare-rendered.mjs). Every difference must belong to an expected
 # category of tools/compare-rendered/expect/ (step1.yml and the course's own
 # file); the report is uploaded. On demand for any course and refs, and on
-# pull requests that change the package, its pins or the tool (the example
-# site, ctm-demo with its STACK review build, ingmat3a; before = the pull
-# request's base, after = its head).
+# pull requests that change the package, its pins or the tool: the example
+# site and every course of integration/pyodide-parity/corpora.json (the one
+# course list) at its branch (ctm-demo with its STACK review build, ingmat3a's
+# main and its linalg-branch; a branch that no longer exists is skipped with
+# a notice); before = the pull request's base, after = its head.
 on:
   workflow_dispatch:
     inputs:
@@ -39,6 +41,8 @@ on:
       - scripts/setup-feedback-integration.py
       - scripts/build-course.py
       - tools/**
+      - integration/pyodide-parity/corpora.json
+      - integration/pyodide-parity/build-corpora.py
       - .github/workflows/compare-courses.yml
 
 permissions:
@@ -49,13 +53,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  courses:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list
+        env:
+          COURSE: ${{ inputs.course }}
+          COURSE_REF: ${{ inputs['course-ref'] }}
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            python3 -c 'import json, os; print("matrix=" + json.dumps([{"course": os.environ["COURSE"], "ref": os.environ["COURSE_REF"], "profile": os.environ["PROFILE"]}]))' >> "$GITHUB_OUTPUT"
+          else
+            # The example site and the courses of corpora.json, each at its branch.
+            python3 integration/pyodide-parity/build-corpora.py --course-matrix
+          fi
+
   compare:
+    needs: courses
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && format('[{{"course":"{0}","ref":"{1}","profile":"{2}"}}]', inputs.course, inputs['course-ref'], inputs.profile) || '[{"course":"examples","ref":"","profile":""},{"course":"aacchhee/ctm-demo","ref":"main","profile":"review"},{"course":"aacchhee/ingmat3a_ntnu","ref":"main","profile":""}]') }}
+        include: ${{ fromJSON(needs.courses.outputs.matrix) }}
     env:
       BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.base || 'main' }}
       AFTER: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.head || github.sha }}
@@ -114,7 +139,7 @@ jobs:
           status=0
           for output in "${outputs[@]}"; do
             node tools/compare-rendered.mjs --before "$RUNNER_TEMP/out/before/$output" --after "$RUNNER_TEMP/out/after/$output" "${expect[@]}" \
-              --name "$COURSE $output ($BASE -> $AFTER)" --report "$RUNNER_TEMP/reports/$name$output.json" --summary "$RUNNER_TEMP/reports/$name$output.md" || status=1
+              --name "$COURSE${COURSE_REF:+@$COURSE_REF} $output ($BASE -> $AFTER)" --report "$RUNNER_TEMP/reports/$name$output.json" --summary "$RUNNER_TEMP/reports/$name$output.md" || status=1
           done
           cat "$RUNNER_TEMP"/reports/*.md
           exit $status
@@ -123,7 +148,7 @@ jobs:
         run: |
           text=$(cat "$RUNNER_TEMP"/reports/*.md 2>/dev/null | head -c 6000 || echo 'no report')
           level=notice; [ "${{ job.status }}" = success ] || level=error
-          printf '::%s title=Compare %s::%s\n' "$level" "$COURSE" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+          printf '::%s title=Compare %s::%s\n' "$level" "$COURSE${COURSE_REF:+@$COURSE_REF}" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -1,8 +1,9 @@
 name: Pyodide parity and goldens
 
 # The parity harness (integration/pyodide-parity) over the example site,
-# math-exercise's example site and the courses (ctm-demo with its review
-# build, ingmat3a; at the commits in corpora.json):
+# math-exercise's example site and the courses of corpora.json (the one course
+# list: ctm-demo with its review build and ingmat3a at their pinned commits,
+# ingmat3a's linalg-branch at its tip, skipped with a notice once it is gone):
 # - parity: every exercise graded under Pyodide 0.27.2 and 0.28.3 (D4 gate;
 #   any difference in status or score fails), with the golden capture for
 #   ctm-checkers (step-2 design §6, §13): artifact goldens-export (the rows
@@ -71,11 +72,8 @@ on:
     - cron: '23 3 * * 1'
   workflow_dispatch:
     inputs:
-      ctm-demo:
-        description: 'ctm-demo commit (empty: the commit in corpora.json)'
-        default: ''
-      ingmat3a:
-        description: 'ingmat3a_ntnu commit (empty: the commit in corpora.json)'
+      courses:
+        description: 'Other course commits, as NAME=COMMIT separated by spaces (names from corpora.json, e.g. ingmat3a=d7ddfc6); empty: as corpora.json says'
         default: ''
       base:
         description: 'Umbrella commit, tag or branch built as the base of the build comparison (a branch means origin/<branch>; empty: no comparison)'
@@ -91,9 +89,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 env:
-  COURSE_REFS: >-
-    ${{ github.event.inputs.ctm-demo && format('--ref ctm-demo={0}', github.event.inputs.ctm-demo) || '' }}
-    ${{ github.event.inputs.ingmat3a && format('--ref ingmat3a={0}', github.event.inputs.ingmat3a) || '' }}
+  # NAME=COMMIT words, checked by the first step of each job.
+  COURSES: ${{ github.event.inputs.courses }}
 
 jobs:
   parity:
@@ -106,12 +103,10 @@ jobs:
       - name: Check the inputs of a run on demand
         if: github.event_name == 'workflow_dispatch'
         env:
-          CTM_DEMO: ${{ github.event.inputs.ctm-demo }}
-          INGMAT3A: ${{ github.event.inputs.ingmat3a }}
           BASE: ${{ github.event.inputs.base }}
         run: |
-          for value in "$CTM_DEMO" "$INGMAT3A"; do
-            [ -z "$value" ] || [[ "$value" =~ ^[0-9a-f]{7,40}$ ]] || { echo "::error::A course commit is 7 to 40 hex digits: $value"; exit 1; }
+          for course in $COURSES; do
+            [[ "$course" =~ ^[a-z0-9][a-z0-9-]*=[0-9a-f]{7,40}$ ]] || { echo "::error::courses takes NAME=COMMIT (7 to 40 hex digits): $course"; exit 1; }
           done
           [ -z "$BASE" ] || [[ "$BASE" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || { echo "::error::base is a commit, tag or branch name: $BASE"; exit 1; }
       - name: Select explicit review dependencies (main keeps normal defaults)
@@ -134,7 +129,9 @@ jobs:
         with:
           version: '1.8.27'
       - name: Build the corpora with the package
-        run: python integration/pyodide-parity/build-corpora.py --umbrella . --out "$RUNNER_TEMP/corpora" --review-refs "$CTM_REVIEW_REFS" $COURSE_REFS
+        run: |
+          refs=(); for course in $COURSES; do refs+=(--ref "$course"); done
+          python integration/pyodide-parity/build-corpora.py --umbrella . --out "$RUNNER_TEMP/corpora" --review-refs "$CTM_REVIEW_REFS" "${refs[@]}"
       - run: npm ci --ignore-scripts
       - run: npm ci --ignore-scripts
         working-directory: integration/pyodide-parity
@@ -142,11 +139,8 @@ jobs:
         run: |
           set -o pipefail
           c="$RUNNER_TEMP/corpora"
-          node integration/pyodide-parity/run.cjs \
-            --site umbrella="$c/ws/site/_site" --site math-exercise="$c/sites/math-exercise/_site" \
-            --site ctm-demo="$c/sites/ctm-demo/_site" --site ctm-demo-review="$c/sites/ctm-demo/_review-site" --site ingmat3a="$c/sites/ingmat3a/_site" \
-            --sources umbrella=. --sources math-exercise="$c/sites/math-exercise" --sources ctm-demo="$c/sites/ctm-demo" --sources ingmat3a="$c/sites/ingmat3a" \
-            --python . --extensions "$c/ws/site/_extensions" --out "$RUNNER_TEMP/parity" --capture "$RUNNER_TEMP/goldens" 2>&1 | tee "$RUNNER_TEMP/parity.log"
+          node integration/pyodide-parity/run.cjs --corpora "$c/corpora-built.json" \
+            --out "$RUNNER_TEMP/parity" --capture "$RUNNER_TEMP/goldens" 2>&1 | tee "$RUNNER_TEMP/parity.log"
       - name: Capture the umbrella's and math-exercise's corpora again with PYTHONHASHSEED 1; every row must be the same
         run: |
           c="$RUNNER_TEMP/corpora"
@@ -207,12 +201,10 @@ jobs:
       - name: Check the inputs of a run on demand
         if: github.event_name == 'workflow_dispatch'
         env:
-          CTM_DEMO: ${{ github.event.inputs.ctm-demo }}
-          INGMAT3A: ${{ github.event.inputs.ingmat3a }}
           BASE: ${{ github.event.inputs.base }}
         run: |
-          for value in "$CTM_DEMO" "$INGMAT3A"; do
-            [ -z "$value" ] || [[ "$value" =~ ^[0-9a-f]{7,40}$ ]] || { echo "::error::A course commit is 7 to 40 hex digits: $value"; exit 1; }
+          for course in $COURSES; do
+            [[ "$course" =~ ^[a-z0-9][a-z0-9-]*=[0-9a-f]{7,40}$ ]] || { echo "::error::courses takes NAME=COMMIT (7 to 40 hex digits): $course"; exit 1; }
           done
           [ -z "$BASE" ] || [[ "$BASE" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || { echo "::error::base is a commit, tag or branch name: $BASE"; exit 1; }
       - name: Select explicit review dependencies (main keeps normal defaults)
@@ -244,8 +236,11 @@ jobs:
           git rev-parse --verify "$ref^{commit}"
           git worktree add --detach "$RUNNER_TEMP/base-umbrella" "$ref"
           # The base keeps its own pins; review refs belong to this commit only.
-          python integration/pyodide-parity/build-corpora.py --umbrella "$RUNNER_TEMP/base-umbrella" --out "$RUNNER_TEMP/builds/base" $COURSE_REFS
-          python integration/pyodide-parity/build-corpora.py --umbrella . --out "$RUNNER_TEMP/builds/head" --review-refs "$CTM_REVIEW_REFS" $COURSE_REFS
+          # One set of course commits for both builds (a course that follows its branch could move between them).
+          refs=(); for course in $COURSES; do refs+=(--ref "$course"); done
+          python integration/pyodide-parity/build-corpora.py --resolve "$RUNNER_TEMP/course-commits.json" "${refs[@]}"
+          python integration/pyodide-parity/build-corpora.py --umbrella "$RUNNER_TEMP/base-umbrella" --out "$RUNNER_TEMP/builds/base" --refs "$RUNNER_TEMP/course-commits.json"
+          python integration/pyodide-parity/build-corpora.py --umbrella . --out "$RUNNER_TEMP/builds/head" --review-refs "$CTM_REVIEW_REFS" --refs "$RUNNER_TEMP/course-commits.json"
       - run: npm ci --ignore-scripts
       - run: npm ci --ignore-scripts
         working-directory: integration/pyodide-parity
@@ -258,10 +253,7 @@ jobs:
           expected=()
           if [ -n "$EXPECTED" ] && [ -f "$EXPECTED" ]; then expected=(--expected "$EXPECTED"); echo "Expected differences: $EXPECTED"; fi
           node integration/pyodide-parity/run.cjs --builds base="$RUNNER_TEMP/builds/base",head="$RUNNER_TEMP/builds/head" "${expected[@]}" \
-            --site umbrella=ws/site/_site --site math-exercise=sites/math-exercise/_site \
-            --site ctm-demo=sites/ctm-demo/_site --site ctm-demo-review=sites/ctm-demo/_review-site --site ingmat3a=sites/ingmat3a/_site \
-            --sources umbrella=umbrella --sources math-exercise=sites/math-exercise --sources ctm-demo=sites/ctm-demo --sources ingmat3a=sites/ingmat3a \
-            --python umbrella --extensions ws/site/_extensions --out "$RUNNER_TEMP/builds-report" 2>&1 | tee "$RUNNER_TEMP/builds.log"
+            --corpora corpora-built.json --out "$RUNNER_TEMP/builds-report" 2>&1 | tee "$RUNNER_TEMP/builds.log"
       - name: Report the result as an annotation
         if: always()
         run: |

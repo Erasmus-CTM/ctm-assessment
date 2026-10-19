@@ -30,9 +30,14 @@
 //     --extensions .feedback-workspace/site/_extensions --out DIR \
 //     [--versions 0.27.2,0.28.3 | --builds base=DIR,head=DIR [--versions 0.28.3] [--expected FILE]]
 //     [--capture DIR] [--hash-seed N]
+//   node integration/pyodide-parity/run.cjs --corpora DIR/corpora-built.json --out DIR ...
 //
-// A site belongs to the corpus (corpora.json) of the source tree of the same
-// name, or whose name it starts with (ctm-demo-review: ctm-demo).
+// --corpora FILE: the corpora build-corpora.py built (sites, source trees,
+// package, Python programs; with --builds a path inside each build). A site
+// belongs to the corpus (corpora.json) named there, else to the source tree
+// of the same name, or whose name it starts with (ctm-demo-review: ctm-demo).
+// A course that follows its branch (no pinned commit) has its teacher
+// answers' expectations reported, not enforced.
 // --capture DIR writes the golden suites (capture.cjs), split by provenance.
 // --hash-seed N: Python's PYTHONHASHSEED in every run (default 0; CI captures
 // twice with different seeds and compares).
@@ -54,14 +59,14 @@ const capture = require('./capture.cjs');
 
 function parse(argv) {
   const options = {site: [], sources: [], versions: null, builds: null, timeout: 240, python: null, extensions: null, out: null, capture: null,
-    hashSeed: 0, expected: null};
+    hashSeed: 0, expected: null, corpora: null};
   for (let i = 0; i < argv.length; i++) {
     const [flag, value] = [argv[i], argv[i + 1]];
     if (flag === '--site' || flag === '--sources') { options[flag.slice(2)].push(value); i++; }
     else if (flag === '--versions') { options.versions = value.split(','); i++; }
     else if (flag === '--builds') { options.builds = value.split(',').map(entry => { const [name, dir] = entry.split('='); return {name, root: path.resolve(dir)}; }); i++; }
     else if (flag === '--hash-seed') { options.hashSeed = Number(value); i++; }
-    else if (['--python', '--extensions', '--out', '--timeout', '--capture', '--expected'].includes(flag)) { options[flag.slice(2)] = flag === '--timeout' ? Number(value) : value; i++; }
+    else if (['--python', '--extensions', '--out', '--timeout', '--capture', '--expected', '--corpora'].includes(flag)) { options[flag.slice(2)] = flag === '--timeout' ? Number(value) : value; i++; }
     else throw new Error('Unknown option ' + flag);
   }
   if (options.builds) {
@@ -71,9 +76,25 @@ function parse(argv) {
   } else options.versions ||= ['0.27.2', '0.28.3'];
   if (!Number.isInteger(options.hashSeed) || options.hashSeed < 0 || options.hashSeed > 4294967295) throw new Error('--hash-seed takes an integer 0-4294967295');
   if (options.expected && !options.builds) throw new Error('--expected applies to --builds');
-  if (!options.out || !options.extensions || (!options.builds && options.versions.length !== 2)) throw new Error('Usage: see the header of run.cjs');
+  if (!options.out || !(options.extensions || options.corpora) || (!options.builds && options.versions.length !== 2)) throw new Error('Usage: see the header of run.cjs');
   const pairs = list => list.map(entry => { const [name, dir] = entry.split('='); return {name, dir}; });
-  return {...options, site: pairs(options.site), sources: pairs(options.sources)};
+  return withCorpora({...options, site: pairs(options.site), sources: pairs(options.sources)});
+}
+
+// --corpora FILE (build-corpora.py's corpora-built.json): its sites (with
+// their corpus), source trees, package and Python programs, paths relative to
+// the file; with --builds the file is a path inside each build (read from the
+// head build) and so are its paths.
+function withCorpora(options) {
+  if (!options.corpora) return options;
+  const file = options.builds ? path.resolve(options.builds[1].root, options.corpora) : path.resolve(options.corpora);
+  const built = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const base = options.builds ? path.dirname(options.corpora) : path.dirname(file);
+  const join = dir => path.join(base, dir);
+  return {...options, courseCommits: built.courses || {},
+    site: [...built.sites.map(s => ({name: s.name, dir: join(s.dir), corpus: s.corpus})), ...options.site],
+    sources: [...built.sources.map(s => ({name: s.name, dir: join(s.dir)})), ...options.sources],
+    extensions: options.extensions || join(built.extensions), python: options.python || (built.python ? join(built.python) : null)};
 }
 
 // The runs: two Pyodide versions over one build, or two builds under one version.
@@ -262,7 +283,12 @@ function coverage(job, records) {
     .map(({page, position, label, cases, verdicts}) => ({page, position, label, cases, verdicts}))};
 }
 
-// The corpus of a site: the source tree of that name, or the longest whose name the site's starts with.
+// The corpus of a site: the one --corpora names, the source tree of that name, or the longest whose name the site's starts with.
+const siteCorpus = (site, options, corpora) => site.corpus || corpusOf(site.name, options.sources, corpora);
+// A course that follows its branch (no pinned commit): its teacher answers' expectations are reported, not enforced.
+const followsBranch = (corpus, corpora) => Boolean(corpora[corpus] && corpora[corpus].course && !corpora[corpus].commit);
+// The teacher answers of a corpus (answers.json; "answers" in corpora.json names another corpus's).
+const answersOf = (corpus, corpora) => ANSWERS[(corpora[corpus] || {}).answers || corpus] || {};
 function corpusOf(site, sources, corpora) {
   const names = [...new Set([...sources.map(s => s.name), ...Object.keys(corpora)])];
   if (names.includes(site)) return site;
@@ -279,16 +305,16 @@ function buildJob(run, options, wheels, authoredResponses, corpora) {
     mathExtension: path.join(at(run, options.extensions), 'math-exercise'), capture: Boolean(options.capture)};
   const seen = new Map();
   for (const site of options.site) {
-    const root = at(run, site.dir), corpus = corpusOf(site.name, options.sources, corpora);
+    const root = at(run, site.dir), corpus = siteCorpus(site, options, corpora);
     for (const file of pagesUnder(root)) {
       const relative = site.name + '/' + file.split(path.sep).join('/');
-      const {cases, skipped, cells, unshaped, misfits} = pageCases(path.join(root, file), relative, authoredResponses[corpus] || {}, ANSWERS[corpus] || {});
+      const {cases, skipped, cells, unshaped, misfits} = pageCases(path.join(root, file), relative, authoredResponses[corpus] || {}, answersOf(corpus, corpora));
       const signature = casesSignature(cases);
       if (cases.length && seen.has(signature)) { job.duplicates.push({page: relative, same: seen.get(signature)}); continue; }
       if (cases.length) seen.set(signature, relative);
       job.pages[relative] = {root, file};
       job.cases.push(...cases.map(c => ({...c, corpus})));
-      job.skipped.push(...skipped); job.unshaped.push(...unshaped); job.misfits.push(...misfits);
+      job.skipped.push(...skipped); job.unshaped.push(...unshaped); job.misfits.push(...misfits.map(m => ({...m, corpus})));
       job.cells.push(...cells.map(cell => ({...cell, corpus})));
     }
   }
@@ -355,10 +381,14 @@ async function main() {
     + `${job.skipped.length} cells or variants without anything to grade`);
   // Every teacher answer of a corpus in the run must fit and reach its exercise
   // (in the head of a build comparison: the base may predate an answer).
-  const answersMisfit = job.misfits.map(m => `${m.page} cell ${m.position} (${m.label}, ${m.variant}), answers.json entry ${m.entry}: ${m.problem}`);
-  const runCorpora = new Set(options.site.map(s => corpusOf(s.name, options.sources, corpora)));
-  const answersUnused = [...runCorpora].flatMap(corpus => Object.keys(ANSWERS[corpus] || {})
-    .filter(label => !job.cases.some(c => c.corpus === corpus && c.source === 'answer' && c.label === label)).map(label => corpus + ': ' + label));
+  const misfitsAll = job.misfits.map(m => ({corpus: m.corpus, text: `${m.page} cell ${m.position} (${m.label}, ${m.variant}), answers.json entry ${m.entry}: ${m.problem}`}));
+  const runCorpora = new Set(options.site.map(s => siteCorpus(s, options, corpora)));
+  const unusedAll = [...runCorpora].flatMap(corpus => Object.keys(answersOf(corpus, corpora))
+    .filter(label => !job.cases.some(c => c.corpus === corpus && c.source === 'answer' && c.label === label)).map(label => ({corpus, text: corpus + ': ' + label})));
+  // Enforced for pinned corpora; for a course that follows its branch, reported.
+  const enforced = item => !followsBranch(item.corpus, corpora);
+  const answersMisfit = misfitsAll.filter(enforced).map(m => m.text), answersUnused = unusedAll.filter(enforced).map(u => u.text);
+  const answerNotes = [...misfitsAll, ...unusedAll].filter(item => !enforced(item)).map(item => item.text);
 
   // Phase 3: both runs, in parallel processes.
   const resultFiles = Object.fromEntries(runs.map(r => [r.name, path.join(out, `results-${r.name}.jsonl`)]));
@@ -391,8 +421,10 @@ async function main() {
   const verdictOf = record => [...new Set((record?.results || []).map(r => r.status))].sort().join('+') || 'none';
   // Teacher answers: the verdict each must get (both versions; the head of a build comparison).
   const checked = strict ? [runs[1]] : runs;
-  const answersUnexpected = job.cases.filter(c => c.expect).flatMap(c => checked.map(r => ({c, run: r.name, got: verdictOf(results[r.name].get(c.id))})))
-    .filter(({c, got}) => got !== c.expect).map(({c, run, got}) => ({id: c.id, run, expected: c.expect, got}));
+  const unexpectedAll = job.cases.filter(c => c.expect).flatMap(c => checked.map(r => ({c, run: r.name, got: verdictOf(results[r.name].get(c.id))})))
+    .filter(({c, got}) => got !== c.expect).map(({c, run, got}) => ({id: c.id, corpus: c.corpus, run, expected: c.expect, got}));
+  const answersUnexpected = unexpectedAll.filter(enforced);
+  answerNotes.push(...unexpectedAll.filter(item => !enforced(item)).map(a => `${a.run}: ${a.id}: expected ${a.expected}, got ${a.got}`));
   const keysNotCorrect = job.cases.filter(c => c.source === 'keys' && !(last.get(c.id)?.results || []).every(r => r.status === 'correct')).map(c => c.id);
   const fixtureMismatch = job.cases.filter(c => c.kind === 'fixture').map(c => ({c, got: runs.map(r => (results[r.name].get(c.id)?.results || []).map(x => x.status))}))
     .filter(({c, got}) => got.some(statusList => JSON.stringify(statusList) !== JSON.stringify(c.expected))).map(({c, got}) => ({id: c.id, expected: c.expected, got}));
@@ -411,6 +443,7 @@ async function main() {
     customCells: covered.cells.length, customCoverage: covered.byCorpus, customWithoutCorrect: covered.withoutCorrect.length,
     authoredResponsesNotPageShaped: job.unshaped.length, teacherAnswers: job.cases.filter(c => c.expect).length,
     teacherAnswersUnexpected: answersUnexpected.length, teacherAnswersUnused: answersUnused.length, teacherAnswersMisfit: answersMisfit.length,
+    teacherAnswerNotes: answerNotes.length, courseCommits: options.courseCommits || null,
     authoredTests: authored.length, authoredNotPassing: authoredFailing.length,
     pythonPrograms: job.python ? job.python.cases.length : 0, pythonUnexpected: pythonExpectations.length,
     skipped: job.skipped.length, timeouts: Object.fromEntries(runs.map((r, i) => [r.name, timeouts[i]])), incomplete: incomplete.length,
@@ -426,7 +459,7 @@ async function main() {
       for (const [id, record] of results[run.name]) {
         if (record.authored) {
           const m = /^authored:([^:]+):/.exec(id);
-          collect.authored(corpusOf(m[1], options.sources, corpora), record.authored, python);
+          collect.authored(corpusOf(m[1], options.sources, corpora), record.authored, python);   // a source tree is named as its corpus
         } else if (record.calls && record.calls.length) {
           const c = byId.get(id);
           if (c) collect.request(c.corpus, Boolean(c.probe), c.source || c.kind, record.calls, python);
@@ -445,9 +478,10 @@ async function main() {
     for (const name of Object.keys(suites)) {
       const tree = options.sources.find(t => t.name === name);
       const component = record && record.repositories && record.repositories[name];
+      // The commit built (a run on demand or a course that follows its branch may differ from the pin).
       corporaInfo[name] = {...(corpora[name] || {}),
-        commit: (corpora[name] || {}).commit || (tree && commitOf(at(runs[runs.length - 1], tree.dir))) || (component && component.commit) || null,
-        sites: options.site.filter(s => corpusOf(s.name, options.sources, corpora) === name).map(s => s.name)};
+        commit: (tree && commitOf(at(runs[runs.length - 1], tree.dir))) || (corpora[name] || {}).commit || (component && component.commit) || null,
+        sites: options.site.filter(s => siteCorpus(s, options, corpora) === name).map(s => s.name)};
     }
     // The harness's checkout and the package the sites were built with, recorded both (they are one commit in CI).
     const umbrella = commitOf(process.cwd());
@@ -462,7 +496,7 @@ async function main() {
   }
 
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify({summary, differences, expectedDifferences: accepted, staleExpectations: stale, notes, incomplete,
-    teacherAnswersUnexpected: answersUnexpected, teacherAnswersUnused: answersUnused, teacherAnswersMisfit: answersMisfit, customWithoutCorrect: covered.withoutCorrect, customCells: covered.cells,
+    teacherAnswersUnexpected: answersUnexpected, teacherAnswersUnused: answersUnused, teacherAnswersMisfit: answersMisfit, teacherAnswerNotes: answerNotes, customWithoutCorrect: covered.withoutCorrect, customCells: covered.cells,
     authoredResponsesNotPageShaped: job.unshaped, skipped: job.skipped, duplicates: job.duplicates, keysNotCorrect, fixtureMismatch,
     authoredNotPassing: authoredFailing.map(id => ({id, outcome: last.get(id).results[0].status})), pythonUnexpected: pythonExpectations}, null, 1));
   const title = strict
@@ -478,7 +512,8 @@ async function main() {
       : `**Differences in status or score: ${differences.length}.** Other differences (messages, feedback text): ${notes.length}.`,
     `**Cases without a result, timed out or with a harness error: ${incomplete.length}** (timeouts: ${runs.map(r => r.name + ' ' + summary.timeouts[r.name]).join(', ')}). `
     + `**Teacher answers graded unlike their expectation: ${answersUnexpected.length}** (of ${summary.teacherAnswers}); answers.json entries that do not fit their cell: `
-    + `${answersMisfit.length}; labels on no page of their corpus: ${answersUnused.length}.`, '',
+    + `${answersMisfit.length}; labels on no page of their corpus: ${answersUnused.length}`
+    + (answerNotes.length ? `; in courses that follow their branch (reported only): ${answerNotes.length}` : '') + '.', '',
     `Cells with custom checkers, without keys or with a diagram response: ${summary.customCells}; by corpus (cells, labels: reaching correct / partial / wrong): `
     + cov.map(([name, e]) => `${name} ${e.cells} (${e.labels} labels): ${e.correct} / ${e.partial} / ${e.wrong}`).join('; ') + '. '
     + `Without a correct verdict: ${covered.withoutCorrect.length ? covered.withoutCorrect.map(c => '`' + c.page + '#' + c.position + ':' + c.label + '`').join(', ') : 'none'}. `
@@ -494,6 +529,7 @@ async function main() {
   list('Teacher answers graded unlike their expectation:', answersUnexpected, a => `- ${a.run}: \`${a.id}\`: expected ${a.expected}, got ${a.got}`);
   list('Entries of answers.json that do not fit their cell:', answersMisfit, text => `- ${text}`);
   list('Labels of answers.json on no page of their corpus:', answersUnused, label => `- ${label}`);
+  list('Teacher answers in courses that follow their branch (reported, not enforced):', answerNotes, text => `- ${text}`);
   list('Expected differences not found (remove them from the expectations):', stale, s => `- ${JSON.stringify(s)}`);
   list('Differences:', differences, d => '- `' + d.id + '`: ' + JSON.stringify(d).slice(0, 600));
   list('Expected differences:', accepted, d => `- \`${d.id}\` (${d.reason})`);

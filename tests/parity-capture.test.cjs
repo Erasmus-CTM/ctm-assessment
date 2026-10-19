@@ -196,3 +196,22 @@ test('a case without a result, a timeout or a harness error makes a run incomple
   assert.deepEqual(covered.cells[0].verdicts, ['correct', 'harness-error', 'wrong']);
   assert.deepEqual(covered.byCorpus.c, {cells: 1, labels: 1, graded: 1, correct: 1, partial: 0, wrong: 1});
 });
+
+test('--corpora reads the sites, source trees and package build-corpora.py built', () => {
+  const {parse} = require('../integration/pyodide-parity/run.cjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctm-corpora-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'corpora-built.json'), JSON.stringify({courses: {'ingmat3a-linalg': 'a'.repeat(40)},
+      extensions: 'ws/site/_extensions', python: 'umbrella', sources: [{name: 'umbrella', dir: 'umbrella'}],
+      sites: [{name: 'umbrella', dir: 'ws/site/_site', corpus: 'umbrella'}, {name: 'ctm-demo-review', dir: 'sites/ctm-demo/_review-site', corpus: 'ctm-demo'}]}));
+    const versions = parse(['--corpora', path.join(dir, 'corpora-built.json'), '--out', 'out']);
+    assert.deepEqual(versions.site[1], {name: 'ctm-demo-review', dir: path.join(dir, 'sites/ctm-demo/_review-site'), corpus: 'ctm-demo'});
+    assert.equal(versions.extensions, path.join(dir, 'ws/site/_extensions'));
+    assert.equal(versions.courseCommits['ingmat3a-linalg'], 'a'.repeat(40));
+    // A build comparison reads the file in the head build; its paths stay relative to each build.
+    const builds = parse(['--builds', `base=${dir},head=${dir}`, '--corpora', 'corpora-built.json', '--out', 'out']);
+    assert.deepEqual(builds.site.map(s => s.dir), ['ws/site/_site', 'sites/ctm-demo/_review-site']);
+    assert.deepEqual(builds.sources, [{name: 'umbrella', dir: 'umbrella'}]);
+    assert.equal(builds.python, 'umbrella');
+  } finally { fs.rmSync(dir, {recursive: true, force: true}); }
+});
