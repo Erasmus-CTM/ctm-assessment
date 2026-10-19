@@ -74,12 +74,10 @@ function grade(version, jobFile, results, timeout, log) {
   });
 }
 
-// The page's exercises as rendered (render noise such as JSXGraph's random board names removed).
-function exercisesSignature(file) {
-  const {JSDOM} = require('jsdom');
-  const doc = new JSDOM(fs.readFileSync(file, 'utf8')).window.document;
-  const cells = [...doc.querySelectorAll('.math-exercise-cell')].map(cell => cell.outerHTML.replace(/JXG[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{8}/g, 'JXG'));
-  return require('node:crypto').createHash('sha256').update(cells.join('\n')).digest('hex');
+// What a page's cases grade: exercises, variants, responses and fixtures.
+function casesSignature(cases) {
+  const content = cases.map(c => [c.position, c.label, c.variantKey, c.kind, c.values, c.fixture]);
+  return require('node:crypto').createHash('sha256').update(JSON.stringify(content)).digest('hex');
 }
 
 const sameScore = (a, b) => a === b || (typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= 1e-12);
@@ -121,19 +119,18 @@ function read(file) {
   // Phase 1: the cases, from the pages and sources (the same list for both versions).
   const job = {wheels, pages: {}, cases: [], skipped: [], authored: [], python: null,
     mathExtension: path.join(path.resolve(options.extensions), 'math-exercise')};
-  // A page whose exercises are those of a page already included (a second
-  // build of a course, such as a review profile that renders every page) is
-  // graded once.
+  // A page whose cases are those of a page already included (a second build
+  // of a course, such as a review profile that renders every page) is graded once.
   const seen = new Map();
   job.duplicates = [];
   for (const site of options.site) {
     for (const file of pagesUnder(site.root)) {
       const relative = site.name + '/' + file.split(path.sep).join('/');
-      const signature = exercisesSignature(path.join(site.root, file));
-      if (seen.has(signature)) { job.duplicates.push({page: relative, same: seen.get(signature)}); continue; }
-      seen.set(signature, relative);
-      job.pages[relative] = {root: site.root, file};
       const {cases, skipped} = pageCases(path.join(site.root, file), relative);
+      const signature = casesSignature(cases);
+      if (cases.length && seen.has(signature)) { job.duplicates.push({page: relative, same: seen.get(signature)}); continue; }
+      if (cases.length) seen.set(signature, relative);
+      job.pages[relative] = {root: site.root, file};
       job.cases.push(...cases); job.skipped.push(...skipped);
     }
   }
