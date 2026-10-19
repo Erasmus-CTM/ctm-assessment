@@ -1,0 +1,9 @@
+ai-feedback:
+  policies:
+    course:
+      base-prompt: POLICY_MARKER_5126
+    brief:
+      extends: course
+      max-words: 60
+      steps:
+        - step-prompt: STEP_MARKER_2087

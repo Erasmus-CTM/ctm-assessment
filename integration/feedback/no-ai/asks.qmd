@@ -1,0 +1,12 @@
+---
+title: A page that asks for AI feedback
+engine: markdown
+ai-feedback:
+  enabled: true
+math-exercise:
+  feedback: true
+---
+
+```{math-exercise}
+Compute $2+2$: _[4]
+```
