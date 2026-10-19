@@ -99,14 +99,20 @@ test('the capture is split by provenance: only exportable corpora go to export/'
   try {
     const corpora = {'math-exercise': {repository: 'Erasmus-CTM/math-exercise', licence: 'AGPL-3.0-or-later', export: true, commit: 'a'.repeat(40)},
       'ctm-demo': {repository: 'aacchhee/ctm-demo', licence: 'course', export: false}, umbrella: {repository: 'Erasmus-CTM/ctm-assessment', export: false}};
-    const manifest = capture.write(dir, collect.suites().suites, corpora, {format: 1});
+    const manifest = capture.write(dir, collect.suites().suites, corpora, {format: 1, corpora, conflicts: [{corpus: 'ctm-demo', id: 'x'}], incomplete: []});
     assert.deepEqual(Object.keys(manifest.files).sort(), ['export/math_exercise/requests-math-exercise.jsonl',
       'umbrella/math_exercise/requests-ctm-demo.jsonl', 'umbrella/math_exercise/requests-umbrella.jsonl']);
     assert.equal(manifest.files['export/math_exercise/requests-math-exercise.jsonl'].export, true);
-    assert.deepEqual(fs.readdirSync(path.join(dir, 'export')).sort(), ['PROVENANCE.md', 'math_exercise']);
+    assert.deepEqual(fs.readdirSync(path.join(dir, 'export')).sort(), ['PROVENANCE.md', 'manifest.json', 'math_exercise']);
     assert.doesNotMatch(fs.readFileSync(path.join(dir, 'export', 'PROVENANCE.md'), 'utf8'), /ctm-demo/);
     assert.match(fs.readFileSync(path.join(dir, 'PROVENANCE.md'), 'utf8'), /\| `umbrella\/math_exercise\/requests-ctm-demo\.jsonl` \| ctm-demo \| 1 \|/);
+    assert.match(fs.readFileSync(path.join(dir, 'export', 'PROVENANCE.md'), 'utf8'), /written for the harness in the umbrella/);
     assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')).format, 1);
+    // export/ has a manifest of its own: its files (relative to export/) and corpora, nothing of the umbrella's side.
+    const own = JSON.parse(fs.readFileSync(path.join(dir, 'export', 'manifest.json'), 'utf8'));
+    assert.deepEqual(Object.keys(own.files), ['math_exercise/requests-math-exercise.jsonl']);
+    assert.deepEqual(Object.keys(own.corpora), ['math-exercise']);
+    assert.doesNotMatch(JSON.stringify(own), /ctm-demo|umbrella\//);
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
 });
 

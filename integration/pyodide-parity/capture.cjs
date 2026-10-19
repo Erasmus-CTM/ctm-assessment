@@ -24,17 +24,23 @@
 //
 // Provenance (§13 item 7): only corpora marked `export` in corpora.json
 // (math-exercise's own examples) are written under export/, for ctm-checkers
-// to commit; every other corpus (the courses, the umbrella's example site)
-// is written under umbrella/ and stays in the umbrella.
+// to commit, with a manifest and a notice of their own that name nothing
+// else; every other corpus (the courses, the umbrella's example site) is
+// written under umbrella/ and stays in the umbrella.
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-// A number as Python wrote it ("1.0" stays "1.0").
+// A number as Python wrote it ("1.0" stays "1.0"). JSON.parse gives the
+// source text of a number from Node 21 on; older versions cannot keep it.
 class Raw { constructor(text) { this.text = text; } }
 function pythonJson(text) {
-  return JSON.parse(text, (key, value, context) => (typeof value === 'number' && context && typeof context.source === 'string' ? new Raw(context.source) : value));
+  return JSON.parse(text, (key, value, context) => {
+    if (typeof value !== 'number') return value;
+    if (!context || typeof context.source !== 'string') throw new Error('The golden capture needs Node 21 or later (JSON.parse source text)');
+    return new Raw(context.source);
+  });
 }
 function canonical(value) {
   if (value instanceof Raw) return value.text;
@@ -135,7 +141,8 @@ function canonicalRow(value) {
 }
 
 // Writes the suites under DIR/export and DIR/umbrella by provenance, with a
-// manifest and a provenance notice.
+// manifest and a provenance notice for all of them, and for export/ its own
+// (paths relative to export/, only the exported corpora).
 function write(dir, suites, corpora, manifest) {
   const written = {};
   for (const [name, files] of Object.entries(suites)) {
@@ -152,7 +159,15 @@ function write(dir, suites, corpora, manifest) {
   const full = {...manifest, files: written};
   fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(full, null, 1) + '\n');
   fs.writeFileSync(path.join(dir, 'PROVENANCE.md'), provenance(corpora, written));
-  if (fs.existsSync(path.join(dir, 'export'))) fs.writeFileSync(path.join(dir, 'export', 'PROVENANCE.md'), provenance(corpora, written, 'export'));
+  if (fs.existsSync(path.join(dir, 'export'))) {
+    const exported = Object.keys(corpora).filter(name => corpora[name] && corpora[name].export);
+    const only = {...manifest, corpora: Object.fromEntries(exported.map(name => [name, corpora[name]])),
+      conflicts: (manifest.conflicts || []).filter(c => exported.includes(c.corpus)),
+      files: Object.fromEntries(Object.entries(written).filter(([, info]) => info.export).map(([file, info]) => [file.replace(/^export\//, ''), info]))};
+    delete only.incomplete;   // a capture is exported only from a complete run
+    fs.writeFileSync(path.join(dir, 'export', 'manifest.json'), JSON.stringify(only, null, 1) + '\n');
+    fs.writeFileSync(path.join(dir, 'export', 'PROVENANCE.md'), provenance(corpora, written, 'export'));
+  }
   return full;
 }
 
@@ -163,6 +178,10 @@ function provenance(corpora, written, only) {
     'go to ctm-checkers (`export/`); rows derived from courses and the umbrella\'s example site stay in the umbrella (`umbrella/`),',
     'generated in CI from the pinned repositories. STACK fixture rows are recorded in ctm-checkers itself and keep their',
     'GPL-3.0 licence file (`tests/native_compliance/COPYING.txt`) with a notice per suite.', '',
+    'Inputs: each request is what a rendered page of the corpus sent to the checker library. The answers typed into the pages',
+    'come from the corpus itself (answer keys, authored tests, variant fixtures) or were written for the harness in the umbrella,',
+    'under the umbrella\'s licence (AGPL-3.0-or-later, compatible with every exported corpus): the probe set and the boundary',
+    'probes (`cases.cjs`), the audit\'s challenge answers (`challenges.json`) and the teacher answers (`answers.json`).', '',
     '| File | Corpus | Rows | Source | Licence | Exported |', '|---|---|---|---|---|---|'];
   for (const [file, info] of Object.entries(written).sort()) {
     if (only === 'export' && !info.export) continue;
