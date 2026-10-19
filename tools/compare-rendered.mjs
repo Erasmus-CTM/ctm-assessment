@@ -116,7 +116,93 @@ function extract(file) {
   }
   for (const exercise of configs.__pyExercises || []) if (exercise && exercise.policySelection) selections.push(['py-exercise', exercise.policySelection]);
   for (const cell of configs.qpyodideCellDetails || []) if (cell?.options?.policySelection) selections.push(['pyodide-interaktiv', cell.options.policySelection]);
-  return {files, inline, configs, sources, selections, dom: canonical(doc.body)};
+  return {doc, files, inline, configs, sources, selections, dom: canonical(doc.body)};
+}
+
+// Feedback context (A5): the prose an exercise sends is that of its own
+// section, the innermost tab or heading section around it, without raw
+// <details> blocks, other tabs, nested sections, other exercises, code blocks
+// and the blocks the exercise lists itself (those are sent on their own).
+// `contextVerdict` gives "own-section" when the after page's context text is
+// exactly that, and every piece of the section's prose that the before page
+// sent is still sent; otherwise it names the first piece that is not and where
+// it comes from. Text is compared as letters and digits only, so markup, math
+// delimiters, punctuation and the spacing of table cells do not matter.
+const EXERCISES = '.math-exercise-cell, .py-exercise-cell, [id^="qpyodide-insertion-location-"], .ai-feedback-activity, .ai-feedback-task';
+const NOT_TEXT = 'script, style, noscript, template';
+const NOT_PROSE = NOT_TEXT + ', pre, details';
+const squash = value => String(value ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+const pieces = value => String(value ?? '').split('\n').map(text => ({text: text.trim(), key: squash(text)})).filter(piece => piece.key);
+function textOf(root, skip = node => node.matches(NOT_TEXT)) {
+  const parts = [];
+  (function visit(node) {
+    if (node.nodeType === 3) { parts.push(node.textContent); return; }
+    if (node.nodeType !== 1 || (node !== root && skip(node))) return;
+    for (const child of node.childNodes) visit(child);
+  })(root);
+  return parts.join(' ');
+}
+function contextVerdict(doc, element, after, before, refs) {
+  if (!element) return 'no exercise element';
+  const scope = element.parentElement?.closest('.tab-pane, section') || doc.body;
+  const listed = String(refs ?? '').split(',').map(id => id.trim())
+    .filter(id => id && id !== 'auto' && id !== 'none' && !id.startsWith('jsxgraph:')).map(id => doc.getElementById(id)).filter(Boolean);
+  const skip = node => node.matches(NOT_PROSE) || node.matches(EXERCISES) || node.matches('.tab-pane, section, .nav') || listed.includes(node);
+  const label = scope.matches('.tab-pane') && doc.getElementById(scope.getAttribute('aria-labelledby') || '');
+  const own = squash((label ? label.textContent + ' ' : '') + textOf(scope, skip));
+  for (const piece of pieces(after)) {
+    if (own.includes(piece.key)) continue;
+    return `not prose of the own section (${origin(doc, element, scope, listed, piece)}): ${piece.text.slice(0, 100)}`;
+  }
+  // Everything of the section's prose that the before page sent is still sent
+  // (unless the 1500-character bound of the context leaves it out).
+  const sent = squash(after);
+  for (const piece of pieces(before)) {
+    if (!own.includes(piece.key) || sent.includes(piece.key)) continue;
+    if (String(after ?? '').length + piece.text.length > 1400) continue;
+    return `lost prose of the own section: ${piece.text.slice(0, 100)}`;
+  }
+  return 'own-section';
+}
+function origin(doc, element, scope, listed, piece) {
+  const has = el => el && squash(textOf(el)).includes(piece.key);
+  const enclosing = [];
+  for (let el = scope.parentElement?.closest('.tab-pane, section'); el; el = el.parentElement?.closest('.tab-pane, section')) enclosing.push(el);
+  const otherTabs = [...doc.querySelectorAll('.tab-pane')].filter(el => !el.contains(element));
+  const otherLabels = [...doc.querySelectorAll('[role="tab"]')].filter(tab => !doc.getElementById(tab.getAttribute('aria-controls') || '')?.contains(element));
+  const places = [
+    ['a <details> block', [...doc.querySelectorAll('details')]],
+    ['a listed block', listed],
+    ['the exercise itself', [element]],
+    ['another exercise', [...doc.querySelectorAll(EXERCISES)].filter(el => el !== element)],
+    ['another tab', [...otherTabs, ...otherLabels]],
+    ['a code block', [...scope.querySelectorAll('pre')]],
+    ['an enclosing section', enclosing],
+    ['another section', [...doc.querySelectorAll('section')].filter(el => !el.contains(element))],
+  ];
+  for (const [name, elements] of places) if (elements.some(has)) return 'from ' + name;
+  return has(doc.body) ? 'elsewhere on the page' : 'not on the page';
+}
+// The context differences of a page get their verdict from the after page.
+function contextItems(items, B) {
+  const json = value => { try { return typeof value === 'string' && value.startsWith('"') ? JSON.parse(value) : value; } catch (_) { return value; } };
+  for (const item of items) {
+    let m, element, refs;
+    if (item.area === 'config' && /^ai-feedback-data/.test(item.object) && (m = /^\/(\d+)\/context$/.exec(item.path))) {
+      const data = B.configs[item.object]?.[m[1]];
+      element = data && B.doc.getElementById(data.id); refs = data?.contextRefs;
+    } else if (item.area === 'config' && item.object === 'qpyodideCellDetails' && (m = /^\/(\d+)\/options\/feedbackContext\/text$/.exec(item.path))) {
+      const cell = B.configs.qpyodideCellDetails?.[m[1]];
+      element = cell && B.doc.getElementById('qpyodide-insertion-location-' + cell.id); refs = cell?.options?.feedbackContext?.refs;
+    } else if (item.area === 'config' && item.object === '__pyExercises' && (m = /^\/(\d+)\/feedbackContext\/text$/.exec(item.path))) {
+      const exercise = B.configs.__pyExercises?.[m[1]];
+      element = exercise && B.doc.getElementById('py-exercise-' + exercise.id); refs = exercise?.feedbackContext?.refs;
+    } else if (item.area === 'dom' && item.attribute === 'data-context' && item.attrs?.id) {
+      element = B.doc.getElementById(item.attrs.id); refs = item.attrs['data-context-refs'];
+    } else continue;
+    item.context = contextVerdict(B.doc, element, json(item.after), json(item.before), refs);
+  }
+  return items;
 }
 
 // Whether two policy configurations give every selection on the page the same
@@ -246,7 +332,7 @@ function comparePage(page, before, after) {
     for (const d of differences) items.push({page, area: 'config', change: 'changed', object, ...d, effective, item: (b[d.path.split('/')[1]] ?? a[d.path.split('/')[1]])});
   }
   for (const hunk of diffLines(A.dom, B.dom)) items.push(...domItems(page, hunk));
-  return items;
+  return contextItems(items, B);
 }
 
 // ---------------------------------------------------------------- expectations
@@ -267,7 +353,7 @@ function test(pattern, value) {
 // __pyExercises, ai-feedback-data, qpyodideCellDetails).
 function matches(rule, item) {
   if (rule.area && rule.area !== item.area) return false;
-  for (const field of ['change', 'what', 'object', 'path', 'tag', 'element', 'attribute', 'before', 'after', 'line', 'page', 'effective'])
+  for (const field of ['change', 'what', 'object', 'path', 'tag', 'element', 'attribute', 'before', 'after', 'line', 'page', 'effective', 'context'])
     if (rule[field] !== undefined && !test(rule[field], item[field])) return false;
   for (const [field, pattern] of Object.entries(rule.where || {})) {
     const value = field.split('.').reduce((v, k) => (v == null ? v : v[k]), item.item ?? item.attrs);
