@@ -47,29 +47,74 @@ and an old ai-feedback 0.8.1.
 ### Pyodide parity, build comparison and golden capture
 
 `integration/pyodide-parity` grades every exercise of the example sites and
-courses with the pages' own math-exercise.js in jsdom: answer keys,
-perturbations, the audit's challenge answers, every variant's fixtures, the
-authored question tests and the umbrella's Python programs. Cells that decide
-without answer keys (custom checkers) and cells whose response comes from a
-diagram (`data-response`) get probes too (step-2 review finding 1): a field
-without a key takes a fixed probe set (`PROBES` in `cases.cjs`: numbers,
-symbols, expressions, collections, a matrix, invalid input, a dunder), rotated
-across the cell's keyless fields, plus the challenge answers and the
-`expressions` responses its authored tests give the checker; a diagram cell
-gets the JSON responses its authored tests give the checker (answered through
-the page's JSXGraph response protocol) and its variants' fixtures. What stays
-uncovered: a diagram cell without authored tests or fixtures (the report counts
-it under "nothing to grade"), checker branches that neither the probes nor the
-authored responses reach, matrix inputs at shapes other than the default, and
-authored responses that are not JSON (they are left out).
+courses with the pages' own math-exercise.js in jsdom (`cases.cjs`):
 
-Two runs are compared. **Versions** (default): the same sites under two
-Pyodide versions (0.27.2 and ctm-libs' 0.28.3); any difference in status or
-score fails, other differences are reported. **Builds** (`--builds
+- cells with answer keys: the keys, perturbations of each key (for a custom
+  checker also all keys wrong at once), the audit's challenge answers
+  (`challenges.json`), and for numeric cells with decimal
+  places, significant figures or a tolerance boundary probes in a cell's
+  first two variants (step-2 review S7): the two half-way values next to the
+  key's rounding (one of them shows the tie rule) and answers exactly at the
+  tolerance (where the binary difference equals it) and just inside and
+  outside it;
+- cells that decide without answer keys (custom checkers, dynamic matrices;
+  step-2 finding 1 and review S1): the teacher answers of `answers.json`
+  (by corpus and label, each with the verdict it must get), the challenge
+  answers, a fixed probe set in the fields without a key (`PROBES`: numbers,
+  symbols, expressions, collections, a matrix, invalid input, a dunder), and
+  the responses the cell's authored tests give its checker, as the page would
+  send them (text per field; shape and entries per dynamic matrix, within the
+  sizes the page allows; a response the page cannot send is left out and
+  counted in the report);
+- cells whose response comes from a diagram (`data-response`): the teacher
+  answers and the authored tests' responses, answered through the page's
+  JSXGraph response protocol;
+- every variant's fixtures, the authored question tests and the umbrella's
+  Python programs.
+
+The report counts coverage by cell: every rendered cell with a custom
+checker, without keys or with a diagram response, and whether its cases
+reached a correct, a partial and a wrong verdict. The step-2 design's 78
+custom checkers are the `mode: custom` blocks of the sources (math-exercise
+46, ctm-demo 12, ingmat3a 19, the umbrella 1). 69 of them are rendered, one
+cell each, and all 69 are graded; every one reaches a correct and a wrong
+verdict except `custom-special-linear-matrix`, whose checker gives at least
+1/3 to any matrix. The other 9 are documentation snippets in math-exercise's
+`docs/*.md` (`reference.md` 5, `graph-editor.md` 2, `assess-basis.md` 1,
+`question-tests.md` 1) that no site renders; the harness does not see them.
+What else stays uncovered: checker branches that no teacher answer, probe or
+authored response reaches, and authored responses the page cannot send
+(today two, matrices of a size the page does not offer).
+
+A run fails when a case has no result, timed out or ended in a harness error
+(in either run, step-2 review S6), or when a teacher answer gets another
+verdict than its `expect`, does not fit its cell, or its label is on no page
+of its corpus (for a course that follows its branch these are reported
+only). Two runs are compared. **Versions** (default): the same sites under
+two Pyodide versions (0.27.2 and ctm-libs' 0.28.3); any difference in status
+or score fails, other differences are reported. **Builds** (`--builds
 base=DIR,head=DIR`, one version, 0.28.3 by default): two builds of the same
 sites, with site, source and extension paths relative to each build's folder;
-the case lists must be identical and any difference — status, score, details
-or feedback text — fails (layer L2 of the step-2 design).
+any difference — status, score, details, feedback text, or a case only one
+build has — fails (layer L2 of the step-2 design), unless the pull request
+lists it in `integration/pyodide-parity/expected/<PR number>.json`:
+
+```json
+{"differences": [
+  {"path": "math-exercise/examples.html", "case": "/#11:ex-custom-monotonicity\\|/",
+   "reason": "math-exercise 0.11.1 words the monotonicity feedback differently", "required": true}
+]}
+```
+
+`path` is a page (`<site>/<page>.html`), an authored source
+(`<corpus>/<file>.qmd`), a folder of them, or `python` (the Python
+programs); `case` a case id or a `/regular expression/` over case ids (the
+report lists both for every difference); `reason` says why the difference
+is right. An entry with
+`required` (the default) must match a difference, so an expectation that no
+longer applies fails too. Unlisted differences still fail. The file belongs to
+its pull request (the workflow reads only the one named by the PR's number) and
+can be deleted after the merge.
 
 `--capture DIR` writes the golden suites for ctm-checkers (`capture.cjs`): every
 grading call at the runtime boundary — the `_math_*` values the page set and
@@ -77,27 +122,59 @@ the JSON the checker returned, or the error raised — one row per distinct
 request (`math_exercise/requests-<corpus>`, `custom-probes-<corpus>`,
 `authored-<corpus>`, with checker and test sources once in
 `sources-<corpus>.jsonl`). Rows are canonical JSON with Python's number
-spelling; an output with a Python error message, or one that differs between
-the versions, is kept per Python minor version (`by_python`). The capture is
-split by provenance (step-2 design §13 item 7; `corpora.json`): `export/` holds
-only math-exercise's own examples (AGPL-3.0-or-later), which ctm-checkers may
-commit; the courses' rows and the umbrella's example site stay in `umbrella/`,
-generated in CI from the pinned repositories. `manifest.json` names the
-commits, runtimes and files; `PROVENANCE.md` the licence of each file.
+spelling (this needs Node 21 or later, for `JSON.parse`'s source text) and
+the checker's own number types (`{"$type": "Rational", "value": "1/3"}`); an
+output with a Python error message, or one that differs between the
+versions, is kept per Python minor version (`by_python`). The capture is
+split by provenance (step-2 design §13 item 7; `corpora.json`): `export/`
+holds only math-exercise's own examples (AGPL-3.0-or-later), which
+ctm-checkers may commit, with a `manifest.json` and `PROVENANCE.md` of its own;
+the courses' rows and the umbrella's example site stay in `umbrella/`,
+generated in CI from the pinned repositories. The top-level `manifest.json`
+names the commits (the harness's checkout and the package the sites were
+built with), runtimes, files and anything incomplete; `PROVENANCE.md` the
+licence of each file and the inputs written in the umbrella (probe sets,
+challenge and teacher answers).
+
+Python runs with a fixed `PYTHONHASHSEED` (`--hash-seed`, default 0; the
+worker checks that it reached the interpreter), and `random` is seeded before
+every grading call and every authored question. CI captures the umbrella's
+and math-exercise's corpora a second time with seed 1 and fails on any row
+that differs. Under these fixed seeds the boundary probes make the exported
+rows sensitive to the numeric comparison itself: changing `_round_places` to
+round half to even, or the tolerance test from `<=` to `<`, changes rows of
+math-exercise's corpus (checked by hand on 19 Oct 2026); ctm-checkers' own
+rounding grid (step-2 design §6.2) remains the systematic test of these paths.
 
 The workflow **Pyodide parity and goldens** runs both: the parity run with the
 capture (artifacts `goldens-export` and `goldens-umbrella`) and, on pull
 requests, the build comparison against the base branch. It runs when the
-harness, the pins or the package change, in full every Monday, and on demand
-(with other course commits, or a base ref for the build comparison).
-`build-corpora.py` builds the corpora with one umbrella checkout (courses at the
-commits in `corpora.json`). Locally:
+harness, the pins, the package or the example site's inputs change, in full
+every Monday, and on demand (with other course commits, `courses:
+NAME=COMMIT …`, or a base ref for the build comparison: a commit, tag or
+branch name).
+
+The courses are listed once, in `integration/pyodide-parity/corpora.json`
+(entries with `course`: repository, branch, Quarto profiles), for this
+workflow and for **Compare rendered courses**. `build-corpora.py` builds the
+corpora with one umbrella checkout and writes `corpora-built.json`, which
+`run.cjs --corpora` reads (sites, source trees, package, Python programs).
+A course with a pinned `commit` (ctm-demo, ingmat3a) is built there; the pins
+are bumped by hand, in a pull request of their own that updates
+`answers.json` with them. A course without one follows its branch: ingmat3a's
+`linalg-branch`, where the linear-algebra work happens, is built at its tip
+(resolved once per job, so the two builds of a comparison get the same
+commit), graded with ingmat3a's teacher answers, whose expectations are
+reported there, not enforced (the branch moves), and skipped with a notice
+once the branch is gone (`optional`). The course comparison builds every
+course at its branch. Locally:
 
 ```sh
 (cd integration/pyodide-parity && npm ci)
-python integration/pyodide-parity/build-corpora.py --umbrella . --out /tmp/corpora
-node integration/pyodide-parity/run.cjs --site umbrella=/tmp/corpora/ws/site/_site \
-  --sources umbrella=. --python . --extensions /tmp/corpora/ws/site/_extensions --out /tmp/parity --capture /tmp/goldens
+work=$(mktemp -d)
+python integration/pyodide-parity/build-corpora.py --umbrella . --out "$work/corpora"
+node integration/pyodide-parity/run.cjs --corpora "$work/corpora/corpora-built.json" \
+  --out "$work/parity" --capture "$work/goldens"
 ```
 
 The SymPy, mpmath and NetworkX wheels come from jsDelivr, checked against each
@@ -132,8 +209,11 @@ unchanged context of the after page gets the same check; one that fails it is
 reported too (area `context`). The workflow
 **Compare rendered courses** builds a course with two ctm-assessment refs
 through their own installers and compares them: on pull requests that change
-the package (the example site, ctm-demo with its review build, ingmat3a), and
-on demand for any course, course ref and pair of refs.
+the package (the example site and every course of
+`integration/pyodide-parity/corpora.json` at its branch: ctm-demo with its
+review build, ingmat3a's `main` and its `linalg-branch`, which is skipped
+with a notice once it no longer exists), and on demand for any course,
+course ref and pair of refs.
 
 ### Releases
 
