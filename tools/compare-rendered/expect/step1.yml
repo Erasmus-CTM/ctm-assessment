@@ -1,0 +1,42 @@
+# Expected differences of consolidation step 1 (CTM Assessment 0.9.0, ctm-libs)
+# between a page built with the package before it and with 0.9.0: design
+# §13 A1 and §16.14. tools/compare-rendered.mjs classifies every difference
+# by the first category with a matching rule and fails on any other.
+#
+# A rule names the area of a difference (file, inline, config, dom) and
+# regular expressions for its fields (what, object, path, tag, attribute,
+# before, after, line, change, effective); `where` tests fields of the
+# configuration object (an activity's data, a py-exercise, a Pyodide cell) or
+# of the element (its attributes) the difference belongs to.
+categories:
+  - id: D1
+    title: Scripts and styles as cacheable files; the components' inline bundles become HTML dependencies
+    match:
+      - {area: file, change: added, what: '^(script|css) (ai-feedback|ctm-runtime|ctm-locale|ctm-locale-math-exercise|ctm-locale-py-exercise|math-exercise|py-exercise|py-exercise-feedback)/[\w.-]+$'}
+      - {area: inline, change: removed, what: '^(math-exercise|py-exercise|runtime) bundle$'}
+
+  - id: A5
+    title: Explicit context also sends the exercise's own section prose, without the listed blocks
+    match:
+      - {area: config, object: '^ai-feedback-data', path: '^/\d+/context$', where: {contextMode: '^explicit$'}}
+      - {area: config, object: '^qpyodideCellDetails$', path: '^/\d+/options/feedbackContext/text$', where: {options.feedbackContext.mode: '^explicit$'}}
+      - {area: config, object: '^__pyExercises$', path: '^/\d+/feedbackContext/text$', where: {feedbackContext.mode: '^explicit$'}}
+      - {area: dom, tag: '^div$', attribute: '^data-context$', where: {data-context-mode: '^explicit$'}}
+
+  - id: D4
+    title: Pyodide 0.28.3 (0.27.2 before) for the page's Python runtime
+    match:
+      - {area: config, before: 'pyodide/v0\.27\.2/', after: 'pyodide/v0\.28\.3/'}
+      - {area: dom, before: 'pyodide/v0\.27\.2/', after: 'pyodide/v0\.28\.3/'}
+
+  - id: py-nb
+    title: py-exercise speaks Norwegian Bokmål on pages in Norwegian (it had no nb texts), and asks for feedback in the page's language
+    match:
+      - {area: config, object: '^__pyExerciseConfig$', path: '^/0/lang$', before: '^en$', after: '^nb$'}
+      - {area: config, object: '^__pyExercises$', path: '^/\d+/feedbackLanguage$', before: '^en$', after: '^nb$'}
+      - {area: dom, change: 'text changed', before: '^Please enable JavaScript to load the interactive exercise\.$', after: '^Slå på JavaScript for å laste inn den interaktive oppgaven\.$'}
+
+  - id: policy-json
+    title: The policy configuration's JSON changed shape; every selection on the page has the same effective policy
+    match:
+      - {area: config, object: '^__aiFeedbackPolicies$', effective: '^equal$'}

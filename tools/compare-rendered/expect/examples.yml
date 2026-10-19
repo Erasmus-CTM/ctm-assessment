@@ -1,0 +1,9 @@
+# The umbrella example site only: its policies moved to the new keys
+# (policy-files, policy; design §10.6), so the policy YAML shown in the source
+# panels changed. The effective policies are equal (policy-json in step1.yml,
+# and integration/feedback/example-policies.test.cjs).
+categories:
+  - id: example-policy-keys
+    title: Example source panels show feedback/page.yml with practice-feedback extending course-feedback
+    match:
+      - {area: dom, change: 'text changed', before: '^ai-feedback: policies: practice-feedback: max-words: 160 ', after: '^ai-feedback: policies: practice-feedback: extends: course-feedback max-words: 160 '}
