@@ -1,0 +1,27 @@
+{
+  "comment": "The parity harness's corpora: where each comes from, its licence, and whether its captured golden rows may go to ctm-checkers (step-2 design §13 item 7: only math-exercise's own examples; course-derived rows and the umbrella's example site stay in the umbrella). Courses are built at the pinned commit in CI (pyodide-parity.yml); math-exercise's example site at the component's pin in integration/feedback/repos.json.",
+  "corpora": {
+    "umbrella": {
+      "repository": "Erasmus-CTM/ctm-assessment",
+      "licence": "AGPL-3.0-or-later",
+      "export": false
+    },
+    "math-exercise": {
+      "repository": "Erasmus-CTM/math-exercise",
+      "licence": "AGPL-3.0-or-later",
+      "export": true
+    },
+    "ctm-demo": {
+      "repository": "aacchhee/ctm-demo",
+      "commit": "7f9cbec8510fc71aa3a94d585b5f8401da0e7367",
+      "licence": "course repository (no licence file); rows stay in the umbrella",
+      "export": false
+    },
+    "ingmat3a": {
+      "repository": "aacchhee/ingmat3a_ntnu",
+      "commit": "d7ddfc623aac9d8fcf0994b7993f9f05fdfa9c9b",
+      "licence": "CC-BY-SA-4.0 course repository; rows stay in the umbrella",
+      "export": false
+    }
+  }
+}
