@@ -49,7 +49,15 @@ commits recorded in `_extensions/ctm-assessment/resolved-repos.json`.
   hides the test hints; it was ignored before.
 - **Explicit context also sends the section's prose** (A5): with
   `context: <block ids>`, feedback requests hold the listed blocks and then
-  the prose of the exercise's own section, without those blocks.
+  the prose of the exercise's own section, without context blocks (the
+  listed ones come first, the others belong to other exercises).
+- **The AI context stays in the exercise's tab and leaves out `<details>`**,
+  for automatic and explicit context alike: a tab of a tabset starts a section
+  as a heading does (nested tabsets too), and after a tabset its section goes
+  on without the tabs' prose; the content of `<details>` blocks (solutions,
+  reading steps, hints) is never sent. Before, automatic context could carry
+  other tabs' prose and closed solutions. This changes what a feedback request
+  contains, not grading.
 - **Scripts are cacheable files** (D1): the runtime, the message catalogues,
   AI feedback and the components' scripts are HTML dependencies, loaded once
   per page, instead of about 190 KB inlined per page.

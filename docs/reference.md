@@ -74,10 +74,10 @@ summary when a provider cannot accept the optional graph image.
 
 | Setting | Meaning |
 |---|---|
-| Omitted or `context: auto` | Preceding prose since the latest heading, including that heading |
+| Omitted or `context: auto` | Preceding prose since the latest heading or tab, including that heading or tab label |
 | `context: none` | No surrounding learning context |
-| `context: notes` | The tagged block `notes`, anywhere on the page, then the prose of the exercise's own section without it |
-| `context: notes,formula` | Those tagged blocks in the specified order, then the section's prose without them |
+| `context: notes` | The tagged block `notes`, anywhere on the page, then the prose of the exercise's own section without context blocks |
+| `context: notes,formula` | Those tagged blocks in the specified order, then the section's prose without context blocks |
 
 Text activities use attributes such as `context="notes"`; code cells use
 `#| context: notes`. Code integrations also accept `feedback-context` as an
@@ -95,14 +95,19 @@ feedback criteria/starters, `.example-author-notes`, `.ai-feedback-ignore`,
 hidden content and generated cell output are excluded. Author callouts remain
 visible but are excluded from context. Heading boundaries apply inside nested
 containers too; a single oversized latest block is omitted rather than sliced.
+Since CTM Assessment 0.9 a tab of a tabset starts a section as a heading does
+(nested tabsets too), after a tabset its section goes on without the tabs'
+prose, and the content of `<details>` blocks (solutions, reading steps,
+hints) is never context.
 
 Explicit context uses a combined 6,000-character budget for the listed blocks
 and preserves math through MathJax or KaTeX rendering. Missing, duplicate,
 untagged, empty or over-budget references are skipped with a browser-console
 warning. Since CTM Assessment 0.9 the listed blocks are followed by the prose
-of the exercise's own section (the automatic context without the listed
-blocks, up to 1,500 characters), so the request knows where the exercise
-stands; before, explicit selection replaced that prose.
+of the exercise's own section (the automatic context without context blocks:
+the listed ones come first, the others belong to other exercises; up to
+1,500 characters), so the request knows where the exercise stands; before,
+explicit selection replaced that prose.
 
 ### Reuse one block across different integrations
 
