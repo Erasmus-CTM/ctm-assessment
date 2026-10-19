@@ -100,6 +100,17 @@ board.create('circle', [[0,0],1]);
     once(html, SCRIPTS)
     assert 'var ME_CFG =' not in html, 'math-exercise must not inline its bundle'
     assert 'ai-feedback-' + libs_version + '/' in html
+    # The pre-ast filter that keeps tab-heading ids is installed with the
+    # package, at the path a course's _quarto.yml names (step 4).
+    config = (course / '_quarto.yml').read_text()
+    (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [tabs.qmd]\nfilters:\n'
+                                        '  - path: _extensions/ctm-assessment/tab-ids.lua\n    at: pre-ast\n  - ctm-assessment\n')
+    (course / 'tabs.qmd').write_text('---\nformat: html\n---\n\n::: {.panel-tabset}\n\n## One\n\nFirst.\n\n'
+                                     '## 3.5 Polynomer {#uke3-del5}\n\nSecond.\n\n:::\n')
+    render(course)
+    tabs = (course / 'tabs.html').read_text()
+    assert '<div id="uke3-del5" class="ctm-tab-target">' in tabs and 'ctm-nav.js' in tabs, 'tab-ids.lua: the tab-heading id is not kept'
+    (course / '_quarto.yml').write_text(config)
     # A course may also hold separately added copies (`quarto add Erasmus-CTM/...`
     # installs under an owner folder). The package keeps using its own set.
     for name in ['ctm-libs', 'ai-feedback', 'math-exercise', 'py-exercise']:
@@ -164,4 +175,5 @@ assert answer() == 2
     assert render(course, expect_ok=False).returncode != 0, 'the package must not render without ctm-libs'
 print('Installable archive passed: all five components render from a fresh course with one copy of each script, also next to '
       'standalone copies (an old ai-feedback 0.8.1, a newer ctm-libs); an old ai-feedback listed with the package stops; '
-      'without ctm-libs a component stops with the install command; JSXGraph release line and licence notices.')
+      'without ctm-libs a component stops with the install command; JSXGraph release line and licence notices; '
+      'tab-ids.lua keeps tab-heading ids at pre-ast.')
