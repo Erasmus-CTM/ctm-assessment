@@ -116,7 +116,8 @@ function extract(file) {
   }
   for (const exercise of configs.__pyExercises || []) if (exercise && exercise.policySelection) selections.push(['py-exercise', exercise.policySelection]);
   for (const cell of configs.qpyodideCellDetails || []) if (cell?.options?.policySelection) selections.push(['pyodide-interaktiv', cell.options.policySelection]);
-  return {doc, files, inline, configs, sources, selections, dom: canonical(doc.body)};
+  const domNodes = [];
+  return {doc, files, inline, configs, sources, selections, dom: canonical(doc.body, domNodes), domNodes};
 }
 
 // Feedback context: the prose an exercise sends is that of its own section,
@@ -145,6 +146,35 @@ function textOf(root, skip = node => node.matches(NOT_TEXT)) {
   })(root);
   return parts.join(' ');
 }
+// The exercise's own section inside its scope (innermost tab or <section>):
+// from the nearest heading before the exercise (headings that Quarto did not
+// wrap in a <section>, as inside tabs, start a section too; none: the start of
+// the scope, with the tab's label) to the next heading. Returns its text and
+// the blocks before the exercise (for the completeness check).
+const HEADING = {heading: true};
+const BLOCKS = 'p, h1, h2, h3, h4, h5, h6, li, dt, dd, table, figcaption, blockquote';
+function ownSection(doc, scope, element, skip) {
+  const parts = [], blocks = [];
+  let at = -1;
+  (function visit(node) {
+    if (node.nodeType === 3) { parts.push(node.textContent); return; }
+    if (node.nodeType !== 1) return;
+    if (node !== scope && (node === element || (skip(node) && node.contains(element)))) { at = parts.length; parts.push(''); return; }
+    if (node !== scope && skip(node)) return;
+    if (/^H[1-6]$/.test(node.tagName)) parts.push(HEADING);
+    if (node.matches(BLOCKS)) blocks.push({index: parts.length, node});
+    for (const child of node.childNodes) visit(child);
+  })(scope);
+  if (at < 0) at = parts.length;
+  const start = parts.lastIndexOf(HEADING, at);
+  let end = parts.indexOf(HEADING, at);
+  if (end < 0) end = parts.length;
+  const label = start < 0 && scope.matches('.tab-pane') && doc.getElementById(scope.getAttribute('aria-labelledby') || '');
+  const text = (label ? label.textContent + ' ' : '') + parts.slice(start + 1, end).filter(part => part !== HEADING).join(' ');
+  const before = blocks.filter(block => block.index > start && block.index < at).map(block => squash(textOf(block.node, skip)));
+  if (label) before.push(squash(label.textContent));
+  return {text: squash(text), before: new Set(before)};
+}
 function contextVerdict(doc, element, after, before, refs, explicit) {
   if (!element) return 'no exercise element';
   const scope = element.parentElement?.closest('.tab-pane, section') || doc.body;
@@ -152,17 +182,16 @@ function contextVerdict(doc, element, after, before, refs, explicit) {
     .filter(id => id && id !== 'auto' && id !== 'none' && !id.startsWith('jsxgraph:')).map(id => doc.getElementById(id)).filter(Boolean);
   const skip = node => node.matches(NOT_PROSE) || node.matches(EXERCISES) || node.matches('.tab-pane, section, .nav') || listed.includes(node)
     || (explicit && node.matches(CONTEXT_BLOCKS));
-  const label = scope.matches('.tab-pane') && doc.getElementById(scope.getAttribute('aria-labelledby') || '');
-  const own = squash((label ? label.textContent + ' ' : '') + textOf(scope, skip));
+  const own = ownSection(doc, scope, element, skip);
   for (const piece of pieces(after)) {
-    if (own.includes(piece.key)) continue;
+    if (own.text.includes(piece.key)) continue;
     return `not prose of the own section (${origin(doc, element, scope, listed, piece)}): ${piece.text.slice(0, 100)}`;
   }
-  // Everything of the section's prose that the before page sent is still sent
-  // (unless the 1500-character bound of the context leaves it out).
+  // Every block of the section's prose before the exercise that the before
+  // page sent is still sent (unless the 1500-character bound leaves it out).
   const sent = squash(after);
   for (const piece of pieces(before)) {
-    if (!own.includes(piece.key) || sent.includes(piece.key)) continue;
+    if (!own.before.has(piece.key) || sent.includes(piece.key)) continue;
     if (String(after ?? '').length + piece.text.length > 1400) continue;
     return `lost prose of the own section: ${piece.text.slice(0, 100)}`;
   }
@@ -202,10 +231,15 @@ function contextItems(items, B) {
     } else if (item.area === 'config' && item.object === '__pyExercises' && (m = /^\/(\d+)\/feedbackContext\/text$/.exec(item.path))) {
       const exercise = B.configs.__pyExercises?.[m[1]];
       element = exercise && B.doc.getElementById('py-exercise-' + exercise.id); refs = exercise?.feedbackContext?.refs; mode = exercise?.feedbackContext?.mode;
-    } else if (item.area === 'dom' && item.attribute === 'data-context' && item.attrs?.id) {
-      element = B.doc.getElementById(item.attrs.id); refs = item.attrs['data-context-refs']; mode = item.attrs['data-context-mode'];
+    } else if (item.area === 'dom' && item.attribute === 'data-context' && (item.node || item.attrs?.id)) {
+      element = item.node || B.doc.getElementById(item.attrs.id); refs = item.attrs['data-context-refs']; mode = item.attrs['data-context-mode'];
+    } else if (item.area === 'dom' && item.attribute === 'data-ai-feedback-context' && item.node) {
+      // ctm-libs writes the context on every code block; a plain one keeps it in the page.
+      element = item.node; refs = ''; mode = 'auto';
     } else continue;
-    item.context = contextVerdict(B.doc, element, json(item.after), json(item.before), refs, mode === 'explicit');
+    // DOM attributes from the elements themselves: the lines have their whitespace collapsed.
+    const value = (node, line) => item.area === 'dom' ? node?.getAttribute?.(item.attribute) ?? line : line;
+    item.context = contextVerdict(B.doc, element, json(value(item.node, item.after)), json(value(item.beforeNode, item.before)), refs, mode === 'explicit');
   }
   return items;
 }
@@ -230,15 +264,24 @@ function samePolicies(coreFile, before, after, selections) {
   return 'equal';
 }
 
-function canonical(node) {
-  if (node.nodeType === 3) { const t = node.textContent.replace(/\s+/g, ' ').trim(); return t ? ['text: ' + t] : []; }
+// The body as lines; `nodes` gets the element of each line (start tags and
+// text: their element; end tags: null), so a difference can find its element.
+function canonical(node, nodes = []) {
+  if (node.nodeType === 3) {
+    const t = node.textContent.replace(/\s+/g, ' ').trim();
+    if (!t) return [];
+    nodes.push(node.parentElement);
+    return ['text: ' + t];
+  }
   if (node.nodeType !== 1) return [];
   const tag = node.tagName.toLowerCase();
   if (tag === 'script' || tag === 'style' || (tag === 'link' && node.getAttribute('rel') === 'stylesheet')) return [];
   const attrs = [...node.attributes].map(a => [a.name, noiseFree(a.name, a.value).replace(/\s+/g, ' ')]).sort((a, b) => a[0] < b[0] ? -1 : 1);
   const lines = ['<' + tag + attrs.map(([n, v]) => ` ${n}=${JSON.stringify(v)}`).join('') + '>'];
-  for (const child of node.childNodes) lines.push(...canonical(child));
+  nodes.push(node);
+  for (const child of node.childNodes) lines.push(...canonical(child, nodes));
   lines.push('</' + tag + '>');
+  nodes.push(null);
   return lines;
 }
 
@@ -250,7 +293,7 @@ function diffLines(a, b) {
   let endA = a.length, endB = b.length;
   while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
   const x = a.slice(start, endA), y = b.slice(start, endB), n = x.length, m = y.length;
-  if (n * m > 6e7) return [{removed: x, added: y, at: start}];
+  if (n * m > 6e7) return [{removed: x, added: y, at: start, addedAt: y.map((_, k) => start + k)}];
   const dp = Array.from({length: n + 1}, () => new Uint32Array(m + 1));
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = x[i] === y[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
   const hunks = [];
@@ -258,8 +301,8 @@ function diffLines(a, b) {
   const flush = () => { if (hunk) { hunks.push(hunk); hunk = null; } };
   while (i < n || j < m) {
     if (i < n && j < m && x[i] === y[j]) { flush(); i++; j++; }
-    else if (j >= m || (i < n && dp[i + 1][j] >= dp[i][j + 1])) { (hunk ||= {removed: [], added: [], at: start + i}).removed.push(x[i++]); }
-    else { (hunk ||= {removed: [], added: [], at: start + i}).added.push(y[j++]); }
+    else if (j >= m || (i < n && dp[i + 1][j] >= dp[i][j + 1])) { (hunk ||= {removed: [], added: [], addedAt: [], at: start + i}).removed.push(x[i++]); }
+    else { (hunk ||= {removed: [], added: [], addedAt: [], at: start + i}).added.push(y[j]); hunk.addedAt.push(start + j++); }
   }
   flush();
   return hunks;
@@ -274,8 +317,10 @@ function parseTag(line) {
 }
 // DOM hunks -> items: element lines paired by tag and identity give attribute
 // changes; text lines paired in order give text changes; the rest is added or removed.
-function domItems(page, hunk) {
-  const items = [], removed = hunk.removed.map(line => ({line, tag: parseTag(line)})), added = hunk.added.map(line => ({line, tag: parseTag(line)}));
+function domItems(page, hunk, nodesBefore = [], nodesAfter = []) {
+  // A hunk's removed lines are consecutive from `at`; `addedAt` indexes the after lines.
+  const items = [], removed = hunk.removed.map((line, k) => ({line, tag: parseTag(line), node: nodesBefore[hunk.at + k]}));
+  const added = hunk.added.map((line, k) => ({line, tag: parseTag(line), node: nodesAfter[hunk.addedAt?.[k]]}));
   const identity = t => t.tag + '|' + (t.attrs.id ?? t.attrs['data-label'] ?? t.attrs['data-id'] ?? '');
   for (const r of removed) {
     if (!r.tag) continue;
@@ -285,7 +330,7 @@ function domItems(page, hunk) {
     for (const name of new Set([...Object.keys(r.tag.attrs), ...Object.keys(a.tag.attrs)]))
       if (r.tag.attrs[name] !== a.tag.attrs[name])
         items.push({page, area: 'dom', change: r.tag.attrs[name] === undefined ? 'attribute added' : a.tag.attrs[name] === undefined ? 'attribute removed' : 'attribute changed',
-          tag: r.tag.tag, element: identity(r.tag), attribute: name, before: r.tag.attrs[name] ?? null, after: a.tag.attrs[name] ?? null, attrs: a.tag.attrs});
+          tag: r.tag.tag, element: identity(r.tag), attribute: name, before: r.tag.attrs[name] ?? null, after: a.tag.attrs[name] ?? null, attrs: a.tag.attrs, node: a.node, beforeNode: r.node});
   }
   const texts = side => side.filter(x => !x.used && x.line.startsWith('text: '));
   const [rt, at] = [texts(removed), texts(added)];
@@ -336,7 +381,7 @@ function comparePage(page, before, after) {
       ? samePolicies(Object.entries(B.sources).find(([url]) => url.endsWith('/feedback-core.js'))?.[1], a[0], b[0], B.selections) : undefined;
     for (const d of differences) items.push({page, area: 'config', change: 'changed', object, ...d, effective, item: (b[d.path.split('/')[1]] ?? a[d.path.split('/')[1]])});
   }
-  for (const hunk of diffLines(A.dom, B.dom)) items.push(...domItems(page, hunk));
+  for (const hunk of diffLines(A.dom, B.dom)) items.push(...domItems(page, hunk, A.domNodes, B.domNodes));
   return contextItems(items, B);
 }
 
@@ -400,9 +445,9 @@ function main() {
   for (const [id, v] of Object.entries(summary.categories)) md.push(`- **${id}** ${v.title}: ${v.differences} in ${v.pages} pages`);
   if (unexpected.length) {
     md.push('', '**Unexplained differences:**');
-    for (const item of unexpected.slice(0, 80)) md.push('- `' + item.page + '` ' + JSON.stringify({...item, page: undefined, item: undefined, attrs: undefined}).slice(0, 700));
+    for (const item of unexpected.slice(0, 80)) md.push('- `' + item.page + '` ' + JSON.stringify({...item, page: undefined, item: undefined, attrs: undefined, node: undefined, beforeNode: undefined}).slice(0, 700));
   }
-  const report = {summary, items: items.map(item => ({...item, item: undefined, attrs: undefined}))};
+  const report = {summary, items: items.map(item => ({...item, item: undefined, attrs: undefined, node: undefined, beforeNode: undefined}))};
   if (o.report) fs.writeFileSync(o.report, JSON.stringify(report, null, 1));
   if (o.summary) fs.writeFileSync(o.summary, md.join('\n') + '\n');
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join('\n') + '\n');

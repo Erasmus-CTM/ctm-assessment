@@ -39,6 +39,8 @@ categories:
       - {area: config, object: '^qpyodideCellDetails$', path: '^/\d+/options/feedbackContext/text$', where: {options.feedbackContext.mode: '^(?!explicit$)'}, context: '^own-section$'}
       - {area: config, object: '^__pyExercises$', path: '^/\d+/feedbackContext/text$', where: {feedbackContext.mode: '^(?!explicit$)'}, context: '^own-section$'}
       - {area: dom, tag: '^div$', attribute: '^data-context$', where: {data-context-mode: '^(?!explicit$)'}, context: '^own-section$'}
+      # ctm-libs writes the context on every code block; plain code blocks keep it in the page.
+      - {area: dom, attribute: '^data-ai-feedback-context$', context: '^own-section$'}
 
   - id: D4
     title: Pyodide 0.28.3 (0.27.2 before) for the page's Python runtime
