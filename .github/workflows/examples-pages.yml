@@ -52,6 +52,9 @@ jobs:
         if: failure()
         run: |
           printf '::error title=Last build output::%s\n' "$(grep -v '^\s*$' "$RUNNER_TEMP/build.log" | tail -40 | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+          if grep -q 'not ok' "$RUNNER_TEMP/build.log"; then
+            printf '::error title=Failing tests::%s\n' "$(grep -B2 -A22 'not ok' "$RUNNER_TEMP/build.log" | grep -v 'duration_ms\|^\s*$' | head -c 6000 | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -411,10 +411,20 @@ def main():
             run(['python', sources['ctm-libs'] / 'scripts/check-locales.py'], env=env)
             run(['npm', 'test'], cwd=ROOT, env=env)
             env['JSXGRAPH_EXTENSION'] = str(site / '_extensions' / 'jsxgraph')
-            for consumer in ('ctm-libs', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'):
-                run(['npm', 'ci', '--ignore-scripts'], cwd=sources[consumer])
-                run(['npm', 'test'], cwd=sources[consumer], env=env)
-            run(['python', '-m', 'unittest', 'discover', '-s', 'tests'], cwd=sources['py-exercise'], env=env)
+            # The components' tests render single files in temporary folders, and
+            # a single file finds CTM Assessment in the _extensions of any folder
+            # above it. Inside this checkout (the default workspace) that is the
+            # umbrella's own _extensions/ctm-assessment, so tests of "no package
+            # installed" would see one: they get a temporary folder outside.
+            component_tmp = Path(tempfile.mkdtemp(prefix='ctm-component-tests-'))
+            component_env = dict(env, TMPDIR=str(component_tmp))
+            try:
+                for consumer in ('ctm-libs', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'):
+                    run(['npm', 'ci', '--ignore-scripts'], cwd=sources[consumer])
+                    run(['npm', 'test'], cwd=sources[consumer], env=component_env)
+                run(['python', '-m', 'unittest', 'discover', '-s', 'tests'], cwd=sources['py-exercise'], env=component_env)
+            finally:
+                shutil.rmtree(component_tmp, ignore_errors=True)
             run(['npm', 'run', 'test:integration'], cwd=ROOT, env=env)
         if args.browser:
             run(['npm', 'run', 'test:browser'], cwd=ROOT, env=env)
