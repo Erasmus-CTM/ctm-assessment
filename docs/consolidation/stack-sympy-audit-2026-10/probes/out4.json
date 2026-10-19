@@ -1,0 +1,420 @@
+[
+ {
+  "test": "AlgEquiv",
+  "student": "2^3^2",
+  "teacher": "512",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.004
+  },
+  "native": {
+   "case_id": "2966f283e1e5700595a2f0e20947817e6f5fed041c3d7379273366d660bed5b9-1",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "-2^2",
+  "teacher": "-4",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "832de59187f015659b22c1c8f6eb27f2a096852d12d40047508464ab7b9dc378-2",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "a/b*c",
+  "teacher": "a*c/b",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.001
+  },
+  "native": {
+   "case_id": "058e42344b7a57c491a356593b80456d14c39d619e4be81db7f2e916b9add2ff-3",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "x^-1",
+  "teacher": "1/x",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "6cddc4c7d8438036267ccb61531d159b22864e24b311d311365741280cfbc0a6-4",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "2^-1",
+  "teacher": "1/2",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "ea31ddacac53ec0d703b3555e2a9eb94bd4754725ce74d6360fc0971feb10231-5",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "-x^-2",
+  "teacher": "-1/x^2",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.001
+  },
+  "native": {
+   "case_id": "902c741075558e739e4408a454710b43ba997b775898809c6d9eb25222f9d613-6",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "a-b-c",
+  "teacher": "a-(b+c)",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.069
+  },
+  "native": {
+   "case_id": "0cb809d2bd53bb246011226be10d426daf903dd1b5e956bd9e8d6ae711e3d993-7",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "a/b/c",
+  "teacher": "a/(b*c)",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.001
+  },
+  "native": {
+   "case_id": "797a53423f1f84674c6c87c534a7909d3a7d1e9c6d44bd800ed5525963897061-8",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "x**2",
+  "teacher": "x^2",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "a444cdb48c9500d2531688d0dcbb8c5dd0f16b92705964d4ab1d77ec7464237a-9",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "%e^(%i*%pi)",
+  "teacher": "-1",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.002
+  },
+  "native": {
+   "case_id": "ba4986a5d8ebb2695800cd413f46c3302e8a73730d86c02f040216caf0aac096-10",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "mod(7,3)",
+  "teacher": "1",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.001
+  },
+  "native": {
+   "case_id": "44aa569380e87dcab261a28b778dd4eddc31cc57f5408cfea91ebd859063832b-11",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "mod(-7,3)",
+  "teacher": "2",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "eaeec0eb42d5c44b0b1756b13657a029d8d878ed6d94a15ee88580e55bc7cf08-12",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "gcd(2*x+2,4*x+4)",
+  "teacher": "2*x+2",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.005
+  },
+  "native": {
+   "case_id": "27d217b0efb47c1cc6fd4712db5d7d65d7a714efb20dfe447c77d49a51c68184-13",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "num(6/4)",
+  "teacher": "3",
+  "options": "",
+  "port": {
+   "valid": false,
+   "correct": false,
+   "note": "invalid",
+   "feedback": "Function num is not allowed in student input",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "fdf07e5996b96818ed2e7fe1ca9a861bbcc2292374bc4a410b82cccb5de7ae94-14",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "denom(x/(2*y))",
+  "teacher": "2*y",
+  "options": "",
+  "port": {
+   "valid": false,
+   "correct": false,
+   "note": "invalid",
+   "feedback": "Function denom is not allowed in student input",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "b6a7ebe2ac3f8375cf27d13f7a3956987842a7ebbc43f7f740125ac290f04f01-15",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "cosec(x)",
+  "teacher": "1/sin(x)",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.029
+  },
+  "native": {
+   "case_id": "336df977f81926a65c6c0e242796c2bb2d4a2d2b151764479bf70ae07395bb56-16",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "sech(x)",
+  "teacher": "1/cosh(x)",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.023
+  },
+  "native": {
+   "case_id": "d3557ec65e71dbbd728d0487a40affd1bfc06b9124e097c60fefe522d76b5ce1-17",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "abs(x)",
+  "teacher": "abs(-x)",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.001
+  },
+  "native": {
+   "case_id": "c97b7be6140204a11ea2cba287d15da6b2cfcbd7400505c9d3591a1bce125d6a-18",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "AlgEquiv",
+  "student": "exp(1)",
+  "teacher": "e",
+  "options": "",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "f1d2783403ce97d5c261874ca505cc0f919b495808aa726946889ae7838c7dc7-19",
+   "test": "AlgEquiv",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "",
+   "controlled_error": false
+  }
+ }
+]

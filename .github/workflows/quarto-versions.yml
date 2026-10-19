@@ -28,12 +28,12 @@ jobs:
       matrix:
         quarto: ['1.8.27', 'release']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       # Native checks use the SymPy that the browser's Pyodide (0.28.3) ships.

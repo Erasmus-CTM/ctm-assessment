@@ -9,6 +9,10 @@ ai-feedback:
   mode: copy
   policy-files: policies.yml
   policy: course
+  # Without AI feedback, the activities only AI feedback can assess stay as
+  # text (ctm-libs: otherwise such a build stops; before that rule, an unknown
+  # option that only warns).
+  without-ai: text
 py-exercise:
   feedback: true
 pyodide:

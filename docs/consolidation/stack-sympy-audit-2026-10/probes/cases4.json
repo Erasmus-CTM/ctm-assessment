@@ -1,0 +1,21 @@
+[
+ ["AlgEquiv", "2^3^2", "512", ""],
+ ["AlgEquiv", "-2^2", "-4", ""],
+ ["AlgEquiv", "a/b*c", "a*c/b", ""],
+ ["AlgEquiv", "x^-1", "1/x", ""],
+ ["AlgEquiv", "2^-1", "1/2", ""],
+ ["AlgEquiv", "-x^-2", "-1/x^2", ""],
+ ["AlgEquiv", "a-b-c", "a-(b+c)", ""],
+ ["AlgEquiv", "a/b/c", "a/(b*c)", ""],
+ ["AlgEquiv", "x**2", "x^2", ""],
+ ["AlgEquiv", "%e^(%i*%pi)", "-1", ""],
+ ["AlgEquiv", "mod(7,3)", "1", ""],
+ ["AlgEquiv", "mod(-7,3)", "2", ""],
+ ["AlgEquiv", "gcd(2*x+2,4*x+4)", "2*x+2", ""],
+ ["AlgEquiv", "num(6/4)", "3", ""],
+ ["AlgEquiv", "denom(x/(2*y))", "2*y", ""],
+ ["AlgEquiv", "cosec(x)", "1/sin(x)", ""],
+ ["AlgEquiv", "sech(x)", "1/cosh(x)", ""],
+ ["AlgEquiv", "abs(x)", "abs(-x)", ""],
+ ["AlgEquiv", "exp(1)", "e", ""]
+]

@@ -1,0 +1,178 @@
+[
+ {
+  "test": "NumDecPlaces",
+  "student": "1.02",
+  "teacher": "1.015",
+  "options": "2",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.002
+  },
+  "native": {
+   "case_id": "7dbed6f9d1e5ea4eefd49b19e9c6f8fcea16322fe01cd1bd9d487d7b561303b3-1",
+   "test": "NumDecPlaces",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": false,
+   "answer_note": "ATNumDecPlaces_Correct. ATNumDecPlaces_Not_equiv. ",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "NumDecPlaces",
+  "student": "1.01",
+  "teacher": "1.015",
+  "options": "2",
+  "port": {
+   "valid": true,
+   "correct": false,
+   "note": "wrong_value",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "ffbe0a1e997e617e76d33da1495860a8ead83ffe5dee5868d1e2e4ad351c95cd-2",
+   "test": "NumDecPlaces",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "ATNumDecPlaces_Correct. ATNumDecPlaces_Equiv. ",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "NumDecPlaces",
+  "student": "1.04",
+  "teacher": "1.035",
+  "options": "2",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "569629718f8e866d53fb188cf84470879728006c8935ec05342ee5cdb8c34b85-3",
+   "test": "NumDecPlaces",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": false,
+   "answer_note": "ATNumDecPlaces_Correct. ATNumDecPlaces_Not_equiv. ",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "NumDecPlaces",
+  "student": "1.03",
+  "teacher": "1.035",
+  "options": "2",
+  "port": {
+   "valid": true,
+   "correct": false,
+   "note": "wrong_value",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "72d974f2db42e7a54ff84e42f279cb1a05b83e2415f74e7d5ce18ae99c335f5b-4",
+   "test": "NumDecPlaces",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "ATNumDecPlaces_Correct. ATNumDecPlaces_Equiv. ",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "NumDecPlaces",
+  "student": "1.22",
+  "teacher": "1.225",
+  "options": "2",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "d6ca1307db7a04e46928ccae8e27b2155e3bd6b042ed144e490ab1427061cd6d-5",
+   "test": "NumDecPlaces",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": false,
+   "answer_note": "ATNumDecPlaces_Correct. ATNumDecPlaces_Not_equiv. ",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "NumDecPlaces",
+  "student": "1.23",
+  "teacher": "1.225",
+  "options": "2",
+  "port": {
+   "valid": true,
+   "correct": false,
+   "note": "wrong_value",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "20ee96f77b3d82c24c5370e9fac4c4ef101790d93af0be9ba198d55edee31701-6",
+   "test": "NumDecPlaces",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "ATNumDecPlaces_Correct. ATNumDecPlaces_Equiv. ",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "NumDecPlaces",
+  "student": "1.24",
+  "teacher": "1.245",
+  "options": "2",
+  "port": {
+   "valid": true,
+   "correct": true,
+   "note": "",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "b46169b31690e82d77c003a70e7355838a53c5033b26502add05bc3dc2955051-7",
+   "test": "NumDecPlaces",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": false,
+   "answer_note": "ATNumDecPlaces_Correct. ATNumDecPlaces_Not_equiv. ",
+   "controlled_error": false
+  }
+ },
+ {
+  "test": "NumDecPlaces",
+  "student": "1.25",
+  "teacher": "1.245",
+  "options": "2",
+  "port": {
+   "valid": true,
+   "correct": false,
+   "note": "wrong_value",
+   "feedback": "",
+   "seconds": 0.0
+  },
+  "native": {
+   "case_id": "b21faef1167c61f3291700b6cf8c1911c5320a1cfe8f2a26b93867327c4684e4-8",
+   "test": "NumDecPlaces",
+   "status": "ok",
+   "cas_valid": true,
+   "correct": true,
+   "answer_note": "ATNumDecPlaces_Correct. ATNumDecPlaces_Equiv. ",
+   "controlled_error": false
+  }
+ }
+]

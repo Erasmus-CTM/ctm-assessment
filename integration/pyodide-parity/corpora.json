@@ -1,0 +1,46 @@
+{
+  "comment": "The parity harness's corpora, and the one list of courses (entries with \"course\") for it and for the workflow \"Compare rendered courses\": where each comes from, its licence, and whether its captured golden rows may go to ctm-checkers (step-2 design §13 item 7: only math-exercise's own examples; course-derived rows and the umbrella's example site stay in the umbrella). A course names its repository, its branch (built and compared by the course comparison) and Quarto profiles rendered besides the default (graded as site <course>-<profile>). The parity harness builds a course at its pinned \"commit\" in its blocking jobs. A course without one follows its branch (active work): it is built at the tip (resolved once per job) and graded only in jobs of their own that report and never fail (the parity workflow's job \"following\", the course comparison's informational entries), with the teacher answers of \"answers\" (another corpus's answers.json entries) reported, not enforced; \"optional\" skips it with a notice when the branch no longer exists. math-exercise's example site is built at the component's pin in integration/feedback/repos.json. Pinned course commits are bumped by hand, in a pull request of their own that also updates answers.json (track-components does not touch them); a run on demand grades other course commits.",
+  "corpora": {
+    "umbrella": {
+      "repository": "Erasmus-CTM/ctm-assessment",
+      "licence": "AGPL-3.0-or-later",
+      "export": false
+    },
+    "math-exercise": {
+      "repository": "Erasmus-CTM/math-exercise",
+      "licence": "AGPL-3.0-or-later",
+      "export": true
+    },
+    "ctm-demo": {
+      "repository": "aacchhee/ctm-demo",
+      "course": {
+        "branch": "main",
+        "profiles": [
+          "review"
+        ]
+      },
+      "commit": "7f9cbec8510fc71aa3a94d585b5f8401da0e7367",
+      "licence": "course repository (no licence file); rows stay in the umbrella",
+      "export": false
+    },
+    "ingmat3a": {
+      "repository": "aacchhee/ingmat3a_ntnu",
+      "course": {
+        "branch": "main"
+      },
+      "commit": "d7ddfc623aac9d8fcf0994b7993f9f05fdfa9c9b",
+      "licence": "CC-BY-SA-4.0 course repository; rows stay in the umbrella",
+      "export": false
+    },
+    "ingmat3a-linalg": {
+      "repository": "aacchhee/ingmat3a_ntnu",
+      "course": {
+        "branch": "linalg-branch",
+        "optional": true
+      },
+      "answers": "ingmat3a",
+      "licence": "CC-BY-SA-4.0 course repository (its active linear-algebra branch); rows stay in the umbrella",
+      "export": false
+    }
+  }
+}
