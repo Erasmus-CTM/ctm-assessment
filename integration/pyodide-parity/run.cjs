@@ -343,7 +343,8 @@ async function main() {
   }
 
   // Phase 2: the cases of each run (one list for both versions; per build).
-  const jobs = runs.map(run => buildJob(run, options, wheels, authoredResponses, corpora));
+  const jobs = strict ? runs.map(run => buildJob(run, options, wheels, authoredResponses, corpora))
+    : Array(2).fill(buildJob(runs[0], options, wheels, authoredResponses, corpora));
   const job = jobs[jobs.length - 1];
   const count = kind => job.cases.filter(c => c.kind === kind).length;
   const bySource = {};

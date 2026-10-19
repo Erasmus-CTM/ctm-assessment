@@ -4,8 +4,9 @@
 // generated variant) and gets responses:
 // - cells with answer keys: the keys, perturbations of each key, the audit's
 //   challenge answers for its label, for numeric cells with decimal places,
-//   significant figures or a tolerance boundary probes (half-way values,
-//   answers at the tolerance; step-2 review S7), and the variants' fixtures;
+//   significant figures or a tolerance boundary probes in their first two
+//   variants (half-way values, answers at the tolerance; step-2 review S7),
+//   and the variants' fixtures;
 // - cells that decide without answer keys (custom checkers, dynamic matrices;
 //   step-2 review finding 1 and S1): the teacher answers of answers.json with
 //   the verdict each must get, the challenge answers, a fixed probe set in
@@ -26,6 +27,9 @@ const CHALLENGES = require('./challenges.json');
 const ANSWERS = require('./answers.json');   // by corpus
 // Keys perturbed per variant: the first fields of a cell (a matrix has many).
 const PERTURBED_FIELDS = 4;
+// Variants of a cell that get boundary probes: they share the cell's
+// comparison options, and a pool can have hundreds of variants.
+const BOUNDARY_VARIANTS = 2;
 // Probe answers for a field without an answer key: numbers, symbols,
 // expressions, collections, a matrix, invalid input and a dunder (refused).
 // A cell's keyless fields take them rotated, so each field gets every probe
@@ -248,7 +252,7 @@ function pageCases(file, relative, authored = {}, answers = {}) {
       const teacher = answers[label] || [];
       const info = {...base, mode, diagram: Boolean(diagram), keyless: false, variants: 0};
       cells.push(info);
-      let slot = original;
+      let slot = original, boundaryVariants = 0;
       for (const variant of variantsOf(original)) {
         const cell = prepare(w, api, slot, pristine, label, variant);
         slot = cell;
@@ -305,11 +309,13 @@ function pageCases(file, relative, authored = {}, answers = {}) {
           });
           for (const values of CHALLENGES[label] || [])
             if (values.length === keys.length) add('response', {values, source: 'challenge'});
-          if (mode === 'numeric') {
+          if (mode === 'numeric' && boundaryVariants < BOUNDARY_VARIANTS) {
             const options = {decplaces: cell.dataset.decplaces, sigfigs: cell.dataset.sigfigs, tolerance: cell.dataset.tolerance};
-            keys.forEach((answer, i) => {
-              for (const value of boundaryProbes(answer, options)) add('response', {values: keys.map((a, j) => j === i ? value : a), source: 'boundary'});
+            const probes = keys.map(answer => boundaryProbes(answer, options));
+            probes.forEach((values, i) => {
+              for (const value of values) add('response', {values: keys.map((a, j) => j === i ? value : a), source: 'boundary'});
             });
+            if (probes.some(values => values.length)) boundaryVariants++;
           }
         }
         (variant.tests || []).forEach((fixture, index) => add('fixture', {fixture: index, name: fixture.name || '',
