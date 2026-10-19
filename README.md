@@ -62,7 +62,9 @@ Developed by the **CTM team** for the Erasmus+ project
 
 Normal builds use the component commits pinned in
 `integration/feedback/repos.json`. A non-main review commit can declare exact dependency
-SHAs in a `CTM-Review-Refs: {"ai-feedback":"<40-character SHA>"}` commit trailer.
+SHAs in a `CTM-Review-Refs: {"ctm-libs":"<40-character SHA>"}` commit trailer
+(the name `ai-feedback` is read as ctm-libs in 0.9).
 The visibly named workflow step prints those refs; the umbrella records them in
 `resolved-repos.json`. Main ignores review trailers. Merge upstream changes
-first, then rerun consumers with default dependencies before merging them.
+first, with merge commits, then rerun consumers with default dependencies before
+merging them. Releases and their changes: [CHANGELOG](CHANGELOG.md).

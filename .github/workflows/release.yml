@@ -1,0 +1,70 @@
+name: Release
+
+# A release is a tag vMAJOR.MINOR.PATCH pushed by the owner. The tag must
+# name the package version (_extensions/ctm-assessment/_extension.yml) and
+# every component must be pinned by commit (scripts/release-check.py). The
+# package is built from those pins, tested like a pull request (including the
+# browser tests), and published as a GitHub release with the archive and its
+# record; the notes are the version's CHANGELOG.md section. A course pins
+# `ref: v0.9.0`, or installs the release archive:
+#   quarto add https://github.com/Erasmus-CTM/ctm-assessment/releases/download/v0.9.0/ctm-assessment.tar.gz
+# GitHub Pages keeps deploying from main (the site URL is the latest build).
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ctm-assessment-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: The tag names the package version; every component is pinned
+        run: python scripts/release-check.py --tag "$GITHUB_REF_NAME" --notes "$RUNNER_TEMP/notes.md"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'  # SymPy: the version Pyodide 0.28.3 ships
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - name: Build and test the release from its pins
+        run: |
+          set -o pipefail
+          python scripts/setup-feedback-integration.py --test 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        env:
+          CTM_INTEGRATION_SITE: ${{ github.workspace }}/.feedback-workspace/site/_site
+        run: |
+          set -o pipefail
+          npm run test:browser 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'EOF'
+          import json, os, sys
+          record = json.load(open('.feedback-workspace/resolved-repos.json'))
+          tag = os.environ['GITHUB_REF_NAME']
+          if record.get('version') != tag[1:] or any(not r['pinned'] for n, r in record['repositories'].items() if n != 'ctm-assessment'):
+              sys.exit(f'The build record does not match {tag}: version {record.get("version")}, every component pinned required')
+          EOF
+          gh release create "$GITHUB_REF_NAME" .feedback-workspace/ctm-assessment.tar.gz .feedback-workspace/resolved-repos.json \
+            --title "CTM Assessment ${GITHUB_REF_NAME#v}" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+      - name: Report failure details as an annotation
+        if: failure()
+        run: |
+          printf '::error title=Release build output::%s\n' "$(grep -v '^\s*$' "$RUNNER_TEMP/build.log" 2>/dev/null | tail -40 | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"

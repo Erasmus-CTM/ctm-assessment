@@ -2,6 +2,41 @@
 
 [Start here](../README.md) · [Authoring guide](authoring.md)
 
+## Settings for all components
+
+Every CTM section (`ctm-assessment`, `math-exercise`, `py-exercise`,
+`ai-feedback`) is read key by key across the levels Quarto knows, so a page
+that sets one key keeps the project's other keys of that section:
+
+1. the page's front matter;
+2. Quarto's merged metadata (`metadata-files`, `format: html:` settings,
+   notebooks, `-M`);
+3. the files, the later winning: `_quarto.yml`, the active profiles
+   (`_quarto-<profile>.yml`; with several profiles the first listed wins),
+   `_quarto.yml.local`, then the `_metadata.yml` files from the project root
+   to the page's folder;
+4. for the shared keys, the same levels for `ctm-assessment.<key>`;
+5. for languages, Quarto's `lang`; then the default.
+
+A component's own spelling of a shared key (`math-exercise: {stop-after: 30}`)
+wins over `ctm-assessment:` at any level.
+
+```yaml
+ctm-assessment:
+  stop-after: 30    # seconds before a long check offers Stop, all components (default 20)
+  lang: nb          # interface language of all components: en, de, nb (nn and no give nb)
+```
+
+`ai-feedback: enabled: false` at any level (or `CTM_FEEDBACK=off`) builds the
+site without AI feedback; no level can turn it back on
+([installation](installation.md#a-site-without-ai-feedback)).
+
+The render stops when a CTM section holds a key that looks like a credential
+(`api-key`, `token`, `secret`, `password`, …, at any level), without showing
+its value: learners enter their own key in the Feedback settings. Unknown
+`ai-feedback:` and `ctm-assessment:` options, and values that were accepted
+loosely before, give a warning that they become errors in 1.0.
+
 ## Author text, translation and image tasks
 
 ````markdown
@@ -39,10 +74,10 @@ summary when a provider cannot accept the optional graph image.
 
 | Setting | Meaning |
 |---|---|
-| Omitted or `context: auto` | Preceding prose since the latest heading, including that heading |
+| Omitted or `context: auto` | Preceding prose since the latest heading or tab, including that heading or tab label |
 | `context: none` | No surrounding learning context |
-| `context: notes` | Only the tagged block `notes`, anywhere on the page |
-| `context: notes,formula` | Those tagged blocks in the specified order |
+| `context: notes` | The tagged block `notes`, anywhere on the page, then the prose of the exercise's own section without context blocks |
+| `context: notes,formula` | Those tagged blocks in the specified order, then the section's prose without context blocks |
 
 Text activities use attributes such as `context="notes"`; code cells use
 `#| context: notes`. Code integrations also accept `feedback-context` as an
@@ -60,11 +95,20 @@ feedback criteria/starters, `.example-author-notes`, `.ai-feedback-ignore`,
 hidden content and generated cell output are excluded. Author callouts remain
 visible but are excluded from context. Heading boundaries apply inside nested
 containers too; a single oversized latest block is omitted rather than sliced.
+Since CTM Assessment 0.9 a tab of a tabset starts a section as a heading does
+(nested tabsets too), after a tabset its section goes on without the tabs'
+prose, and the content of `<details>` blocks and collapsed callouts
+(solutions, reading steps, hints) is context only for an exercise inside such
+a block (with the section's prose before it).
 
-Explicit context uses a combined 6,000-character budget and preserves math
-through MathJax or KaTeX rendering. Missing, duplicate, untagged, empty or
-over-budget references are skipped with a browser-console warning. Explicit
-selection replaces automatic prose; it does not append to it.
+Explicit context uses a combined 6,000-character budget for the listed blocks
+and preserves math through MathJax or KaTeX rendering. Missing, duplicate,
+untagged, empty or over-budget references are skipped with a browser-console
+warning. Since CTM Assessment 0.9 the listed blocks are followed by the prose
+of the exercise's own section (the automatic context without context blocks:
+the listed ones come first, the others belong to other exercises; up to
+1,500 characters), so the request knows where the exercise stands; before,
+explicit selection replaced that prose.
 
 ### Reuse one block across different integrations
 
@@ -106,9 +150,13 @@ in any integration, including across tabs on the same HTML page.
 
 ## Prompts, hints and local YAML
 
-Shipped defaults are always available. Loading `policy-files` or
-`page-policy-files` only registers named definitions; activate a baseline with
-`project-policy` or `page-policy`, or select `feedback-policy` on an exercise.
+Shipped defaults are always available. `policy-files` only registers named
+definitions; the files named in the project, profiles, `_metadata.yml` and the
+page add up. `policy` activates a baseline, the nearest setting winning (a
+page's `policy` replaces the project's; extend the project's policy where the
+page should build on it), and `feedback-policy` selects a policy for one
+exercise. The keys `project-policy`, `page-policy` and `page-policy-files` of
+earlier versions keep working in 0.9, with a warning each.
 
 ```yaml
 # feedback.yml
@@ -128,8 +176,8 @@ ai-feedback:
 ```yaml
 # Page front matter
 ai-feedback:
-  page-policy-files: feedback.yml
-  page-policy: brief-feedback
+  policy-files: feedback.yml
+  policy: brief-feedback
 ```
 
 A child inherits omitted fields. A supplied `steps` list replaces the complete
@@ -140,7 +188,7 @@ instructions. Step limits and permissions override the policy for that step.
 Successful feedback advances one step; the last repeats. Failed, cancelled or
 stale requests consume no step. Run/Check resets by default; select a policy
 with `reset-on-run: false` to preserve progression. Changing the effective policy
-resets saved progress. See the [complete policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md)
+resets saved progress. See the [complete policy guide](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/feedback-policies.md)
 for inheritance, explicit scopes and targeted exercise overrides.
 
 ## Provider settings and data sent
@@ -148,7 +196,7 @@ for inheritance, explicit scopes and targeted exercise overrides.
 Every cogwheel opens the same settings dialog. Copy mode needs no account and
 makes no provider request. Direct API mode uses an OpenAI-compatible endpoint,
 model and personal key entered in the browser. Institutional defaults belong in
-Quarto metadata; never put keys in the project:
+Quarto metadata; never put keys in the project (a key there stops the render):
 
 ```yaml
 ai-feedback:
@@ -179,13 +227,14 @@ progression, settings, requests and rendering. `getRequest` should collect data
 without executing code. Use `AIFeedback.contextMaterials({mode, refs, text})` for
 context and `handle.reset('run')` on Run/Check. Call `handle.cancel({clearOutput:
 true})` on edits and `handle.reset()` on explicit Reset. The consumer owns its
-editor, checker and evidence boundary. [API reference](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/api.md).
+editor, checker and evidence boundary. [API reference](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/api.md).
 
-The Quarto side exposes `feedback-quarto.lua`: a `markCallout` filter prepass,
-`prepare(doc)` and `context(block, options, isPyodide)`. Consumers contain only
-small dependency-discovery glue. All policy, context and feedback implementation
-belongs in the ai-feedback source repository.
+On the Quarto side, components load ctm-libs through their copy of
+`ctm-bootstrap.lua` and use its Lua API: settings (`ctm.settings`), languages
+(`ctm.locale`), the runtime (`ctm.runtime`) and feedback (`ctm.feedback`:
+`prepare`, `markCallout`, `selection`, `context`, `enabled`, `request`). All
+policy, context and feedback implementation belongs in ctm-libs.
 
 ## Page and exercise policy examples
 
-The mathematics tab contains identical problems and drafts with different named YAML policies: a guiding question versus an immediate worked solution. The first activity in each integration also selects a shared page policy. All examples include collapsed copyable source directly after the activity, with JSXGraph source and policy YAML where used. Policy definitions live in YAML; inline `feedback-policy` attributes/options select existing names only. See [the scoped policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
+The mathematics tab contains identical problems and drafts with different named YAML policies: a guiding question versus an immediate worked solution. The first activity in each integration also selects a shared page policy. All examples include collapsed copyable source directly after the activity, with JSXGraph source and policy YAML where used. Policy definitions live in YAML; inline `feedback-policy` attributes/options select existing names only. See [the scoped policy guide](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/feedback-policies.md).

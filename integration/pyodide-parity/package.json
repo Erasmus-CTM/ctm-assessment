@@ -1,0 +1,12 @@
+{
+  "name": "@erasmus-ctm/pyodide-parity",
+  "private": true,
+  "description": "D4 gate: every exercise of the example sites and courses graded under the previous and the current Pyodide",
+  "scripts": {
+    "parity": "node run.cjs"
+  },
+  "dependencies": {
+    "pyodide-0.27.2": "npm:pyodide@0.27.2",
+    "pyodide-0.28.3": "npm:pyodide@0.28.3"
+  }
+}

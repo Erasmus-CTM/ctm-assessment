@@ -1,7 +1,9 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {spawnSync}=require('node:child_process'),{JSDOM}=require('jsdom');
 const site=process.env.CTM_INTEGRATION_SITE;
-const names=['ai-feedback','math-exercise','py-exercise','pyodide-interaktiv'];
+// ctm-libs (with its ai-feedback alias) and the components; the package's own folder
+// (ctm-assessment) is installed unqualified, as `quarto add <archive>` does.
+const names=['ctm-libs','ai-feedback','math-exercise','py-exercise','pyodide-interaktiv'];
 function fixture(filters){
  let q=`---\nformat: html\n${filters.length ? 'filters: ['+filters.join(', ')+']\n' : ''}py-exercise:\n  feedback: true\npyodide:\n  feedback: true\n---\n`;
  for(const mode of ['auto','none','shared']){
@@ -22,6 +24,7 @@ test('one shared installation supplies identical context across integrations, or
  try{
   
   for(const name of names)fs.cpSync(path.join(path.dirname(site),'_extensions',name),path.join(dir,'_extensions',...(qualified?['Erasmus-CTM']:[]),name),{recursive:true});
+  fs.cpSync(path.join(path.dirname(site),'_extensions','ctm-assessment'),path.join(dir,'_extensions','ctm-assessment'),{recursive:true});
   fs.mkdirSync(path.join(dir,'chapter'));
   const filters=qualified?['ai-feedback','py-exercise','pyodide-interaktiv','math-exercise']:['math-exercise','pyodide-interaktiv','py-exercise'];
   fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\n  render: [chapter/context.qmd]\nfilters: ['+filters.join(', ')+']\n');
@@ -52,17 +55,17 @@ test('one shared installation supplies identical context across integrations, or
   assert.equal(pyodide[3].mode,'explicit');assert.equal(pyodide[3].refs,'shared');assert.equal(pyodide[4].mode,'none');
   assert.match(python[3].text,/NESTED_LEAD/);assert.match(pyodide[5].text,/NESTED_TAGGED_PROSE/);
   w.close();
-  // Without the installation: feedback: true fails early with an actionable
-  // render error; the default (auto) renders without feedback and says why.
-  fs.rmSync(path.join(dir,'_extensions',...(qualified?['Erasmus-CTM']:[]),'ai-feedback'),{recursive:true});
+  // Without ctm-libs, every page with a component stops with the install
+  // command, with and without feedback: true (decision 3).
+  fs.rmSync(path.join(dir,'_extensions',...(qualified?['Erasmus-CTM']:[]),'ctm-libs'),{recursive:true});
   for(const required of [true,false]){
    fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\n  render: [chapter/context.qmd]\nfilters: [math-exercise]\n'+(required?'math-exercise:\n  feedback: true\n':''));
    fs.writeFileSync(path.join(dir,'chapter/context.qmd'),fixture([]).replace(/::: \{\.ai-feedback[\s\S]*?\n:::\n/g,''));
    fs.rmSync(path.join(dir,'_site'),{recursive:true,force:true});
    fs.rmSync(path.join(dir,'.quarto'),{recursive:true,force:true});
    const missing=spawnSync(process.env.QUARTO_BIN||'quarto',['render'],{cwd:dir,encoding:'utf8',timeout:120000});
-   assert.match(missing.stderr,/quarto add Erasmus-CTM\/ai-feedback/);
-   if(required)assert.notEqual(missing.status,0);else assert.equal(missing.status,0,missing.stderr);
+   assert.match(missing.stderr,/needs its library ctm-libs, which is not installed\. Install CTM Assessment: quarto add https:\/\/erasmus-ctm\.github\.io\/ctm-assessment\/ctm-assessment\.tar\.gz/);
+   assert.notEqual(missing.status,0,String(required));
   }
  }finally{if(!process.env.KEEP_CONTEXT)fs.rmSync(dir,{recursive:true,force:true});else console.log('Fixture:',dir);}
  }

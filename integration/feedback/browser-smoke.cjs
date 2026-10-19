@@ -344,7 +344,10 @@ const server = http.createServer((req, res) => {
     // Local policy overrides enable the same progression in both review integrations.
     await page.evaluate(() => {
       window.__savedPolicies = window.__aiFeedbackPolicies;
-      window.__aiFeedbackPolicies = {pageLayers:window.__savedPolicies.pageLayers,projectPolicy:{'py-exercise':'code-hints','plain-text':'writing-hints'},layers:[{policies:{
+      // Self-contained: the activities select practice-feedback, which here only limits the length (as
+      // feedback/page.yml did before it extended course-feedback for the policy-files/policy keys).
+      window.__aiFeedbackPolicies = {pageLayers:[],projectPolicy:{'py-exercise':'code-hints','plain-text':'writing-hints'},layers:[{policies:{
+        'practice-feedback':{'max-words':160},
         'code-hints':{'reset-on-run':false,steps:[{'step-prompt':'LOCAL FIRST'},{'step-prompt':'LOCAL SECOND'}]},
         'writing-hints':{steps:[{'step-prompt':'WRITING FIRST'},{'step-prompt':'WRITING SECOND'}]}
       }}]};

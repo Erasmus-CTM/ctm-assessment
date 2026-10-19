@@ -14,6 +14,17 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / 'integration' / 'feedback'
+# The components share one copy of ctm-libs' bootstrap (the file that finds
+# ctm-libs); each must equal the canonical copy in the ctm-libs repository.
+BOOTSTRAP = 'ctm-bootstrap.lua'
+BOOTSTRAP_COMPONENTS = ('math-exercise', 'py-exercise')
+# Copies that moved into ctm-libs in consolidation step 1. pyodide-interaktiv
+# keeps its own loader until it ships ctm-libs (step 3).
+RETIRED_COPIES = ('feedback-loader.lua', 'shared/pyodide-runtime.js')
+KEEPS_RETIRED_COPIES = ('pyodide-interaktiv',)
+# The last standalone ai-feedback release (0.8.1) before it became ctm-libs:
+# tests check that such a copy next to the package is ignored or stops a page.
+LEGACY_AI_FEEDBACK = ('Erasmus-CTM/ctm-libs', '79103a6a829b9c5cf62f645857ca7f8330ff7be2')
 
 
 def run(args, cwd=None, env=None):
@@ -88,10 +99,12 @@ def tracked_extensions(source, local, own):
     """Extension names a repository ships (tracked files only).
 
     `_extensions/<x>` and `_extensions/<owner>/<x>` both ship `<x>`; anything
-    inside the repository's own extension folder that is itself an extension
-    folder (`<own>/<x>/_extension.yml`) or an `_extensions` tree is reported
-    as `<x>` too, so nested copies cannot slip into the distribution.
+    inside one of the repository's own extension folders (`own`: a name or a
+    list of names) that is itself an extension folder (`<own>/<x>/_extension.yml`)
+    or an `_extensions` tree is reported as `<x>` too, so nested copies cannot
+    slip into the distribution.
     """
+    owns = [own] if isinstance(own, str) else list(own)
     if local:
         files = subprocess.check_output(['git', '-C', str(source), 'ls-files', '_extensions'], text=True).splitlines()
     else:
@@ -103,9 +116,81 @@ def tracked_extensions(source, local, own):
             folders = parts[1:-1]
             if folders:
                 shipped.add(folders[-1])
-        if own in parts[1:3] and '_extensions' in parts[2:]:
-            shipped.add('nested-_extensions-in-' + own)
+        for folder in owns:
+            if folder in parts[1:3] and '_extensions' in parts[2:]:
+                shipped.add('nested-_extensions-in-' + folder)
     return shipped
+
+
+def extension_folders(config):
+    """{repository name: [extension folders it owns]}; the first is its main folder.
+
+    `extensions` lists several folders (ctm-libs ships its library and the
+    ai-feedback alias), `extension` names one, the default is the name.
+    """
+    folders = {name: list(spec.get('extensions', [spec.get('extension', name)]))
+               for name, spec in config['repositories'].items()}
+    owners = {}
+    for name, names in folders.items():
+        for folder in names:
+            if folder in owners:
+                raise SystemExit(f'repos.json: {owners[folder]} and {name} both own the extension folder {folder}.')
+            owners[folder] = name
+    return folders
+
+
+def aliases(config):
+    """{old name: repository name} from `review-ref-aliases` (ai-feedback -> ctm-libs)."""
+    return {alias: name for name, spec in config['repositories'].items() for alias in spec.get('review-ref-aliases', [])}
+
+
+def canonical_name(name, config, option, notices):
+    """A repository name as given in --source/--ref/--review-refs/--only, aliases resolved."""
+    renamed = aliases(config)
+    if name in renamed and name not in config['repositories']:
+        if name not in notices:
+            notices.add(name)
+            print(f'Note: {name} is now part of {renamed[name]}; {option} {name} is read as {renamed[name]} '
+                  '(the old name is accepted in CTM Assessment 0.9 only).', flush=True)
+        return renamed[name]
+    return name
+
+
+def check_shared_files(config, sources, extensions, hashes):
+    """The shared bootstrap is byte-identical everywhere; retired copies are gone."""
+    canonical = sources['ctm-libs'] / 'bootstrap' / BOOTSTRAP
+    if not canonical.is_file():
+        raise SystemExit(f'ctm-libs has no bootstrap/{BOOTSTRAP} to compare the components\' copies with.')
+    expected = hashlib.sha256(canonical.read_bytes()).hexdigest()
+    digests = {}
+    for name in config['repositories']:
+        for folder in extensions[name]:
+            for path, digest in hashes[folder].items():
+                if Path(path).name == BOOTSTRAP:
+                    digests[f'{folder}/{path}'] = digest
+    for name in BOOTSTRAP_COMPONENTS:
+        digests.setdefault(f'{extensions[name][0]}/{BOOTSTRAP}', None)
+    differ = {path: digest for path, digest in digests.items() if digest != expected}
+    if differ:
+        raise SystemExit(f'Copies of {BOOTSTRAP} must equal ctm-libs\' bootstrap/{BOOTSTRAP} ({expected[:12]}): '
+                         + ', '.join(f'{path}={(digest or "missing")[:12]}' for path, digest in sorted(differ.items())))
+    for name in config['repositories']:
+        if name in KEEPS_RETIRED_COPIES:
+            continue
+        for folder in extensions[name]:
+            left = [path for path in RETIRED_COPIES if path in hashes[folder]]
+            if left:
+                raise SystemExit(f'{name} still ships {", ".join(folder + "/" + path for path in left)}, '
+                                 'which ctm-libs provides now; remove the copy.')
+
+
+def package_version():
+    """The CTM Assessment version (`version:` of the package manifest)."""
+    manifest = (ROOT / '_extensions' / 'ctm-assessment' / '_extension.yml').read_text(encoding='utf-8')
+    found = re.search(r'(?m)^version:\s*["\']?([0-9A-Za-z.+-]+)', manifest)
+    if not found:
+        raise SystemExit('_extensions/ctm-assessment/_extension.yml has no version.')
+    return found.group(1)
 
 
 def version_tuple(text):
@@ -114,19 +199,38 @@ def version_tuple(text):
 
 
 def descends(repository, ancestor, tip):
-    """True if `tip` contains `ancestor` (GitHub compare API; public repositories)."""
-    request = urllib.request.Request(f'https://api.github.com/repos/{repository}/compare/{ancestor}...{tip}',
-                                     headers={'User-Agent': 'CTM-feedback-integration', 'Accept': 'application/vnd.github+json'})
+    """True if `tip` contains `ancestor` (GitHub compare API; public repositories).
+    GITHUB_TOKEN or GH_TOKEN, when set, only raises the API's rate limit."""
+    headers = {'User-Agent': 'CTM-feedback-integration', 'Accept': 'application/vnd.github+json'}
+    token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+    if token:
+        headers['Authorization'] = 'Bearer ' + token
+    request = urllib.request.Request(f'https://api.github.com/repos/{repository}/compare/{ancestor}...{tip}', headers=headers)
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.load(response)['status'] in ('ahead', 'identical')
+
+
+def followed_revision(name, spec):
+    """--follow-branches: the branch tip, or the pin when the branch does not
+    contain it. Such a pin lies outside its branch (the JSXGraph pin is the fork
+    commit of upstream pull request #2, not on upstream main): the tip would be
+    other code, not newer code. Returns (commit, pin kept)."""
+    tip = remote_revision(name, spec, follow=True)
+    pin = spec.get('commit')
+    if pin and tip != pin and not descends(spec['repository'], pin, tip):
+        print(f'{name}: {spec["branch"]} @ {tip} does not contain the pinned {pin}; '
+              'following keeps the pin (a commit outside its branch, such as an upstream pull request).', flush=True)
+        return pin, True
+    return tip, False
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--workspace', type=Path, default=ROOT / '.feedback-workspace')
     parser.add_argument('--refresh', action='store_true', help='Compatibility option without effect: every component is pinned by commit')
-    parser.add_argument('--follow-branches', action='store_true', help='Resolve each component\'s branch tip instead of its pinned commit (early warning; not a release build)')
+    parser.add_argument('--follow-branches', action='store_true', help='Resolve each component\'s branch tip instead of its pinned commit (early warning; not a release build); a pin its branch does not contain is kept')
     parser.add_argument('--update-pins', action='store_true', help='Write the current branch tips into repos.json and stop; then run --test')
+    parser.add_argument('--only', metavar='NAME[,NAME]', help='With --update-pins: re-pin only these repositories (others, such as the JSXGraph fork pin, stay as they are)')
     parser.add_argument('--ref', action='append', default=[], metavar='NAME=BRANCH', help='Use a review branch for a dependency without changing normal build defaults')
     parser.add_argument('--review-refs', default='{}', help='Explicit JSON dependency SHA map for coordinated review builds; normal defaults stay unchanged')
     parser.add_argument('--source', action='append', default=[], metavar='NAME=PATH', help='Use a local Git checkout for a repository; record SHA and dirty files')
@@ -136,10 +240,21 @@ def main():
     args = parser.parse_args()
     if args.package_only and (args.test or args.browser):
         raise SystemExit('--package-only cannot be combined with --test or --browser (they test the rendered site).')
+    if args.only and not args.update_pins:
+        raise SystemExit('--only selects the repositories that --update-pins re-pins; use it with --update-pins.')
     config = json.loads((TEMPLATE / 'repos.json').read_text())
+    extensions = extension_folders(config)
+    notices = set()
     if args.update_pins:
+        only = None
+        if args.only:
+            only = {canonical_name(name.strip(), config, '--only', notices) for name in args.only.split(',') if name.strip()}
+            unknown = sorted(only - set(config['repositories']) | ({'ctm-assessment'} & only))
+            if unknown or not only:
+                raise SystemExit('--only names repositories that repos.json pins: ' + (', '.join(unknown) or 'none given')
+                                 + ' (known: ' + ', '.join(sorted(set(config['repositories']) - {'ctm-assessment'})) + ')')
         for name, spec in config['repositories'].items():
-            if name == 'ctm-assessment':
+            if name == 'ctm-assessment' or (only is not None and name not in only):
                 continue
             sha = remote_revision(name, spec, follow=True)
             old = spec.get('commit')
@@ -171,14 +286,22 @@ def main():
     local = {'ctm-assessment': ROOT}
     for entry in args.source:
         name, path = entry.split('=', 1)
+        name = canonical_name(name, config, '--source', notices)
         if name not in config['repositories']:
             raise SystemExit('Unknown repository: ' + name)
         local[name] = Path(path).resolve()
-    review_refs = json.loads(args.review_refs)
-    if not isinstance(review_refs, dict) or any(name not in config['repositories'] or not re.fullmatch(r'[0-9a-f]{40}', str(ref)) for name,ref in review_refs.items()):
+    given = json.loads(args.review_refs)
+    if not isinstance(given, dict):
         raise SystemExit('Review refs must map known repositories to full SHAs')
+    review_refs = {}
+    for name, ref in given.items():
+        name = canonical_name(name, config, 'review refs', notices)
+        if name not in config['repositories'] or not re.fullmatch(r'[0-9a-f]{40}', str(ref)) or name in review_refs:
+            raise SystemExit('Review refs must map known repositories to full SHAs, each once')
+        review_refs[name] = ref
     for entry in args.ref:
         name, ref = entry.split('=', 1)
+        name = canonical_name(name, config, '--ref', notices)
         if name not in config['repositories'] or not ref.strip():
             raise SystemExit('Unknown repository or empty review branch: ' + name)
         if name in local:
@@ -188,17 +311,20 @@ def main():
     for name, spec in config['repositories'].items():
         sha = spec.get('commit')
         requested_ref = review_refs.get(name, spec['branch'])
-        dirty = []
+        dirty, kept = [], False
         if name in local:
             source = local[name]
             sha = git(source, 'rev-parse', 'HEAD')
             dirty = git(source, 'status', '--porcelain', '--untracked-files=all').splitlines()
         else:
-            sha = remote_revision(name, spec, review_refs.get(name), args.follow_branches)
+            if args.follow_branches and name not in review_refs:
+                sha, kept = followed_revision(name, spec)
+            else:
+                sha = remote_revision(name, spec, review_refs.get(name), args.follow_branches)
             source = snapshot(spec['repository'], sha, cache)
         sources[name] = source
-        pinned = bool(spec.get('commit')) and not args.follow_branches and name not in review_refs and name not in local
-        revisions[name] = {'repository': spec['repository'], 'branch': spec['branch'], 'requested_ref': requested_ref, 'commit': sha, 'ref_override': name in review_refs, 'pinned': pinned, 'local_override': name in local, 'dirty_files': dirty}
+        pinned = bool(spec.get('commit')) and (not args.follow_branches or kept) and name not in review_refs and name not in local
+        revisions[name] = {'repository': spec['repository'], 'branch': spec['branch'], 'requested_ref': requested_ref, 'commit': sha, 'ref_override': name in review_refs, 'pinned': pinned, 'local_override': name in local, 'dirty_files': dirty, 'extensions': extensions[name]}
         print(f'Resolved {name}: {requested_ref} @ {sha}', flush=True)
     site = workspace / 'site'
     distribution = workspace / 'ctm-assessment'
@@ -228,51 +354,50 @@ def main():
         shutil.copytree(ROOT / '_filters', site / '_filters')
         extensions_root = site / '_extensions'
     hashes = {}
-    extensions = {name: spec.get('extension', name) for name, spec in config['repositories'].items()}
     # Bytecode left by component tests in a reused workspace is not shipped.
     build_files = shutil.ignore_patterns('__pycache__', '*.pyc')
     for name, source in sources.items():
-        extension = source / '_extensions' / extensions[name]
-        destination = extensions_root / extensions[name]
-        shutil.copytree(extension, destination, ignore=build_files)
-        hashes[extensions[name]] = {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(destination.rglob('*')) if p.is_file()}
-    # Deliberate shared copies must stay byte-identical across components.
-    shared_copies = {
-        'feedback-loader.lua': [('math-exercise', 'feedback-loader.lua'), ('py-exercise', 'feedback-loader.lua'), ('pyodide-interaktiv', 'feedback-loader.lua')],
-        'pyodide-runtime.js': [('math-exercise', 'shared/pyodide-runtime.js'), ('py-exercise', 'shared/pyodide-runtime.js')],
-    }
-    for label, copies in shared_copies.items():
-        digests = {f'{name}/{path}': hashes[extensions[name]].get(path) for name, path in copies}
-        if None in digests.values() or len(set(digests.values())) != 1:
-            raise SystemExit(f'Shared copies of {label} differ or are missing: ' + ', '.join(f'{k}={(v or "missing")[:12]}' for k, v in digests.items()))
+        for folder in extensions[name]:
+            extension = source / '_extensions' / folder
+            if not any((extension / manifest).is_file() for manifest in ('_extension.yml', '_extension.yaml')):
+                raise SystemExit(f'{name} @ {revisions[name]["commit"][:12]} has no _extensions/{folder}; '
+                                 'repos.json expects it (check the pin or the branch).')
+            destination = extensions_root / folder
+            shutil.copytree(extension, destination, ignore=build_files)
+            hashes[folder] = {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(destination.rglob('*')) if p.is_file()}
+    # The one deliberate shared copy (ctm-libs' bootstrap in every component)
+    # stays byte-identical; copies that moved into ctm-libs are gone.
+    check_shared_files(config, sources, extensions, hashes)
     # Licence notices travel with the package (`quarto add` installs only
-    # _extensions/): each component's repository licence, when its extension
-    # folder has none of its own.
-    notices = extensions_root / 'ctm-assessment' / 'licenses'
+    # _extensions/): each repository's licence, when its main extension folder
+    # has none of its own (ctm-libs' notice also covers its ai-feedback alias).
+    licence_notices = extensions_root / 'ctm-assessment' / 'licenses'
     for name, source in sources.items():
-        if any(p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING')) for p in (extensions_root / extensions[name]).iterdir()):
+        if any(p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING')) for p in (extensions_root / extensions[name][0]).iterdir()):
             continue
         found = sorted(p for p in source.iterdir() if p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING')))
         if not found:
             raise SystemExit(f'{name} has no licence file to ship with the package.')
-        notices.mkdir(exist_ok=True)
-        shutil.copy2(found[0], notices / f'{name}.txt')
-        hashes['ctm-assessment'][f'licenses/{name}.txt'] = hashlib.sha256((notices / f'{name}.txt').read_bytes()).hexdigest()
+        licence_notices.mkdir(exist_ok=True)
+        shutil.copy2(found[0], licence_notices / f'{name}.txt')
+        hashes['ctm-assessment'][f'licenses/{name}.txt'] = hashlib.sha256((licence_notices / f'{name}.txt').read_bytes()).hexdigest()
     # One source per component: no repository may ship another component's
     # extension (a vendored copy would silently diverge from the pinned one).
+    owned = {folder for folders in extensions.values() for folder in folders}
     for name, source in sources.items():
+        own = set(extensions[name])
         shipped = tracked_extensions(source, name in local, extensions[name])
         # A declared distribution copy next to the component (pyodide-interaktiv
         # ships ai-feedback for its existing projects) is allowed; the package
-        # copies only the component's own folder, so it never installs it.
-        foreign = shipped - {extensions[name]} - set(config['repositories'][name].get('ships-copies', []))
-        # A copy inside the component's own folder would be shipped: never allowed.
-        foreign |= {other for other in extensions.values() if other != extensions[name]
-                    and any(path.startswith(other + '/') for path in hashes[extensions[name]])}
+        # copies only the component's own folders, so it never installs it.
+        foreign = shipped - own - set(config['repositories'][name].get('ships-copies', []))
+        # A copy inside one of the component's own folders would be shipped: never allowed.
+        foreign |= {other for other in owned - own
+                    if any(path.startswith(other + '/') for folder in own for path in hashes[folder])}
         foreign = sorted(foreign)
         if foreign:
             raise SystemExit(f'{name} ships its own copy of {", ".join(foreign)}; use the pinned component instead.')
-    result = {'quarto': quarto_version, 'quarto_required': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
+    result = {'version': package_version(), 'quarto': quarto_version, 'quarto_required': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
     (workspace / 'resolved-repos.json').write_text(json.dumps(result, indent=2) + '\n')
     if not args.package_only:
         shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
@@ -290,18 +415,37 @@ def main():
     archive = shutil.make_archive(str(workspace / 'ctm-assessment'), 'gztar', root_dir=distribution)
     shutil.copy2(archive, site / '_site' / 'ctm-assessment.tar.gz')
     if args.test or args.browser:
-        env = dict(base_env, CTM_INTEGRATION_SITE=str(site / '_site'), CTM_INTEGRATION_RECORD=str(workspace / 'resolved-repos.json'), AI_FEEDBACK_EXTENSION=str(sources['ai-feedback'] / '_extensions' / 'ai-feedback'))
+        libs = sources['ctm-libs'] / '_extensions' / 'ctm-libs'
+        # CTM_LIBS_EXTENSION: ctm-libs' extension folder (the components' tests
+        # load its runtime, catalogues and feedback files); AI_FEEDBACK_EXTENSION:
+        # its three self-contained feedback files, which pyodide-interaktiv 1.8's
+        # tests load on their own.
+        env = dict(base_env, CTM_INTEGRATION_SITE=str(site / '_site'), CTM_INTEGRATION_RECORD=str(workspace / 'resolved-repos.json'),
+                   CTM_LIBS_EXTENSION=str(libs), AI_FEEDBACK_EXTENSION=str(libs / 'feedback'))
         run(['npm', 'ci', '--ignore-scripts'], cwd=ROOT)
         if args.test:
+            legacy = snapshot(*LEGACY_AI_FEEDBACK, cache)
+            env['CTM_LEGACY_AI_FEEDBACK'] = str(legacy / '_extensions' / 'ai-feedback')
             run(['python', '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'], cwd=ROOT, env=env)
             run(['python', ROOT / 'scripts/test-package.py', archive], env=env)
-            run(['python', sources['ai-feedback'] / 'scripts/sync-feedback-defaults.py', '--check'], env=env)
+            run(['python', sources['ctm-libs'] / 'scripts/sync-feedback-defaults.py', '--check'], env=env)
+            run(['python', sources['ctm-libs'] / 'scripts/check-locales.py'], env=env)
             run(['npm', 'test'], cwd=ROOT, env=env)
             env['JSXGRAPH_EXTENSION'] = str(site / '_extensions' / 'jsxgraph')
-            for consumer in ('ai-feedback', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'):
-                run(['npm', 'ci', '--ignore-scripts'], cwd=sources[consumer])
-                run(['npm', 'test'], cwd=sources[consumer], env=env)
-            run(['python', '-m', 'unittest', 'discover', '-s', 'tests'], cwd=sources['py-exercise'], env=env)
+            # The components' tests render single files in temporary folders, and
+            # a single file finds CTM Assessment in the _extensions of any folder
+            # above it. Inside this checkout (the default workspace) that is the
+            # umbrella's own _extensions/ctm-assessment, so tests of "no package
+            # installed" would see one: they get a temporary folder outside.
+            component_tmp = Path(tempfile.mkdtemp(prefix='ctm-component-tests-'))
+            component_env = dict(env, TMPDIR=str(component_tmp))
+            try:
+                for consumer in ('ctm-libs', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'):
+                    run(['npm', 'ci', '--ignore-scripts'], cwd=sources[consumer])
+                    run(['npm', 'test'], cwd=sources[consumer], env=component_env)
+                run(['python', '-m', 'unittest', 'discover', '-s', 'tests'], cwd=sources['py-exercise'], env=component_env)
+            finally:
+                shutil.rmtree(component_tmp, ignore_errors=True)
             run(['npm', 'run', 'test:integration'], cwd=ROOT, env=env)
         if args.browser:
             run(['npm', 'run', 'test:browser'], cwd=ROOT, env=env)

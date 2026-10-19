@@ -1,0 +1,15 @@
+# Fixture of no-ai-build.test.cjs: every component on one page, AI feedback
+# asked for everywhere. `--profile no-ai` (_quarto-no-ai.yml) or
+# CTM_FEEDBACK=off build the same source without AI feedback (P22).
+project:
+  type: website
+  render: [all.qmd, asks.qmd, plain.qmd]
+filters: [ctm-assessment]
+ai-feedback:
+  mode: copy
+  policy-files: policies.yml
+  policy: course
+py-exercise:
+  feedback: true
+pyodide:
+  feedback: true

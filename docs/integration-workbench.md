@@ -32,45 +32,60 @@ Use an HTTP origin: Monaco and Pyodide workers do not work reliably with `file:/
 `repos.json` pins every component by full commit; `branch` names the branch
 that contains that commit and that `--update-pins` follows:
 
-| Component | Repository | Branch |
-|---|---|---|
-| ctm-assessment | this repository | this checkout, including local edits |
-| ai-feedback | Erasmus-CTM/ai-feedback | `main` |
-| py-exercise | Erasmus-CTM/py-exercise | `main` |
-| math-exercise | Erasmus-CTM/math-exercise | `main` |
-| pyodide-interaktiv | Erasmus-CTM/pyodide-interaktiv | `feature/shared-feedback-integration` |
-| jsxgraph | jsxgraph/jsxgraph-quarto (upstream) | `main` (extension folder `jsxgraph`); pinned to the commit of upstream pull request #2 until it is merged |
+| Name | Repository | Branch | Extension folders |
+|---|---|---|---|
+| ctm-assessment | this repository | this checkout, including local edits | `ctm-assessment` |
+| ctm-libs | Erasmus-CTM/ctm-libs (formerly ai-feedback) | `main` | `ctm-libs` and the alias `ai-feedback` |
+| py-exercise | Erasmus-CTM/py-exercise | `main` | `py-exercise` |
+| math-exercise | Erasmus-CTM/math-exercise | `main` | `math-exercise` |
+| pyodide-interaktiv | Erasmus-CTM/pyodide-interaktiv | `feature/shared-feedback-integration` | `pyodide-interaktiv` (its shipped `ai-feedback` copy is not packaged) |
+| jsxgraph | jsxgraph/jsxgraph-quarto (upstream) | `main`; pinned to the commit of upstream pull request #2 until it is merged | `jsxgraph` |
+
+A repository may own several extension folders (`extensions`); every folder is
+copied and recorded. `review-ref-aliases` names earlier names of a repository:
+`ai-feedback` is read as `ctm-libs` in `--source`, `--ref`, `--review-refs`,
+`--only` and review trailers, with one notice (CTM Assessment 0.9 only).
 
 **Release order.** Merge the component PRs first, keeping their commits (a
 merge commit or rebase; a squash creates new commits that do not contain the
 pins). Then set each `branch` to the branch they were merged into, run
 `--update-pins` (it refuses a branch that does not contain the current pin),
-run `--test --browser`, commit `repos.json`, and merge the umbrella.
+run `--test --browser`, commit `repos.json`, and merge the umbrella. To
+re-pin only some repositories, name them: `--update-pins --only
+ctm-libs,math-exercise,py-exercise` leaves the JSXGraph fork pin (not on
+upstream `main`) and pyodide-interaktiv as they are.
 
-The script records every resolved commit, local dirty-file list and copied
-extension file's SHA-256 in `resolved-repos.json`. That record is included in the
-rendered site and the archive. External sources are downloaded as exact-commit
-archives. No upstream checkout is overwritten. A component repository that
-ships another component's extension folder in any layout (`_extensions/<x>`,
-`_extensions/<owner>/<x>`, or nested inside its own folder) fails the build.
+The script records the package version, every resolved commit, local
+dirty-file list and copied extension file's SHA-256 in `resolved-repos.json`.
+That record is included in the rendered site and the archive. External sources
+are downloaded as exact-commit archives. No upstream checkout is overwritten. A
+component repository that ships another component's extension folder in any
+layout (`_extensions/<x>`, `_extensions/<owner>/<x>`, or nested inside its own
+folder) fails the build. The one deliberate shared file, `ctm-bootstrap.lua`
+(how math-exercise and py-exercise find ctm-libs), must be byte-identical to
+ctm-libs' `bootstrap/ctm-bootstrap.lua`, and no component but
+pyodide-interaktiv may still ship `feedback-loader.lua` or
+`shared/pyodide-runtime.js`, which ctm-libs provides.
 
 Normal builds use the pins, so a merge in a component never changes the umbrella
-by itself. To move to newer components:
+by itself. To move to newer components, name them (a bare `--update-pins`
+stops at the JSXGraph pin, which upstream `main` does not contain):
 
 ```sh
-python scripts/setup-feedback-integration.py --update-pins   # writes branch tips into repos.json
+python scripts/setup-feedback-integration.py --update-pins --only ctm-libs,math-exercise,py-exercise   # writes their branch tips into repos.json
 python scripts/setup-feedback-integration.py --test --browser
 ```
 
 Commit the updated `repos.json` with the passing run. `--follow-branches`
 builds against the branch tips without changing the manifest; the scheduled
 **Track component branches** workflow does this weekly and fails early when a
-component change breaks the combined page. The legacy `--refresh` flag has no
-effect.
+component change breaks the combined page. A pin that its branch does not
+contain (the JSXGraph pin) stays, with a log line saying so. The legacy
+`--refresh` flag has no effect.
 For unmerged dependencies, explicitly select a review branch:
 
 ```sh
-python scripts/setup-feedback-integration.py --ref ai-feedback=my-review-branch --test
+python scripts/setup-feedback-integration.py --ref ctm-libs=my-review-branch --test
 ```
 
 CI uses the normal manifest unless a non-main review commit explicitly declares
@@ -81,6 +96,7 @@ dependency checks before merging a consumer PR. To include local branch work:
 
 ```sh
 python scripts/setup-feedback-integration.py \
+  --source ctm-libs=../ctm-libs \
   --source py-exercise=../py-exercise \
   --source math-exercise=../math-exercise \
   --source pyodide-interaktiv=../pyodide-interaktiv \
@@ -124,7 +140,7 @@ Python tasks (py-exercise) use shared Feedback and settings; the Pyodide tab use
 `feature/shared-feedback-integration` branch until its AI migration is merged. Feedback
 reads current code without execution and includes only code-matched checker
 summaries and learner output. Edits and Reset invalidate that evidence.
-Mathematics uses shared settings, transport and rendering while retaining its four-step teaching policy. Feedback never runs its checker. Only matching prior Check evidence is sent; graph payloads, expected values and checker source stay local. Consumers load the single installed ai-feedback extension automatically; no runtime is bundled. The Pyodide tab now exercises its shared adapter with incomplete starters.
+Mathematics uses shared settings, transport and rendering while retaining its four-step teaching policy. Feedback never runs its checker. Only matching prior Check evidence is sent; graph payloads, expected values and checker source stay local. math-exercise and py-exercise load ctm-libs (settings, languages, runtime, feedback) through their `ctm-bootstrap.lua`; pyodide-interaktiv 1.8 loads its feedback through the `ai-feedback` alias, which hands it ctm-libs' feedback module. The Pyodide tab now exercises its shared adapter with incomplete starters.
 Python exercises also use Pyodide internally to execute code.
 
 The adapters must omit stale output and hidden test source, preserve
@@ -139,8 +155,8 @@ feedback feature branch; the other components from `main`; all are pinned by com
 share settings, transport and LaTeX rendering. Pyodide retains three hints that
 never supply finished code, and feedback never executes Python.
 
-The builder rejects vendored copies of other components and installs the shared
-runtime byte for byte. Tests cover fresh stdout evidence, edit/reset/run/restart
+The builder rejects vendored copies of other components; the shared runtime
+is ctm-libs' file, loaded once per page. Tests cover fresh stdout evidence, edit/reset/run/restart
 invalidation, no raw stderr, standalone documents and both filter orders.
 Consumer PRs remain deferred until this common page is accepted.
 

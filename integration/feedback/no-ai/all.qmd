@@ -1,0 +1,63 @@
+---
+title: Every component
+engine: markdown
+---
+
+## Writing
+
+Context prose with $x^2$.
+
+::: {#notes .ai-context}
+Lesson notes with $y^3$.
+:::
+
+::: {.ai-feedback #essay feedback-policy="brief" context="notes"}
+Write two sentences about the notes.
+
+::: {.feedback-source}
+Visible source text.
+:::
+
+::: {.feedback-criteria}
+CRITERIA_MARKER_3381
+:::
+
+::: {.feedback-starter}
+STARTER_MARKER_6604
+:::
+:::
+
+## Mathematics
+
+```{math-exercise}
+#| label: product
+#| feedback-policy: brief
+#| context: notes
+Compute $6\cdot 7$: _[42]
+```
+
+## Python
+
+```{py-exercise}
+#| label: answer
+#| task: Return two.
+#| feedback-policy: brief
+def answer():
+    return 0
+## TESTS ##
+assert answer() == 2
+```
+
+## Pyodide
+
+```{pyodide-python}
+#| task: Print two.
+print(0)
+```
+
+## Diagram
+
+```{.jsxgraph width="300" height="200"}
+var board = JXG.JSXGraph.initBoard(BOARDID, {boundingbox: [-2,2,2,-2]});
+board.create('circle', [[0,0],1]);
+```

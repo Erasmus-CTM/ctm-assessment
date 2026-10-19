@@ -13,7 +13,8 @@ spec = importlib.util.spec_from_file_location('install_project', Path(__file__).
 installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
 
-KNOWN = {'ai-feedback', 'math-exercise', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'}
+KNOWN = {'ctm-libs', 'math-exercise', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'}
+RENAMED = {'ai-feedback': 'ctm-libs'}
 A, B = 'a' * 40, 'b' * 40
 
 # Stands in for `quarto add DIST --no-prompt`: copies DIST/_extensions/* into
@@ -63,6 +64,24 @@ class ReviewRefs(unittest.TestCase):
         with self.assertRaisesRegex(installer.InstallError, 'NAME=SHA'):
             installer.parse_review_refs('{math-exercise: ' + A + '}', KNOWN)
 
+    def test_the_old_name_ai_feedback_is_read_as_ctm_libs(self):
+        # ai-feedback became ctm-libs; course review refs keep working for 0.9.
+        import contextlib, io
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(installer.parse_review_refs(f'ai-feedback={A}', KNOWN, RENAMED), {'ctm-libs': A})
+            self.assertEqual(installer.parse_review_refs(json.dumps({'ai-feedback': A, 'math-exercise': B}), KNOWN, RENAMED),
+                             {'ctm-libs': A, 'math-exercise': B})
+        self.assertIn('ai-feedback is now part of ctm-libs', out.getvalue())
+        with self.assertRaisesRegex(installer.InstallError, 'names ctm-libs twice'):
+            installer.parse_review_refs(f'ai-feedback={A},ctm-libs={B}', KNOWN, RENAMED)
+        with self.assertRaisesRegex(installer.InstallError, 'unknown component: ai-feedback'):
+            installer.parse_review_refs(f'ai-feedback={A}', KNOWN)
+
+    def test_the_manifest_declares_the_alias(self):
+        self.assertEqual(installer.aliases(), RENAMED)
+        self.assertEqual(installer.components(), KNOWN)
+
     def test_installer_rejects_ctm_assessment_before_building(self):
         with tempfile.TemporaryDirectory() as temp, \
                 patch.object(sys, 'argv', ['install-project.py', '--project', temp, '--review-refs', f'ctm-assessment={A}']), \
@@ -72,6 +91,46 @@ class ReviewRefs(unittest.TestCase):
             self.assertIn('cannot set ctm-assessment', str(stop.exception.code))
             run.assert_not_called()
             self.assertFalse((Path(temp) / '.private-extensions').exists())
+
+
+class Release(unittest.TestCase):
+    """--release vX.Y.Z: the checkout is that release, built from pins only."""
+
+    def manifest(self, **changes):
+        repositories = {name: {'commit': c * 40} for name, c in zip(sorted(KNOWN - {'ctm-assessment'}), 'abcde')}
+        repositories['ctm-assessment'] = {'branch': 'main'}
+        for name, spec in changes.items():
+            repositories[name] = spec
+        return {'repositories': repositories}
+
+    def test_the_checkout_of_the_tag_passes(self):
+        with patch.object(installer, 'package_version', return_value='0.9.0'), \
+                patch.object(installer, 'manifest', return_value=self.manifest()):
+            installer.check_release('v0.9.0')
+            installer.check_release('0.9.0')
+
+    def test_another_version_or_an_unpinned_component_stops(self):
+        with patch.object(installer, 'package_version', return_value='0.9.0'), \
+                patch.object(installer, 'manifest', return_value=self.manifest(**{'math-exercise': {'branch': 'main'}})):
+            with self.assertRaisesRegex(installer.InstallError, 'version 0.9.0, not 0.9.1'):
+                installer.check_release('v0.9.1')
+            with self.assertRaisesRegex(installer.InstallError, 'math-exercise not pinned by commit'):
+                installer.check_release('v0.9.0')
+            with self.assertRaisesRegex(installer.InstallError, 'not a release tag'):
+                installer.check_release('main')
+
+    def test_this_checkout_has_a_version(self):
+        self.assertRegex(installer.package_version(), r'^\d+\.\d+\.\d+')
+
+    def test_a_release_cannot_take_review_refs_or_sources(self):
+        for extra in (['--review-refs', f'math-exercise={A}'], ['--source', 'math-exercise=../math-exercise']):
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as temp, \
+                    patch.object(sys, 'argv', ['install-project.py', '--project', temp, '--release', 'v0.9.0', *extra]), \
+                    patch.object(installer.subprocess, 'run') as run:
+                with self.assertRaises(SystemExit) as stop:
+                    installer.main()
+                self.assertIn('cannot be combined with --review-refs or --source', str(stop.exception.code))
+                run.assert_not_called()
 
 
 @unittest.skipIf(os.name == 'nt', 'the fake quarto is a POSIX script')
@@ -90,7 +149,8 @@ class AtomicReplacement(unittest.TestCase):
         self.addCleanup(path.stop)
         # The package: two owned extensions and their record.
         self.distribution = root / 'dist'
-        files = {'ctm-assessment': {'_extension.yml': 'title: CTM'}, 'math-exercise': {'filter.lua': 'return {}', 'shared/x.js': 'new'}}
+        files = {'ctm-assessment': {'_extension.yml': 'title: CTM'}, 'math-exercise': {'filter.lua': 'return {}', 'shared/x.js': 'new'},
+                 'ctm-libs': {'_extension.yml': 'title: CTM libraries'}, 'ai-feedback': {'feedback-quarto.lua': 'alias'}}
         self.record = {'extension_sha256': {}}
         for name, contents in files.items():
             for relative, text in contents.items():
@@ -105,6 +165,9 @@ class AtomicReplacement(unittest.TestCase):
         (self.extensions / 'my-own' / '_extension.yml').write_text('title: mine')
         (self.extensions / 'math-exercise').mkdir()
         (self.extensions / 'math-exercise' / 'stale.txt').write_text('old')
+        # The ai-feedback 0.8 folder of an earlier package: now the alias of ctm-libs.
+        (self.extensions / 'ai-feedback').mkdir()
+        (self.extensions / 'ai-feedback' / 'feedback-core.js').write_text('0.8.1')
         self.backup = self.project / '.private-extensions' / 'previous'
 
     def install(self, mode):
@@ -117,6 +180,10 @@ class AtomicReplacement(unittest.TestCase):
     def test_success_replaces_owned_folders_and_drops_the_backup(self):
         self.install('ok')
         self.assertFalse((self.extensions / 'math-exercise' / 'stale.txt').exists())
+        # Owned folders come from the record: ctm-libs and its alias replace the old ai-feedback.
+        self.assertFalse((self.extensions / 'ai-feedback' / 'feedback-core.js').exists())
+        self.assertEqual((self.extensions / 'ai-feedback' / 'feedback-quarto.lua').read_text(), 'alias')
+        self.assertTrue((self.extensions / 'ctm-libs' / '_extension.yml').is_file())
         self.assertEqual((self.extensions / 'math-exercise' / 'shared' / 'x.js').read_text(), 'new')
         self.assertTrue((self.extensions / 'my-own' / '_extension.yml').is_file())
         self.assertFalse(self.backup.exists())
