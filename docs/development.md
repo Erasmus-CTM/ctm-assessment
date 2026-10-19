@@ -110,11 +110,14 @@ lists it in `integration/pyodide-parity/expected/<PR number>.json`:
 (`<corpus>/<file>.qmd`), a folder of them, or `python` (the Python
 programs); `case` a case id or a `/regular expression/` over case ids (the
 report lists both for every difference); `reason` says why the difference
-is right. An entry with
-`required` (the default) must match a difference, so an expectation that no
-longer applies fails too. Unlisted differences still fail. The file belongs to
-its pull request (the workflow reads only the one named by the PR's number) and
-can be deleted after the merge.
+is right. Prefer `case`: a `path` alone accepts every difference under it.
+Every entry is matched against every difference; the narrowest matching
+entry gives the reason (an exact case id before a pattern before a path
+alone; then the longer path, the longer pattern, the earlier entry). An entry
+with `required` (the default) must match at least one difference, so an
+expectation that no longer applies fails too. Unlisted differences still
+fail. The file belongs to its pull request (the workflow reads only the one
+named by the PR's number) and can be deleted after the merge.
 
 `--capture DIR` writes the golden suites for ctm-checkers (`capture.cjs`): every
 grading call at the runtime boundary — the `_math_*` values the page set and

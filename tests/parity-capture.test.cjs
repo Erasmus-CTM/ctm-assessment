@@ -171,6 +171,17 @@ test('build comparison: expected differences are accepted, others and stale expe
     assert.deepEqual(accepted.map(a => a.reason), ['new feedback text', 'test edited']);
     assert.deepEqual(unexpected.map(u => u.id), ['math-exercise/examples.html#12:other|single|response:0']);
     assert.deepEqual(stale.map(s => s.reason), ['gone already'], 'a required entry that matches nothing fails; optional ones do not');
+    // Overlapping entries: the narrowest gives the reason, and a later, narrower entry is not stale.
+    fs.writeFileSync(file, JSON.stringify({differences: [
+      {path: 'math-exercise', reason: 'pin bump'},
+      {path: 'math-exercise/examples.html', case: '/\\|response:/', reason: 'responses'},
+      {case: 'math-exercise/examples.html#11:a|single|response:0', reason: 'this one'}]}));
+    const overlapping = applyExpected(readExpected(file), [
+      d('math-exercise/examples.html#11:a|single|response:0', 'math-exercise/examples.html'),
+      d('math-exercise/examples.html#12:b|single|response:1', 'math-exercise/examples.html'),
+      d('math-exercise/examples.html#12:b|single|fixture:0', 'math-exercise/examples.html')]);
+    assert.deepEqual(overlapping.accepted.map(a => a.reason), ['this one', 'responses', 'pin bump']);
+    assert.deepEqual(overlapping.stale, []);
     fs.writeFileSync(file, JSON.stringify({differences: [{case: 'x'}]}));
     assert.throws(() => readExpected(file), /needs a reason/);
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }

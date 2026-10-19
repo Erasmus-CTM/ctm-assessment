@@ -45,7 +45,9 @@
 // {"differences": [{"path", "case", "reason", "required"}]}: `path` a page
 // ("math-exercise/examples.html") or authored source ("math-exercise/examples.qmd"),
 // or its folder; `case` a case id or "/regex/"; `reason` why; `required`
-// (default true) fails the run when the entry matches no difference.
+// (default true) fails the run when the entry matches no difference. The
+// narrowest matching entry gives a difference its reason (exact case id,
+// then pattern, then path alone).
 // PYODIDE_PARITY_CACHE: wheel cache (default DIR/wheels); PYODIDE_PARITY_WHEELS:
 // a local folder <dir>/<version>/<wheel> instead of jsDelivr (hashes are checked either way).
 'use strict';
@@ -239,18 +241,29 @@ function readExpected(file) {
     if (unknown.length || typeof entry.reason !== 'string' || !entry.reason.trim() || !(entry.path || entry.case))
       throw new Error(`${file}: entry ${i + 1} needs a reason and a path or case (path, case, reason, required)`);
     const pattern = typeof entry.case === 'string' && /^\/.*\/$/.test(entry.case) ? new RegExp(entry.case.slice(1, -1)) : null;
-    return {...entry, required: entry.required !== false,
+    // The narrower entry wins a difference: an exact case id, then a case pattern, then a path alone; the longer path, then the
+    // longer pattern, then the earlier entry.
+    const rank = [entry.case ? (pattern ? 2 : 3) : 1, (entry.path || '').length, (entry.case || '').length];
+    return {...entry, required: entry.required !== false, index: i, rank,
       matches: d => (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
         && (!entry.case || (pattern ? pattern.test(d.id) : d.id === entry.case))};
   });
 }
+const narrower = (a, b) => {
+  for (let k = 0; k < a.rank.length; k++) if (a.rank[k] !== b.rank[k]) return b.rank[k] - a.rank[k];
+  return a.index - b.index;
+};
+// Every entry is matched against every difference (round-2 review N2): the
+// narrowest matching entry gives the reason, and an entry is stale only when
+// it matches no difference at all.
 function applyExpected(entries, differences) {
   const used = entries.map(() => 0), accepted = [], unexpected = [];
   for (const d of differences) {
-    const index = entries.findIndex(entry => entry.matches(d));
-    if (index < 0) { unexpected.push(d); continue; }
-    used[index]++;
-    accepted.push({...d, reason: entries[index].reason});
+    const matching = entries.filter(entry => entry.matches(d));
+    if (!matching.length) { unexpected.push(d); continue; }
+    for (const entry of matching) used[entry.index]++;
+    const best = [...matching].sort(narrower)[0];
+    accepted.push({...d, reason: best.reason, entry: best.index + 1});
   }
   const stale = entries.filter((entry, i) => entry.required && !used[i]).map(({path: p, case: c, reason}) => ({path: p, case: c, reason}));
   return {accepted, unexpected, stale};
