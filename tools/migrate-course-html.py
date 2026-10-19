@@ -270,17 +270,17 @@ def constructs(lines, scanned):
         follows, summary_follows = summary_follows, False
         if re.search(r'<details[\s>]', lower):
             cls = re.search(r'class\s*=\s*"([^"]*)"', text, re.I)
-            title = re.search(r'<summary>(.*?)</summary>', text, re.I)
+            title = re.search(r'<summary>(.*?)</summary>', lines[index], re.I)
             if not title:
                 for later in range(index + 1, min(index + 4, len(scanned))):
                     if scanned[later][0] and scanned[later][0].strip():
-                        title = re.search(r'<summary>(.*?)</summary>', scanned[later][0], re.I)
+                        title = re.search(r'<summary>(.*?)</summary>', lines[later], re.I)
                         break
             key = 'details' + ('.' + '.'.join(cls.group(1).split()) if cls and cls.group(1).strip() else '')
             found.append(Construct('details', number, key + (': ' + title.group(1).strip() if title else ''), not raw, 'inside a ```{=html} block' if raw else ''))
             summary_follows = not re.search(r'<summary[\s>]', lower)
         elif re.search(r'<summary[\s>]', lower) and not follows:
-            title = re.search(r'<summary>(.*?)</summary>', text, re.I)
+            title = re.search(r'<summary>(.*?)</summary>', lines[index], re.I)
             found.append(Construct('details', number, 'summary' + (': ' + title.group(1).strip() if title else ''), False,
                                    'a <summary> without its <details> on the line before'))
         for anchor in re.finditer(r'<div\s+id\s*=\s*"([^"]*)"\s*>\s*</div>', text, re.I):
@@ -324,8 +324,12 @@ def convert_file(path, lines, scanned, languages, switch, report):
     """(converted lines, indexes of the converted constructs' first lines, why others were left)."""
     out, done, why = [], set(), {}
     closes = {}  # index of a </details> line -> the indent of its fence
-    usable = [text is not None and not raw and text.rstrip() == line.rstrip()
-              for line, (text, raw) in zip(lines, scanned)]
+    # Markdown lines (outside code, comments and front matter); `usable`: also
+    # without inline code or a comment on the line. A <summary> line may hold
+    # inline code (its title is Markdown, as Pandoc read it inside raw HTML).
+    markdown = [text is not None and not raw for text, raw in scanned]
+    usable = [ok and text.rstrip() == line.rstrip() for ok, line, (text, raw) in zip(markdown, lines, scanned)]
+    texts = [text if ok else '' for ok, (text, raw) in zip(markdown, scanned)]
     content = front_matter_end(lines)
     started = False  # some content before this line
 
@@ -341,13 +345,14 @@ def convert_file(path, lines, scanned, languages, switch, report):
     index = 0
     while index < len(lines):
         line = lines[index]
-        if not usable[index]:
+        if not markdown[index]:
+            # Code (a cell) is content; front matter is not.
             started = started or (index >= content and bool(line.strip()))
             out.append(line)
             index += 1
             continue
 
-        match = SWITCH.match(line)
+        match = SWITCH.match(line) if usable[index] else None
         if match:
             end = next((j for j in range(index + 1, min(index + 12, len(lines)))
                         if usable[j] and lines[j].strip().lower() == '</div>'), None)
@@ -378,9 +383,9 @@ def convert_file(path, lines, scanned, languages, switch, report):
             started = True
             continue
 
-        match = DETAILS.match(line)
+        match = DETAILS.match(line) if DETAILS.match(texts[index]) else None
         if match:
-            converted = details(path, lines, usable, index, match, languages, report)
+            converted = details(path, lines, texts, index, match, languages, report)
             if isinstance(converted, tuple):
                 fence, close, after = converted
                 fence_after_blank(index)
@@ -392,7 +397,7 @@ def convert_file(path, lines, scanned, languages, switch, report):
                 continue
             why[index] = converted
 
-        match = ANCHOR.match(line)
+        match = ANCHOR.match(line) if usable[index] else None
         if match:
             fence_after_blank(index)
             out += [f'{match.group(1)}::: {{#{match.group(2)}}}', match.group(1) + ':::']
@@ -402,7 +407,7 @@ def convert_file(path, lines, scanned, languages, switch, report):
             started = True
             continue
 
-        match = IFRAME.match(line)
+        match = IFRAME.match(line) if usable[index] else None
         if match:
             embed = iframe(match.group(2))
             if embed.startswith('::: '):
@@ -415,14 +420,16 @@ def convert_file(path, lines, scanned, languages, switch, report):
                 continue
             why[index] = embed
 
-        started = started or (index >= content and bool(line.strip()))
+        # An HTML comment is not content: a switch after one still starts the page.
+        started = started or bool(texts[index].strip())
         out.append(line)
         index += 1
     return out, done, why
 
 
-def details(path, lines, usable, index, match, languages, report):
-    """(opening fence, index of the </details> line, index after the <summary>), or why not."""
+def details(path, lines, texts, index, match, languages, report):
+    """(opening fence, index of the </details> line, index after the <summary>), or why not.
+    `texts`: each line's Markdown text without inline code ('' outside Markdown)."""
     indent, attrs, rest = match.groups()
     found = attributes(attrs)
     others = [name for name, _ in found if name != 'class']
@@ -438,28 +445,26 @@ def details(path, lines, usable, index, match, languages, report):
         title, summary = SUMMARY.match(rest), index
     else:
         summary = index + 1
-        title = SUMMARY.match(lines[summary]) if summary < len(lines) and usable[summary] else None
+        tags = summary < len(lines) and re.search(r'<summary>', texts[summary], re.I) and re.search(r'</summary>', texts[summary], re.I)
+        title = SUMMARY.match(lines[summary]) if tags else None
     if not title:
         return 'a <details> without <summary>…</summary> (alone on its line) right after it'
     # Its </details>: the first one at the same depth, alone at the end of a line.
     depth, close = 0, None
     for j in range(summary + 1, len(lines)):
-        if not usable[j]:
-            continue
-        if DETAILS.match(lines[j]):
+        if DETAILS.match(texts[j]):
             depth += 1
-        elif CLOSE.match(lines[j]):
+        elif CLOSE.match(texts[j]):
             if depth == 0:
                 close = j
                 break
             depth -= 1
     if close is None:
         return 'a <details> without a </details> that ends a line'
+    # The title stays Markdown, as Pandoc read the <summary> line's content.
     text = title.group(1).strip()
     langs = languages.get(path, set())
     keep = not (len(langs) == 1 and DEFAULT_TITLES.get(kind, {}).get(next(iter(langs))) == text)
-    if keep and re.search(r'[*_`$\[\]<>\\]', text):
-        report.note(path, index + 1, f'the title "{text}" is read as Markdown now: check how it looks')
     parts = ['.' + kind] + ['.' + c for c in extra] + ([f'title={quoted(text)}'] if keep else [])
     report.counts[f'<details{" class=" + chr(34) + " ".join(classes) + chr(34) if classes else ""}> -> ::: {{.{kind}}}'
                   + ('' if keep else ' (default title left out)')] += 1

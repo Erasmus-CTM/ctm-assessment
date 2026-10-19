@@ -75,6 +75,13 @@ Innhold med $x$.
 Et hint.
 </details>
 
+<details class="reading-step">
+<summary>Gå i dybden: `float`, $Q^TQ$ og flyttall</summary>
+
+Kode og matematikk i tittelen.
+
+</details>
+
 1. Et punkt
    som fortsetter.
 <details>
@@ -161,6 +168,8 @@ class Migrate(unittest.TestCase):
             'pages/intro.qmd': '---\ntitle: Intro\nlang: en\n---\n\n{{< include ../_includes/intro.md >}}\n',
             '_includes/intro.md': INTRO,
             '_includes/unused.md': '<details>\n<summary>Not shown by a page</summary>\n</details>\n',
+            'pages/setup.qmd': '---\ntitle: Oppsett\n---\n\n{{< include ../_includes/setup.md >}}\n',
+            '_includes/setup.md': '<!--\nThe switch sits here.\n-->\n\n' + WEEK.split('\n\n', 1)[0] + '\n\nTekst.\n',
             '_includes/site/tab-links.html': '<script></script>\n',
             '_includes/site/learning-mode.html': '<script></script>\n',
             'README.md': '<details>\n<summary>Readme</summary>\n</details>\n',
@@ -189,6 +198,9 @@ class Migrate(unittest.TestCase):
         # Titles: backslashes doubled and quotes escaped (Pandoc reads attribute values with escapes).
         self.assertIn('::: {.reading-step title="Gå i dybden: $\\\\mathbf{A}\\\\,x$ og \\"sitat\\""}\n', week)
         self.assertIn('::: {.hint title="Hint til oppgave 1"}\n\nEt hint.\n:::\n', week)
+        # Inline code and maths stay in the title: Pandoc read the <summary> line as Markdown too.
+        self.assertIn('::: {.reading-step title="Gå i dybden: `float`, $Q^TQ$ og flyttall"}\n', week)
+        self.assertNotIn('read as Markdown', out)
         # The default title of the page language is left out (nb: Løsningsforslag, Gå i dybden).
         self.assertIn('::: {.solution}\n\nLøsningen.\n\n:::\n', week)
         self.assertIn('::: {.reading-step}\n\nYtre.\n\n::: {.details title="Indre"}\n\nIndre tekst.\n:::\n\n:::\n', week)
@@ -211,6 +223,8 @@ class Migrate(unittest.TestCase):
         intro = self.read('_includes/intro.md')
         self.assertEqual(intro, 'Explore a direction.\nUse the tabs.\n\n::: {.modes}\n:::\n\n'
                                 '::: {.solution title="Løsningsforslag"}\n\nOn an English page the title stays.\n\n:::\n')
+        # An HTML comment before the switch is not content: the switch still starts its file.
+        self.assertEqual(self.read('_includes/setup.md'), '<!--\nThe switch sits here.\n-->\n\nTekst.\n')
         # Files no page shows, and READMEs, are left alone.
         self.assertIn('<details>', self.read('_includes/unused.md'))
         self.assertIn('<details>', self.read('README.md'))
@@ -247,7 +261,8 @@ class Migrate(unittest.TestCase):
         lines = [line for line in out.splitlines() if re.match(r'^_includes/', line)]
         self.assertTrue(any(line.startswith('_includes/uke5.md:1: ') and 'lecture/reading switch' in line for line in lines), out)
         self.assertTrue(any(line.startswith('_includes/uke5.md:11: ') and '::: {#id}' in line for line in lines), out)
-        self.assertEqual(sum('<details>/<summary>' in line for line in lines), 9, out)
+        self.assertEqual(sum('<details>/<summary>' in line for line in lines), 10, out)
+        self.assertTrue(any('Found: details.reading-step: Gå i dybden: `float`, $Q^TQ$ og flyttall' in line for line in lines), out)
         # What the conversion cannot do is named.
         self.assertTrue(any(line.startswith('_includes/uke5.md:') and 'Found: details: Åpen' in line
                             and 'convert it by hand (a <details> with other attributes (open))' in line for line in lines), out)
@@ -321,6 +336,7 @@ class Migrate(unittest.TestCase):
         self.assertEqual(reveals, [
             (['reading-step'], 'Gå i dybden: $\\mathbf{A}\\,x$ og "sitat"'),
             (['hint'], 'Hint til oppgave 1'),
+            (['reading-step'], 'Gå i dybden: `float`, $Q^TQ$ og flyttall'),
             (['details'], 'Valgfri fordypning'),
             (['solution'], None),
             (['reading-step'], None),
