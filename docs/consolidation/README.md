@@ -12,7 +12,7 @@ merged by AC.
 | 1 | ctm-libs: runtime, locator, settings reader, locale, feedback folded in; A1–A7, P19, P22; cacheable scripts; Pyodide 0.28.3; versioned releases | [2026-10-step1.md](2026-10-step1.md) (reviewed; amendments in §16) | merged (CTM Assessment 0.9.0) |
 | 2 | ctm-checkers extraction; stack-sympy audit alongside | [2026-10-step2.md](2026-10-step2.md) (reviewed; amendments in §13); [stack-sympy audit](stack-sympy-audit-2026-10.md) | implementing |
 | 3 | pyodide-interaktiv onto ctm-libs (working branch) | — | — |
-| 4 | UI: saved answers, progress, quizzes (P17); Markdown reveals, modes, figures (P18) with the course migrations; languages (P21) | — | — |
+| 4 | UI: saved answers, progress, quizzes (P17); Markdown reveals, modes, figures (P18) with the course migrations; languages (P21) | [2026-10-step4.md](2026-10-step4.md) (reviewed twice; AC's decisions at the end) | implementing: A1 (ctm-libs #22, #24) merged, courses pinned (P0), A2 in review |
 | 5 | Worker for standalone pages (P13), preload and status lamp (P16) | — | — |
 
 ## Log
