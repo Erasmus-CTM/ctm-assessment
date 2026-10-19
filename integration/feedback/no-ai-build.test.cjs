@@ -40,7 +40,9 @@ function messages(stderr) {
   for (const line of stderr.split('\n')) {
     const start = /^\[\d+\/\d+\] (\S+)/.exec(line);
     if (start) { page = start[1]; pages[page] = []; continue; }
-    const message = /AI feedback is off for this build \((.*)\); left out on this page: (.*)\.$/.exec(line);
+    // "...(<reason>); left out on this page: <items>." or, with ctm-libs' without-ai,
+    // "...(<reason>); shown as text, without automatic feedback (...): <names>. Left out on this page: <items>."
+    const message = /AI feedback is off for this build \((.*?)\); (.*)\.$/.exec(line);
     if (message && page) pages[page].push({reason: message[1], items: message[2]});
   }
   return pages;
@@ -74,7 +76,7 @@ function checkWithout(dir, pages, reason, stderr) {
   assert.equal(found['all.qmd'][0].reason, reason);
   // The activity only AI feedback can assess: named and shown as text (without-ai: text);
   // ctm-libs before that rule counts it as one AI feedback activity left out.
-  assert.match(found['all.qmd'][0].items, /only AI feedback can assess, shown as text|1 AI feedback activity/);
+  assert.match(found['all.qmd'][0].items, /shown as text, without automatic feedback \(without-ai: text|only AI feedback can assess, shown as text|1 AI feedback activity/);
   assert.match(found['all.qmd'][0].items, /py-exercise feedback/);
   assert.equal(found['asks.qmd'].length, 1, stderr);
   assert.match(found['asks.qmd'][0].items, /ai-feedback: enabled: true \(asks\.qmd\)/);
