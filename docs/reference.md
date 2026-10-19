@@ -97,8 +97,9 @@ visible but are excluded from context. Heading boundaries apply inside nested
 containers too; a single oversized latest block is omitted rather than sliced.
 Since CTM Assessment 0.9 a tab of a tabset starts a section as a heading does
 (nested tabsets too), after a tabset its section goes on without the tabs'
-prose, and the content of `<details>` blocks (solutions, reading steps,
-hints) is never context.
+prose, and the content of `<details>` blocks and collapsed callouts
+(solutions, reading steps, hints) is context only for an exercise inside such
+a block (with the section's prose before it).
 
 Explicit context uses a combined 6,000-character budget for the listed blocks
 and preserves math through MathJax or KaTeX rendering. Missing, duplicate,
