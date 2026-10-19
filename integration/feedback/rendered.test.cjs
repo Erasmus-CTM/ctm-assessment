@@ -3,10 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
+const page = require('./page-scripts.cjs');
 const site = process.env.CTM_INTEGRATION_SITE;
 assert.ok(site, 'Run scripts/setup-feedback-integration.py --test first.');
 const html = fs.readFileSync(path.join(site, 'example.html'), 'utf8');
-const sharedVersion = require(path.join(path.dirname(site), '_extensions/ai-feedback/feedback-core.js')).version;
+// ctm-libs (formerly ai-feedback) holds the feedback files; AIFeedback.version is its version.
+const libs = path.join(path.dirname(site), '_extensions', 'ctm-libs');
+const sharedVersion = require(path.join(libs, 'feedback', 'feedback-core.js')).version;
+const legacy = process.env.CTM_LEGACY_AI_FEEDBACK;  // ai-feedback 0.8.1, prepared by the builder
 
 test('common page renders the active extensions and keeps local dependencies resolvable', () => {
   const dom = new JSDOM(html);
@@ -35,7 +39,7 @@ test('common page renders the active extensions and keeps local dependencies res
     const names = [...policy.querySelectorAll('strong')].map(n => n.textContent);
     assert.deepEqual(names, ['AI Feedback defaults (feedback-defaults.yml)', 'feedback/page.yml', 'feedback/comparison.yml']);
     [...policy.querySelectorAll('code')].forEach((code, i) => {
-      assert.equal(code.textContent, fs.readFileSync(path.join(site, '..', i === 0 ? '_extensions/ai-feedback/feedback-defaults.yml' : names[i]), 'utf8'));
+      assert.equal(code.textContent, fs.readFileSync(path.join(site, '..', i === 0 ? '_extensions/ctm-libs/feedback/feedback-defaults.yml' : names[i]), 'utf8'));
     });
   }
   for (const diagram of doc.querySelectorAll('details[data-source-kind="jsxgraph"]')) {
@@ -52,8 +56,13 @@ test('common page renders the active extensions and keeps local dependencies res
   for (const name of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) {
     assert.equal([...doc.scripts].filter(s => s.src.endsWith('/' + name)).length, 1, name + ' must load once');
   }
+  // D1: the components' scripts and ctm-libs' runtime are files, each loaded once, none inlined.
+  for (const [name, file] of [['math-exercise', 'math-exercise.js'], ['py-exercise', 'py-exercise.js'], ['ctm-runtime', 'pyodide-runtime.js'],
+    ['ctm-locale', 'ctm-locale.js'], ['ctm-locale-math-exercise', 'math-exercise.js'], ['ctm-locale-py-exercise', 'py-exercise.js']]) {
+    assert.equal(page.scriptsOf(doc, name, file).length, 1, name + '/' + file + ' must load once');
+  }
   for (const marker of ['var ME_CFG =', 'function setupExercise(exerciseData)']) {
-    assert.equal([...doc.scripts].filter(s => s.textContent.includes(marker)).length, 1, marker + ' must initialize once');
+    assert.equal([...doc.scripts].filter(s => !s.src && s.textContent.includes(marker)).length, 0, marker + ' must not be inlined');
   }
   for (const node of doc.querySelectorAll('script[src],link[rel="stylesheet"][href]')) {
     const resource = node.getAttribute('src') || node.getAttribute('href');
@@ -61,7 +70,7 @@ test('common page renders the active extensions and keeps local dependencies res
     assert.ok(fs.existsSync(path.resolve(site, resource.split('?')[0])), 'Missing ' + resource);
   }
   const record = JSON.parse(fs.readFileSync(path.join(site, 'resolved-repos.json'), 'utf8'));
-  assert.deepEqual(Object.keys(record.repositories).sort(), ['ai-feedback', 'ctm-assessment', 'jsxgraph', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
+  assert.deepEqual(Object.keys(record.repositories).sort(), ['ctm-assessment', 'ctm-libs', 'jsxgraph', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
   assert.equal(panels[2].querySelectorAll('.math-exercise-cell').length, 7);
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'repos.json'), 'utf8'));
   for (const [name, source] of Object.entries(record.repositories)) {
@@ -80,9 +89,14 @@ test('common page renders the active extensions and keeps local dependencies res
   for (const file of ['feedback-core.js','feedback-dom.js','ai-feedback.js','ai-feedback.css']) {
     assert.equal(record.extension_sha256['pyodide-interaktiv']['ai-feedback/'+file],undefined);
   }
+  // ctm-libs ships its library and the thin ai-feedback alias (0.9.x): no feedback files in the alias.
+  assert.deepEqual(record.repositories['ctm-libs'].extensions, ['ctm-libs', 'ai-feedback']);
+  assert.deepEqual(Object.keys(record.extension_sha256['ai-feedback']).sort(), ['_extension.yml', 'ai-feedback.lua', 'feedback-quarto.lua']);
+  for (const file of ['feedback/feedback-core.js', 'lua/ctm.lua', 'runtime/pyodide-runtime.js', 'locales/ctm-locale.js', 'ctm-libs-end.lua'])
+    assert.ok(record.extension_sha256['ctm-libs'][file], file);
   for (const [name, source] of Object.entries(record.repositories)) {
     assert.match(source.commit, /^[0-9a-f]{40}$/);
-    assert.ok(Object.keys(record.extension_sha256[manifest.repositories[name].extension || name]).length > 0);
+    for (const folder of source.extensions) assert.ok(Object.keys(record.extension_sha256[folder]).length > 0, folder);
   }
   // JSXGraph is the upstream extension, not a copy from another component.
   assert.ok(record.extension_sha256.jsxgraph['lua/jsxgraph.lua']);
@@ -153,16 +167,12 @@ test('copied examples reproduce only their declared drafts, with complete linked
       '\n\n```{math-exercise}\n#| label: ordinary-empty\nNo draft: _[42].\n```\n');
     const render = spawnSync('quarto', ['render','copies.qmd'], {cwd:dir,encoding:'utf8',timeout:120000});
     assert.equal(render.status,0,render.stderr || render.error?.message);
-    dom = new JSDOM(fs.readFileSync(path.join(dir,'copies.html'),'utf8'), {url:'https://copies.invalid/',runScripts:'outside-only'});
+    const copies = path.join(dir,'copies.html');
+    dom = new JSDOM(fs.readFileSync(copies,'utf8'), {url:'https://copies.invalid/',runScripts:'outside-only'});
     const w = dom.window; w.document.addEventListener = () => {}; w.AbortController = AbortController;
     w.__mathExerciseTestMode = true;
-    for (const name of ['feedback-core.js','feedback-dom.js','ai-feedback.js'])
-      w.eval(fs.readFileSync(path.join(dir,'_extensions/ai-feedback',name),'utf8'));
-    const math = path.join(dir,'_extensions/math-exercise');
-    w.eval(fs.readFileSync(path.join(math,'shared/pyodide-runtime.js'),'utf8'));
-    // math-exercise.lua inlines matrix-input.js before math-exercise.js; load them in the same order.
-    if (fs.existsSync(path.join(math,'matrix-input.js'))) w.eval(fs.readFileSync(path.join(math,'matrix-input.js'),'utf8'));
-    w.eval(fs.readFileSync(path.join(math,'math-exercise.js'),'utf8'));
+    // The page's files in page order: feedback, runtime, catalogues, matrix-input.js, math-exercise.js.
+    page.run(w, copies, page.MATH);
     for (const cell of w.document.querySelectorAll('.math-exercise-cell')) {
       w.__mathExerciseTestApi.setupCell(cell);
       assert.deepEqual([...cell.querySelectorAll('.math-input')].map(field => field.value), expected[cell.dataset.label] || ['']);
@@ -176,13 +186,10 @@ test('copied examples reproduce only their declared drafts, with complete linked
 test('mathematics feedback excludes the author note from learning context', () => {
   const dom = new JSDOM(html, {url: 'https://integration.invalid/', runScripts: 'outside-only'});
   const w = dom.window;
-  for (const script of w.document.scripts) if (script.textContent.includes('window.__aiFeedbackPolicies =')) w.eval(script.textContent);
-  for(const file of ['feedback-core.js','feedback-dom.js','ai-feedback.js']) w.eval(fs.readFileSync(path.join(process.env.AI_FEEDBACK_EXTENSION,file),'utf8'));
   w.__mathExerciseTestMode = true;
   // Exercise the real resolver/prompt builder without starting consumer runtimes.
   w.document.addEventListener = () => {};
-  const bundle = [...w.document.scripts].find(s => s.textContent.includes('var ME_CFG ='));
-  w.eval(bundle.textContent);
+  page.run(w, path.join(site, 'example.html'), page.MATH);
   const cell = w.document.querySelector('.math-exercise-cell');
   const api = w.__mathExerciseTestApi;
   assert.equal(cell.dataset.contextMode, 'none');
@@ -230,51 +237,42 @@ test('Python practice keeps five incomplete starters and their tasks separate fr
   dom.window.close();
 });
 
-test('standalone math and both shared-filter orders load one usable runtime', async () => {
+test('individually listed math-exercise and both shared-filter orders load one usable runtime; an old ai-feedback stops', async () => {
+  // The package is installed (ctm-assessment, ctm-libs with its ai-feedback
+  // alias, math-exercise) and the page lists filters itself, as documented
+  // for pages that do not use filters: [ctm-assessment].
   const {spawnSync} = require('node:child_process');
   const dir = fs.mkdtempSync(path.join(path.dirname(site), 'filter-order-'));
   try {
     const source = path.join(path.dirname(site), '_extensions');
-    fs.cpSync(path.join(source, 'math-exercise'), path.join(dir, '_extensions/math-exercise'), {recursive: true});
-    fs.cpSync(path.join(source, 'ai-feedback'), path.join(dir, '_extensions/ai-feedback'), {recursive: true});
-    for (const [i, filters] of [['math-exercise'], ['ai-feedback', 'math-exercise'], ['math-exercise', 'ai-feedback'], ['ai-feedback', 'math-exercise'], ['math-exercise', 'ai-feedback']].entries()) {
-      if (i === 3) {
-        // Simulate the previously released explicit dependency and callback contract.
-        for (const name of ['feedback-quarto.lua', 'feedback-core.js', 'ai-feedback.js']) {
-          const file = path.join(dir, '_extensions/ai-feedback', name);
-          fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll(sharedVersion, '0.1.0').replace('await getRequest({ hintLevel })', 'await getRequest()'));
-        }
-      }
+    for (const name of ['ctm-assessment', 'ctm-libs', 'ai-feedback', 'math-exercise'])
+      fs.cpSync(path.join(source, name), path.join(dir, '_extensions', name), {recursive: true});
+    if (legacy) fs.cpSync(legacy, path.join(dir, '_extensions/Erasmus-CTM/ai-feedback'), {recursive: true});
+    const orders = [['math-exercise'], ['ai-feedback', 'math-exercise'], ['math-exercise', 'ai-feedback']];
+    if (legacy) orders.push(['Erasmus-CTM/ai-feedback', 'math-exercise'], ['math-exercise', 'Erasmus-CTM/ai-feedback']);
+    for (const [i, filters] of orders.entries()) {
       fs.writeFileSync(path.join(dir, `order-${i}.qmd`), `---\nformat: html\nfilters: [${filters.join(', ')}]\n---\n\n::: {#context .ai-context}\nUse $x^2$.\n:::\n\n\x60\x60\x60{math-exercise}\n#| label: order\n#| context: context\nCompute $2+2$: _[SECRET_ANSWER]\n\x60\x60\x60\n`);
       const render = spawnSync(process.env.QUARTO_BIN || 'quarto', ['render', `order-${i}.qmd`], {cwd: dir, encoding: 'utf8', timeout: 120000});
-      assert.equal(render.status, 0, render.stderr);
-      const dom = new JSDOM(fs.readFileSync(path.join(dir, `order-${i}.html`), 'utf8'), {url: 'https://order.invalid/', runScripts: 'outside-only'});
-      const w = dom.window;
-  for (const script of w.document.scripts) if (script.textContent.includes('window.__aiFeedbackPolicies =')) w.eval(script.textContent); w.document.addEventListener = () => {}; w.__mathExerciseTestMode = true;
-      for (const name of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) {
-        const scripts = [...w.document.scripts].filter(s => s.src.endsWith('/' + name));
-        assert.equal(scripts.length, 1, `${filters}: ${name}`);
-        w.eval(fs.readFileSync(path.join(dir, scripts[0].getAttribute('src')), 'utf8'));
+      if (filters.some(name => name.startsWith('Erasmus-CTM/'))) {
+        // ai-feedback 0.8.1 listed next to the package's components: a page uses one version.
+        assert.notEqual(render.status, 0, filters.join(', '));
+        assert.match(render.stderr, /combines filters that use different ai-feedback versions/);
+        continue;
       }
-      assert.equal(w.AIFeedback.version, i < 3 ? sharedVersion : '0.1.0');
+      assert.equal(render.status, 0, render.stderr);
+      if (filters.includes('ai-feedback')) assert.match(render.stderr, /filters: \[ai-feedback\] is deprecated/);
+      const file = path.join(dir, `order-${i}.html`);
+      const dom = new JSDOM(fs.readFileSync(file, 'utf8'), {url: 'https://order.invalid/', runScripts: 'outside-only'});
+      const w = dom.window;
+      w.document.addEventListener = () => {}; w.__mathExerciseTestMode = true;
+      for (const [name, script] of [['ai-feedback', 'feedback-core.js'], ['ai-feedback', 'feedback-dom.js'], ['ai-feedback', 'ai-feedback.js'],
+        ['ctm-runtime', 'pyodide-runtime.js'], ['math-exercise', 'math-exercise.js']])
+        assert.equal(page.scriptsOf(w.document, name, script).length, 1, `${filters}: ${name}/${script}`);
+      page.run(w, file, page.MATH);
+      assert.equal(w.AIFeedback.version, sharedVersion);
       w.AIFeedback.initialize();
-      const math = [...w.document.scripts].find(s => s.textContent.includes('var ME_CFG ='));
-      w.eval(math.textContent);
       const cell = w.document.querySelector('.math-exercise-cell');
       w.__mathExerciseTestApi.setupCell(cell); cell.querySelector('.math-input').value = '3';
-      if (w.AIFeedback.version === '0.1.0') {
-        assert.ok(cell.querySelector('.math-feedback-btn').disabled);
-        assert.match(cell.querySelector('.ai-feedback-output').textContent, /Update.*ai-feedback/);
-        assert.equal(cell.querySelector('.math-check-btn').disabled, false);
-        w.mainPyodide = {loadPackage: async () => {}, globals: {set() {}}, runPythonAsync: async () => JSON.stringify({status: 'correct', score: 1})};
-        cell.querySelector('.math-input').dispatchEvent(new w.Event('input', {bubbles: true}));
-        const check = cell.querySelector('.math-check-btn'); check.click();
-        for (let n = 0; n < 30 && check.disabled; n++) await new Promise(resolve => setImmediate(resolve));
-        assert.equal(check.disabled, false); assert.ok(cell.querySelector('.math-fb-ok'));
-        assert.ok(cell.querySelector('.math-feedback-btn').disabled);
-        assert.match(cell.querySelector('.ai-feedback-output').textContent, /Update.*ai-feedback/);
-        dom.window.close(); continue;
-      }
       cell.querySelector('.math-feedback-btn').click();
       for (let n = 0; n < 30 && !cell.querySelector('pre'); n++) await new Promise(resolve => setImmediate(resolve));
       const prompt = cell.querySelector('pre')?.textContent;
@@ -290,7 +288,8 @@ test('standalone Pyodide, both filter orders and disabled feedback render correc
   const {spawnSync} = require('node:child_process');
   const dir = fs.mkdtempSync(path.join(path.dirname(site), 'pyodide-order-'));
   try {
-    for(const extension of ['pyodide-interaktiv','ai-feedback']) fs.cpSync(path.join(path.dirname(site),'_extensions',extension),path.join(dir,'_extensions',extension),{recursive:true});
+    // pyodide-interaktiv 1.8 loads ai-feedback through its own loader: the alias hands it ctm-libs' feedback.
+    for(const extension of ['pyodide-interaktiv','ctm-libs','ai-feedback']) fs.cpSync(path.join(path.dirname(site),'_extensions',extension),path.join(dir,'_extensions',extension),{recursive:true});
     for(const [i,filters] of [['pyodide-interaktiv'],['ai-feedback','pyodide-interaktiv'],['pyodide-interaktiv','ai-feedback'],['pyodide-interaktiv']].entries()) {
       const blocks=['interactive','setup','output'].map(context=>'```{pyodide-python}\n#| context: '+context+'\n#| task: Print the value.\nprint(1)\n```').join('\n\n');
       fs.writeFileSync(path.join(dir,`order-${i}.qmd`),`---\nformat: html\nfilters: [${filters.join(', ')}]\npyodide:\n  feedback: ${i!==3}\n---\n\n${blocks}\n`);
@@ -316,7 +315,7 @@ test('standalone Pyodide, both filter orders and disabled feedback render correc
 });
 
 test('explicit file selection and inherited overrides preserve effective policy', () => {
-  const F = require(path.join(path.dirname(site),'_extensions/ai-feedback/feedback-core.js'));
+  const F = require(path.join(libs,'feedback','feedback-core.js'));
   const c={layers:[{policies:{base:{'base-prompt':String.raw`Use \(x^2\).`,steps:[{'step-prompt':'Question'},{'step-prompt':'Solution','allow-full-solution':true}]},brief:{extends:'base','max-words':80}}}]};
   assert.equal(F.resolvePolicy('math-exercise','en',{},c).steps.length,4);
   c.pagePolicy='brief';
