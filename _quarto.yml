@@ -22,7 +22,7 @@ format:
     theme: cosmo
 ai-feedback:
   policy-files: feedback.yml
-  project-policy: course-feedback
+  policy: course-feedback
   mode: copy
   storage: local
 py-exercise:

@@ -162,7 +162,7 @@ test('copied examples reproduce only their declared drafts, with complete linked
     fs.cpSync(path.join(original, '_extensions'), path.join(dir, '_extensions'), {recursive:true});
     fs.cpSync(path.join(original, 'feedback'), path.join(dir, 'feedback'), {recursive:true});
     fs.copyFileSync(path.join(original, 'feedback.yml'), path.join(dir, 'feedback.yml'));
-    const metadata = '---\nformat: html\nfilters: [ctm-assessment]\nai-feedback:\n  policy-files: feedback.yml\n  page-policy-files: [feedback/page.yml, feedback/comparison.yml]\n---\n\n';
+    const metadata = '---\nformat: html\nfilters: [ctm-assessment]\nai-feedback:\n  policy-files: [feedback.yml, feedback/page.yml, feedback/comparison.yml]\n  policy: practice-feedback\n---\n\n';
     fs.writeFileSync(path.join(dir, 'copies.qmd'), metadata + snippets.join('\n\n') + '\n\n' + shapeSource +
       '\n\n```{math-exercise}\n#| label: ordinary-empty\nNo draft: _[42].\n```\n');
     const render = spawnSync('quarto', ['render','copies.qmd'], {cwd:dir,encoding:'utf8',timeout:120000});
