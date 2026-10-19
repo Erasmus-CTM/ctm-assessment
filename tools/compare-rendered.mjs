@@ -121,11 +121,12 @@ function extract(file) {
 }
 
 // Feedback context: the prose an exercise sends is that of its own section,
-// the innermost tab (with its label) or heading section around it, without raw
-// <details> blocks, other tabs, nested sections, other exercises and code
-// blocks; an explicit context (A5) also leaves out every context block with an
-// id (the listed ones are sent on their own, the others belong to other
-// exercises). `contextVerdict` gives "own-section" when the after page's
+// the innermost tab (with its label), heading section, <details> block or
+// collapsed callout around it, without closed blocks (<details>, collapsed
+// callouts) it is not in, other tabs, nested sections, other exercises and
+// code blocks; an explicit context (A5) also leaves out every context block
+// with an id (the listed ones are sent on their own, the others belong to
+// other exercises). `contextVerdict` gives "own-section" when the after page's
 // context text is exactly that, and every piece of the section's prose that
 // the before page sent is still sent; otherwise it names the first piece that
 // is not and where it comes from. Text is compared as letters and digits only,
@@ -134,7 +135,10 @@ function extract(file) {
 const EXERCISES = '.math-exercise-cell, .py-exercise-cell, [id^="qpyodide-insertion-location-"], .ai-feedback-activity, .ai-feedback-task';
 const CONTEXT_BLOCKS = '.ai-context[id], .ai-feedback-context[id], .math-exercise-context[id]';
 const NOT_TEXT = 'script, style, noscript, template';
-const NOT_PROSE = NOT_TEXT + ', pre, details';
+// Closed until the learner opens them: prose only for exercises inside them.
+const CLOSED = 'details, .callout-collapse.collapse:not(.show)';
+const SCOPES = '.tab-pane, section, ' + CLOSED;
+const NOT_PROSE = NOT_TEXT + ', pre, ' + CLOSED;
 const squash = value => String(value ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 const pieces = value => String(value ?? '').split('\n').map(text => ({text: text.trim(), key: squash(text)})).filter(piece => piece.key);
 function textOf(root, skip = node => node.matches(NOT_TEXT)) {
@@ -146,7 +150,8 @@ function textOf(root, skip = node => node.matches(NOT_TEXT)) {
   })(root);
   return parts.join(' ');
 }
-// The exercise's own section inside its scope (innermost tab or <section>):
+// The exercise's own section inside its scope (innermost tab, <section>,
+// <details> or collapsed callout):
 // from the nearest heading before the exercise (headings that Quarto did not
 // wrap in a <section>, as inside tabs, start a section too; none: the start of
 // the scope, with the tab's label) to the next heading. Returns its text and
@@ -177,7 +182,7 @@ function ownSection(doc, scope, element, skip) {
 }
 function contextVerdict(doc, element, after, before, refs, explicit) {
   if (!element) return 'no exercise element';
-  const scope = element.parentElement?.closest('.tab-pane, section') || doc.body;
+  const scope = element.parentElement?.closest(SCOPES) || doc.body;
   const listed = String(refs ?? '').split(',').map(id => id.trim())
     .filter(id => id && id !== 'auto' && id !== 'none' && !id.startsWith('jsxgraph:')).map(id => doc.getElementById(id)).filter(Boolean);
   const skip = node => node.matches(NOT_PROSE) || node.matches(EXERCISES) || node.matches('.tab-pane, section, .nav') || listed.includes(node)
@@ -200,11 +205,12 @@ function contextVerdict(doc, element, after, before, refs, explicit) {
 function origin(doc, element, scope, listed, piece) {
   const has = el => el && squash(textOf(el)).includes(piece.key);
   const enclosing = [];
-  for (let el = scope.parentElement?.closest('.tab-pane, section'); el; el = el.parentElement?.closest('.tab-pane, section')) enclosing.push(el);
+  for (let el = scope.parentElement?.closest(SCOPES); el; el = el.parentElement?.closest(SCOPES)) enclosing.push(el);
   const otherTabs = [...doc.querySelectorAll('.tab-pane')].filter(el => !el.contains(element));
   const otherLabels = [...doc.querySelectorAll('[role="tab"]')].filter(tab => !doc.getElementById(tab.getAttribute('aria-controls') || '')?.contains(element));
   const places = [
-    ['a <details> block', [...doc.querySelectorAll('details')]],
+    ['a <details> block', [...doc.querySelectorAll('details')].filter(el => !el.contains(element))],
+    ['a collapsed callout', [...doc.querySelectorAll('.callout-collapse.collapse:not(.show)')].filter(el => !el.contains(element))],
     ['a listed block', listed],
     ['a context block', [...doc.querySelectorAll(CONTEXT_BLOCKS)]],
     ['the exercise itself', [element]],
@@ -218,7 +224,7 @@ function origin(doc, element, scope, listed, piece) {
   return has(doc.body) ? 'elsewhere on the page' : 'not on the page';
 }
 // The context differences of a page get their verdict from the after page.
-function contextItems(items, B) {
+function contextItems(items, B, page) {
   const json = value => { try { return typeof value === 'string' && value.startsWith('"') ? JSON.parse(value) : value; } catch (_) { return value; } };
   for (const item of items) {
     let m, element, refs, mode;
@@ -240,8 +246,38 @@ function contextItems(items, B) {
     // DOM attributes from the elements themselves: the lines have their whitespace collapsed.
     const value = (node, line) => item.area === 'dom' ? node?.getAttribute?.(item.attribute) ?? line : line;
     item.context = contextVerdict(B.doc, element, json(value(item.node, item.after)), json(value(item.beforeNode, item.before)), refs, mode === 'explicit');
+    item.checked = item.node ? item.node : item.object + item.path;
+  }
+  // Every other context of the after page gets the same check: an unchanged
+  // context that is not prose of its own section is reported too (area
+  // "context"), so a leak that the old page had as well is not missed.
+  const checked = new Set(items.map(item => item.checked).filter(Boolean));
+  for (const item of items) delete item.checked;
+  for (const c of pageContexts(B, json)) {
+    if (checked.has(c.node || c.object + c.path)) continue;
+    const verdict = contextVerdict(B.doc, c.element, c.text, null, c.refs, c.mode === 'explicit');
+    if (verdict !== 'own-section') items.push({page, area: 'context', change: 'unchanged', object: c.object, path: c.path, attribute: c.attribute,
+      element: c.element ? c.element.tagName.toLowerCase() + '|' + (c.element.id || '') : null, after: c.text, context: verdict});
   }
   return items;
+}
+function pageContexts(B, json) {
+  const found = [];
+  for (const [object, list] of Object.entries(B.configs)) {
+    if (!/^ai-feedback-data/.test(object)) continue;
+    list.forEach((data, i) => { if (data?.context) found.push({object, path: `/${i}/context`, element: B.doc.getElementById(data.id), text: data.context, refs: data.contextRefs, mode: data.contextMode}); });
+  }
+  (B.configs.qpyodideCellDetails || []).forEach((cell, i) => {
+    const context = cell?.options?.feedbackContext;
+    if (context?.text) found.push({object: 'qpyodideCellDetails', path: `/${i}/options/feedbackContext/text`, element: B.doc.getElementById('qpyodide-insertion-location-' + cell.id), text: context.text, refs: context.refs, mode: context.mode});
+  });
+  (B.configs.__pyExercises || []).forEach((exercise, i) => {
+    const context = exercise?.feedbackContext;
+    if (context?.text) found.push({object: '__pyExercises', path: `/${i}/feedbackContext/text`, element: B.doc.getElementById('py-exercise-' + exercise.id), text: context.text, refs: context.refs, mode: context.mode});
+  });
+  for (const el of B.doc.body.querySelectorAll('[data-context]')) found.push({attribute: 'data-context', node: el, element: el, text: json(el.getAttribute('data-context')), refs: el.getAttribute('data-context-refs'), mode: el.getAttribute('data-context-mode')});
+  for (const el of B.doc.body.querySelectorAll('[data-ai-feedback-context]')) found.push({attribute: 'data-ai-feedback-context', node: el, element: el, text: el.getAttribute('data-ai-feedback-context'), refs: '', mode: 'auto'});
+  return found.filter(c => String(c.text ?? '').trim());
 }
 
 // Whether two policy configurations give every selection on the page the same
@@ -382,7 +418,7 @@ function comparePage(page, before, after) {
     for (const d of differences) items.push({page, area: 'config', change: 'changed', object, ...d, effective, item: (b[d.path.split('/')[1]] ?? a[d.path.split('/')[1]])});
   }
   for (const hunk of diffLines(A.dom, B.dom)) items.push(...domItems(page, hunk, A.domNodes, B.domNodes));
-  return contextItems(items, B);
+  return contextItems(items, B, page);
 }
 
 // ---------------------------------------------------------------- expectations

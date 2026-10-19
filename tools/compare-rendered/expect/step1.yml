@@ -16,11 +16,12 @@ categories:
       - {area: inline, change: removed, what: '^(math-exercise|py-exercise|runtime) bundle$'}
 
   # Only when the new context is exactly the prose of the exercise's own
-  # section (innermost tab with its label, or heading section) without context
-  # blocks, and keeps all of it that the old context had: no text from raw
-  # <details> blocks, other tabs, other sections, code or other exercises
+  # section (innermost tab with its label, heading section, <details> block or
+  # collapsed callout) without context blocks, and keeps all of it that the old
+  # context had: no text from <details> blocks or collapsed callouts the
+  # exercise is not in, other tabs, other sections, code or other exercises
   # (`context`, computed by the tool on the after page; anything else is
-  # unexplained).
+  # unexplained, and so is an unchanged context that fails the check).
   - id: A5
     title: Explicit context also sends the exercise's own section prose, without context blocks
     match:
@@ -30,10 +31,11 @@ categories:
       - {area: dom, tag: '^div$', attribute: '^data-context$', where: {data-context-mode: '^explicit$'}, context: '^own-section$'}
 
   # ctm-libs' fix S1: automatic context (and the unused context of `context:
-  # none`) keeps to the exercise's tab or section and leaves out <details>,
-  # with the same check as A5 (context blocks of the section stay prose).
+  # none`) keeps to the exercise's tab or section and leaves out <details> and
+  # collapsed callouts, with the same check as A5 (context blocks of the
+  # section stay prose).
   - id: context-scope
-    title: Automatic context keeps to the exercise's own tab or section, without <details> blocks
+    title: Automatic context keeps to the exercise's own tab or section, without closed <details> or callouts
     match:
       - {area: config, object: '^ai-feedback-data', path: '^/\d+/context$', where: {contextMode: '^(?!explicit$)'}, context: '^own-section$'}
       - {area: config, object: '^qpyodideCellDetails$', path: '^/\d+/options/feedbackContext/text$', where: {options.feedbackContext.mode: '^(?!explicit$)'}, context: '^own-section$'}
