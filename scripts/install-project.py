@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """Install the CTM Assessment package, built from this checkout, into a Quarto project.
 
-Course projects fetch ctm-assessment at the ref they want and call:
+Course projects fetch ctm-assessment at the ref they want (main, a release
+tag such as v0.9.0, or a full commit SHA) and call:
 
-    python <ctm-assessment>/scripts/install-project.py --project DIR [--review-refs REFS]
+    python <ctm-assessment>/scripts/install-project.py --project DIR [--release v0.9.0] [--review-refs REFS]
 
 The package is built with setup-feedback-integration.py --package-only (no
 example site, so no SymPy or Node are needed): every component at the
 commit pinned in integration/feedback/repos.json, or at the commits given in
 --review-refs for a coordinated review. REFS is NAME=SHA[,NAME=SHA...] or a
-JSON object {"NAME": "SHA"}; each SHA is a full 40-character commit. The
-script replaces only the extensions the package owns, keeps the project's other
-extensions, checks every installed file against the package record and copies
-that record to DIR/.private-extensions/resolved-repos.json. If `quarto add` or
-the check fails, the previous extensions are put back.
+JSON object {"NAME": "SHA"}; each SHA is a full 40-character commit. A release
+tag builds that release's pins, so the installed files are those of the
+release archive; --release checks first that the checkout is that release.
+The script replaces only the extensions the package owns, keeps the project's
+other extensions, checks every installed file against the package record and
+copies that record to DIR/.private-extensions/resolved-repos.json. If
+`quarto add` or the check fails, the previous extensions are put back.
 
 On Windows, keep the build folder short (for example --workspace C:\\ctm-build)
 when the project path is long.
@@ -40,12 +43,47 @@ def run(*args, cwd=None):
     subprocess.run([str(a) for a in args], cwd=cwd, check=True)
 
 
+def manifest():
+    return json.loads((ROOT / "integration" / "feedback" / "repos.json").read_text(encoding="utf-8"))
+
+
 def components():
-    return set(json.loads((ROOT / "integration" / "feedback" / "repos.json").read_text(encoding="utf-8"))["repositories"])
+    return set(manifest()["repositories"])
 
 
-def parse_review_refs(text, known):
-    """NAME=SHA[,NAME=SHA...] or a JSON object -> {name: sha}; raises InstallError."""
+def aliases():
+    """Old component names accepted for one release: {"ai-feedback": "ctm-libs"}."""
+    return {alias: name for name, spec in manifest()["repositories"].items() for alias in spec.get("review-ref-aliases", [])}
+
+
+def package_version():
+    """The version of the CTM Assessment checkout (the package manifest)."""
+    text = (ROOT / "_extensions" / "ctm-assessment" / "_extension.yml").read_text(encoding="utf-8")
+    found = re.search(r"(?m)^version:\s*[\"']?([0-9A-Za-z.+-]+)", text)
+    return found.group(1) if found else "unknown"
+
+
+def check_release(tag):
+    """--release vX.Y.Z (or X.Y.Z): the checkout is that release, built from pins only."""
+    wanted = tag.strip().removeprefix("v")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", wanted):
+        raise InstallError(f"--release {tag!r} is not a release tag such as v0.9.0")
+    found = package_version()
+    if found != wanted:
+        raise InstallError(f"--release {tag}: this ctm-assessment checkout is version {found}, not {wanted}. "
+                           f"Fetch ctm-assessment at the tag v{wanted}.")
+    unpinned = sorted(name for name, spec in manifest()["repositories"].items()
+                      if name != "ctm-assessment" and not FULL_SHA.fullmatch(spec.get("commit", "")))
+    if unpinned:
+        raise InstallError(f"--release {tag}: {', '.join(unpinned)} not pinned by commit in this checkout; "
+                           "a release builds from pins only.")
+
+
+def parse_review_refs(text, known, renamed=None):
+    """NAME=SHA[,NAME=SHA...] or a JSON object -> {name: sha}; raises InstallError.
+
+    `renamed` maps old component names to their current one (ai-feedback ->
+    ctm-libs); such a name is read as the new one, with a notice."""
     text = text.strip()
     if text.startswith(("{", "[")):
         try:
@@ -64,6 +102,13 @@ def parse_review_refs(text, known):
             if name.strip() in refs:
                 raise InstallError(f"--review-refs names {name.strip()} twice")
             refs[name.strip()] = sha.strip()
+    for old, new in (renamed or {}).items():
+        if old in refs:
+            if new in refs:
+                raise InstallError(f"--review-refs names {new} twice (also as its old name {old})")
+            print(f"Note: {old} is now part of {new}; --review-refs {old}=... is used for {new} "
+                  "(the old name is accepted in CTM Assessment 0.9 only).", flush=True)
+            refs = {(new if name == old else name): sha for name, sha in refs.items()}
     if "ctm-assessment" in refs:
         raise InstallError("--review-refs cannot set ctm-assessment: the installer always builds the "
                            "checkout it is part of. Fetch ctm-assessment at the ref you want instead.")
@@ -137,6 +182,8 @@ def replace_extensions(project, distribution, record, backup):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", type=Path, required=True, help="Quarto project to install into")
+    parser.add_argument("--release", metavar="TAG",
+                        help="Check that this checkout is the release TAG (for example v0.9.0) before installing")
     parser.add_argument("--review-refs", default="", metavar="REFS",
                         help="Component commits for a coordinated review build: NAME=SHA[,NAME=SHA...] "
                              "or a JSON object; full 40-character SHAs")
@@ -150,7 +197,12 @@ def main():
     try:
         if not project.is_dir():
             raise InstallError(f"project folder not found: {project}")
-        review_refs = parse_review_refs(args.review_refs, components())
+        review_refs = parse_review_refs(args.review_refs, components(), aliases())
+        if args.release:
+            if review_refs or args.source:
+                raise InstallError(f"--release {args.release} installs the release's own components; "
+                                   "it cannot be combined with --review-refs or --source.")
+            check_release(args.release)
         private = project / ".private-extensions"
         workspace = (args.workspace or private / "ctm-assessment-build").resolve()
         private.mkdir(exist_ok=True)
@@ -166,7 +218,7 @@ def main():
         shutil.copy2(distribution / "resolved-repos.json", private / "resolved-repos.json")
     except InstallError as error:
         sys.exit(f"ERROR: {error}")
-    print(f"\nCTM Assessment installed in {project / '_extensions'}")
+    print(f"\nCTM Assessment {record.get('version', package_version())} installed in {project / '_extensions'}")
     print(f"Component commits: {private / 'resolved-repos.json'}")
 
 

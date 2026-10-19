@@ -184,6 +184,15 @@ def check_shared_files(config, sources, extensions, hashes):
                                  'which ctm-libs provides now; remove the copy.')
 
 
+def package_version():
+    """The CTM Assessment version (`version:` of the package manifest)."""
+    manifest = (ROOT / '_extensions' / 'ctm-assessment' / '_extension.yml').read_text(encoding='utf-8')
+    found = re.search(r'(?m)^version:\s*["\']?([0-9A-Za-z.+-]+)', manifest)
+    if not found:
+        raise SystemExit('_extensions/ctm-assessment/_extension.yml has no version.')
+    return found.group(1)
+
+
 def version_tuple(text):
     """'1.8.27' -> (1, 8, 27); pre-release suffixes are ignored."""
     return tuple(int(part) for part in re.findall(r'\d+', text.split('-')[0])[:3])
@@ -367,7 +376,7 @@ def main():
         foreign = sorted(foreign)
         if foreign:
             raise SystemExit(f'{name} ships its own copy of {", ".join(foreign)}; use the pinned component instead.')
-    result = {'quarto': quarto_version, 'quarto_required': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
+    result = {'version': package_version(), 'quarto': quarto_version, 'quarto_required': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
     (workspace / 'resolved-repos.json').write_text(json.dumps(result, indent=2) + '\n')
     if not args.package_only:
         shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
