@@ -1,0 +1,44 @@
+---
+title: "Oppgaver med løsning"
+---
+
+Prøv oppgavene først.
+Åpne løsningen etterpå.
+
+<div class="learning-mode" data-learning-mode data-reading-label="Gå i dybden" role="group" aria-label="Velg lesemodus">
+<button type="button" data-mode="lecture" aria-pressed="true">Forelesning</button>
+<button type="button" data-mode="reading" aria-pressed="false">Gå i dybden</button>
+<span role="status" aria-live="polite"></span>
+</div>
+
+## Oppgave 1
+
+Regn ut $2+2$.
+
+<details class="learning-hint">
+<summary>Hint for oppgave 1</summary>
+
+Tell på fingrene.
+
+</details>
+
+<details class="solution-block">
+<summary>Løsningsforslag</summary>
+
+Svaret er $4$.
+
+</details>
+
+<details class="reading-step">
+<summary>Gå i dybden: hvorfor fire?</summary>
+
+To og to er fire.
+
+</details>
+
+<details>
+<summary>Regnehjelp: addisjon</summary>
+
+Addisjon er å legge sammen.
+
+</details>

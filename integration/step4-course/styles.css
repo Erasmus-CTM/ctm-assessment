@@ -1,0 +1,33 @@
+/* The courses' CSS before the migration (ingmat3a styles.css:70-100, and
+   ctm-demo's box for .solution-block). */
+.learning-mode {
+  padding: 0.85rem 1rem;
+  margin: 1rem 0 1.5rem;
+  border: 1px solid #9aaebc;
+  border-radius: 0.4rem;
+  background: #f4f8fa;
+}
+.learning-mode button {
+  padding: 0.4rem 0.85rem;
+  margin: 0.25rem 0.4rem 0.25rem 0;
+  border: 1px solid #245b79;
+  border-radius: 0.3rem;
+  background: white;
+  color: #183e53;
+}
+.learning-mode button[aria-pressed="true"] { background: #245b79; color: white; }
+.learning-mode button:focus-visible, details.reading-step > summary:focus-visible {
+  outline: 3px solid #ad6600;
+  outline-offset: 3px;
+}
+.learning-mode [role="status"] { display: block; margin-top: 0.4rem; font-size: 0.9rem; }
+main details.reading-step, main details.learning-hint, main details.learning-extension {
+  margin: 1rem 0;
+  padding: 0.7rem 1rem;
+  border-left: 3px solid #7899ac;
+  background: #f6f8fa;
+}
+main details.solution-block { margin: 1rem 0; padding: .7rem 1rem; border-left: 3px solid #4f7d57; background: #f4f8f4; }
+main details > summary { cursor: pointer; font-weight: 600; }
+main details[open] > summary { margin-bottom: 0.8rem; }
+@media print { .learning-mode { display: none; } }

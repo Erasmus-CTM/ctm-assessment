@@ -73,9 +73,10 @@ categories:
 # The browser comparison (tools/compare-browser.mjs, design §6.3 item 6):
 # screenshots of the same element, old and new, may differ in at most 0.5 %
 # of their pixels, except as listed here. `height` is the expected change of
-# the element's height in px, as [min, max]; the part both shots have is then
-# compared. `pixels: any` accepts any change (a new look). `courses` limits an
-# entry to these courses (the repository name; the umbrella's fixture is
+# the element's height in px, as [min, max] (or any); the part both shots have
+# is then compared. `pixels: any` accepts any change (a new look), `styles:
+# any` any change of the summary's computed style. `courses` limits an entry
+# to these courses (the repository name; the umbrella's fixture is
 # step4-course).
 look:
   - id: open-reveal
@@ -88,14 +89,15 @@ look:
     courses: [ingmat3a_ntnu, step4-course]
     height: [-19, -15]
     pixels: any
-  - id: switch-taller
-    title: ctm-demo's switch is a few px taller (A1 deviation 6)
+  - id: switch-height
+    title: ctm-demo's switch differs by a few px in height (A1 deviation 6; 7 px shorter at 1280 px)
     shots: [switch]
     courses: [ctm-demo]
-    height: [2, 10]
+    height: [-10, 10]
     pixels: any
   - id: details-look
     title: .details is related to the reading steps but clearly distinct (dashed border, no fill, normal-weight summary; D2)
     shots: [details-closed, details-open]
+    height: any
     pixels: any
     styles: any

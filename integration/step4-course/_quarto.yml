@@ -1,0 +1,33 @@
+# A small course in the form the courses have before their step-4 migration
+# (raw HTML for reveals, anchors, an embedded page and the lecture/reading
+# switch; the courses' site scripts and CSS), for the old-against-new checks
+# of tools/compare-rendered.mjs and tools/compare-browser.mjs. The "new" side
+# is this course after tools/migrate-course-html.py --config, with migrated/
+# copied over it (the CSS a migration PR keeps). Its package is pinned in
+# quarto-extensions.yml, as the courses' are (compare-courses.yml).
+project:
+  type: website
+
+lang: nb
+
+filters:
+  - ctm-assessment
+
+website:
+  title: "Steg 4-kurs"
+  sidebar:
+    style: docked
+    contents:
+      - index.qmd
+      - pages/uke1.qmd
+      - pages/uke2.qmd
+      - pages/losning.qmd
+      - pages/grupper.qmd
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    include-after-body:
+      - _includes/site/tab-links.html
+      - _includes/site/learning-mode.html

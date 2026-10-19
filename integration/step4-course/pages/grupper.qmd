@@ -1,0 +1,33 @@
+---
+title: "Grupperte faner"
+---
+
+::: {.panel-tabset group="lang"}
+
+## R
+
+R først.
+
+## Python
+
+Python først.
+
+:::
+
+Et avsnitt mellom fanene.
+
+::: {.panel-tabset group="lang"}
+
+## R
+
+<div id="i-r"></div>
+
+Målet i R.
+
+## Python
+
+<div id="i-python"></div>
+
+Målet i Python.
+
+:::
