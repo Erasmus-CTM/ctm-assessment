@@ -24,7 +24,7 @@ jobs:
         id: review
         env:
           REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: python3 .github/review-dependencies.py
+        run: python3 tools/ci/review-dependencies.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -85,7 +85,7 @@ jobs:
         id: review
         env:
           REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: python3 .github/review-dependencies.py
+        run: python3 tools/ci/review-dependencies.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
