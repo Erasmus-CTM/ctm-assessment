@@ -155,7 +155,8 @@ jobs:
           echo "BEFORE=$before" >> "$GITHUB_ENV"
           echo "AFTER=$after" >> "$GITHUB_ENV"
           converted=''; [ "$CONVERT" = true ] && converted=', converted (migration preview)'
-          echo "::notice title=Packages for $COURSE${COURSE_REF:+@$COURSE_REF}::before: ctm-assessment $before ($BASE) with the course at ${COURSE_BASE_REF:-its folder}; after: $after with the course at ${COURSE_REF:-its folder}$converted"
+          where() { if [ "$COURSE" = examples ]; then echo 'the example site'; elif [ -n "$COURSE_PATH" ]; then echo "$COURSE_PATH"; else echo "the course at $1"; fi; }
+          echo "::notice title=Packages for $COURSE${COURSE_REF:+@$COURSE_REF}::before: ctm-assessment $before ($BASE) with $(where "$COURSE_BASE_REF"); after: $after with $(where "$COURSE_REF")$converted"
       - name: Check out ctm-assessment before and after
         run: |
           for side in before after; do

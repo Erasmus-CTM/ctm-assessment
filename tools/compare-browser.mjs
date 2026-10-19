@@ -6,7 +6,7 @@
 //
 //   node tools/compare-browser.mjs --old DIR --new DIR [--browser chromium] [--browser firefox] ...
 //     [--expect tools/compare-rendered/expect/step4-migration.yml] [--course NAME] [--pages a.html,b.html]
-//     [--offline] [--max-links N] [--shots DIR] [--report OUT.json] [--summary OUT.md]
+//     [--offline] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
 //
 // Checks, on the pages with reveals, the switch or links into tabs:
 //  1. reveals: count per kind, summary texts and initial state equal;
@@ -25,9 +25,11 @@
 //     changing it. A link that was dead on old and works now is reported;
 //  5. print: reading steps open, the switch hidden, all restored afterwards;
 //  6. look: screenshots of the switch and of each kind of reveal, closed and
-//     open, at 1280 and 390 px (and dark, where the site has a toggle): at
-//     most 0.5 % of the pixels differ, unless the expect file's `look` says
-//     otherwise (a height change, a new look);
+//     open, at 1280 and 390 px (and dark, where both sites have Quarto's
+//     light/dark toggle): at most 0.5 % of the pixels differ (a pixel
+//     whose colour the other shot has within one pixel is anti-aliasing),
+//     unless the expect file's `look` says otherwise (a height change, a new
+//     look);
 //  7. computed styles of every summary equal (component <details> included);
 //  8. embedded content (not --offline): JSXGraph boards in reveals have a
 //     finite size once opened; a Python cell in a reveal runs;
@@ -44,13 +46,14 @@ const playwright = require('playwright');
 
 // ---------------------------------------------------------------- options
 function options(argv) {
-  const o = {browsers: [], pages: null, offline: false, maxLinks: 0, expect: null, course: '', shots: null, report: null, summary: null};
+  const o = {browsers: [], pages: null, checks: null, offline: false, maxLinks: 0, expect: null, course: '', shots: null, report: null, summary: null};
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i], value = argv[i + 1];
     if (flag === '--offline') { o.offline = true; continue; }
     i++;
     if (flag === '--browser') o.browsers.push(value);
     else if (flag === '--pages') o.pages = value.split(',').filter(Boolean);
+    else if (flag === '--checks') o.checks = value.split(',').filter(Boolean);
     else if (flag === '--max-links') o.maxLinks = Number(value);
     else if (['--old', '--new', '--expect', '--course', '--shots', '--report', '--summary'].includes(flag)) o[flag.slice(2)] = value;
     else throw new Error('Unknown option ' + flag);
@@ -103,7 +106,7 @@ function inventory(root, page, side) {
   }
   const groups = [...doc.querySelectorAll('.panel-tabset[data-group]')].map(set => set.getAttribute('data-group'));
   return {reveals, links, groups, switch: !!doc.querySelector(side === 'new' ? '.ctm-modes' : '[data-learning-mode]'),
-    nav: !!doc.querySelector('script[src*="ctm-nav"]'),
+    nav: !!doc.querySelector('script[src*="ctm-nav"]'), toggle: !!doc.querySelector('.quarto-color-scheme-toggle'),
     tabsets: doc.querySelectorAll('.panel-tabset').length, ids: new Set([...doc.querySelectorAll('[id]')].map(el => el.id)),
     inTabs: new Set([...doc.querySelectorAll('.tab-pane [id], details [id]')].map(el => el.id)),
     boards: doc.querySelectorAll('main details iframe[name^="iframeJXG"]').length,
@@ -214,7 +217,8 @@ class Run {
 
   // A full load (not a fragment navigation within the page shown).
   async load(page, side, url, id) {
-    await page.goto('about:blank');
+    // A page may still be navigating (Firefox interrupts one about:blank by another).
+    await page.goto('about:blank').catch(() => page.waitForTimeout(300));
     await page.goto(url, {waitUntil: 'load', timeout: 60000}).catch(() => {});
     if (id && side === 'new') {
       await page.waitForFunction(id => document.getElementById(id)?.getAttribute('data-ctm-nav') === 'load', id, {timeout: 10000}).catch(() => {});
@@ -230,6 +234,7 @@ class Run {
     try {
       for (const [name, check] of [['reveals', this.reveals], ['switch', this.switches], ['keyboard', this.keyboard], ['links', this.links],
         ['groups', this.groups], ['print', this.print], ['look', this.looks], ['styles', this.styles], ['embedded', this.embedded]]) {
+        if (this.o.checks && !this.o.checks.includes(name)) continue;
         console.log(`${this.browserName}: ${name}`);
         try {
           await check.call(this);
@@ -561,9 +566,11 @@ class Run {
       if (!plan) { await context.close(); continue; }
       await tab.evaluate(([group, first]) => localStorage.setItem('quarto-persistent-tabsets-data', JSON.stringify({[group]: first})), [plan.group, plan.first]);
       const stored = await tab.evaluate(() => localStorage.getItem('quarto-persistent-tabsets-data'));
-      await this.load(tab, 'new', this.url('new', page, plan.id), plan.id);
-      const s = await tab.evaluate(stateOf, plan.id);
-      const after = await tab.evaluate(() => localStorage.getItem('quarto-persistent-tabsets-data'));
+      // The link in a new tab of the same browser (the stored choice is the origin's).
+      const linked = await context.newPage();
+      await this.load(linked, 'new', this.url('new', page, plan.id), plan.id);
+      const s = await linked.evaluate(stateOf, plan.id);
+      const after = await linked.evaluate(() => localStorage.getItem('quarto-persistent-tabsets-data'));
       await context.close();
       const problems = [];
       if (!works(s)) problems.push('the link does not win over the stored group: ' + describeState(s));
@@ -620,7 +627,9 @@ class Run {
       return shot === 'switch' ? v.old.switch && v.new.switch : v.new.reveals.some(r => r.kind === shot.replace(/-(open|closed)$/, '')) && v.old.reveals.some(r => r.kind === shot.replace(/-(open|closed)$/, ''));
     });
     const differ = await this.browser.newPage();
-    for (const width of [1280, 390]) {
+    // Dark too, where both sites have Quarto's light/dark toggle.
+    const schemes = Object.values(this.inventories).some(v => v.old?.toggle && v.new?.toggle) ? ['light', 'dark'] : ['light'];
+    for (const [width, scheme] of [1280, 390].flatMap(width => schemes.map(scheme => [width, scheme]))) {
       for (const [shot, oldSelector, newSelector, open] of wanted) {
         const page = pageFor(shot);
         if (!page) continue;
@@ -629,6 +638,10 @@ class Run {
           const context = await this.context(side, {viewport: {width, height: 900}});
           const tab = await context.newPage();
           await this.load(tab, side, this.url(side, page));
+          if (scheme === 'dark') {
+            await tab.evaluate(() => document.querySelector('.quarto-color-scheme-toggle')?.click());
+            await tab.waitForTimeout(300);
+          }
           await tab.addStyleTag({content: '#quarto-header, .headroom, #quarto-sidebar-toggle-title, .quarto-secondary-nav { visibility: hidden !important; }'});
           const selector = side === 'old' ? oldSelector : newSelector;
           // The first such element, shown: its tabs and <details> are opened as a reader would.
@@ -661,20 +674,34 @@ class Run {
           await context.close();
         }
         if (!images.old || !images.new) continue;
-        const name = `${shot} ${width}px`;
+        const name = `${shot} ${width}px${scheme === 'dark' ? ' dark' : ''}`;
         const result = await differ.evaluate(async ([a, b]) => {
           const decode = async data => { const image = new Image(); image.src = 'data:image/png;base64,' + data; await image.decode(); return image; };
           const [x, y] = [await decode(a), await decode(b)];
           const w = Math.min(x.width, y.width), h = Math.min(x.height, y.height);
           const pixels = image => { const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h; const g = canvas.getContext('2d'); g.drawImage(image, 0, 0); return g.getImageData(0, 0, w, h).data; };
           const [p, q] = [pixels(x), pixels(y)];
+          // A pixel differs when neither image has its colour within one pixel
+          // of it in the other: text drawn a fraction of a pixel apart is the
+          // same text (anti-aliasing), a changed colour or a moved block is not.
+          const close = (a, i, b, j) => Math.abs(a[i] - b[j]) <= 24 && Math.abs(a[i + 1] - b[j + 1]) <= 24 && Math.abs(a[i + 2] - b[j + 2]) <= 24;
+          const near = (a, b, px, py) => {
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+              const nx = px + dx, ny = py + dy;
+              if (nx >= 0 && ny >= 0 && nx < w && ny < h && close(a, 4 * (py * w + px), b, 4 * (ny * w + nx))) return true;
+            }
+            return false;
+          };
           let differ = 0;
-          for (let i = 0; i < p.length; i += 4) if (Math.abs(p[i] - q[i]) > 24 || Math.abs(p[i + 1] - q[i + 1]) > 24 || Math.abs(p[i + 2] - q[i + 2]) > 24) differ++;
+          for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+            const i = 4 * (py * w + px);
+            if (!close(p, i, q, i) && !(near(p, q, px, py) && near(q, p, px, py))) differ++;
+          }
           return {old: [x.width, x.height], new: [y.width, y.height], ratio: w * h ? differ / (w * h) : 1};
         }, [images.old.toString('base64'), images.new.toString('base64')]);
         if (this.o.shots) {
           fs.mkdirSync(this.o.shots, {recursive: true});
-          for (const side of ['old', 'new']) fs.writeFileSync(path.join(this.o.shots, `${this.browserName}-${width}-${shot}-${side}.png`), images[side]);
+          for (const side of ['old', 'new']) fs.writeFileSync(path.join(this.o.shots, `${this.browserName}-${width}${scheme === 'dark' ? '-dark' : ''}-${shot}-${side}.png`), images[side]);
         }
         const rule = this.lookRule(shot);
         const dh = result.new[1] - result.old[1], dw = result.new[0] - result.old[0];
