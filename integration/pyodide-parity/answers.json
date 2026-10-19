@@ -1,0 +1,124 @@
+{
+  "$comment": "Teacher answers for cells that decide without answer keys or with a diagram (step-2 review S1), by corpus and exercise label, worked out from each checker: a correct answer and partial and wrong ones, each with the verdict it must get (`expect`; another verdict fails the run). `values` fill the text fields in page order; `matrices` give each dynamic matrix its shape and entries (row by row); `payload` is a diagram's response; `variant` (optional) limits an entry to one variant ('single', 'task:N', 'variant:ID'). Every label of a corpus in the run must be found on its pages. Written for the umbrella's harness (AGPL-3.0-or-later); the rows they give follow their corpus (corpora.json: math-exercise's are exported, the courses' stay in the umbrella).",
+  "math-exercise": {
+    "dynamic-both-dimensions": [
+      {"matrices": {"A": {"rows": 2, "cols": 2, "raw": ["1", "1", "1", "1"]}}, "expect": "wrong"}
+    ],
+    "jsxgraph-pooled-maxima": [
+      {"payload": {"variant": 0, "clicks": [[0, -1]]}, "expect": "wrong"}
+    ]
+  },
+  "ctm-demo": {
+    "demo-coordinate-interpretation": [
+      {"values": ["2", "1", "1", "1", "1", "-1"], "expect": "correct"},
+      {"values": ["2", "1", "1", "1", "-1", "1"], "expect": "partial"},
+      {"values": ["1", "2", "1", "0", "0", "1"], "expect": "wrong"}
+    ],
+    "demo-eigenvector-families": [
+      {"values": ["t", "t", "t", "-t", "0", "1", "0"], "expect": "correct"},
+      {"values": ["t", "t", "t", "t", "0", "1", "0"], "expect": "partial"},
+      {"values": ["t", "-t", "t", "t", "1", "0", "1"], "expect": "wrong"}
+    ],
+    "fourier-a": [
+      {"values": ["pi/2", "pi/4", "1"], "expect": "correct"},
+      {"values": ["pi/2", "pi/2", "1"], "expect": "partial"},
+      {"values": ["0", "0", "0"], "expect": "wrong"}
+    ],
+    "fourier-b": [
+      {"values": ["((-1)^n-1)/(pi*n^2)", "(-1)^(n+1)/n"], "expect": "correct"},
+      {"values": ["((-1)^n-1)/(pi*n^2)", "1/n"], "expect": "partial"},
+      {"values": ["0", "0"], "expect": "wrong"}
+    ],
+    "fourier-c": [
+      {"values": ["((-1)^n-1)/(pi*n^2)*cos(n*pi/3) - (-1)^(n+1)/n*sin(n*pi/3)", "((-1)^n-1)/(pi*n^2)*sin(n*pi/3) + (-1)^(n+1)/n*cos(n*pi/3)", "pi/2"], "expect": "correct"},
+      {"values": ["((-1)^n-1)/(pi*n^2)*cos(n*pi/3) - (-1)^(n+1)/n*sin(n*pi/3)", "((-1)^n-1)/(pi*n^2)*sin(n*pi/3) + (-1)^(n+1)/n*cos(n*pi/3)", "0"], "expect": "partial"},
+      {"values": ["0", "0", "0"], "expect": "wrong"}
+    ],
+    "phys-2024-1-4": [
+      {"values": ["sin(6*t)/12"], "expect": "correct"},
+      {"values": ["0.08333*sin(6.0*t)"], "expect": "correct"},
+      {"values": ["sin(6*t)/10"], "expect": "wrong"}
+    ],
+    "phys-2025-1-3": [
+      {"values": ["-243*sin(9*t)/50", "0"], "expect": "correct"},
+      {"values": ["-243*sin(9*t)/50", "1"], "expect": "partial"},
+      {"values": ["243*sin(9*t)/50", "1"], "expect": "wrong"}
+    ],
+    "phys-2026-1-4": [
+      {"values": ["(cos(7*t)+sin(7*t))/10"], "expect": "correct"},
+      {"values": ["sqrt(2)/10*sin(7*t+pi/4)"], "expect": "correct"},
+      {"values": ["(cos(7*t)-sin(7*t))/10"], "expect": "wrong"}
+    ],
+    "phys-2026-1-5": [
+      {"values": ["sqrt((1/1000)^2+(1/(400*pi))^2)", "100*pi", "800*pi", "atan2(-1/1000, 1/(400*pi))"], "expect": "correct"},
+      {"values": ["sqrt((1/1000)^2+(1/(400*pi))^2)", "100*pi", "800*pi", "0"], "expect": "partial"},
+      {"values": ["1", "1", "1", "1"], "expect": "wrong"}
+    ],
+    "phys-2026-4-3": [
+      {"values": ["198*t/5"], "expect": "correct"},
+      {"values": ["198*t"], "expect": "wrong"}
+    ]
+  },
+  "ingmat3a": {
+    "week3-polynomial-p3-basis": [
+      {"matrices": {"P3basis": {"rows": 4, "cols": 4, "raw": ["1", "0", "0", "0", "0", "1", "0", "0", "0", "0", "1", "0", "0", "0", "0", "1"]}}, "expect": "correct"},
+      {"matrices": {"P3basis": {"rows": 4, "cols": 2, "raw": ["1", "0", "0", "1", "0", "0", "0", "0"]}}, "expect": "partial"},
+      {"matrices": {"P3basis": {"rows": 4, "cols": 1, "raw": ["0", "0", "0", "0"]}}, "expect": "wrong"}
+    ],
+    "week3-polynomial-subspace-basis": [
+      {"matrices": {"Ubasis": {"rows": 4, "cols": 3, "raw": ["1", "0", "1", "1", "1", "0", "0", "1", "1", "0", "0", "1"]}}, "expect": "correct"},
+      {"matrices": {"Ubasis": {"rows": 4, "cols": 2, "raw": ["1", "0", "1", "1", "0", "1", "0", "0"]}}, "expect": "partial"},
+      {"matrices": {"Ubasis": {"rows": 4, "cols": 1, "raw": ["0", "0", "0", "1"]}}, "expect": "wrong"}
+    ],
+    "week3-paper-b-echelon": [
+      {"values": ["1", "0", "1", "0", "1", "1", "0", "0", "0"], "matrices": {"PBstep": {"rows": 1, "cols": 2, "raw": ["1", "2"]}}, "expect": "correct"},
+      {"values": ["1", "0", "1", "0", "1", "1", "0", "0", "0"], "matrices": {"PBstep": {"rows": 1, "cols": 1, "raw": ["1"]}}, "expect": "partial"},
+      {"values": ["0", "0", "1", "1", "0", "0", "0", "1", "0"], "matrices": {"PBstep": {"rows": 1, "cols": 1, "raw": ["3"]}}, "expect": "wrong"}
+    ],
+    "week3-paper-b-rank": [
+      {"values": ["2"], "matrices": {"PBrank": {"rows": 1, "cols": 2, "raw": ["1", "2"]}}, "expect": "correct"},
+      {"values": ["2"], "matrices": {"PBrank": {"rows": 1, "cols": 1, "raw": ["1"]}}, "expect": "partial"},
+      {"values": ["3"], "matrices": {"PBrank": {"rows": 1, "cols": 1, "raw": ["3"]}}, "expect": "wrong"}
+    ],
+    "week3-paper-b-column-basis": [
+      {"matrices": {"QB": {"rows": 3, "cols": 2, "raw": ["1", "0", "0", "1", "1", "1"]}}, "expect": "correct"},
+      {"matrices": {"QB": {"rows": 3, "cols": 1, "raw": ["1", "0", "1"]}}, "expect": "partial"},
+      {"matrices": {"QB": {"rows": 3, "cols": 1, "raw": ["1", "1", "1"]}}, "expect": "wrong"}
+    ],
+    "week3-paper-b-null-basis": [
+      {"matrices": {"ZB": {"rows": 3, "cols": 1, "raw": ["-1", "-1", "1"]}}, "expect": "correct"},
+      {"matrices": {"ZB": {"rows": 3, "cols": 2, "raw": ["-1", "-2", "-1", "-2", "1", "2"]}}, "expect": "partial"},
+      {"matrices": {"ZB": {"rows": 3, "cols": 1, "raw": ["1", "0", "0"]}}, "expect": "wrong"}
+    ],
+    "week3-paper-c-echelon": [
+      {"values": ["1", "2", "3", "0", "0", "0"], "matrices": {"PCstep": {"rows": 1, "cols": 1, "raw": ["1"]}}, "expect": "correct"},
+      {"values": ["1", "2", "3", "0", "0", "0"], "matrices": {"PCstep": {"rows": 1, "cols": 2, "raw": ["1", "2"]}}, "expect": "partial"},
+      {"values": ["0", "1", "0", "1", "0", "0"], "matrices": {"PCstep": {"rows": 1, "cols": 1, "raw": ["3"]}}, "expect": "wrong"}
+    ],
+    "week3-paper-c-rank": [
+      {"values": ["1"], "matrices": {"PCrank": {"rows": 1, "cols": 1, "raw": ["1"]}}, "expect": "correct"},
+      {"values": ["2"], "matrices": {"PCrank": {"rows": 1, "cols": 1, "raw": ["1"]}}, "expect": "partial"},
+      {"values": ["2"], "matrices": {"PCrank": {"rows": 1, "cols": 1, "raw": ["2"]}}, "expect": "wrong"}
+    ],
+    "week3-paper-c-column-basis": [
+      {"matrices": {"QC": {"rows": 2, "cols": 1, "raw": ["1", "2"]}}, "expect": "correct"},
+      {"matrices": {"QC": {"rows": 2, "cols": 2, "raw": ["1", "2", "2", "4"]}}, "expect": "partial"},
+      {"matrices": {"QC": {"rows": 2, "cols": 1, "raw": ["1", "0"]}}, "expect": "wrong"}
+    ],
+    "week3-paper-c-null-basis": [
+      {"matrices": {"ZC": {"rows": 3, "cols": 2, "raw": ["-2", "-3", "1", "0", "0", "1"]}}, "expect": "correct"},
+      {"matrices": {"ZC": {"rows": 3, "cols": 1, "raw": ["-2", "1", "0"]}}, "expect": "partial"},
+      {"matrices": {"ZC": {"rows": 3, "cols": 1, "raw": ["1", "0", "0"]}}, "expect": "wrong"}
+    ],
+    "click-seven-correct-decimals": [
+      {"payload": {"index": 7}, "expect": "correct"},
+      {"payload": {"index": 6}, "expect": "wrong"},
+      {"payload": {"index": null}, "expect": "wrong"}
+    ],
+    "click-quadratic-seven-decimals": [
+      {"payload": {"index": 4, "error": 4.304672099999998e-09}, "expect": "correct"},
+      {"payload": {"index": 3, "error": 6.560999999999999e-05}, "expect": "wrong"},
+      {"payload": {"index": null, "error": null}, "expect": "wrong"}
+    ]
+  }
+}
