@@ -11,7 +11,7 @@
 # wrapper is told apart from what it holds; "moved" is an element removed and
 # added unchanged elsewhere. Three invariants are checked on every page and
 # no category can explain a breach: each reveal keeps its words (field
-# `reveal`: same, heading, grown; never shrunk or changed), the switch keeps
+# `reveal`: same, heading, grown; never shrunk, changed or swallowed), the switch keeps
 # its place or goes to the top, and no id occurs more often than before
 # (hand anchors that repeat a tab heading's id, review A2 S3).
 categories:
@@ -35,9 +35,11 @@ categories:
   # its div.ctm-reveal-body. Only where the end tags of the <details> and of
   # the sections fall changes; the content is the same. `reveal: heading`:
   # the reveal holds the old <details>' words followed by exactly the words
-  # that followed it on the old page, starting with a heading
-  # (compare-rendered.mjs; a reveal with fewer or other words than before is
-  # always unexplained, review A2 S1).
+  # that followed it on the old page, starting with a heading, and old's
+  # <details> had no </details> of its own before that heading's section
+  # (compare-rendered.mjs; a reveal with fewer or other words than before, or
+  # one that took in a heading old's <details> had ended before, "swallowed",
+  # is always unexplained, reviews A2 S1 and A2b S1).
   - id: reveal-heading
     title: A heading inside a reveal stays inside it (a raw <details> was closed early by the heading's section)
     match:

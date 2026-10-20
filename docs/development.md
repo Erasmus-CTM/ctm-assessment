@@ -311,7 +311,9 @@ lists failures that are fixed elsewhere and not pinned yet (a browser, checks,
 `compare-rendered.mjs` also checks three invariants on every page, which no
 expected category can explain: each `<details>` keeps its words (more only as
 its old words followed by what followed it on old: `reveal: heading` when
-that starts with a heading, `grown` otherwise), the new switch stands where
+that starts with a heading and old's `<details>` was closed by that heading's
+section, that is, had no `</details>` of its own before it in old's HTML;
+`swallowed`, never explained, when it had one; `grown` otherwise), the new switch stands where
 the old one stood or at the top of the page, and no id occurs more often than
 on old.
 

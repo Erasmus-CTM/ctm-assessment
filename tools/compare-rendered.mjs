@@ -18,6 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire} from 'node:module';
+import {closedBySection} from './compare-rendered/details-close.mjs';
 const require = createRequire(import.meta.url);
 const vm = require('node:vm');
 const {JSDOM} = require('jsdom');
@@ -89,7 +90,8 @@ function inlineKind(t) {
 }
 
 function extract(file) {
-  const doc = new JSDOM(fs.readFileSync(file, 'utf8')).window.document;
+  const html = fs.readFileSync(file, 'utf8');
+  const doc = new JSDOM(html).window.document;
   const files = [], inline = [], configs = {}, sources = {};
   for (const el of doc.querySelectorAll('script, link[rel="stylesheet"]')) {
     const where = el.closest('head') ? 'head' : 'body';
@@ -122,7 +124,7 @@ function extract(file) {
   for (const exercise of configs.__pyExercises || []) if (exercise && exercise.policySelection) selections.push(['py-exercise', exercise.policySelection]);
   for (const cell of configs.qpyodideCellDetails || []) if (cell?.options?.policySelection) selections.push(['pyodide-interaktiv', cell.options.policySelection]);
   const domNodes = [];
-  return {doc, files, inline, configs, sources, selections, dom: canonical(doc.body, domNodes), domNodes};
+  return {doc, html, files, inline, configs, sources, selections, dom: canonical(doc.body, domNodes), domNodes};
 }
 
 // Feedback context: the prose an exercise sends is that of its own section,
@@ -521,13 +523,20 @@ const startsWith = (a, b) => b.length <= a.length && b.every((w, k) => w === a[k
 // Reveals: the k-th <details> of the old page against the k-th of the new
 // one. A reveal must hold the same words as before ("same"). It may hold
 // more only as old + what directly followed the old <details>: "heading"
-// when that starts with a heading (a raw <details> closed early by the
-// heading's section, design §1.4 item 5), else "grown" (a course's own
-// accepted case). Fewer or other words ("shrunk", "changed"), or another
-// number of <details>, is a difference that no expectation explains.
+// when that starts with a heading and the old <details> was closed by that
+// heading's section (no </details> of its own before it in old's source:
+// a raw <details> closed early, design §1.4 item 5), "swallowed" when it
+// starts with a heading that old's <details> had ended before (a closing
+// fence moved past the next heading, review A2b S1), else "grown" (a
+// course's own accepted case). "Swallowed", fewer or other words ("shrunk",
+// "changed"), or another number of <details>, is a difference that no
+// expectation explains.
 function revealChecks(page, A, B) {
   const status = new Map(), items = [];
   const before = [...A.doc.body.querySelectorAll('details')], after = [...B.doc.body.querySelectorAll('details')];
+  // Unknown (the source's start tags do not match the DOM's): never "heading".
+  const bySection = closedBySection(A.html);
+  if (bySection.length !== before.length) bySection.fill(false);
   const [wa, wb] = [words(A.doc), words(B.doc)];
   if (before.length !== after.length)
     items.push({page, area: 'dom', change: 'reveal count changed', before: before.length, after: after.length, invariant: true});
@@ -540,11 +549,11 @@ function revealChecks(page, A, B) {
     else if (nw.length > ow.length && startsWith(nw, ow) && same(wa.list.slice(oe, oe + nw.length - ow.length), nw.slice(ow.length))) {
       const first = wb.at(ns + ow.length);
       const heading = first?.parentElement?.closest('h1, h2, h3, h4, h5, h6');
-      found = heading && n.contains(heading) ? 'heading' : 'grown';
+      found = !(heading && n.contains(heading)) ? 'grown' : bySection[k] ? 'heading' : 'swallowed';
     } else if (nw.length < ow.length && startsWith(ow, nw)) found = 'shrunk';
     status.set(o, found);
     status.set(n, found);
-    if (found === 'shrunk' || found === 'changed') {
+    if (found === 'shrunk' || found === 'changed' || found === 'swallowed') {
       const summary = n.querySelector('summary')?.textContent.replace(/\s+/g, ' ').trim() || '';
       items.push({page, area: 'dom', change: 'reveal content changed', reveal: found, line: `<details> ${k + 1}: ${summary}`,
         ancestors: ancestorsOf(n), ...wordChanges(ow.join(' '), nw.join(' ')), invariant: true});

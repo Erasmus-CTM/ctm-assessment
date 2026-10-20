@@ -1,6 +1,6 @@
 // tools/compare-rendered.mjs: the invariants that no expected category can
-// explain (review A2 S1, S3). A reveal keeps its words (more only as the
-// words that followed a raw <details> closed early by a heading), the
+// explain (review A2 S1, S3; A2b S1). A reveal keeps its words (more only as
+// the words that followed a raw <details> closed early by a heading), the
 // lecture/reading switch stays where it was or goes to the top of the page,
 // and no id occurs more often than before. Small sites, old against new.
 const test = require('node:test');
@@ -63,15 +63,35 @@ test('a reveal that holds other words is unexplained', () => {
   assert.deepEqual(invariants(items), ['reveal content changed changed']);
 });
 
+// Old as Pandoc writes a raw <details> whose </details> comes after a
+// heading: the heading's section ends the <details> (the browser closes it
+// there), and its </details> stands stray in the next section.
+const AFTER_HEADING = page(`${NEW_SWITCH}<section id="a" class="level3"><h3>A</h3>`
+  + reveal('<p>En.</p><section id="b" class="level3"><h3>B</h3><p>To.</p></section>') + '</section><p>Etter.</p>');
+
 test('a heading that escaped a raw <details> and is inside the reveal now: "heading", explained', () => {
   const before = page(`${OLD_SWITCH}<section id="a" class="level3"><h3>A</h3><details class="reading-step"><summary>Gå i dybden</summary>`
-    + '<p>En.</p></details></section><section id="b" class="level3"><h3>B</h3><p>To.</p></section><p>Etter.</p>');
-  const after = page(`${NEW_SWITCH}<section id="a" class="level3"><h3>A</h3>`
-    + reveal('<p>En.</p><section id="b" class="level3"><h3>B</h3><p>To.</p></section>') + '</section><p>Etter.</p>');
-  const items = compare(after, before);
+    + '\n<p>En.</p>\n</section>\n<section id="b" class="level3">\n<h3>B</h3>\n<p>To.</p>\n</details>\n</section><p>Etter.</p>');
+  const items = compare(AFTER_HEADING, before);
   assert.deepEqual(invariants(items), []);
   const ends = items.filter(item => /^<\/details/.test(item.line || ''));
   assert.ok(ends.length >= 2 && ends.every(item => item.reveal === 'heading' && item.category === 'reveal-heading'), JSON.stringify(ends));
+});
+
+test('a reveal that swallowed the next heading is unexplained (the reviewer\'s mutation of week6_preconditioning)', () => {
+  // Old's <details> ended before the heading (its own </details>): a closing
+  // fence moved past the heading, not a raw <details> closed early.
+  const before = page(`${OLD_SWITCH}<section id="a" class="level3"><h3>A</h3><details class="reading-step"><summary>Gå i dybden</summary>`
+    + '\n<p>En.</p>\n</details>\n</section>\n<section id="b" class="level3">\n<h3>B</h3>\n<p>To.</p>\n</section><p>Etter.</p>');
+  const items = compare(AFTER_HEADING, before);
+  assert.deepEqual(invariants(items), ['reveal content changed swallowed']);
+  assert.ok(!items.some(item => item.category === 'reveal-heading'), 'no "heading" case');
+});
+
+test('the source tells how each <details> ends', async () => {
+  const {closedBySection} = await import('../tools/compare-rendered/details-close.mjs');
+  assert.deepEqual(closedBySection('<details><p>a</p></details><section><details><details></details></section>'
+    + '<script>"<details>"</script><!-- <details> --><details></section></details>'), [false, true, false, true]);
 });
 
 test('a switch moved down the page is unexplained; one moved to the top is not', () => {

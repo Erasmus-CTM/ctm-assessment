@@ -10,9 +10,11 @@
 //
 // Checks, on the pages with reveals, the switch or links into tabs:
 //  1. reveals: count per kind, summary texts and initial state equal; each
-//     reveal holds the words it held on old (more only as old's words
-//     followed by what came after it there: a heading that escaped a raw
-//     <details>), never fewer or others;
+//     reveal holds the words it held on old, never fewer or others; more
+//     only as old's words followed by exactly what came after it there,
+//     and when that starts with a heading, only if old's <details> was
+//     closed by that heading's section (a raw <details> closed early; not
+//     one that had its own </details> before the heading);
 //  2. the switch: reading opens and lecture closes every reading step, per
 //     block; aria-pressed and the status text equal; the mode survives a
 //     reload and another page; a new tab starts in lecture; it stands where
@@ -58,6 +60,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import {createRequire} from 'node:module';
+import {closedBySection} from './compare-rendered/details-close.mjs';
 const require = createRequire(import.meta.url);
 const {JSDOM} = require('jsdom');
 const yaml = require('js-yaml');
@@ -100,15 +103,19 @@ function htmlPages(root) {
 // What a page holds, from its HTML: reveals (old: the courses' <details>; new:
 // ctm-libs' reveals), the switch, ids, tabsets and the links to ids.
 function inventory(root, page, side) {
-  const doc = new JSDOM(fs.readFileSync(path.join(root, page), 'utf8')).window.document;
+  const html = fs.readFileSync(path.join(root, page), 'utf8');
+  const doc = new JSDOM(html).window.document;
   const reveals = [];
+  // How each <details> ended in the source (unknown when the start tags and the DOM disagree).
+  const all = [...doc.querySelectorAll('details')], ends = closedBySection(html);
+  const bySection = details => ends.length === all.length && ends[all.indexOf(details)];
   for (const details of doc.querySelectorAll('main details')) {
     if (details.closest(COMPONENTS)) continue;
     let kind = null;
     if (side === 'new') kind = details.classList.contains('ctm-reveal') ? details.classList[1] : null;
     else if (!details.className.trim()) kind = 'details';
     else kind = Object.keys(OLD_REVEALS).find(c => details.classList.contains(c)) ? OLD_REVEALS[Object.keys(OLD_REVEALS).find(c => details.classList.contains(c))] : null;
-    if (kind) reveals.push({kind, summary: norm(details.querySelector(':scope > summary')?.textContent)});
+    if (kind) reveals.push({kind, summary: norm(details.querySelector(':scope > summary')?.textContent), bySection: bySection(details)});
   }
   const links = [];
   const main = doc.querySelector('main') || doc.body;
@@ -367,16 +374,46 @@ class Run {
         const context = await this.context(side);
         const tab = await context.newPage();
         await this.load(tab, side, this.url(side, page));
-        seen[side] = await tab.evaluate(([side, components, kinds, wordsSource]) => [...document.querySelectorAll('main details')]
-          .filter(d => !d.closest(components))
-          .map(d => {
+        // Old: also the words that follow each reveal in main. New: whether
+        // the word after old's words (counts) is in a heading inside the reveal.
+        const counts = side === 'new' ? (seen.old || []).map(r => r.words.length) : [];
+        seen[side] = await tab.evaluate(([side, components, kinds, wordsSource, counts]) => {
+          const wordsIn = new Function('return ' + wordsSource)();
+          const textNodes = root => {
+            const out = [], walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            for (let node = walker.nextNode(); node; node = walker.nextNode())
+              if (!node.parentElement?.closest('script, style, template, noscript')) out.push(node);
+            return out;
+          };
+          const main = document.querySelector('main') || document.body, mainText = textNodes(main);
+          return [...document.querySelectorAll('main details')].filter(d => !d.closest(components)).map(d => {
             let kind = null;
             if (side === 'new') kind = d.classList.contains('ctm-reveal') ? d.classList[1] : null;
             else if (!d.className.trim()) kind = 'details';
             else for (const [c, k] of Object.entries(kinds)) if (d.classList.contains(c)) kind = k;
-            const words = new Function('return ' + wordsSource)()(d);
-            return kind && {kind, summary: (d.querySelector(':scope > summary')?.textContent || '').replace(/\s+/g, ' ').trim(), open: d.open, words};
-          }).filter(Boolean), [side, COMPONENTS, OLD_REVEALS, WORDS_IN]);
+            return kind && {d, kind};
+          }).filter(Boolean).map(({d, kind}, k) => {
+            const found = {kind, summary: (d.querySelector(':scope > summary')?.textContent || '').replace(/\s+/g, ' ').trim(), open: d.open, words: wordsIn(d)};
+            if (side === 'old') {
+              const after = [];
+              for (const node of mainText) {
+                if (after.length >= 3000) break;
+                if (!d.contains(node) && d.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) after.push(...node.textContent.split(/\s+/).filter(Boolean));
+              }
+              found.after = after;
+            } else if (counts[k] !== undefined && counts[k] < found.words.length) {
+              let seen = 0;
+              for (const node of textNodes(d)) {
+                seen += node.textContent.split(/\s+/).filter(Boolean).length;
+                if (seen <= counts[k]) continue;
+                const heading = node.parentElement?.closest('h1, h2, h3, h4, h5, h6');
+                found.headingFirst = !!heading && d.contains(heading);
+                break;
+              }
+            }
+            return found;
+          });
+        }, [side, COMPONENTS, OLD_REVEALS, WORDS_IN, counts]);
         await context.close();
       }
       const head = r => r && {kind: r.kind, summary: r.summary, open: r.open};
@@ -387,19 +424,28 @@ class Run {
         const k = seen.old.findIndex((r, i) => JSON.stringify(head(r)) !== JSON.stringify(head(seen.new[i])));
         note = `old ${counts('old')} / new ${counts('new')}; first difference at ${k}: ${JSON.stringify(head(seen.old[k]))} -> ${JSON.stringify(head(seen.new[k]))}`;
       }
-      // Each reveal keeps its words: more only as a prefix of old's (the words
-      // that followed a raw <details> closed early), never fewer or others.
+      // Each reveal keeps its words, never fewer or others. More only as old's
+      // words followed by exactly what followed it on old; when that starts
+      // with a heading, only where old's <details> was closed by the
+      // heading's section (as compare-rendered.mjs: "heading", else
+      // "swallowed"); otherwise "grown" (what a list item cut short).
       const problems = [];
-      let grown = 0;
+      const grown = {heading: 0, grown: 0};
+      const old = this.inventories[page].old.reveals;
       if (same) seen.old.forEach((o, k) => {
         const n = seen.new[k], ow = o.words.join(' '), nw = n.words.join(' ');
         if (ow === nw) return;
-        if (nw.startsWith(ow + ' ')) { grown++; return; }
-        problems.push(`"${o.summary}" (${k + 1}) holds ${n.words.length} words, on old ${o.words.length}`
-          + (ow.startsWith(nw) ? ': it ends early' : ': other words'));
+        const where = `"${o.summary}" (${k + 1}) holds ${n.words.length} words, on old ${o.words.length}`;
+        if (!nw.startsWith(ow + ' ')) { problems.push(where + (ow.startsWith(nw) ? ': it ends early' : ': other words')); return; }
+        const extra = n.words.slice(o.words.length);
+        if (o.after.slice(0, extra.length).join(' ') !== extra.join(' ')) problems.push(where + ': more than what followed it on old');
+        else if (n.headingFirst && !(old.length === seen.old.length && old[k].bySection))
+          problems.push(where + ': it took in the heading after it, which old\'s <details> had ended before (its own </details>)');
+        else grown[n.headingFirst ? 'heading' : 'grown']++;
       });
       if (problems.length) note = problems.join('; ');
-      else if (grown) note += `; ${grown} hold more than on old (what followed a raw <details> closed early)`;
+      else if (grown.heading || grown.grown) note += `; ${grown.heading + grown.grown} hold more than on old, exactly what followed them there`
+        + ` (${grown.heading} a heading that closed a raw <details> early, ${grown.grown} other)`;
       this.record('reveals', page, same && !problems.length, {note});
     }
   }
