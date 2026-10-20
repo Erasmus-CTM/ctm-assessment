@@ -259,7 +259,7 @@ jobs:
     if: ${{ !cancelled() && needs.courses.result == 'success' && needs.courses.outputs.browsers != '[]' }}
     name: browser ${{ matrix.entry.course }}${{ matrix.entry.ref && format(' @ {0}', matrix.entry.ref) || '' }} (${{ matrix.browser }})
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
@@ -285,8 +285,9 @@ jobs:
           node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" \
             --browser ${{ matrix.browser }} --expect tools/compare-rendered/expect/step4-migration.yml --course "$(basename "$COURSE")" \
             --shots "$RUNNER_TEMP/browser/shots" --report "$RUNNER_TEMP/browser/report.json" --summary "$RUNNER_TEMP/browser/summary.md"
-      # The links again on a first visit as GitHub Pages serves a course: no
-      # isolation headers, coi-serviceworker registers and reloads (review A2 S5).
+      # The link loads again on a first visit as GitHub Pages serves a course:
+      # no isolation headers, coi-serviceworker registers and reloads (review
+      # A2 S5). A course's three engines take up to about an hour each.
       - name: First visit in ${{ matrix.browser }} (coi-serviceworker, no isolation headers)
         if: success() || failure()
         env:

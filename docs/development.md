@@ -277,8 +277,8 @@ pull request's look review. Locally, `CHROMIUM_EXECUTABLE` names a Chromium
 and `--offline` blocks the CDNs. `--first-visit` serves both sides as GitHub
 Pages does, without the cross-origin isolation headers and with service
 workers allowed, so a page with Python cells isolates itself with
-coi-serviceworker (a reload) before the links are checked; the workflow runs
-the link checks a second time this way. `known-failures:` in the expect file
+coi-serviceworker (a reload) before the links are loaded; the workflow runs
+the link loads a second time this way (no clicks, no console comparison). `known-failures:` in the expect file
 lists failures that are fixed elsewhere and not pinned yet (a browser, checks,
 `targets: tab-title`): they count as expected and are reported.
 

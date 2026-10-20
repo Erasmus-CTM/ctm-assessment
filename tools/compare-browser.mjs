@@ -45,7 +45,9 @@
 // and lets service workers run, so a page with Python cells isolates itself
 // with coi-serviceworker on a first visit (it registers the worker and
 // reloads), as on GitHub Pages; the links are then followed on that visit.
-// Console errors are not compared then: the reload aborts loads at random.
+// Only the link loads are checked then (a click comes from a page already
+// visited), and console errors are not compared: the reload aborts loads at
+// random.
 //
 // `known-failures` in the expect file lists failures of new that are known
 // and fixed elsewhere (a browser, the checks, which targets, and the fix):
@@ -595,9 +597,11 @@ class Run {
       this.record('link load', name, !problems.length, {note: (problems.join('; ') || `shown, focus ${n.focus}; ${was}`) + visit, expected: dead('old')(link) || undefined,
         previouslyDead: dead('old')(link) || undefined, tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined});
     }
-    // On click, from the page with the link; Back and Forward for the first link of each page.
+    // On click, from the page with the link; Back and Forward for the first
+    // link of each page. Not on a first visit: a click comes from a page the
+    // reader has seen, whose worker already runs.
     const backTried = new Set();
-    for (const link of chosen) {
+    for (const link of this.o.firstVisit ? [] : chosen) {
       if (dead('new')(link)) continue;
       const name = link.page + ' -> ' + link.href;
       const state = {}, history = {};
