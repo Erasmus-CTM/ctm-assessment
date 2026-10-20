@@ -11,6 +11,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {boot, recording} = require('./runtime.cjs');
 const {openPage, prepare, fieldsOf, variantKey} = require('./cases.cjs');
+const {AUTHORED} = require('./authored.cjs');
 
 const [version, jobFile, resultsFile] = process.argv.slice(2);
 const job = JSON.parse(fs.readFileSync(jobFile, 'utf8'));
@@ -116,32 +117,6 @@ async function mathCases(py) {
   }
 }
 
-// question-tests.py, run in Pyodide on the authored tests of a source tree,
-// each question through authored_record.py (the recorder ctm-checkers imports
-// as well): every check() call of the tests is recorded with its result and
-// with the response it was given, as the page would send it. Each question
-// comes back as canonical JSON written by Python (sorted keys, compact), so
-// numbers keep Python's spelling.
-const AUTHORED = String.raw`
-import importlib.util, json, os, runpy
-from pathlib import Path
-_qt = runpy.run_path('/ctm-parity/question-tests.py')
-_spec = importlib.util.spec_from_file_location('_ctm_parity_authored_record', '/ctm-parity/authored_record.py')
-_ar = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_ar)
-def _ctm_authored(root, files):
-    os.chdir(root)
-    runtime = _qt['runtime_namespace']()
-    run = lambda options, base: _qt['run_question'](options, runtime, Path(base))
-    found = []
-    for name in files:
-        for options in _qt['authored_questions'](Path(root) / name):
-            if not options.get('tests', '').strip():
-                continue
-            record = dict(_ar.record(run, options, root), file=name, label=options.get('label', ''), options=options)
-            found.append(json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(',', ':')))
-    return json.dumps(found)
-`;
 
 async function authoredCases(py) {
   if (!job.authored.length || done.has('authored:all')) return;
@@ -149,8 +124,12 @@ async function authoredCases(py) {
   py.FS.mkdirTree('/ctm-parity');
   for (const name of ['question-tests.py', 'math-exercise.js']) py.FS.writeFile('/ctm-parity/' + name, fs.readFileSync(path.join(job.mathExtension, name)));
   py.FS.writeFile('/ctm-parity/authored_record.py', fs.readFileSync(path.join(__dirname, 'authored_record.py')));
+  // ctm-checkers' wheel, when the build has one (zipimport, as at build time).
+  const wheel = job.checkersWheel ? '/ctm-parity/' + path.basename(job.checkersWheel) : null;
+  if (wheel) py.FS.writeFile(wheel, fs.readFileSync(job.checkersWheel));
   await py.loadPackage('sympy');
   await py.loadPackage('networkx');
+  py.globals.set('_ctm_parity_wheel', wheel);
   py.runPython(AUTHORED);
   const found = [];
   job.authored.forEach((tree, i) => {

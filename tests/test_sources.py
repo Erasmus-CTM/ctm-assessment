@@ -13,8 +13,10 @@ spec.loader.exec_module(builder)
 class SourceSelection(unittest.TestCase):
     def test_manifest_pins_every_component_by_commit(self):
         repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
-        self.assertEqual(set(repositories), {'ctm-libs', 'py-exercise', 'math-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'})
+        self.assertEqual(set(repositories), {'ctm-libs', 'py-exercise', 'math-exercise', 'ctm-checkers', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'})
         self.assertEqual(repositories['jsxgraph']['repository'], 'jsxgraph/jsxgraph-quarto')
+        # ctm-checkers, the Python checker library math-exercise grades with: its generated extension folder.
+        self.assertEqual(repositories['ctm-checkers']['repository'], 'Erasmus-CTM/ctm-checkers')
         self.assertEqual(repositories['jsxgraph']['extension'], 'jsxgraph')
         # ai-feedback became ctm-libs: one repository, its library and the alias extension.
         self.assertEqual(repositories['ctm-libs']['repository'], 'Erasmus-CTM/ctm-libs')
@@ -175,6 +177,7 @@ class SourceSelection(unittest.TestCase):
         self.assertEqual(folders['ctm-libs'], ['ctm-libs', 'ai-feedback'])
         self.assertEqual(folders['jsxgraph'], ['jsxgraph'])
         self.assertEqual(folders['math-exercise'], ['math-exercise'])
+        self.assertEqual(folders['ctm-checkers'], ['ctm-checkers'])
         clash = {'repositories': {'a': {'extensions': ['x', 'y']}, 'b': {'extension': 'y'}}}
         with self.assertRaisesRegex(SystemExit, 'both own the extension folder y'):
             builder.extension_folders(clash)

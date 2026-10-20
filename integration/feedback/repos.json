@@ -23,6 +23,11 @@
       "branch": "main",
       "commit": "8ab1b253d8d49f7a02753f1a33c6fc578352bc7f"
     },
+    "ctm-checkers": {
+      "repository": "Erasmus-CTM/ctm-checkers",
+      "branch": "main",
+      "commit": "4bd916d74c10afb82dae9003b3baf5564d19e09b"
+    },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "feature/shared-feedback-integration",

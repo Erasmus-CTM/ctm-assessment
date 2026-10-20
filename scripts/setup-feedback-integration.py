@@ -419,9 +419,13 @@ def main():
         # CTM_LIBS_EXTENSION: ctm-libs' extension folder (the components' tests
         # load its runtime, catalogues and feedback files); AI_FEEDBACK_EXTENSION:
         # its three self-contained feedback files, which pyodide-interaktiv 1.8's
-        # tests load on their own.
+        # tests load on their own. ctm-checkers, the Python checker library
+        # (math-exercise 0.11 grades with it): CTM_CHECKERS_EXTENSION names the
+        # packaged _extensions/ctm-checkers folder (math-exercise's tests),
+        # CTM_CHECKERS_SOURCE its repository (ctm-libs' tests install from it).
         env = dict(base_env, CTM_INTEGRATION_SITE=str(site / '_site'), CTM_INTEGRATION_RECORD=str(workspace / 'resolved-repos.json'),
-                   CTM_LIBS_EXTENSION=str(libs), AI_FEEDBACK_EXTENSION=str(libs / 'feedback'))
+                   CTM_LIBS_EXTENSION=str(libs), AI_FEEDBACK_EXTENSION=str(libs / 'feedback'),
+                   CTM_CHECKERS_EXTENSION=str(extensions_root / 'ctm-checkers'), CTM_CHECKERS_SOURCE=str(sources['ctm-checkers']))
         run(['npm', 'ci', '--ignore-scripts'], cwd=ROOT)
         if args.test:
             legacy = snapshot(*LEGACY_AI_FEEDBACK, cache)
@@ -430,6 +434,9 @@ def main():
             run(['python', ROOT / 'scripts/test-package.py', archive], env=env)
             run(['python', sources['ctm-libs'] / 'scripts/sync-feedback-defaults.py', '--check'], env=env)
             run(['python', sources['ctm-libs'] / 'scripts/check-locales.py'], env=env)
+            # The packaged ctm-checkers folder (wheel and page script) is the one
+            # its source builds.
+            run(['python', sources['ctm-checkers'] / 'tools/build.py', '--check'], env=env)
             run(['npm', 'test'], cwd=ROOT, env=env)
             env['JSXGRAPH_EXTENSION'] = str(site / '_extensions' / 'jsxgraph')
             # The components' tests render single files in temporary folders, and

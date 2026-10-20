@@ -10,8 +10,11 @@
 // cells without keys or with a diagram response the teacher answers of
 // answers.json (with the verdict each must get), probes and the responses of
 // their authored tests (cases.cjs); the authored question tests of the given
-// source trees (question-tests.py in Pyodide); and the umbrella's Python
-// programs (py-exercise's MODULE_PY).
+// source trees (in Pyodide: through ctm-checkers when the build has it next to
+// math-exercise, else question-tests.py); and the umbrella's Python programs
+// (py-exercise's MODULE_PY). math-exercise 0.10 (its own checker module) and
+// 0.11 (ctm-checkers, called through ctm-libs) are graded alike, so --builds
+// compares them.
 //
 // Two runs are compared:
 // - versions (default): the same sites under two Pyodide versions; any
@@ -106,6 +109,13 @@ function runsOf(options) {
 }
 // A path of a run, links resolved (Pyodide's NODEFS mounts real folders only).
 const at = (run, dir) => { const full = path.resolve(run.root, dir); return fs.existsSync(full) ? fs.realpathSync(full) : full; };
+// The wheel of ctm-checkers next to math-exercise in an extensions folder
+// (math-exercise 0.11 grades with it; its authored tests run through it), or null.
+function checkersWheel(extensions) {
+  const manifest = path.join(extensions, 'ctm-checkers', 'checkers.json');
+  if (!fs.existsSync(manifest)) return null;
+  return path.join(extensions, 'ctm-checkers', JSON.parse(fs.readFileSync(manifest, 'utf8')).wheel);
+}
 
 // The runtimes as the workers report them: "Pyodide <v> (Python <v>, SymPy <v>, PYTHONHASHSEED <n>)".
 const runtimes = {};
@@ -315,7 +325,8 @@ function commitOf(dir) {
 // already included, such as a second build of a course, is graded once).
 function buildJob(run, options, wheels, authoredResponses, corpora) {
   const job = {wheels, hashSeed: options.hashSeed, pages: {}, cases: [], skipped: [], cells: [], unshaped: [], misfits: [], authored: [], python: null, duplicates: [],
-    mathExtension: path.join(at(run, options.extensions), 'math-exercise'), capture: Boolean(options.capture)};
+    mathExtension: path.join(at(run, options.extensions), 'math-exercise'), checkersWheel: checkersWheel(at(run, options.extensions)),
+    capture: Boolean(options.capture)};
   const seen = new Map();
   for (const site of options.site) {
     const root = at(run, site.dir), corpus = siteCorpus(site, options, corpora);
@@ -375,7 +386,7 @@ async function main() {
     const first = runs[0];
     const prepass = {wheels, hashSeed: options.hashSeed, pages: {}, cases: [], python: null, responsesOnly: true,
       authored: options.sources.map(t => ({name: t.name, root: at(first, t.dir), files: authoredSources(at(first, t.dir))})),
-      mathExtension: path.join(at(first, options.extensions), 'math-exercise')};
+      mathExtension: path.join(at(first, options.extensions), 'math-exercise'), checkersWheel: checkersWheel(at(first, options.extensions))};
     const prepassFile = path.join(out, 'authored-responses-job.json'), prepassResults = path.join(out, 'authored-responses.jsonl');
     fs.writeFileSync(prepassFile, JSON.stringify(prepass));
     fs.rmSync(prepassResults, {force: true});
@@ -569,5 +580,5 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-module.exports = {parse, inventory, compare, readExpected, applyExpected, coverage, corpusOf};
+module.exports = {parse, inventory, compare, readExpected, applyExpected, coverage, corpusOf, checkersWheel};
 if (require.main === module) main().catch(error => { console.error(error); process.exit(2); });
