@@ -94,8 +94,9 @@ commits recorded in `_extensions/ctm-assessment/resolved-repos.json`.
   `_extensions/ctm-assessment/tab-ids.lua` (`filters: - path: …, at: pre-ast`
   before `- ctm-assessment` in `_quarto.yml`): a tab heading's id and
   attributes move to the start of its pane, so links to a tab work (and
-  `quiz=` reaches the filters). Ids with a cross-reference prefix are not
-  moved, with a warning. A project with the line stops with an older package.
+  `quiz=` reaches the filters). Ids with a cross-reference prefix, and ids of
+  the form of Quarto's own pane ids (`tabset-1-2`), are not moved, with a
+  warning. A project with the line stops with an older package.
 - **Reveals take over six class names** (backwards-incompatible for a site
   that uses them; none of the CTM courses, this package or its components
   does): in HTML a div with `.reading-step`, `.hint`, `.solution` (Quarto's
@@ -165,6 +166,20 @@ pyodide-interaktiv).
   fixture course `integration/step4-course` against its migration
   (`expect/step4-migration.yml`) and in Chromium, Firefox and WebKit
   (`tools/compare-browser.mjs`); `expect/step4.yml` lists step 4's
-  differences on pages without its Markdown. The Quarto-release canary runs
-  the `tab-ids.lua` test first. The umbrella's own unlabelled exercises got
+  differences on pages without its Markdown. The `tab-ids.lua` canary runs
+  in its own job of **Quarto versions**, which fails the run with the
+  current Quarto release too. The umbrella's own unlabelled exercises got
   labels.
+- Step 4 follow-ups (review of A2): the converter and its lint follow nested
+  includes as Quarto does (against the page's folder), and the converter
+  removes a hand-written anchor that repeats the id of the tab heading it
+  follows (with the `tab-ids.lua` line the page would have it twice; links
+  keep working). `compare-rendered.mjs` checks three invariants that no
+  expected category can explain: every reveal keeps its words (more only as
+  the words that followed a raw `<details>` closed early by a heading), the
+  switch stays where it was or goes to the top of the page, and no id occurs
+  more often than before. `compare-browser.mjs` checks the same for reveals
+  and the switch, compares the Tab presses to reach the switch, has a
+  `--first-visit` mode (no isolation headers, coi-serviceworker active) and
+  reads `known-failures` from the expect file; the fixture course has
+  tabsets far down a long page with deep links from another page.

@@ -256,9 +256,11 @@ A course's migration PR is checked with `course` = the course,
 
 `tools/compare-browser.mjs --old DIR --new DIR --browser chromium|firefox|webkit`
 serves two rendered sites from one origin and compares them with Playwright
-(design §6.3): reveals (kinds, titles, initial state), the switch (per
-block, `aria-pressed`, status texts, kept on reload and on another page, a
-new tab in lecture), the keyboard (Tab to the switch; Enter and Space on
+(design §6.3): reveals (kinds, titles, initial state, and the words each
+holds: never fewer than on old), the switch (per block, `aria-pressed`,
+status texts, kept on reload and on another page, a new tab in lecture,
+where old's stood or at the top of the page), the keyboard (Tab to the
+switch, in no more presses than on old; Enter and Space on
 every summary, as on old; axe-core finds no new violation), every link into
 a page with tabs or reveals on load and on click (the tab and reveal opened,
 the target below the header and still there 2 s later, focus in view, the
@@ -270,17 +272,35 @@ screenshots of the switch and of each kind of reveal at 1280 and 390 px
 JSXGraph boards and a Python cell inside reveals (not with `--offline`), and
 console errors that only new has. `--shots DIR` keeps the screenshots for the
 pull request's look review. Locally, `CHROMIUM_EXECUTABLE` names a Chromium
-and `--offline` blocks the CDNs.
+and `--offline` blocks the CDNs. `--first-visit` serves both sides as GitHub
+Pages does, without the cross-origin isolation headers and with service
+workers allowed, so a page with Python cells isolates itself with
+coi-serviceworker (a reload) before the links are checked; the workflow runs
+the link checks a second time this way. `known-failures:` in the expect file
+lists failures that are fixed elsewhere and not pinned yet (a browser, checks,
+`targets: tab-title`): they count as expected and are reported.
+
+`compare-rendered.mjs` also checks three invariants on every page, which no
+expected category can explain: each `<details>` keeps its words (more only as
+its old words followed by what followed it on old: `reveal: heading` when
+that starts with a heading, `grown` otherwise), the new switch stands where
+the old one stood or at the top of the page, and no id occurs more often than
+on old.
 
 ### Migrating a course to step 4's Markdown
 
 `python tools/migrate-course-html.py --project COURSE --config` turns a
 course's raw HTML into the Markdown forms (reveals, anchors, the embed, the
-switch) in its pages and the files they include, adds the `tab-ids.lua` line
+switch) in its pages and the files they include (nested includes resolved
+against the page's folder, as Quarto resolves them), adds the `tab-ids.lua` line
 and `markdown-lint: true` to `_quarto.yml` and drops the courses'
 `learning-mode.html` and `tab-links.html`; it reports what it changed, the
 places where it put a blank line before a fence, and what it left (`--dry-run`
-changes nothing). The course's own CSS for the old classes is the migration
+changes nothing). An anchor that is the first thing in a tab and repeats the
+id of its tab heading (written or automatic, also across an include, on every
+page that shows its file) is removed when the project has the `tab-ids.lua`
+line, since that line puts the id first in the tab; without it, it is
+reported. The course's own CSS for the old classes is the migration
 PR's to remove. Until a course migrates, its CI can run the same tool as a
 lint: `--write-baseline ctm-html-baseline.json` records the raw HTML it has,
 and `--check --baseline ctm-html-baseline.json` gives a warning annotation for
@@ -320,8 +340,9 @@ its branch does not contain stays, with a log line: the JSXGraph pin is the
 fork commit of upstream pull request #2, which upstream `main` lacks.
 The **Quarto versions** workflow (weekly, on demand, and when it or
 `tab-ids.lua` changes) builds and tests with Quarto 1.8.27 and with the
-current release; its first step is the canary for `tab-ids.lua`
-(`integration/feedback/tab-ids.test.cjs` with Quarto alone): the filter keeps
+current release (the release job may fail without failing the run); its
+canary job for `tab-ids.lua` (`integration/feedback/tab-ids.test.cjs` with
+Quarto alone, with both versions) fails the run: the filter keeps
 tab-heading ids only while Quarto parses tabsets after pre-ast filters.
 
 One repository setting is required: **Settings → Pages → Build and deployment →
