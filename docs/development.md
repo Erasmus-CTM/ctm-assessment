@@ -26,8 +26,9 @@ py-exercise, pyodide-interaktiv and JSXGraph (the upstream
 jsxgraph/jsxgraph-quarto extension). It records revisions and hashes, rejects
 any vendored copy of another component, checks that every `ctm-bootstrap.lua`
 equals ctm-libs' own, keeps checker Python in one home (no packaged folder but
-ctm-checkers defines `_math_check` or `assess_basis`, and math-exercise's only
-Python files are `variants.py` and the `question-tests.py` script), and tests installed shared loading, filter order,
+ctm-checkers defines `_math_check` or `assess_basis` in any file or ships a
+wheel, and math-exercise's only Python files are `variants.py` and the
+`question-tests.py` script; `tests/test_one_home.py`), and tests installed shared loading, filter order,
 context reuse and browser behavior. The components' tests run against the
 pinned ctm-libs and ctm-checkers: `CTM_LIBS_EXTENSION` names its
 `_extensions/ctm-libs` folder and `AI_FEEDBACK_EXTENSION` its `feedback`

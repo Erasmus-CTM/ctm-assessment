@@ -29,6 +29,11 @@ function resources(html) {
 }
 
 test('each CTM script and style is one cacheable file per page, after its configuration', {skip: !site}, () => {
+  const manifest = fs.readFileSync(path.join(path.dirname(site), '_extensions/math-exercise/_extension.yml'), 'utf8');
+  const mathVersion = (manifest.match(/^version:\s*['"]?([\d.]+)/m) || [])[1] || '';
+  const [major, minor] = mathVersion.split('.').map(Number);
+  assert.ok(major > 0 || minor >= 11, `math-exercise ${mathVersion} does not grade with ctm-checkers; the package ships 0.11 or later`);
+  assert.ok(fs.existsSync(path.join(path.dirname(site), '_extensions/ctm-checkers/checkers.json')), 'ctm-checkers is not installed');
   for (const file of ['example.html', 'index.html', 'examples.html']) {
     const html = fs.readFileSync(path.join(site, file), 'utf8');
     const ours = resources(html).map(src => page.dependency(src)).filter(Boolean).map(d => d.name + '/' + d.file);
@@ -39,10 +44,8 @@ test('each CTM script and style is one cacheable file per page, after its config
     }
     const doc = new JSDOM(html).window.document;
     for (const script of doc.querySelectorAll('script:not([src])')) assert.doesNotMatch(script.textContent, BUNDLES, file);
-    // A math-exercise that grades with ctm-checkers (0.11 and later) adds its page script.
-    const checkers = fs.readFileSync(path.join(path.dirname(site), '_extensions/math-exercise/math-exercise.lua'), 'utf8').includes('ctm.checkers')
-      ? ['ctm-checkers/ctm-checkers.js'] : [];
-    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED, ...checkers].sort());
+    // The package's math-exercise grades with ctm-checkers (0.11 and later), which adds its page script.
+    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED, 'ctm-checkers/ctm-checkers.js'].sort());
   }
   // Library files in the head; each component's script after its inline configuration.
   const html = fs.readFileSync(path.join(site, 'example.html'), 'utf8');

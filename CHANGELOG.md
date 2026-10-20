@@ -44,10 +44,12 @@ unchanged, at the commits recorded in
   answering after Stop no longer holds up later checks.
 - Learner code in a Pyodide cell that rebinds `__import__` or `globals` no
   longer stops every check on the page.
-- **Builds without AI feedback**: an exercise in `mode: custom` without a
-  `checker` (assessed by AI feedback only) follows ctm-libs'
+- **A build without AI feedback stops at an exercise in `mode: custom`
+  without a `checker`** (breaking for builds without AI feedback): such an
+  exercise (assessed by AI feedback only) follows ctm-libs'
   `ai-feedback: without-ai` (the build stops and names it, unless the
-  setting says `text`, `self-check` or `drop`).
+  setting says `text`, `self-check` or `drop`). Builds with AI feedback
+  are unchanged.
 - `question-tests.py` runs the question tests in ctm-checkers, with the same
   output and exit status.
 
@@ -64,8 +66,9 @@ package's own changes (ctm-assessment #16).
 
 - `integration/feedback/repos.json` pins ctm-checkers (U2a) and the package
   builder keeps checker Python in one home: no packaged folder but
-  ctm-checkers defines `_math_check` or `assess_basis`, and math-exercise's
-  only Python files are `variants.py` and `question-tests.py`.
+  ctm-checkers defines `_math_check` or `assess_basis` (in any file) or
+  ships a wheel, and math-exercise's only Python files are `variants.py`
+  and `question-tests.py`.
 - `tools/compare-rendered/expect/step2.yml`: the one expected rendered
   difference, ctm-checkers' page script on pages with a math exercise.
 

@@ -69,13 +69,13 @@ with tempfile.TemporaryDirectory(prefix='ctm-install-', dir=archive.parent) as t
     carried = re.search(r"\bdata: '([A-Za-z0-9+/=]+)'", payload)
     assert 'sha256: ' + json.dumps(manifest['sha256']) in payload and carried and base64.b64decode(carried.group(1)) == wheel, \
         'ctm-checkers: the page script does not carry the wheel of checkers.json'
-    # A math-exercise that grades with ctm-checkers (0.11 and later, by the
-    # version in its manifest) loads its page script on every page with an
-    # exercise, once.
-    math_version = tuple(int(part) for part in re.findall(r'\d+', version(extensions / 'math-exercise').strip('\'"'))[:2])
-    uses_checkers = math_version >= (0, 11)
-    if uses_checkers:
-        SCRIPTS.append(('ctm-checkers', manifest['script']))
+    # The package ships a math-exercise that grades with ctm-checkers (0.11
+    # and later, by the version in its manifest): its page script loads on
+    # every page with an exercise, once.
+    math_version = version(extensions / 'math-exercise').strip('\'"')
+    assert tuple(int(part) for part in re.findall(r'\d+', math_version)[:2]) >= (0, 11), \
+        f'math-exercise {math_version} does not grade with ctm-checkers; the package ships 0.11 or later'
+    SCRIPTS.append(('ctm-checkers', manifest['script']))
     (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [example.qmd]\nfilters: [ctm-assessment]\npy-exercise:\n  feedback: true\npyodide:\n  feedback: true\n')
     (course / 'example.qmd').write_text('''---
 format: html
@@ -173,19 +173,18 @@ assert answer() == 2
 ''')
     result = render(course, expect_ok=False)
     assert result.returncode != 0 and 'combines filters that use different ai-feedback versions' in result.stderr, result.stderr
-    # Without ctm-checkers, a page with an exercise of a math-exercise that
-    # grades with it stops with the install command; a page without one renders.
-    if uses_checkers:
-        away = course / 'ctm-checkers-away'
-        shutil.move(extensions / 'ctm-checkers', away)
-        (course / 'python.qmd').write_text('---\nformat: html\n---\n\n```{py-exercise}\n#| task: Return two.\n'
-                                           'def answer():\n    return 2\n## TESTS ##\nassert answer() == 2\n```\n')
-        for page in ('mixed.qmd', 'python.qmd'):
-            (course / '_quarto.yml').write_text(f'project:\n  type: default\n  render: [{page}]\nfilters: [ctm-assessment]\n')
-            result = render(course, expect_ok=page == 'python.qmd')
-            if page == 'mixed.qmd':
-                assert result.returncode != 0 and 'needs ctm-checkers' in result.stderr and INSTALL in result.stderr, result.stderr
-        shutil.move(away, extensions / 'ctm-checkers')
+    # Without ctm-checkers, a page with a math exercise stops with the install
+    # command; a page without one renders.
+    away = course / 'ctm-checkers-away'
+    shutil.move(extensions / 'ctm-checkers', away)
+    (course / 'python.qmd').write_text('---\nformat: html\n---\n\n```{py-exercise}\n#| task: Return two.\n'
+                                       'def answer():\n    return 2\n## TESTS ##\nassert answer() == 2\n```\n')
+    for page in ('mixed.qmd', 'python.qmd'):
+        (course / '_quarto.yml').write_text(f'project:\n  type: default\n  render: [{page}]\nfilters: [ctm-assessment]\n')
+        result = render(course, expect_ok=page == 'python.qmd')
+        if page == 'mixed.qmd':
+            assert result.returncode != 0 and 'needs ctm-checkers' in result.stderr and INSTALL in result.stderr, result.stderr
+    shutil.move(away, extensions / 'ctm-checkers')
     # Without ctm-libs, a component stops with the install command (decision 3).
     shutil.rmtree(extensions / 'Erasmus-CTM')
     shutil.rmtree(extensions / 'ctm-libs')
