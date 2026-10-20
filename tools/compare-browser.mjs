@@ -276,8 +276,9 @@ class Run {
     page.on('console', message => {
       if (message.type() !== 'error') return;
       const text = message.text();
-      // Resources (fonts, CDNs while offline, favicons) are not the page's errors.
-      if (/Failed to load resource|ERR_FAILED|net::|NS_ERROR|blocked|status of 404|downloadable font/i.test(text)) return;
+      // Resources (fonts, CDNs while offline or blocked, favicons) are not the
+      // page's errors; WebKit reports a blocked fetch as "access control checks".
+      if (/Failed to load resource|ERR_FAILED|net::|NS_ERROR|blocked|status of 404|downloadable font|cannot load .* due to access control checks/i.test(text)) return;
       add(text);
     });
   }
