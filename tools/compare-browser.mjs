@@ -266,7 +266,9 @@ class Run {
 
   watch(page, side) {
     const add = message => {
-      const key = norm(message).replace(/https?:\/\/127\.0\.0\.1:\d+\/(old|new)\//g, '/').replace(/:\d+:\d+/g, '').slice(0, 200);
+      // Ports, sides and random ids (the URLs coi-serviceworker's fetches name) are not the error.
+      const key = norm(message).replace(/https?:\/\/127\.0\.0\.1:\d+\/((old|new)\/)?/g, '/')
+        .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<id>').replace(/:\d+:\d+/g, '').slice(0, 200);
       const errors = this.errors[side];
       if (!errors.has(key)) errors.set(key, page.url().replace(this.base + side + '/', ''));
     };
@@ -275,7 +277,7 @@ class Run {
       if (message.type() !== 'error') return;
       const text = message.text();
       // Resources (fonts, CDNs while offline, favicons) are not the page's errors.
-      if (/Failed to load resource|ERR_FAILED|net::|NS_ERROR|blocked|status of 404/i.test(text)) return;
+      if (/Failed to load resource|ERR_FAILED|net::|NS_ERROR|blocked|status of 404|downloadable font/i.test(text)) return;
       add(text);
     });
   }
@@ -285,11 +287,12 @@ class Run {
   // --first-visit: on a page with coi-serviceworker, wait for the worker's
   // reload (crossOriginIsolated); "none" on a page without it.
   async isolation(page) {
-    const coi = await page.evaluate(() => !!document.querySelector('script[src*="coi-serviceworker"]')).catch(() => false);
-    if (!coi) return 'none';
+    // The worker's reload may destroy the page's context while we ask: ask again.
     for (let k = 0; k < 50; k++) {
-      const isolated = await page.evaluate(() => window.crossOriginIsolated).catch(() => null);
-      if (isolated) { await page.waitForLoadState('load').catch(() => {}); return 'isolated'; }
+      const seen = await page.evaluate(() => ({coi: !!document.querySelector('script[src*="coi-serviceworker"]'),
+        isolated: window.crossOriginIsolated, ready: document.readyState === 'complete'})).catch(() => null);
+      if (seen?.isolated && seen.ready) return 'isolated';
+      if (seen && seen.ready && !seen.coi) return 'none';
       await page.waitForTimeout(300);
     }
     return 'not isolated';
