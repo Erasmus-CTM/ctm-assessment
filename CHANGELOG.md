@@ -255,4 +255,10 @@ pyodide-interaktiv).
   and the switch, compares the Tab presses to reach the switch, has a
   `--first-visit` mode (no isolation headers, coi-serviceworker active) and
   reads `known-failures` from the expect file; the fixture course has
-  tabsets far down a long page with deep links from another page.
+  tabsets far down a long page with deep links from another page. After the
+  A2b review: a reveal may take in the heading after it only where the old
+  course's Markdown had that heading inside the raw `<details>`
+  (`migrate-course-html.py --reveal-ends`, read by both tools);
+  `compare-browser.mjs --shard I/N` splits a large course into jobs, the
+  first visit is sampled and keeps Pyodide and Monaco blocked, console
+  errors name their frame, and a link in a collapsed callout is clicked.
