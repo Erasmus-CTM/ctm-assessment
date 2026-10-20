@@ -12,23 +12,32 @@ const {JSDOM} = require('jsdom');
 const site = process.env.CTM_INTEGRATION_SITE;
 
 const math = '```{math-exercise}\n#| label: product\nCompute $6\\cdot 7$: _[42]\n```\n';
+const pyodide = '```{pyodide-python}\nprint(1)\n```\n';
 const python = '```{py-exercise}\n#| label: answer\n#| task: Return two.\ndef answer():\n    return 0\n## TESTS ##\nassert answer() == 2\n```\n';
 const FILES = {
   '_quarto.yml': 'project:\n  type: website\n  render: [chapter/page.qmd, chapter/other.qmd, top.qmd]\nfilters: [ctm-assessment]\n'
     + 'ctm-assessment:\n  stop-after: 45\nmath-exercise:\n  feedback: false\npy-exercise:\n  feedback: true\n  show-test-hints: false\n'
-    + 'ai-feedback:\n  mode: copy\n',
+    + 'pyodide:\n  feedback: false\n  show-startup-message: 0\nai-feedback:\n  mode: copy\n',
   '_quarto-nb.yml': 'ctm-assessment:\n  lang: nb\n',
   'chapter/_metadata.yml': 'py-exercise:\n  stop-after: 33\n',
   // The page's own maps name one key each; the project's feedback,
-  // show-test-hints and the shared stop-after must survive.
-  'chapter/page.qmd': '---\ntitle: Page\nengine: markdown\nmath-exercise:\n  lang: nb\npy-exercise:\n  lang: de\n---\n\n' + math + '\n' + python,
-  'chapter/other.qmd': '---\ntitle: Other\nengine: markdown\n---\n\n' + math + '\n' + python,
+  // show-test-hints and the shared stop-after must survive. pyodide: too
+  // (step 3, F-79): the page's lang keeps the project's feedback: false.
+  'chapter/page.qmd': '---\ntitle: Page\nengine: markdown\nmath-exercise:\n  lang: nb\npy-exercise:\n  lang: de\npyodide:\n  lang: de\n---\n\n' + math + '\n' + python + '\n' + pyodide,
+  'chapter/other.qmd': '---\ntitle: Other\nengine: markdown\n---\n\n' + math + '\n' + python + '\n' + pyodide,
   'top.qmd': '---\ntitle: Top\nengine: markdown\nmath-exercise:\n  stop-after: 12\n---\n\n' + math,
 };
 
 function config(doc, name) {
   const script = [...doc.scripts].find(s => s.textContent.includes(`window.${name} =`));
   return script && JSON.parse(script.textContent.replace(new RegExp(`^\\s*window\\.${name} = `), '').replace(/;\s*$/, ''));
+}
+// pyodide-interaktiv's settings script: its language, feedback and startup message.
+function pyodideSettings(doc) {
+  const text = [...doc.scripts].map(s => s.textContent).find(t => t.includes('qpyodideLang ='));
+  if (!text) return null;
+  return {lang: /qpyodideLang = "([^"]*)"/.exec(text)[1], feedback: /qpyodideFeedbackOptions = \{\s*enabled: (\w+)/.exec(text)[1] === 'true',
+    startupMessage: /qpyodideShowStartupMessage = (\w+)/.exec(text)?.[1]};
 }
 function page(dir, file) {
   const doc = new JSDOM(fs.readFileSync(path.join(dir, '_site', file), 'utf8')).window.document;
@@ -39,6 +48,7 @@ function page(dir, file) {
     py: config(doc, '__pyExerciseConfig'),
     exercises,
     feedbackButtons: doc.querySelectorAll('.math-feedback-btn').length,
+    pyodide: pyodideSettings(doc),
     check: doc.querySelector('.math-check-btn')?.textContent.replace(/^\W+/, ''),
   };
 }
@@ -71,7 +81,9 @@ test('settings combine key by key across levels and components', {skip: !site}, 
     assert.equal(p.py.lang, 'de');
     assert.equal(p.py.stopAfter, 33);
     assert.equal(p.exercises[0].showTestHints, false);
+    assert.deepEqual(p.pyodide, {lang: 'de', feedback: false, startupMessage: 'false'});
     p = page(dir, 'chapter/other.html');
+    assert.deepEqual(p.pyodide, {lang: 'en', feedback: false, startupMessage: 'false'});
     assert.deepEqual(p.math, {lang: 'en', stopAfter: 45});
     assert.equal(p.check, 'Check');
     assert.equal(p.feedbackButtons, 0);
@@ -86,7 +98,9 @@ test('settings combine key by key across levels and components', {skip: !site}, 
     assert.equal(p.math.lang, 'nb');
     assert.equal(p.check, 'Sjekk');
     assert.equal(p.py.lang, 'nb');
+    assert.equal(p.pyodide.lang, 'nb', 'ctm-assessment: lang reaches pyodide-interaktiv');
     assert.equal(page(dir, 'chapter/page.html').py.lang, 'de');
+    assert.equal(page(dir, 'chapter/page.html').pyodide.lang, 'de');
     // _quarto.yml.local overrides the project; the chapter's py-exercise stop-after still wins for py-exercise.
     fs.writeFileSync(path.join(dir, '_quarto.yml.local'), 'ctm-assessment:\n  stop-after: 50\n');
     render(dir);

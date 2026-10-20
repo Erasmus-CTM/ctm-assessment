@@ -14,8 +14,8 @@ const site = process.env.CTM_INTEGRATION_SITE;
 
 // Code of ctm-libs or a component that must come from a file, never inline.
 const BUNDLES = /MathExerciseRuntime\s*=|CTMLocales\.add\(|root\.AIFeedback\s*=|root\.CTMWorker\s*=|var ME_CFG =|var MODULE_PY = \[|root\.PyExerciseFeedback\s*=|function setupExercise\(/;
-// pyodide-interaktiv 1.9's modules (1.8 inlined them): a line of each.
-const PYODIDE_19_BUNDLES = /globalThis\.QP_L\s*=|globalThis\.qpyodideStorage\s*=|qpyodideStartupMessage\s*=\s*document\.createElement|globalThis\.QPYODIDE_WORKER_PLUGIN\s*=|globalThis\.qpyodideCellsReady\s*=|class CellContainer\b|qpyodideCellContainer\.addCell\(|function buildStorageSection\(|globalThis\.qpyodideCanvasPlots\s*=|root\.qpyodideFeedback\s*=/;
+// pyodide-interaktiv's modules (1.9 and later; 1.8 inlined them): a line of each.
+const PYODIDE_BUNDLES = /globalThis\.QP_L\s*=|globalThis\.qpyodideStorage\s*=|qpyodideStartupMessage\s*=\s*document\.createElement|globalThis\.QPYODIDE_WORKER_PLUGIN\s*=|globalThis\.qpyodideCellsReady\s*=|class CellContainer\b|qpyodideCellContainer\.addCell\(|function buildStorageSection\(|globalThis\.qpyodideCanvasPlots\s*=|root\.qpyodideFeedback\s*=/;
 // The mixed example page (activities, mathematics, Python, Pyodide, JSXGraph;
 // its tabsets load ctm-libs' links into tabs, on by default since step 4).
 const EXPECTED = [
@@ -28,15 +28,13 @@ const EXPECTED = [
 // pyodide-interaktiv 1.9 (consolidation step 3) runs on ctm-libs: its worker
 // and catalogue are ctm-libs' files, its CSS and modules cacheable files of
 // its own (1.8 inlined them).
-const PYODIDE_19 = [
+const PYODIDE = [
   'ctm-worker/pyodide-worker.js', 'ctm-locale-pyodide-interaktiv/pyodide-interaktiv.js',
   ...['qpyodide-locale.js', 'qpyodide-storage.js', 'qpyodide-document-status.js', 'qpyodide-storage-settings.js', 'qpyodide-worker-plugin.js',
     'qpyodide-document-engine-initialization.js', 'qpyodide-canvas-plots.js', 'qpyodide-styling.css', 'qpyodide-cell-classes.js',
     'qpyodide-cell-initialization.js'].map(file => 'pyodide-interaktiv/' + file),
   'pyodide-interaktiv-feedback/qpyodide-feedback.js',
 ];
-// The package's pyodide-interaktiv version (1.8 or 1.9 while step 3 is merged).
-const pyodideAtLeast19 = () => page.pyodideAtLeast19(path.join(path.dirname(site), '_extensions'));
 
 function resources(html) {
   return [...html.matchAll(/<(?:script[^>]*\ssrc|link[^>]*\shref)="([^"]+)"/g)].map(m => m[1]);
@@ -47,6 +45,8 @@ test('each CTM script and style is one cacheable file per page, after its config
   assert.ok(page.atLeast(extensions, 'math-exercise', 0, 11),
     `math-exercise ${page.extensionVersion(extensions, 'math-exercise').join('.')} does not grade with ctm-checkers; the package ships 0.11 or later`);
   assert.ok(fs.existsSync(path.join(path.dirname(site), '_extensions/ctm-checkers/checkers.json')), 'ctm-checkers is not installed');
+  assert.ok(page.atLeast(extensions, 'pyodide-interaktiv', 1, 9),
+    `pyodide-interaktiv ${page.extensionVersion(extensions, 'pyodide-interaktiv').join('.')} does not run on ctm-libs; the package ships 1.9 or later`);
   for (const file of ['example.html', 'index.html', 'examples.html']) {
     const html = fs.readFileSync(path.join(site, file), 'utf8');
     const ours = resources(html).map(src => page.dependency(src)).filter(Boolean).map(d => d.name + '/' + d.file);
@@ -58,10 +58,10 @@ test('each CTM script and style is one cacheable file per page, after its config
     const doc = new JSDOM(html).window.document;
     for (const script of doc.querySelectorAll('script:not([src])')) {
       assert.doesNotMatch(script.textContent, BUNDLES, file);
-      if (pyodideAtLeast19()) assert.doesNotMatch(script.textContent, PYODIDE_19_BUNDLES, file + ': a pyodide-interaktiv module is inlined');
+      assert.doesNotMatch(script.textContent, PYODIDE_BUNDLES, file + ': a pyodide-interaktiv module is inlined');
     }
     // The package's math-exercise grades with ctm-checkers (0.11 and later), which adds its page script.
-    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED, 'ctm-checkers/ctm-checkers.js', ...(pyodideAtLeast19() ? PYODIDE_19 : [])].sort());
+    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED, 'ctm-checkers/ctm-checkers.js', ...PYODIDE].sort());
   }
   // Library files in the head; each component's script after its inline configuration.
   const html = fs.readFileSync(path.join(site, 'example.html'), 'utf8');
@@ -81,20 +81,24 @@ class Offline extends ResourceLoader {
   fetch(url, options) { return /^data:/.test(url) ? super.fetch(url, options) : null; }
 }
 
-test('with embed-resources a page with every script is self-contained and its scripts run', {skip: !site}, async () => {
+test('with embed-resources a page with every script, a Pyodide cell included, is self-contained and its scripts run', {skip: !site}, async () => {
   const dir = fs.mkdtempSync(path.join(path.dirname(path.dirname(site)), 'embedded-'));
   try {
     fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true});
     fs.writeFileSync(path.join(dir, 'page.qmd'), '---\ntitle: Embedded\nengine: markdown\nformat:\n  html:\n    embed-resources: true\n'
       + 'filters: [ctm-assessment]\npy-exercise:\n  feedback: true\n---\n\n::: {.ai-feedback #act}\nWrite.\n:::\n\n'
       + '```{math-exercise}\n#| label: m\nCompute $2+2$: _[4]\n```\n\n'
-      + '```{py-exercise}\n#| task: Return two.\ndef answer():\n    return 0\n## TESTS ##\nassert answer() == 2\n```\n');
+      + '```{py-exercise}\n#| task: Return two.\ndef answer():\n    return 0\n## TESTS ##\nassert answer() == 2\n```\n\n'
+      + '```{pyodide-python}\nprint(6 * 7)\n```\n');
     const render = spawnSync(process.env.QUARTO_BIN || 'quarto', ['render', 'page.qmd'], {cwd: dir, encoding: 'utf8', timeout: 300000});
     assert.equal(render.status, 0, render.stderr);
     const html = fs.readFileSync(path.join(dir, 'page.html'), 'utf8');
     assert.doesNotMatch(html, /quarto-contrib\//);
     assert.ok(!fs.existsSync(path.join(dir, 'page_files')), 'no page_files folder');
-    for (const src of resources(html)) assert.match(src, /^(https?:|data:|#)/, src);
+    // The one file outside the page: the COI service worker, which a browser
+    // registers only from a URL of the site (pyodide-interaktiv's cells, as 1.8).
+    for (const src of resources(html)) if (!/(^|\/)coi-serviceworker\.js$/.test(src)) assert.match(src, /^(https?:|data:|#)/, src);
+    assert.ok(fs.existsSync(path.join(dir, 'coi-serviceworker.js')), 'coi-serviceworker.js next to the page');
     const version = require(path.join(path.dirname(site), '_extensions/ctm-libs/feedback/feedback-core.js')).version;
     // jsdom cannot import() KaTeX's ES module from the CDN as math-exercise does
     // on DOMContentLoaded; such rejections of the page's async start-up
@@ -120,6 +124,11 @@ test('with embed-resources a page with every script is self-contained and its sc
       assert.equal(typeof w.PyExerciseFeedback.attach, 'function');
       assert.deepEqual(JSON.parse(JSON.stringify(w.__mathExerciseConfig)), {lang: 'en', stopAfter: 20});
       assert.equal(w.document.querySelector('#act button.ai-feedback-button').textContent, 'Feedback');
+      // pyodide-interaktiv: ctm-libs' worker (a classic script) ran; its own
+      // modules are embedded as modules, which jsdom does not run.
+      assert.equal(typeof w.CTMWorker.start, 'function');
+      assert.equal(w.document.querySelectorAll('[id^="qpyodide-insertion-location-"]').length, 1);
+      assert.ok([...w.document.scripts].some(s => s.type === 'module' && /^data:/.test(s.getAttribute('src') || '')), 'Pyodide modules embedded');
     } finally { w.close(); }
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
 });
