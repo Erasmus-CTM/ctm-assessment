@@ -319,8 +319,7 @@ on old.
 
 `python tools/migrate-course-html.py --project COURSE --config` turns a
 course's raw HTML into the Markdown forms (reveals, anchors, the embed, the
-switch) in its pages and the files they include (nested includes resolved
-against the page's folder, as Quarto resolves them), adds the `tab-ids.lua` line
+switch) in its pages and the files they include, adds the `tab-ids.lua` line
 and `markdown-lint: true` to `_quarto.yml` and drops the courses'
 `learning-mode.html` and `tab-links.html`; it reports what it changed, the
 places where it put a blank line before a fence, and what it left (`--dry-run`
@@ -334,6 +333,16 @@ lint: `--write-baseline ctm-html-baseline.json` records the raw HTML it has,
 and `--check --baseline ctm-html-baseline.json` gives a warning annotation for
 every construct the baseline does not list (constructs are keyed by file,
 kind and title, id or address, so moved lines are not reported).
+
+Which files a page includes (nested includes too) is ctm-libs' rule, not the
+tool's: `tools/source-files.lua` runs ctm-libs' own `ctm.source.files()`, the
+one `markdown-lint` reads, with `quarto pandoc lua`, and the tool asks it for
+each page and each include line. The tool therefore needs Quarto and ctm-libs'
+extension folder at the commit the umbrella pins: `--ctm-libs DIR`, or
+`CTM_LIBS_EXTENSION` (`scripts/build-course.py --convert` passes the copy it
+has just installed; a course's CI that runs the lint passes the ctm-libs of
+the ctm-assessment ref it fetches the tool from). `tests/test_migrate_course_html.py`
+fails if the two stop agreeing.
 
 ### Releases
 

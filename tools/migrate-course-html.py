@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Move a course's raw HTML in Markdown to CTM Assessment's Markdown forms (step 4), or report it.
 
-    python migrate-course-html.py [--project DIR] [--config] [--switch auto|marker|remove] [--dry-run] [FILE ...]
-    python migrate-course-html.py [--project DIR] --check [--baseline FILE] [--strict] [FILE ...]
-    python migrate-course-html.py [--project DIR] --write-baseline FILE [FILE ...]
+    python migrate-course-html.py [--project DIR] [--ctm-libs DIR] [--config] [--switch auto|marker|remove] [--dry-run] [FILE ...]
+    python migrate-course-html.py [--project DIR] [--ctm-libs DIR] --check [--baseline FILE] [--strict] [FILE ...]
+    python migrate-course-html.py [--project DIR] [--ctm-libs DIR] --write-baseline FILE [FILE ...]
 
 A maintainer tool of ctm-assessment (not part of the package; Python 3.9+,
-standard library only). It reads the project's pages (project: render:, or
-every .qmd and .md outside folders that start with _ or .) and the files they
-include (nested includes too, resolved against the page's folder as Quarto
-does), or the FILEs given, outside code blocks, HTML comments and front
-matter, rewrites in place, and reports what it did and what it left:
+standard library only, and Quarto). It reads the project's pages (project:
+render:, or every .qmd and .md outside folders that start with _ or .) and
+the files they include, or the FILEs given, outside code blocks, HTML
+comments and front matter, rewrites in place, and reports what it did and
+what it left:
 
   <details class="reading-step">     ->  ::: {.reading-step title="…"}   (the <summary> is the title)
   <details class="learning-hint">    ->  ::: {.hint title="…"}
@@ -39,6 +39,12 @@ browser and the new block is no longer part of that list). What cannot be
 converted (other attributes, a <summary> elsewhere, raw HTML inside
 ```{=html} blocks) stays as it is and is reported.
 
+Which files a page includes (nested includes too) is ctm-libs' rule, the
+one its markdown-lint reads: tools/source-files.lua runs ctm-libs' own
+ctm.source.files() with `quarto pandoc lua`. --ctm-libs DIR names ctm-libs'
+extension folder (default: $CTM_LIBS_EXTENSION), the one the umbrella pins
+(scripts/build-course.py --convert passes the copy it has just installed).
+
 --config also edits _quarto.yml: the tab-ids.lua line first in `filters:`,
 `ctm-assessment: markdown-lint: true`, and no include-after-body entries for
 the courses' _includes/site/learning-mode.html and tab-links.html (deleted
@@ -58,6 +64,8 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -74,6 +82,7 @@ KINDS = {'reading-step': 'reading-step', 'learning-hint': 'hint', 'solution-bloc
 SKIPPED_DIRS = {'_site', '_freeze', '_extensions', 'node_modules', 'site_libs', 'renv', 'venv'}
 SITE_SCRIPTS = ('_includes/site/learning-mode.html', '_includes/site/tab-links.html')
 TAB_IDS = '_extensions/ctm-assessment/tab-ids.lua'
+SOURCE_FILES = Path(__file__).resolve().parent / 'source-files.lua'
 
 ADVICE = {
     'details': 'raw HTML <details>/<summary>: CTM Assessment\'s Markdown form is ::: {.reading-step title="…"}, '
@@ -93,8 +102,46 @@ IFRAME = re.compile(r'^(\s*)<iframe((?:\s+[\w:-]+(?:\s*=\s*"[^"]*")?)*)\s*>\s*</
 SWITCH = re.compile(r'^(\s*)<div\b[^>]*\bdata-learning-mode\b[^>]*>\s*$', re.I)
 ATTRIBUTE = re.compile(r'([\w:-]+)(?:\s*=\s*"([^"]*)")?')
 LENGTH = re.compile(r'^\d+(?:\.\d+)?(?:px|r?em|vh|%)$')
-# {{< include … >}}, as ctm-libs' ctm.source.files() (lua/source.lua) reads it.
-INCLUDE = re.compile(r'\{\{<\s*include\s+(.+?)\s*>\}\}')
+# A shortcode alone on its line: where an include puts its file (ctm-libs
+# decides whether it is one, and which file).
+SHORTCODE = re.compile(r'\{\{<.*>\}\}')
+
+
+class ToolError(Exception):
+    """A failure reported as one line, without a traceback."""
+
+
+def ctm_libs_extension(given=None):
+    """ctm-libs' extension folder: `given` (--ctm-libs), else $CTM_LIBS_EXTENSION."""
+    folder = given or os.environ.get('CTM_LIBS_EXTENSION')
+    if not folder:
+        raise ToolError("which files a page includes is ctm-libs' rule: give ctm-libs' extension folder, at the "
+                        "commit the umbrella pins, as --ctm-libs DIR or $CTM_LIBS_EXTENSION")
+    folder = Path(folder).resolve()
+    if not (folder / 'lua' / 'source.lua').is_file():
+        raise ToolError(f'{folder} is not ctm-libs\' extension folder (no lua/source.lua)')
+    return folder
+
+
+def source_files(libs, root, pages):
+    """{page: [file, …]}: the files each page shows, as ctm-libs'
+    ctm.source.files() gives them (tools/source-files.lua): the page and its
+    includes, nested ones too, in order, relative to the project."""
+    found = {page: [] for page in pages}
+    if not pages:
+        return found
+    quarto = shutil.which(os.environ.get('QUARTO_BIN', 'quarto'))
+    if not quarto:
+        raise ToolError('Quarto is not installed: its Pandoc runs ctm-libs\' include rule (tools/source-files.lua)')
+    done = subprocess.run([quarto, 'pandoc', 'lua', str(SOURCE_FILES), str(libs), str(root), *pages],
+                          capture_output=True, text=True, encoding='utf-8')
+    if done.returncode:
+        raise ToolError(f'tools/source-files.lua failed (exit status {done.returncode}): {done.stderr.strip()}')
+    for line in done.stdout.splitlines():
+        page, _, file = line.partition('\t')
+        if page in found and file and not file.startswith('../') and not os.path.isabs(file):
+            found[page].append(file)
+    return found
 
 
 # ---------------------------------------------------------------- reading
@@ -204,7 +251,7 @@ class Project:
     """The project's pages, the Markdown files they show (includes,
     transitively; posix paths relative to the project) and their languages."""
 
-    def __init__(self, root):
+    def __init__(self, root, libs):
         self.root = root
         top = root / '_quarto.yml'
         self.config = top.read_text(encoding='utf-8') if top.is_file() else ''
@@ -212,22 +259,39 @@ class Project:
         self.lang = found.group(1) if found else None
         self.languages = {}
         self.shown = {}  # file -> the pages that show it
-        for page in self.pages():
+        pages = self.pages()
+        for page, files in source_files(libs, root, pages).items():
             lang = self.page_lang(page)
-            # Quarto resolves every include of a page, nested ones too,
-            # against the page's folder (`/`: the project root), not against
-            # the including file.
-            folder = (root / page).parent
-            todo, seen = [page], set()
-            while todo:
-                current = todo.pop()
-                if current in seen or not (root / current).is_file():
-                    continue
-                seen.add(current)
+            for current in files:
                 self.languages.setdefault(current, set()).add(lang)
                 self.shown.setdefault(current, set()).add(page)
-                todo.extend(self.includes(current, folder))
         self.files = sorted(self.languages)
+        self.included = self.resolve(libs)
+
+    def resolve(self, libs):
+        """{(page folder, line): file or None}: the file that each shortcode
+        line of the shown files puts in, on the pages of that folder. ctm-libs
+        resolves it: each line becomes a probe page of its own in the page's
+        folder (a dot file, removed after), and the first file the probe
+        includes is the line's."""
+        wanted = set()
+        for file in self.files:
+            lines = (self.root / file).read_text(encoding='utf-8').split('\n')
+            for text, raw in scan(lines):
+                if text is not None and not raw and SHORTCODE.fullmatch(text.strip()):
+                    for page in self.shown[file]:
+                        wanted.add((Path(page).parent.as_posix(), text.strip()))
+        probes = {}
+        try:
+            for k, (folder, line) in enumerate(sorted(wanted)):
+                probe = (Path(folder) / f'.ctm-include-probe-{os.getpid()}-{k}.md').as_posix()
+                (self.root / probe).write_text(line + '\n', encoding='utf-8')
+                probes[probe] = (folder, line)
+            found = source_files(libs, self.root, list(probes))
+        finally:
+            for probe in probes:
+                (self.root / probe).unlink(missing_ok=True)
+        return {key: (found[probe][1] if len(found[probe]) > 1 else None) for probe, key in probes.items()}
 
     def markdown(self):
         for folder, dirs, files in os.walk(self.root):
@@ -251,36 +315,11 @@ class Project:
             chosen = chosen - matched if remove else chosen | {m for m in matched if m.endswith(('.md', '.qmd'))}
         return sorted(chosen)
 
-    def include_path(self, target, folder):
-        """An include's file, relative to the project, as the page in `folder`
-        resolves it; None outside the project. The rule of ctm-libs'
-        ctm.source.files() (lua/source.lua), which markdown-lint uses, and of
-        Quarto: relative to the page's folder, `/` the project's root, no
-        fallback (a Python maintainer tool cannot run that Lua, which needs
-        Quarto's page context, so the rule is kept the same here)."""
-        quoted = re.fullmatch(r'"(.*)"|\'(.*)\'', target)
-        if quoted:
-            target = quoted.group(1) if quoted.group(1) is not None else quoted.group(2)
-        full = (self.root / target[1:]) if target.startswith('/') else (folder / target)
-        try:
-            return Path(os.path.normpath(full)).relative_to(self.root).as_posix()
-        except ValueError:
-            return None
-
-    def includes(self, relative, folder):
-        """The files that `relative` includes, as the page in `folder` resolves them."""
-        try:
-            text = (self.root / relative).read_text(encoding='utf-8')
-        except OSError:
-            return []
-        found = [self.include_path(target, folder) for target in INCLUDE.findall(text)]
-        return [path for path in found if path]
-
     def expanded(self, page):
         """The page's Markdown with its includes put in, nested ones too, as
         (file, index, text) for each line: `text` as scan() gives it (None for
         code and front matter)."""
-        folder = (self.root / page).parent
+        folder = Path(page).parent.as_posix()
         out = []
 
         def walk(relative, trail):
@@ -290,10 +329,9 @@ class Project:
             except OSError:
                 return
             for index, (line, (text, raw)) in enumerate(zip(lines, scan(lines))):
-                found = INCLUDE.fullmatch((text or '').strip()) if not raw else None
-                if found:
-                    inner = self.include_path(found.group(1), folder)
-                    if inner and inner not in trail:
+                inner = self.included.get((folder, text.strip())) if text is not None and not raw else None
+                if inner:
+                    if inner not in trail:
                         walk(inner, trail | {inner})
                     continue
                 out.append((relative, index, None if raw else text))
@@ -677,6 +715,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('files', nargs='*', type=Path, help='Markdown files (default: the pages and the files they include)')
     parser.add_argument('--project', type=Path, default=Path('.'), help='The project folder (default: the current folder)')
+    parser.add_argument('--ctm-libs', type=Path, metavar='DIR',
+                        help="ctm-libs' extension folder, as the umbrella pins it (default: $CTM_LIBS_EXTENSION)")
     parser.add_argument('--switch', choices=('auto', 'marker', 'remove'), default='auto',
                         help='The hand-written switch: removed when it starts its file, else a ::: {.modes} marker (auto)')
     parser.add_argument('--config', action='store_true', help='Also edit _quarto.yml (see above)')
@@ -694,7 +734,10 @@ def main(argv=None):
         parser.error(f'no project folder {root}')
     if args.baseline and not args.check:
         parser.error('--baseline belongs to --check')
-    project = Project(root)
+    try:
+        project = Project(root, ctm_libs_extension(args.ctm_libs))
+    except ToolError as error:
+        parser.exit(2, f'{parser.prog}: error: {error}\n')
     files = project.files
     if args.files:
         files = []

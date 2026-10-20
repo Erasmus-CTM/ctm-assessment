@@ -242,7 +242,9 @@ pyodide-interaktiv).
   current Quarto release too. The umbrella's own unlabelled exercises got
   labels.
 - Step 4 follow-ups (review of A2): the converter and its lint follow nested
-  includes as Quarto does (against the page's folder), and the converter
+  includes with ctm-libs' own rule (`ctm.source.files()`, run by
+  `tools/source-files.lua` through `quarto pandoc lua`; the tool now needs
+  Quarto and `--ctm-libs DIR` or `CTM_LIBS_EXTENSION`), and the converter
   removes a hand-written anchor that repeats the id of the tab heading it
   follows (with the `tab-ids.lua` line the page would have it twice; links
   keep working). `compare-rendered.mjs` checks three invariants that no

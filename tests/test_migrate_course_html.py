@@ -10,9 +10,14 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import unittest.mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'tools/migrate-course-html.py'
 QUARTO = shutil.which(os.environ.get('QUARTO_BIN', 'quarto'))
+# ctm-libs' extension folder: the tool reads includes with its rule
+# (tools/source-files.lua); setup-feedback-integration.py --test sets it.
+LIBS = os.environ.get('CTM_LIBS_EXTENSION')
+STEP4_COURSE = Path(__file__).resolve().parents[1] / 'integration/step4-course'
 
 
 def load():
@@ -156,6 +161,7 @@ On an English page the title stays.
 '''
 
 
+@unittest.skipUnless(QUARTO and LIBS, 'Quarto and CTM_LIBS_EXTENSION (setup-feedback-integration.py --test sets it) are needed')
 class Migrate(unittest.TestCase):
     def setUp(self):
         self.module = load()
@@ -309,13 +315,13 @@ class Migrate(unittest.TestCase):
                           '\n{{< include rel.md >}}\n', encoding='utf-8')
         for name in ('root.md', 'rel.md'):
             (self.dir / '_includes/oppgaver' / name).write_text('<div id="x-' + name[:-3] + '"></div>\n', encoding='utf-8')
-        files = self.module.Project(self.dir).files
+        files = self.module.Project(self.dir, LIBS).files
         self.assertIn('_includes/oppgaver/root.md', files)
         self.assertNotIn('_includes/oppgaver/rel.md', files)
         status, out = self.run_tool('--check')
         self.assertIn('_includes/oppgaver/uke5_ex.md:3: ', out)
         self.assertIn('_includes/oppgaver/deeper.md:1: ', out)
-        self.assertEqual(self.module.Project(self.dir).languages['_includes/oppgaver/deeper.md'], {'nb'})
+        self.assertEqual(self.module.Project(self.dir, LIBS).languages['_includes/oppgaver/deeper.md'], {'nb'})
         # The lint: a construct added to a nested file is new to the baseline.
         baseline = self.dir / 'ctm-html-baseline.json'
         self.run_tool('--write-baseline', str(baseline))
@@ -328,6 +334,62 @@ class Migrate(unittest.TestCase):
         self.run_tool()
         self.assertIn('::: {#uke5-oppg}\n:::\n', nested.read_text(encoding='utf-8'))
         self.assertEqual(self.read('_includes/oppgaver/deeper.md'), '::: {.hint title="Hint til 5.1"}\n\nDypt.\n:::\n')
+
+    def test_includes_resolve_with_ctm_libs_own_rule(self):
+        # The tool has no include rule of its own: ctm-libs' ctm.source.files()
+        # (tools/source-files.lua) decides, for the pages' lists and for each
+        # include line. This fails if that stops running, if the two disagree,
+        # or if ctm-libs' rule moves away from the one the courses are written
+        # for (relative to the page, `/` the project's root, quotes dropped,
+        # no fallback).
+        files = {
+            'index.qmd': '# Hjem\n\n{{< include _includes/hjem.md >}}\n\n{{< pagebreak >}}\n',
+            '_includes/hjem.md': 'Hjem.\n\n{{< include _includes/felles/a.md >}}\n',
+            'pages/uke7.qmd': '---\ntitle: Uke 7\n---\n\n{{< include \'../_includes/uke7.md\' >}}\n\n'
+                              '{{< include ../_includes/felles/a.md >}}\n',
+            '_includes/uke7.md': '## 7.1\n\n{{< include ../_includes/felles/a.md >}}\n\n'
+                                 '{{< include "/_includes/felles/b.md" >}}\n\n{{< include c.md >}}\n',
+            '_includes/felles/a.md': 'A.\n',
+            '_includes/felles/b.md': 'B.\n\n```\n{{< include ../_includes/felles/kode.md >}}\n```\n',
+            '_includes/felles/c.md': 'C.\n',
+            '_includes/felles/kode.md': 'Kode.\n',
+        }
+        for name, text in files.items():
+            (self.dir / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.dir / name).write_text(text, encoding='utf-8')
+        project = self.module.Project(self.dir, LIBS)
+        listed = self.module.source_files(Path(LIBS).resolve(), self.dir, project.pages())
+        self.assertEqual(listed['index.qmd'], ['index.qmd', '_includes/hjem.md', '_includes/felles/a.md'])
+        self.assertEqual(listed['pages/uke7.qmd'], ['pages/uke7.qmd', '_includes/uke7.md', '_includes/felles/a.md',
+                                                    '_includes/felles/b.md', '_includes/felles/kode.md'])
+        self.assertEqual(project.shown['_includes/felles/a.md'], {'index.qmd', 'pages/uke7.qmd'})
+        self.assertNotIn('_includes/felles/c.md', project.files)
+        for page in project.pages():
+            # Each page's Markdown, its include lines filled in, reaches exactly
+            # the files ctm-libs lists (a file in a code block is listed, not put in).
+            reached = {file for file, _, _ in project.expanded(page)}
+            self.assertEqual(reached, set(listed[page]) - {'_includes/felles/kode.md'}, page)
+        expanded = [text for _, _, text in project.expanded('pages/uke7.qmd') if text and text.strip()]
+        self.assertEqual(expanded[:5], ['## 7.1', 'A.', 'B.', '{{< include c.md >}}', 'A.'])
+        self.assertIn('{{< pagebreak >}}', [text for _, _, text in project.expanded('index.qmd')])
+        self.assertEqual([p.name for p in self.dir.rglob('.ctm-include-probe-*')], [], 'probes are removed')
+
+    def test_the_fixture_course_reads_as_ctm_libs_reads_it(self):
+        course = self.dir / 'course'
+        shutil.copytree(STEP4_COURSE, course, ignore=shutil.ignore_patterns('_site', '.quarto', '_extensions', 'migrated'))
+        project = self.module.Project(course, LIBS)
+        listed = self.module.source_files(Path(LIBS).resolve(), course, project.pages())
+        self.assertIn('_includes/uke3.md', listed['pages/uke3.qmd'])
+        for page in project.pages():
+            self.assertEqual({file for file, _, _ in project.expanded(page)}, set(listed[page]), page)
+
+    def test_without_ctm_libs_the_tool_stops(self):
+        out = io.StringIO()
+        with contextlib.redirect_stderr(out), unittest.mock.patch.dict(os.environ, {'CTM_LIBS_EXTENSION': ''}):
+            with self.assertRaises(SystemExit) as stopped:
+                self.module.main(['--project', str(self.dir), '--check'])
+        self.assertEqual(stopped.exception.code, 2)
+        self.assertIn("ctm-libs' rule", out.getvalue())
 
     def test_an_anchor_that_repeats_its_tab_heading_id_is_removed_with_the_tab_ids_line(self):
         # A hand anchor first in a tab whose heading has the same id (written or
@@ -344,7 +406,7 @@ class Migrate(unittest.TestCase):
         # A file that another page shows without that tab heading keeps its anchor.
         (self.dir / '_includes/shared.md').write_text('<div id="delt"></div>\n\nDelt.\n', encoding='utf-8')
         (self.dir / 'pages/delt.qmd').write_text('---\ntitle: Delt\n---\n\n{{< include ../_includes/shared.md >}}\n', encoding='utf-8')
-        self.assertEqual(self.module.Project(self.dir).tab_anchor_duplicates(),
+        self.assertEqual(self.module.Project(self.dir, LIBS).tab_anchor_duplicates(),
                          {'pages/uke6.qmd': {8: 'uke6-del1'}, '_includes/m6.md': {0: 'fikspunkt-og-konvergens'}})
         # Without the tab-ids.lua line: converted as any anchor, and named.
         status, out = self.run_tool()
