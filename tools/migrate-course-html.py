@@ -93,6 +93,8 @@ IFRAME = re.compile(r'^(\s*)<iframe((?:\s+[\w:-]+(?:\s*=\s*"[^"]*")?)*)\s*>\s*</
 SWITCH = re.compile(r'^(\s*)<div\b[^>]*\bdata-learning-mode\b[^>]*>\s*$', re.I)
 ATTRIBUTE = re.compile(r'([\w:-]+)(?:\s*=\s*"([^"]*)")?')
 LENGTH = re.compile(r'^\d+(?:\.\d+)?(?:px|r?em|vh|%)$')
+# {{< include … >}}, as ctm-libs' ctm.source.files() (lua/source.lua) reads it.
+INCLUDE = re.compile(r'\{\{<\s*include\s+(.+?)\s*>\}\}')
 
 
 # ---------------------------------------------------------------- reading
@@ -249,22 +251,30 @@ class Project:
             chosen = chosen - matched if remove else chosen | {m for m in matched if m.endswith(('.md', '.qmd'))}
         return sorted(chosen)
 
+    def include_path(self, target, folder):
+        """An include's file, relative to the project, as the page in `folder`
+        resolves it; None outside the project. The rule of ctm-libs'
+        ctm.source.files() (lua/source.lua), which markdown-lint uses, and of
+        Quarto: relative to the page's folder, `/` the project's root, no
+        fallback (a Python maintainer tool cannot run that Lua, which needs
+        Quarto's page context, so the rule is kept the same here)."""
+        quoted = re.fullmatch(r'"(.*)"|\'(.*)\'', target)
+        if quoted:
+            target = quoted.group(1) if quoted.group(1) is not None else quoted.group(2)
+        full = (self.root / target[1:]) if target.startswith('/') else (folder / target)
+        try:
+            return Path(os.path.normpath(full)).relative_to(self.root).as_posix()
+        except ValueError:
+            return None
+
     def includes(self, relative, folder):
         """The files that `relative` includes, as the page in `folder` resolves them."""
-        path = self.root / relative
         try:
-            text = path.read_text(encoding='utf-8')
+            text = (self.root / relative).read_text(encoding='utf-8')
         except OSError:
             return []
-        found = []
-        for target in re.findall(r'\{\{<\s*include\s+(.+?)\s*>\}\}', text):
-            target = target.strip().strip('"\'')
-            full = (self.root / target.lstrip('/')) if target.startswith('/') else (folder / target)
-            try:
-                found.append(Path(os.path.normpath(full)).relative_to(self.root).as_posix())
-            except ValueError:
-                continue
-        return found
+        found = [self.include_path(target, folder) for target in INCLUDE.findall(text)]
+        return [path for path in found if path]
 
     def expanded(self, page):
         """The page's Markdown with its includes put in, nested ones too, as
@@ -280,15 +290,10 @@ class Project:
             except OSError:
                 return
             for index, (line, (text, raw)) in enumerate(zip(lines, scan(lines))):
-                found = re.match(r'^\s*\{\{<\s*include\s+(.+?)\s*>\}\}\s*$', text or '') if not raw else None
+                found = INCLUDE.fullmatch((text or '').strip()) if not raw else None
                 if found:
-                    target = found.group(1).strip().strip('"\'')
-                    full = (self.root / target.lstrip('/')) if target.startswith('/') else (folder / target)
-                    try:
-                        inner = Path(os.path.normpath(full)).relative_to(self.root).as_posix()
-                    except ValueError:
-                        continue
-                    if inner not in trail:
+                    inner = self.include_path(found.group(1), folder)
+                    if inner and inner not in trail:
                         walk(inner, trail | {inner})
                     continue
                 out.append((relative, index, None if raw else text))

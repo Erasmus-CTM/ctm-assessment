@@ -245,7 +245,9 @@ lists the comparisons):
 - on demand for any course: `course-ref` (after) and `course-base-ref`
   (before), the package per side (`base`, `head`; `pin` is the one the
   course pins at that side's ref), `convert` (a migration preview of an
-  unmigrated branch), `expect` (more expect files) and `browser`.
+  unmigrated branch), `expect` (more expect files), `browser` and
+  `review-refs` (component commits for the after side, `NAME=SHA`: a preview
+  of an unmerged component fix, never a pin).
 
 A course's migration PR is checked with `course` = the course,
 `course-ref` = the migration branch, `course-base-ref` = `main`,

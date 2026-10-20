@@ -302,6 +302,16 @@ class Migrate(unittest.TestCase):
                           '{{< include ../_includes/oppgaver/deeper.md >}}\n', encoding='utf-8')
         (self.dir / '_includes/oppgaver/deeper.md').write_text(
             '<details class="learning-hint">\n<summary>Hint til 5.1</summary>\n\nDypt.\n</details>\n', encoding='utf-8')
+        # The rule of ctm-libs' ctm.source.files(): `/` is the project's root,
+        # quotes are dropped, and an include written relative to the including
+        # file is not found (no fallback; Quarto stops on it).
+        nested.write_text(nested.read_text(encoding='utf-8') + '\n{{< include "/_includes/oppgaver/root.md" >}}\n'
+                          '\n{{< include rel.md >}}\n', encoding='utf-8')
+        for name in ('root.md', 'rel.md'):
+            (self.dir / '_includes/oppgaver' / name).write_text('<div id="x-' + name[:-3] + '"></div>\n', encoding='utf-8')
+        files = self.module.Project(self.dir).files
+        self.assertIn('_includes/oppgaver/root.md', files)
+        self.assertNotIn('_includes/oppgaver/rel.md', files)
         status, out = self.run_tool('--check')
         self.assertIn('_includes/oppgaver/uke5_ex.md:3: ', out)
         self.assertIn('_includes/oppgaver/deeper.md:1: ', out)
@@ -313,7 +323,7 @@ class Migrate(unittest.TestCase):
         nested.write_text(nested.read_text(encoding='utf-8') + '\n<details>\n<summary>Ny</summary>\n\nNy.\n</details>\n', encoding='utf-8')
         status, out = self.run_tool('--check', '--baseline', str(baseline), '--strict')
         self.assertEqual(status, 1)
-        self.assertIn('_includes/oppgaver/uke5_ex.md:7: Not in the baseline', out)
+        self.assertIn('_includes/oppgaver/uke5_ex.md:11: Not in the baseline', out)
         # The conversion reaches them too.
         self.run_tool()
         self.assertIn('::: {#uke5-oppg}\n:::\n', nested.read_text(encoding='utf-8'))

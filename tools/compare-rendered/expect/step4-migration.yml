@@ -134,9 +134,9 @@ known-failures:
   - id: webkit-tab-title
     title: >-
       In WebKit a deep link to a tab title far down a page leaves the tab row
-      above the viewport (ctm-nav.js scrolls, then focus scrolls again; review
-      A2 S5). Fixed in ctm-libs' ctm-nav.js; remove this entry when
-      CTM Assessment pins that fix
+      above the viewport (WebKit's own fragment scroll after ctm-nav.js's;
+      review A2 S5). Fixed in ctm-libs' ctm-nav.js by Erasmus-CTM/ctm-libs#25;
+      remove this entry when CTM Assessment pins that fix
     browsers: [webkit]
     checks: [link load, link click]
     targets: tab-title

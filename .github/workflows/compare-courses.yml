@@ -29,7 +29,8 @@ name: Compare rendered courses
 # package per side (`pin`: the one the course pins at that side's ref; the
 # hotfix check R2-2 compares pin against a bumped pin), `convert` previews the
 # migration of an unmigrated branch, `expect` adds expect files, `browser`
-# adds the browser comparison.
+# adds the browser comparison, `review-refs` builds the after side with
+# unmerged component commits (a preview of a fix, never a pin).
 on:
   workflow_dispatch:
     inputs:
@@ -65,6 +66,9 @@ on:
       browsers:
         description: 'The browsers for that, space-separated'
         default: 'chromium firefox webkit'
+      review-refs:
+        description: 'Component commits for the after side only, NAME=SHA[,NAME=SHA] (install-project.py --review-refs): a preview of an unmerged component fix, never a pin'
+        default: ''
   pull_request:
     paths:
       - integration/feedback/repos.json
@@ -184,12 +188,15 @@ jobs:
       - name: Build ${{ matrix.course }} with both refs
         id: build
         continue-on-error: ${{ matrix.informational == true }}
+        env:
+          REVIEW_REFS: ${{ inputs['review-refs'] }}
         run: |
           set -e
           for side in before after; do
             out="$RUNNER_TEMP/out/$side"
             ref=$COURSE_REF; [ "$side" = before ] && ref=$COURSE_BASE_REF
             extra=(); [ "$side" = after ] && [ "$CONVERT" = true ] && extra=(--convert)
+            if [ "$side" = after ] && [ -n "$REVIEW_REFS" ]; then extra+=(--review-refs "$REVIEW_REFS"); echo "::notice title=Review refs (after side)::$REVIEW_REFS"; fi
             if [ "$COURSE" = examples ]; then
               python "$RUNNER_TEMP/$side/scripts/setup-feedback-integration.py" --workspace "$RUNNER_TEMP/ws-$side"
               mkdir -p "$out" && cp -r "$RUNNER_TEMP/ws-$side/site/_site" "$out/_site"
