@@ -6,7 +6,7 @@
 //
 //   node tools/compare-browser.mjs --old DIR --new DIR [--browser chromium] [--browser firefox] ...
 //     [--expect tools/compare-rendered/expect/step4-migration.yml] [--course NAME] [--pages a.html,b.html]
-//     [--offline] [--first-visit] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
+//     [--offline] [--first-visit] [--shard I/N] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
 //
 // Checks, on the pages with reveals, the switch or links into tabs:
 //  1. reveals: count per kind, summary texts and initial state equal; each
@@ -42,7 +42,13 @@
 //  7. computed styles of every summary equal (component <details> included);
 //  8. embedded content (not --offline): JSXGraph boards in reveals have a
 //     finite size once opened; a Python cell in a reveal runs;
-//  9. no console error on new that old did not have.
+//  9. no console error on new that old did not have; each error names the
+//     frame it comes from (the page, or an iframe such as a JSXGraph board).
+//
+// --shard I/N runs the I-th of N parts of the checks (a course too large for
+// one job): the pages' checks and the links are dealt out in turn, the
+// screenshots go to part 1. Every part reads every page's inventory, so a
+// link into another part's page is still checked.
 //
 // --first-visit serves both sides without the cross-origin isolation headers
 // and lets service workers run, so a page with Python cells isolates itself
@@ -50,12 +56,16 @@
 // reloads), as on GitHub Pages; the links are then followed on that visit.
 // Only the link loads are checked then (a click comes from a page already
 // visited), and console errors are not compared: the reload aborts loads at
-// random.
+// random. The loads are sampled: one per page with links into it, and every
+// tab title a link names. Playwright's routes do not see the requests that
+// coi-serviceworker makes for the page, so Pyodide and Monaco are blocked in
+// the served files instead (their CDN addresses point at a closed port).
 //
 // `known-failures` in the expect file lists failures of new that are known
-// and fixed elsewhere (a browser, the checks, which targets, and the fix):
-// such a failure counts as expected and is reported, until the fix is
-// pinned and the entry removed.
+// and fixed elsewhere (the browsers and the checks, both required; the
+// courses, `targets: tab-title`, a `frame` and a `note` pattern, optional;
+// and the fix): such a failure counts as expected and is reported, until the
+// fix is pinned and the entry removed.
 // Exit status: 0 when every check passes, 1 otherwise, 2 on errors.
 import fs from 'node:fs';
 import http from 'node:http';
@@ -69,7 +79,7 @@ const playwright = require('playwright');
 
 // ---------------------------------------------------------------- options
 function options(argv) {
-  const o = {browsers: [], pages: null, checks: null, offline: false, firstVisit: false, maxLinks: 0, expect: null, course: '', shots: null, report: null, summary: null};
+  const o = {browsers: [], pages: null, checks: null, offline: false, firstVisit: false, shard: null, maxLinks: 0, expect: null, course: '', shots: null, report: null, summary: null};
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i], value = argv[i + 1];
     if (flag === '--offline') { o.offline = true; continue; }
@@ -79,6 +89,11 @@ function options(argv) {
     else if (flag === '--pages') o.pages = value.split(',').filter(Boolean);
     else if (flag === '--checks') o.checks = value.split(',').filter(Boolean);
     else if (flag === '--max-links') o.maxLinks = Number(value);
+    else if (flag === '--shard') {
+      const [index, count] = String(value).split('/').map(Number);
+      if (!(Number.isInteger(index) && Number.isInteger(count) && index >= 1 && index <= count)) throw new Error('--shard I/N: 1 <= I <= N');
+      o.shard = {index, count};
+    }
     else if (['--old', '--new', '--expect', '--course', '--shots', '--report', '--summary'].includes(flag)) o[flag.slice(2)] = value;
     else throw new Error('Unknown option ' + flag);
   }
@@ -147,6 +162,11 @@ function inventory(root, page, side) {
 const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff': 'font/woff',
   '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.ttf': 'font/ttf', '.gif': 'image/gif', '.ico': 'image/x-icon'};
+// Pyodide and Monaco from a CDN (the address part that context() routes
+// away): on a first visit coi-serviceworker fetches them for the page, past
+// Playwright's routes, so the served files point them at a closed port.
+const HEAVY = /https?:\/\/[\w.-]+(?=[^\s"'`()<>]*?(?:\/pyodide\/v[\d.]+\/|\/monaco-editor@))/g;
+const BLOCKED = 'http://127.0.0.1:9';
 function serve(roots, isolated = true) {
   const server = http.createServer((request, response) => {
     const parts = decodeURIComponent(new URL(request.url, 'http://x').pathname).split('/');
@@ -158,7 +178,9 @@ function serve(roots, isolated = true) {
     // Without the isolation headers (--first-visit), as GitHub Pages serves a course.
     response.writeHead(200, {'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
       ...(isolated ? {'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'credentialless'} : {})});
-    response.end(fs.readFileSync(file));
+    let body = fs.readFileSync(file);
+    if (!isolated && ['.html', '.js', '.mjs'].includes(path.extname(file))) body = body.toString('utf8').replace(HEAVY, BLOCKED);
+    response.end(body);
   });
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
@@ -179,6 +201,10 @@ const TRACE = `(() => {
   HTMLElement.prototype.focus = function () { log('focus ' + this.tagName + (this.id ? '#' + this.id : '')); return focus.apply(this, arguments); };
   const set = Element.prototype.setAttribute;
   Element.prototype.setAttribute = function (name, value) { if (name === 'data-ctm-nav') log('mark ' + value); return set.apply(this, arguments); };
+  // Errors of this frame (an iframe too) to the harness, which knows the frame.
+  addEventListener('error', event => {
+    if (event instanceof ErrorEvent) try { window.__ctmCompareError?.(String(event.message || event.error?.message || '')); } catch (_) { /* none */ }
+  }, true);
 })();`;
 
 // The target's state: visible, its panes and <details>, below the header, the
@@ -247,14 +273,28 @@ class Run {
   constructor(o, browserName, base, inventories, look) {
     Object.assign(this, {o, browserName, base, inventories, look});
     this.results = [];
-    this.errors = {old: new Map(), new: new Map()};
+    // Console errors as seen ({text, page, frame}), and the errors that each
+    // frame other than the page reported (text -> frame), to tell where an
+    // error comes from.
+    this.errors = {old: [], new: []};
+    this.frameErrors = {old: new Map(), new: new Map()};
+    this.order = Object.keys(inventories).sort();
+  }
+
+  // --shard I/N: the I-th part; the k-th page or link belongs to part k mod N.
+  mine(k) {
+    return !this.o.shard || k % this.o.shard.count === this.o.shard.index - 1;
+  }
+  minePage(page) {
+    return this.mine(this.order.indexOf(page));
   }
 
   record(check, page, ok, detail = {}) {
     // A known failure (expect file `known-failures`) is expected until its fix is pinned.
-    const known = ok ? null : (this.known || []).find(k => (!k.browsers || k.browsers.includes(this.browserName))
-      && (!k.checks || k.checks.includes(check)) && (!k.courses || k.courses.includes(this.o.course))
-      && (!k.targets || k.targets !== 'tab-title' || detail.tabTitle));
+    const known = ok ? null : (this.known || []).find(k => k.browsers.includes(this.browserName)
+      && k.checks.includes(check) && (!k.courses || k.courses.includes(this.o.course))
+      && (!k.targets || k.targets !== 'tab-title' || detail.tabTitle)
+      && (!k.frame || new RegExp(k.frame).test(detail.frame || '')) && (!k.note || new RegExp(k.note).test(detail.note || '')));
     if (known) {
       ok = true;
       detail = {...detail, expected: true, known: known.id, note: `known failure (${known.id}: ${known.title}): ${detail.note || ''}`};
@@ -268,6 +308,12 @@ class Run {
   // would only cost time, on both sides alike.
   async context(side, contextOptions = {}, python = false) {
     const context = await this.browser.newContext({viewport: {width: 1280, height: 900}, serviceWorkers: this.o.firstVisit ? 'allow' : 'block', ...contextOptions});
+    await context.exposeBinding('__ctmCompareError', async ({frame}, text) => {
+      if (!frame || !frame.parentFrame() || !text) return;
+      const label = await this.frameLabel(frame);
+      if (!this.frameErrors[side].has(norm(text))) this.frameErrors[side].set(norm(text), label);
+      this.errors[side].push({text, page: frame.page().url(), frame: label});
+    });
     await context.addInitScript(TRACE);
     if (this.o.offline) await context.route(/^https?:\/\/(?!127\.0\.0\.1)/, route => route.abort());
     else if (!python) await context.route(/\/pyodide\/v[\d.]+\/|\/monaco-editor@/, route => route.abort());
@@ -275,14 +321,34 @@ class Run {
     return context;
   }
 
-  watch(page, side) {
-    const add = message => {
-      // Ports, sides and random ids (the URLs coi-serviceworker's fetches name) are not the error.
-      const key = norm(message).replace(/https?:\/\/127\.0\.0\.1:\d+\/((old|new)\/)?/g, '/')
+  // An iframe as an error names it: a JSXGraph board (jsxgraph-quarto's
+  // iframe[name^=iframeJXG]), else its name, title or address.
+  async frameLabel(frame) {
+    const element = await frame.frameElement().catch(() => null);
+    const seen = element ? await element.evaluate(el => ({name: el.getAttribute('name') || '', title: el.getAttribute('title') || '',
+      src: el.getAttribute('src') || (el.hasAttribute('srcdoc') ? 'srcdoc' : '')})).catch(() => null) : null;
+    if (seen?.name.startsWith('iframeJXG')) return 'iframe: JSXGraph board (jsxgraph-quarto)';
+    const what = seen ? seen.name || seen.title || seen.src : frame.url();
+    return 'iframe: ' + norm(what).replace(/\d+/g, 'N').slice(0, 80);
+  }
+
+  // The console errors of a side, keyed: the frame (an iframe's errors carry
+  // it), and the text without ports, sides and random ids (the URLs
+  // coi-serviceworker's fetches name).
+  consoleErrors(side) {
+    const found = new Map();
+    for (const {text, page, frame} of this.errors[side]) {
+      const n = norm(text);
+      const known = frame || (n.length > 8 ? [...this.frameErrors[side]].find(([t]) => n.includes(t) || t.includes(n))?.[1] : undefined);
+      const key = (known ? `[${known}] ` : '') + norm(text).replace(/https?:\/\/127\.0\.0\.1:\d+\/((old|new)\/)?/g, '/')
         .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<id>').replace(/:\d+:\d+/g, '').slice(0, 200);
-      const errors = this.errors[side];
-      if (!errors.has(key)) errors.set(key, page.url().replace(this.base + side + '/', ''));
-    };
+      if (!found.has(key)) found.set(key, {page: page.replace(this.base + side + '/', ''), frame: known || 'page'});
+    }
+    return found;
+  }
+
+  watch(page, side) {
+    const add = message => this.errors[side].push({text: message, page: page.url(), frame: null});
     page.on('pageerror', error => add(error.message));
     page.on('console', message => {
       if (message.type() !== 'error') return;
@@ -298,14 +364,21 @@ class Run {
 
   // --first-visit: on a page with coi-serviceworker, wait for the worker's
   // reload (crossOriginIsolated), as long as a reader would see it happen
-  // (5 s; WebKit is not isolated by it); "none" on a page without it.
+  // (5 s); "none" on a page without it. WebKit is not isolated by it: once
+  // the worker controls the page and the same page has stayed loaded for
+  // 1.2 s (no reload pending), "controlled, not isolated".
   async isolation(page) {
     // The worker's reload may destroy the page's context while we ask: ask again.
+    let calm = 0, last = null;
     for (let k = 0; k < 17; k++) {
       const seen = await page.evaluate(() => ({coi: !!document.querySelector('script[src*="coi-serviceworker"]'),
-        isolated: window.crossOriginIsolated, ready: document.readyState === 'complete'})).catch(() => null);
+        isolated: window.crossOriginIsolated, ready: document.readyState === 'complete',
+        controlled: !!navigator.serviceWorker?.controller, origin: performance.timeOrigin})).catch(() => null);
       if (seen?.isolated && seen.ready) return 'isolated';
       if (seen && seen.ready && !seen.coi) return 'none';
+      calm = seen?.ready && seen.controlled && seen.origin === last ? calm + 1 : 0;
+      last = seen?.origin ?? null;
+      if (calm >= 4) return 'controlled, not isolated';
       await page.waitForTimeout(300);
     }
     return 'not isolated';
@@ -349,22 +422,24 @@ class Run {
       // On a first visit the worker's reload aborts whatever is loading, at
       // a moment that differs from load to load: the console is compared in
       // the run without --first-visit.
+      const [before, after] = [this.consoleErrors('old'), this.consoleErrors('new')];
       if (this.o.firstVisit) {
-        this.record('console', '-', true, {note: `not compared on a first visit (${this.errors.new.size} distinct console errors on new, ${this.errors.old.size} on old)`});
+        this.record('console', '-', true, {note: `not compared on a first visit (${after.size} distinct console errors on new, ${before.size} on old)`});
       } else {
-        for (const [key, page] of this.errors.new) {
-          if (!this.errors.old.has(key)) this.record('console', page, false, {note: 'a console error new has and old had not: ' + key});
+        for (const [key, {page, frame}] of after) {
+          if (!before.has(key)) this.record('console', page, false, {frame, note: `a console error new has and old had not (${frame}): ${key}`});
         }
-        this.record('console', '-', true, {note: `${this.errors.new.size} distinct console errors on new, ${this.errors.old.size} on old`});
+        this.record('console', '-', true, {note: `${after.size} distinct console errors on new, ${before.size} on old`});
       }
     } finally {
       await this.browser.close();
     }
   }
 
-  // Pages with reveals or a switch on either side.
-  revealPages() {
-    return Object.entries(this.inventories).filter(([, v]) => v.old && v.new && (v.old.reveals.length || v.new.reveals.length || v.old.switch || v.new.switch)).map(([page]) => page);
+  // Pages with reveals or a switch on either side (of this part, unless `all`).
+  revealPages(all = false) {
+    return Object.entries(this.inventories).filter(([page, v]) => (all || this.minePage(page))
+      && v.old && v.new && (v.old.reveals.length || v.new.reveals.length || v.old.switch || v.new.switch)).map(([page]) => page);
   }
 
   // 1. Reveals: kinds, summaries, initial state.
@@ -611,10 +686,13 @@ class Run {
       }
     }
     const chosen = this.o.maxLinks > 0 ? links.slice(0, this.o.maxLinks) : links;
-    const targets = [...new Map(chosen.map(link => [link.target + '#' + link.id, link])).values()];
+    let targets = [...new Map(chosen.map(link => [link.target + '#' + link.id, link])).values()];
+    const tabTitle = link => this.inventories[link.target]?.new?.tabTitles.has(link.id);
+    // A first visit, sampled: the first target of each page, and every tab title.
+    if (this.o.firstVisit) targets = targets.filter((link, k) => tabTitle(link) || targets.findIndex(other => other.target === link.target) === k);
     const dead = side => link => !this.inventories[link.target]?.[side]?.ids.has(link.id);
-    // On load.
-    for (const link of targets) {
+    // On load (this part's share of the targets).
+    for (const link of targets.filter((_, k) => this.mine(k))) {
       const name = link.target + '#' + link.id;
       if (dead('new')(link)) {
         const before = dead('old')(link);
@@ -649,7 +727,7 @@ class Run {
     // link of each page. Not on a first visit: a click comes from a page the
     // reader has seen, whose worker already runs.
     const backTried = new Set();
-    for (const link of this.o.firstVisit ? [] : chosen) {
+    for (const link of this.o.firstVisit ? [] : chosen.filter((_, k) => this.mine(k))) {
       if (dead('new')(link)) continue;
       const name = link.page + ' -> ' + link.href;
       const state = {}, history = {};
@@ -727,13 +805,14 @@ class Run {
         tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined});
     }
     const previously = this.results.filter(r => r.previouslyDead && r.ok).map(r => r.page);
-    this.record('links', '-', true, {note: `${chosen.length} links to ${targets.length} targets; previously dead, now working: ${previously.join(', ') || 'none'}`});
+    const part = this.o.shard ? ` (part ${this.o.shard.index}/${this.o.shard.count} of them)` : '';
+    this.record('links', '-', true, {note: `${chosen.length} links to ${targets.length} targets${this.o.firstVisit ? ' (sampled: one per page, and every tab title)' : ''}${part}; previously dead, now working: ${previously.join(', ') || 'none'}`});
   }
 
   // A link into a grouped tabset wins over the stored choice and leaves it.
   async groups() {
     for (const [page, v] of Object.entries(this.inventories)) {
-      if (!v.new?.groups.length) continue;
+      if (!v.new?.groups.length || !this.minePage(page)) continue;
       const context = await this.context('new');
       const tab = await context.newPage();
       await this.load(tab, 'new', this.url('new', page));
@@ -799,13 +878,14 @@ class Run {
   }
 
   async looks() {
+    if (this.o.shard && this.o.shard.index !== 1) return;
     const kinds = {'reading-step': ['details.reading-step', 'details.ctm-reveal.reading-step'], hint: ['details.learning-hint', 'details.ctm-reveal.hint'],
       solution: ['details.solution-block', 'details.ctm-reveal.solution'], details: ['main details:not([class])', 'details.ctm-reveal.details']};
     const wanted = [['switch', '[data-learning-mode]', '.ctm-modes', null]];
     for (const [kind, [oldSelector, newSelector]] of Object.entries(kinds)) {
       wanted.push([kind + '-closed', oldSelector, newSelector, false], [kind + '-open', oldSelector, newSelector, true]);
     }
-    const pageFor = shot => this.revealPages().find(page => {
+    const pageFor = shot => this.revealPages(true).find(page => {
       const v = this.inventories[page];
       return shot === 'switch' ? v.old.switch && v.new.switch : v.new.reveals.some(r => r.kind === shot.replace(/-(open|closed)$/, '')) && v.old.reveals.some(r => r.kind === shot.replace(/-(open|closed)$/, ''));
     });
@@ -949,6 +1029,7 @@ class Run {
   // 8. Boards and Python cells inside reveals (needs the network).
   async embedded() {
     if (this.o.offline) return;
+    if (this.o.firstVisit) { this.record('embedded', '-', true, {note: 'not on a first visit (Pyodide and Monaco are blocked in the served files)'}); return; }
     for (const page of this.revealPages()) {
       const inv = this.inventories[page];
       if (!inv.new.boards && !inv.new.cells) continue;
@@ -983,10 +1064,17 @@ class Run {
         seen[side] = result;
         await context.close();
       }
+      // A board without a finite size on old too, at the same place, is the
+      // course's as it was (not the migration's): expected, and reported.
       const problems = [];
-      if (seen.new.boards.some(ok => !ok)) problems.push(`boards ${JSON.stringify(seen.new.boards)} (old ${JSON.stringify(seen.old.boards)})`);
+      const asOld = JSON.stringify(seen.new.boards) === JSON.stringify(seen.old.boards);
+      if (seen.new.boards.some(ok => !ok) && !asOld) problems.push(`boards ${JSON.stringify(seen.new.boards)} (old ${JSON.stringify(seen.old.boards)})`);
       if (seen.new.python === false && seen.old.python !== false) problems.push('the Python cell in a reveal does not run');
-      this.record('embedded', page, !problems.length, {note: problems.join('; ') || `${seen.new.boards.length} boards with a finite size${seen.new.python === null ? '' : seen.new.python ? '; a Python cell ran' : '; the Python cell ran on neither'}`});
+      const failing = seen.new.boards.filter(ok => !ok).length;
+      this.record('embedded', page, !problems.length, {expected: (failing && asOld) || undefined,
+        note: problems.join('; ') || `${seen.new.boards.length - failing} boards with a finite size`
+          + (failing ? `, ${failing} without one, as on old (${JSON.stringify(seen.old.boards)})` : '')
+          + `${seen.new.python === null ? '' : seen.new.python ? '; a Python cell ran' : '; the Python cell ran on neither'}`});
     }
   }
 }
@@ -996,6 +1084,11 @@ async function main() {
   const o = options(process.argv.slice(2));
   const expect = o.expect ? yaml.load(fs.readFileSync(o.expect, 'utf8')) || {} : {};
   const look = expect.look || [], known = expect['known-failures'] || [];
+  // An entry must name its browsers and checks: without them it would match every failure.
+  for (const entry of known) {
+    if (!Array.isArray(entry.browsers) || !entry.browsers.length || !Array.isArray(entry.checks) || !entry.checks.length)
+      throw new Error(`known-failures ${entry.id || JSON.stringify(entry)}: name its browsers and checks (lists)`);
+  }
   const pages = o.pages || [...new Set([...htmlPages(o.old), ...htmlPages(o.new)])];
   const inventories = {};
   for (const page of pages) {
@@ -1020,7 +1113,7 @@ async function main() {
   }
   const failed = results.filter(r => !r.ok);
   const knownFailures = results.filter(r => r.known).length;
-  const lines = [`### Browser comparison${o.course ? ' of ' + o.course : ''}, old against new (${o.browsers.join(', ')}${o.firstVisit ? ', first visit without isolation headers' : ''}): ${results.length} checks, ${failed.length} failed${knownFailures ? `, ${knownFailures} known failures` : ''}`, ''];
+  const lines = [`### Browser comparison${o.course ? ' of ' + o.course : ''}, old against new (${o.browsers.join(', ')}${o.firstVisit ? ', first visit without isolation headers' : ''}${o.shard ? `, part ${o.shard.index}/${o.shard.count}` : ''}): ${results.length} checks, ${failed.length} failed${knownFailures ? `, ${knownFailures} known failures` : ''}`, ''];
   const byCheck = {};
   for (const r of results) {
     const key = r.browser + ' ' + r.check;
@@ -1029,14 +1122,15 @@ async function main() {
     if (r.ok && r.expected) byCheck[key].expected++;
   }
   for (const [key, v] of Object.entries(byCheck)) lines.push(`- **${key}**: ${v.ok} passed${v.expected ? ` (${v.expected} with an expected difference)` : ''}${v.failed ? `, **${v.failed} failed**` : ''}`);
+  // Failures first: an annotation keeps only its first 4 KB.
+  if (failed.length) {
+    lines.push('', '**Failed:**');
+    for (const r of failed.slice(0, 80)) lines.push(`- ${r.browser} ${r.check} \`${r.page}\`: ${String(r.note || "").slice(0, 600)}`);
+  }
   const notes = results.filter(r => r.ok && (r.expected || r.page === '-'));
   if (notes.length) {
     lines.push('', '**Expected differences and notes:**');
     for (const r of notes.slice(0, 60)) lines.push(`- ${r.browser} ${r.check} \`${r.page}\`: ${r.note}`);
-  }
-  if (failed.length) {
-    lines.push('', '**Failed:**');
-    for (const r of failed.slice(0, 80)) lines.push(`- ${r.browser} ${r.check} \`${r.page}\`: ${r.note}`);
   }
   const md = lines.join('\n') + '\n';
   if (o.report) fs.writeFileSync(o.report, JSON.stringify({old: o.old, new: o.new, browsers: o.browsers, results}, null, 1));

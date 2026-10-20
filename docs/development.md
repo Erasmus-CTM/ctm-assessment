@@ -304,9 +304,18 @@ and `--offline` blocks the CDNs. `--first-visit` serves both sides as GitHub
 Pages does, without the cross-origin isolation headers and with service
 workers allowed, so a page with Python cells isolates itself with
 coi-serviceworker (a reload) before the links are loaded; the workflow runs
-the link loads a second time this way (no clicks, no console comparison). `known-failures:` in the expect file
-lists failures that are fixed elsewhere and not pinned yet (a browser, checks,
-`targets: tab-title`): they count as expected and are reported.
+the link loads a second time this way (no clicks, no console comparison),
+sampled: one load per page and every tab title. On a first visit Pyodide and
+Monaco are blocked in the served files, since Playwright's routes do not see
+the fetches coi-serviceworker makes. `--shard I/N` runs the I-th of N parts
+(the workflow's `shards`; by default 4 jobs per browser for ingmat3a's
+`linalg-branch`, 2 for its other refs): every part reads every page, so links
+into other parts' pages are checked, and the screenshots go to part 1. A
+console error names its frame (the page, or an iframe such as a JSXGraph
+board). `known-failures:` in the expect file lists failures that are fixed
+elsewhere and not pinned yet (browsers and checks, both required; optional
+courses, `targets: tab-title`, `frame` and `note` patterns): they count as
+expected and are reported.
 
 `compare-rendered.mjs` also checks three invariants on every page, which no
 expected category can explain: each `<details>` keeps its words (more only as

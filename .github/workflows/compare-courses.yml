@@ -67,6 +67,9 @@ on:
       browsers:
         description: 'The browsers for that, space-separated'
         default: 'chromium firefox webkit'
+      shards:
+        description: 'Parts of the browser comparison, each a job per browser (empty: 4 for ingmat3a linalg-branch, 2 for ingmat3a, else 1)'
+        default: ''
       review-refs:
         description: 'Component commits for the after side only, NAME=SHA[,NAME=SHA] (install-project.py --review-refs): a preview of an unmerged component fix, never a pin'
         default: ''
@@ -120,6 +123,7 @@ jobs:
           EXPECT: ${{ inputs.expect }}
           BROWSER: ${{ inputs.browser }}
           BROWSERS: ${{ inputs.browsers }}
+          SHARDS: ${{ inputs.shards }}
         run: python3 tools/ci/compare-matrix.py
 
   compare:
@@ -258,7 +262,7 @@ jobs:
   browser:
     needs: [courses, compare]
     if: ${{ !cancelled() && needs.courses.result == 'success' && needs.courses.outputs.browsers != '[]' }}
-    name: browser ${{ matrix.entry.course }}${{ matrix.entry.ref && format(' @ {0}', matrix.entry.ref) || '' }} (${{ matrix.browser }})
+    name: browser ${{ matrix.entry.course }}${{ matrix.entry.ref && format(' @ {0}', matrix.entry.ref) || '' }} (${{ matrix.browser }}${{ matrix.entry.shard && format(', part {0}', matrix.entry.shard) || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
@@ -278,23 +282,27 @@ jobs:
         with:
           name: sites-${{ matrix.entry.key }}
           path: ${{ runner.temp }}/sites
+      # A large course runs in parts (compare-browser.mjs --shard): each part
+      # reads every page and checks its share of the pages and links.
       - name: Old against new in ${{ matrix.browser }}
         env:
           COURSE: ${{ matrix.entry.course }}
+          SHARD: ${{ matrix.entry.shard }}
         run: |
           mkdir -p "$RUNNER_TEMP/browser"
-          node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" \
+          node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" ${SHARD:+--shard "$SHARD"} \
             --browser ${{ matrix.browser }} --expect tools/compare-rendered/expect/step4-migration.yml --course "$(basename "$COURSE")" \
             --shots "$RUNNER_TEMP/browser/shots" --report "$RUNNER_TEMP/browser/report.json" --summary "$RUNNER_TEMP/browser/summary.md"
       # The link loads again on a first visit as GitHub Pages serves a course:
       # no isolation headers, coi-serviceworker registers and reloads (review
-      # A2 S5). A course's three engines take up to about an hour each.
+      # A2 S5), sampled (one load per page, every tab title; review A2b S4).
       - name: First visit in ${{ matrix.browser }} (coi-serviceworker, no isolation headers)
         if: success() || failure()
         env:
           COURSE: ${{ matrix.entry.course }}
+          SHARD: ${{ matrix.entry.shard }}
         run: |
-          node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" --first-visit --checks links \
+          node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" --first-visit --checks links ${SHARD:+--shard "$SHARD"} \
             --browser ${{ matrix.browser }} --expect tools/compare-rendered/expect/step4-migration.yml --course "$(basename "$COURSE")" \
             --report "$RUNNER_TEMP/browser/first-visit.json" --summary "$RUNNER_TEMP/browser/first-visit.md"
       - name: Report the result as an annotation
@@ -304,10 +312,10 @@ jobs:
           # One annotation per pass, so that the first visit's failures are not cut off.
           for pass in summary first-visit; do
             text=$(head -c 20000 "$RUNNER_TEMP/browser/$pass.md" 2>/dev/null || echo 'no report')
-            printf '::%s title=Browser %s (%s, %s)::%s\n' "$level" "${{ matrix.entry.key }}" "${{ matrix.browser }}" "$pass" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+            printf '::%s title=Browser %s%s (%s, %s)::%s\n' "$level" "${{ matrix.entry.key }}" "${{ matrix.entry.part }}" "${{ matrix.browser }}" "$pass" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
           done
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: browser-${{ matrix.entry.key }}-${{ matrix.browser }}
+          name: browser-${{ matrix.entry.key }}${{ matrix.entry.part }}-${{ matrix.browser }}
           path: ${{ runner.temp }}/browser

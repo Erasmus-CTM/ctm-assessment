@@ -130,8 +130,23 @@ look:
 
 # Failures of new that are known and fixed elsewhere (tools/compare-browser.mjs):
 # they count as expected, and are reported, until the fix is pinned; then the
-# entry goes. Fields: id, title, browsers, checks, courses, and `targets:
-# tab-title` (only links to an id that tab-ids.lua put on div.ctm-tab-target).
-# None now: WebKit's tab-title links (review A2 S5) work since ctm-libs
-# e415cee (Erasmus-CTM/ctm-libs#25), which CTM Assessment pins.
-known-failures: []
+# entry goes. Fields: id, title, fix, browsers and checks (both required),
+# and optionally courses, `targets: tab-title` (only links to an id that
+# tab-ids.lua put on div.ctm-tab-target), `frame` and `note` (patterns for
+# the frame a console error comes from, and the failure's note).
+# WebKit's tab-title links (review A2 S5) work since ctm-libs e415cee
+# (Erasmus-CTM/ctm-libs#25), which CTM Assessment pins.
+known-failures:
+  # A JSXGraph board in a tab that a link opens (on old the link was dead, so
+  # the board was never shown): jsxgraph-quarto's ResizeObserver callbacks
+  # resize the board's container at once (scheduleBoardRefresh ->
+  # refreshBoards, graph-editor.js resizeToVisibleContainer), and the browser
+  # reports a loop, in the board's iframe, at random (review A2b S3).
+  - id: jsxgraph-resize-loop
+    title: A ResizeObserver loop in a JSXGraph board's iframe
+    fix: jsxgraph-quarto (follow-up, not filed yet), defer the refresh in observer callbacks to requestAnimationFrame; then re-pin jsxgraph
+    browsers: [chromium, firefox, webkit]
+    checks: [console]
+    frame: '^iframe: JSXGraph board \(jsxgraph-quarto\)$'
+    note: 'ResizeObserver loop'
+
