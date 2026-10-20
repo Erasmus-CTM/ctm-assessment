@@ -60,8 +60,11 @@
 // reloads), as on GitHub Pages; the links are then followed on that visit.
 // Only the link loads are checked then (a click comes from a page already
 // visited), and console errors are not compared: the reload aborts loads at
-// random. The loads are sampled: one per page with links into it, and every
-// tab title a link names. Playwright's routes do not see the requests that
+// random. The loads are sampled, stratified: on each page with links into
+// it, one target of each kind (a tab title, or in a tab pane, a nested pane,
+// a <details>, a collapsed callout, as they combine, or none of them; linked
+// from its own page or another), and every tab title a link names; the
+// summary lists the kinds loaded, in every run. Playwright's routes do not see the requests that
 // coi-serviceworker makes for the page, so Pyodide and Monaco are blocked in
 // the served files instead (their CDN addresses point at a closed port).
 //
@@ -75,6 +78,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
 import {COMPONENTS, closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 const require = createRequire(import.meta.url);
 const {JSDOM} = require('jsdom');
@@ -121,7 +125,7 @@ function htmlPages(root) {
 
 // What a page holds, from its HTML: reveals (old: the courses' <details>; new:
 // ctm-libs' reveals), the switch, ids, tabsets and the links to ids.
-function inventory(root, page, side, ends) {
+export function inventory(root, page, side, ends) {
   const doc = new JSDOM(fs.readFileSync(path.join(root, page), 'utf8')).window.document;
   const reveals = [];
   // How each old <details> ended (--reveal-ends; unknown: not by a section).
@@ -150,14 +154,57 @@ function inventory(root, page, side, ends) {
     if (id) links.push({href, page, target, id, text: norm(a.textContent).slice(0, 60)});
   }
   const groups = [...doc.querySelectorAll('.panel-tabset[data-group]')].map(set => set.getAttribute('data-group'));
+  // Where each id stands, as a kind of place (a link's target: sampled by it on a first visit).
+  const places = new Map();
+  for (const el of doc.querySelectorAll('[id]')) if (!places.has(el.id)) places.set(el.id, placeOf(el));
   return {reveals, links, groups, switch: !!doc.querySelector(side === 'new' ? '.ctm-modes' : '[data-learning-mode]'),
     nav: !!doc.querySelector('script[src*="ctm-nav"]'), toggle: !!doc.querySelector('.quarto-color-scheme-toggle'),
-    tabsets: doc.querySelectorAll('.panel-tabset').length, ids: new Set([...doc.querySelectorAll('[id]')].map(el => el.id)),
+    tabsets: doc.querySelectorAll('.panel-tabset').length, ids: new Set(places.keys()), places,
     tabTitles: new Set([...doc.querySelectorAll('.ctm-tab-target[id]')].map(el => el.id)),
     coi: !!doc.querySelector('script[src*="coi-serviceworker"]'),
     inTabs: new Set([...doc.querySelectorAll('.tab-pane [id], details [id]')].map(el => el.id)),
     boards: doc.querySelectorAll('main details iframe[name^="iframeJXG"]').length,
     cells: doc.querySelectorAll('main details [id^="qpyodide-insertion-location-"]').length};
+}
+
+// The kind of place an element stands in: a tab title (of a nested tabset:
+// one inside another's pane), else in a tab pane (nested: in a pane of a
+// pane), inside a <details> and inside a collapsed callout, each that holds;
+// "plain" when none does.
+function placeOf(el) {
+  let panes = 0, details = false, collapse = false;
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    if (node.classList.contains('tab-pane')) panes++;
+    if (node.tagName === 'DETAILS') details = true;
+    if (node.classList.contains('collapse')) collapse = true;
+  }
+  if (el.classList.contains('ctm-tab-target')) return panes ? 'nested tab title' : 'tab title';
+  const parts = [];
+  if (panes) parts.push(panes > 1 ? 'nested pane' : 'pane');
+  if (details) parts.push('details');
+  if (collapse) parts.push('collapsed callout');
+  return parts.join(' + ') || 'plain';
+}
+
+// The targets that the link loads visit: all of them, or on a first visit a
+// stratified sample, one target of each kind on each page (kind: where it
+// stands on new, placeOf(), and whether its link is on that page or
+// another) and every tab title, so that each kind the full run has is
+// loaded. Also the kinds loaded ("kind n"), those of all targets, and the
+// kinds left out (none).
+export function sampleTargets(all, inventories, firstVisit) {
+  const kind = link => (inventories[link.target]?.new?.places.get(link.id) || 'dead')
+    + (link.page === link.target ? ', same page' : ', other page');
+  const kinds = list => Object.entries(list.reduce((n, link) => ({...n, [kind(link)]: (n[kind(link)] || 0) + 1}), {}))
+    .sort(([a], [b]) => a.localeCompare(b)).map(([k, n]) => `${k} ${n}`);
+  let targets = all;
+  if (firstVisit) {
+    const first = new Map();
+    all.forEach((link, k) => { const key = link.target + ' ' + kind(link); if (!first.has(key)) first.set(key, k); });
+    targets = all.filter((link, k) => inventories[link.target]?.new?.tabTitles.has(link.id) || first.get(link.target + ' ' + kind(link)) === k);
+  }
+  const every = kinds(all), covered = kinds(targets), name = k => k.replace(/ \d+$/, '');
+  return {targets, every, covered, missing: every.map(name).filter(k => !covered.map(name).includes(k))};
 }
 
 // One origin for both sides; a folder serves its index.html, x serves x.html.
@@ -712,9 +759,8 @@ class Run {
     }
     const chosen = this.o.maxLinks > 0 ? links.slice(0, this.o.maxLinks) : links;
     let targets = [...new Map(chosen.map(link => [link.target + '#' + link.id, link])).values()];
-    const tabTitle = link => this.inventories[link.target]?.new?.tabTitles.has(link.id);
-    // A first visit, sampled: the first target of each page, and every tab title.
-    if (this.o.firstVisit) targets = targets.filter((link, k) => tabTitle(link) || targets.findIndex(other => other.target === link.target) === k);
+    const sampled = sampleTargets(targets, this.inventories, this.o.firstVisit);
+    targets = sampled.targets;
     const dead = side => link => !this.inventories[link.target]?.[side]?.ids.has(link.id);
     // On load (this part's share of the targets).
     for (const link of targets.filter((_, k) => this.mine(k))) {
@@ -831,7 +877,11 @@ class Run {
     }
     const previously = this.results.filter(r => r.previouslyDead && r.ok).map(r => r.page);
     const part = this.o.shard ? ` (part ${this.o.shard.index}/${this.o.shard.count} of them)` : '';
-    this.record('links', '-', true, {note: `${chosen.length} links to ${targets.length} targets${this.o.firstVisit ? ' (sampled: one per page, and every tab title)' : ''}${part}; previously dead, now working: ${previously.join(', ') || 'none'}`});
+    const {covered, missing, every} = sampled;
+    this.record('links', '-', !missing.length, {note: `${chosen.length} links to ${targets.length} targets`
+      + `${this.o.firstVisit ? ' (sampled: one of each kind per page, and every tab title)' : ''}${part}; kinds of target loaded: ${covered.join(', ') || 'none'}`
+      + `${missing.length ? '; NOT loaded: ' + missing.join(', ') : this.o.firstVisit ? ` (every one of the ${every.length} kinds the links have)` : ''}`
+      + `; previously dead, now working: ${previously.join(', ') || 'none'}`});
   }
 
   // A link into a grouped tabset wins over the stored choice and leaves it.
@@ -1165,4 +1215,5 @@ async function main() {
   process.exit(failed.length ? 1 : 0);
 }
 
-main().catch(error => { console.error(error); process.exit(2); });
+// Run as a program (tests import sampleTargets and inventory).
+if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))) main().catch(error => { console.error(error); process.exit(2); });
