@@ -44,7 +44,10 @@
 //  8. embedded content (not --offline): JSXGraph boards in reveals have a
 //     finite size once opened; a Python cell in a reveal runs;
 //  9. no console error on new that old did not have; each error names the
-//     frame it comes from (the page, or an iframe such as a JSXGraph board).
+//     frame it comes from (the page, or an iframe such as a JSXGraph board):
+//     every frame reports its uncaught errors and console.error calls, and a
+//     message that does not say its frame is an iframe's only when an iframe
+//     of the same page load reported exactly that text and the page did not.
 //
 // --shard I/N runs the I-th of N parts of the checks (a course too large for
 // one job): the pages' checks and the links are dealt out in turn, the
@@ -200,11 +203,20 @@ const TRACE = `(() => {
   HTMLElement.prototype.focus = function () { log('focus ' + this.tagName + (this.id ? '#' + this.id : '')); return focus.apply(this, arguments); };
   const set = Element.prototype.setAttribute;
   Element.prototype.setAttribute = function (name, value) { if (name === 'data-ctm-nav') log('mark ' + value); return set.apply(this, arguments); };
-  // Errors of this frame (an iframe too) to the harness, which knows the frame.
-  addEventListener('error', event => {
-    if (event instanceof ErrorEvent) try { window.__ctmCompareError?.(String(event.message || event.error?.message || '')); } catch (_) { /* none */ }
-  }, true);
+  // Errors of this frame (the page's or an iframe's) to the harness, which
+  // knows the frame: uncaught errors and console.error calls.
+  const report = text => { try { window.__ctmCompareError?.(text); } catch (_) { /* none */ } };
+  addEventListener('error', event => { if (event instanceof ErrorEvent) report(String(event.message || event.error?.message || '')); }, true);
+  const consoleError = console.error;
+  console.error = function (...args) {
+    report(args.map(a => a instanceof Error ? a.message : typeof a === 'string' ? a : String(a)).join(' '));
+    return consoleError.apply(this, args);
+  };
 })();`;
+// An error's text as the harness compares it: its first line, without
+// "Uncaught" and the error's type (an error event says "Uncaught Error: x"
+// where the page error says "x").
+const errorText = text => norm(String(text || '').split('\n')[0]).replace(/^(Uncaught\s+)?(\w*Error:\s+)?/, '');
 
 // The target's state: visible, its panes and <details>, below the header, the
 // focused element and whether it is in view, the script's mark.
@@ -272,11 +284,14 @@ class Run {
   constructor(o, browserName, base, inventories, look) {
     Object.assign(this, {o, browserName, base, inventories, look});
     this.results = [];
-    // Console errors as seen ({text, page, frame}), and the errors that each
-    // frame other than the page reported (text -> frame), to tell where an
-    // error comes from.
+    // Console errors as seen ({text, page, frame, load}; `frame` null for a
+    // console message or page error, which do not say their frame), and
+    // what each frame reported itself, per page load (load -> [{text,
+    // frame}]), to tell where such an error comes from.
     this.errors = {old: [], new: []};
-    this.frameErrors = {old: new Map(), new: new Map()};
+    this.reports = {old: new Map(), new: new Map()};
+    this.tabs = new WeakMap();
+    this.tabCount = 0;
     this.order = Object.keys(inventories).sort();
   }
 
@@ -308,11 +323,12 @@ class Run {
   async context(side, contextOptions = {}, python = false) {
     const context = await this.browser.newContext({viewport: {width: 1280, height: 900}, serviceWorkers: this.o.firstVisit ? 'allow' : 'block', ...contextOptions});
     await context.exposeBinding('__ctmCompareError', async ({frame}, text) => {
-      if (!frame || !frame.parentFrame() || !text) return;
-      const label = await this.frameLabel(frame);
-      const n = norm(text).replace(/^(Uncaught\s+)?(\w*Error:\s+)?/, '');
-      if (!this.frameErrors[side].has(n)) this.frameErrors[side].set(n, label);
-      this.errors[side].push({text, page: frame.page().url(), frame: label});
+      if (!frame || !text) return;
+      const load = this.loadKey(frame.page());
+      const label = frame.parentFrame() ? await this.frameLabel(frame) : 'page';
+      if (!this.reports[side].has(load)) this.reports[side].set(load, []);
+      this.reports[side].get(load).push({text: errorText(text), frame: label});
+      this.errors[side].push({text, page: frame.page().url(), frame: label, load});
     });
     await context.addInitScript(TRACE);
     if (this.o.offline) await context.route(/^https?:\/\/(?!127\.0\.0\.1)/, route => route.abort());
@@ -332,24 +348,32 @@ class Run {
     return 'iframe: ' + norm(what).replace(/\d+/g, 'N').slice(0, 80);
   }
 
-  // The console errors of a side, keyed: the frame (an iframe's errors carry
-  // it), and the text without ports, sides and random ids (the URLs
-  // coi-serviceworker's fetches name).
+  // A page load: the tab (a Page) and the address it shows, without the hash.
+  loadKey(tab) {
+    if (!this.tabs.has(tab)) this.tabs.set(tab, ++this.tabCount);
+    return this.tabs.get(tab) + ' ' + tab.url().replace(/#.*$/, '');
+  }
+
+  // The console errors of a side, keyed: the frame, and the text without
+  // ports, sides and random ids (the URLs coi-serviceworker's fetches name).
+  // A message without its frame is an iframe's only when an iframe of the
+  // same page load reported that very text and the page itself did not
+  // (review A2c S3): a board's error elsewhere hides nothing.
   consoleErrors(side) {
     const found = new Map();
-    for (const {text, page, frame} of this.errors[side]) {
-      // An error event says "Uncaught Error: x" where the page error says "x": one error.
-      const n = norm(text).replace(/^(Uncaught\s+)?(\w*Error:\s+)?/, '');
-      const known = frame || (n.length > 8 ? [...this.frameErrors[side]].find(([t]) => n.includes(t) || t.includes(n))?.[1] : undefined);
-      const key = (known ? `[${known}] ` : '') + n.replace(/https?:\/\/127\.0\.0\.1:\d+\/((old|new)\/)?/g, '/')
+    for (const {text, page, frame, load} of this.errors[side]) {
+      const n = errorText(text), reports = this.reports[side].get(load) || [];
+      const known = frame || (reports.some(r => r.frame === 'page' && r.text === n) ? 'page'
+        : reports.find(r => r.frame !== 'page' && r.text === n)?.frame || 'page');
+      const key = (known !== 'page' ? `[${known}] ` : '') + n.replace(/https?:\/\/127\.0\.0\.1:\d+\/((old|new)\/)?/g, '/')
         .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<id>').replace(/:\d+:\d+/g, '').slice(0, 200);
-      if (!found.has(key)) found.set(key, {page: page.replace(this.base + side + '/', ''), frame: known || 'page'});
+      if (!found.has(key)) found.set(key, {page: page.replace(this.base + side + '/', ''), frame: known});
     }
     return found;
   }
 
   watch(page, side) {
-    const add = message => this.errors[side].push({text: message, page: page.url(), frame: null});
+    const add = message => this.errors[side].push({text: message, page: page.url(), frame: null, load: this.loadKey(page)});
     page.on('pageerror', error => add(error.message));
     page.on('console', message => {
       if (message.type() !== 'error') return;
