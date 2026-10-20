@@ -23,8 +23,9 @@
 //  3. keyboard: Tab reaches both buttons, in no more presses than on old;
 //     each summary takes focus and Enter and Space toggle it, as on old;
 //     axe-core finds no new violation;
-//  4. links: every link to an id on a page of the site, on load and on click:
-//     the right (nested) tab and every <details> around the target open, the
+//  4. links: every link to an id on a page of the site, on load and on click
+//     (a link in a closed tab, <details> or collapsed callout is opened
+//     first, as a reader would): the right (nested) tab and every <details> around the target open, the
 //     target below the header and still there 2 s later (pinned while the
 //     layout settles), focus inside the viewport; the script's path is
 //     asserted (its data-ctm-nav mark, a pushState for a link in the page),
@@ -658,7 +659,7 @@ class Run {
         const tab = await context.newPage();
         await this.load(tab, side, this.url(side, link.page));
         // The link, by its address (Quarto's scripts rewrite hrefs), may sit in a
-        // closed tab or <details>: open them as a reader would.
+        // closed tab, <details> or collapsed callout: open them as a reader would.
         const found = await tab.evaluate(href => {
           const page = url => { const u = new URL(url, location.href); return u.origin + u.pathname.replace(/\/index\.html$/, '/').replace(/\.html$/, '') + u.hash; };
           const wanted = page(href);
@@ -666,6 +667,12 @@ class Run {
           if (!anchor) return false;
           for (let node = anchor; node; node = node.parentElement) {
             if (node.tagName === 'DETAILS') node.open = true;
+            // A collapsed callout (Quarto: .callout-collapse.collapse, opened by its header).
+            if (node.classList?.contains('collapse') && !node.classList.contains('show')) {
+              node.classList.add('show');
+              const toggle = node.id && document.querySelector(`[data-bs-target="#${CSS.escape(node.id)}"]`);
+              if (toggle) { toggle.classList.remove('collapsed'); toggle.setAttribute('aria-expanded', 'true'); }
+            }
             if (node.classList?.contains('tab-pane') && !node.classList.contains('active') && node.id) {
               const tab = document.querySelector(`[data-bs-target="#${CSS.escape(node.id)}"], [href="#${CSS.escape(node.id)}"]`);
               if (tab && window.bootstrap?.Tab) window.bootstrap.Tab.getOrCreateInstance(tab).show(); else tab?.click();
