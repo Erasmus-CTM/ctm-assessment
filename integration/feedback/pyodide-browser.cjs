@@ -105,11 +105,35 @@ async function status(page) {
   return (await page.locator('#qpyodide-status-message-text').innerText()).trim();
 }
 
+// Diagnosis (temporary, step 3's combined CI): how the CDN answers a byte
+// range and then the full request with integrity, as stage 2 and Pyodide's
+// loadPackage make them, in the page's context.
+async function cdnProbe(page) {
+  return page.evaluate(async () => {
+    const index = globalThis.qpyodideCustomizedPyodideOptions?.indexURL || 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';
+    const lock = await (await fetch(index + 'pyodide-lock.json')).json();
+    const out = {isolated: globalThis.crossOriginIsolated, controlled: !!navigator.serviceWorker?.controller};
+    const pick = r => Object.fromEntries(['content-range', 'content-length', 'etag', 'accept-ranges', 'cache-control', 'age', 'content-encoding', 'vary', 'last-modified'].map(h => [h, r.headers.get(h)]));
+    for (const name of ['packaging', 'pyodide-http']) {
+      const entry = lock.packages[name];
+      const url = index + entry.file_name;
+      const sri = 'sha256-' + btoa(String.fromCharCode(...entry.sha256.match(/../g).map(h => parseInt(h, 16))));
+      const r = out[name] = {size: null};
+      try { const a = await fetch(url, {headers: {Range: 'bytes=0-524287'}}); const b = await a.arrayBuffer(); r.range = {status: a.status, bytes: b.byteLength, ...pick(a)}; } catch (e) { r.range = String(e); }
+      try { const a = await fetch(url, {integrity: sri}); const b = await a.arrayBuffer(); r.integrity = {status: a.status, bytes: b.byteLength, type: a.type, ...pick(a)}; } catch (e) { r.integrity = String(e); }
+      try { const a = await fetch(url); const b = await a.arrayBuffer(); const d = [...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map(x => x.toString(16).padStart(2, '0')).join('');
+        r.plain = {status: a.status, bytes: b.byteLength, shaMatches: d === entry.sha256}; } catch (e) { r.plain = String(e); }
+    }
+    return out;
+  }).catch(error => String(error));
+}
+
 (async () => {
   const dir = project();
   const out = path.join(dir, '_site');
   const report = [];
   let browser, current = null;
+  const probes = [];
   try {
     // The service worker file: once, at the output root; pages link it from there.
     assert.ok(fs.existsSync(path.join(out, 'coi-serviceworker.js')), 'coi-serviceworker.js at the output root');
@@ -133,6 +157,7 @@ async function status(page) {
       const url = `http://127.0.0.1:${server.address().port}/sub/cells.html`;
       await page.goto(url);
       await page.waitForFunction(() => globalThis.crossOriginIsolated === true, null, {timeout: TIMEOUT});
+      if (process.env.CTM_CDN_PROBE !== '0') probes.push('CDN probe (service worker): ' + JSON.stringify(await cdnProbe(page)));
       assert.equal(navigations, 2, 'the page reloaded once for the service worker');
       const scope = await page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.scope);
       assert.equal(scope, `http://127.0.0.1:${server.address().port}/`, 'the service worker\'s scope is the site root');
@@ -176,6 +201,7 @@ async function status(page) {
       page.setDefaultTimeout(TIMEOUT);
       const errors = pageErrors(page);
       await page.goto(`http://127.0.0.1:${server.address().port}/sub/cells.html`);
+      if (process.env.CTM_CDN_PROBE !== '0') probes.push('CDN probe (no isolation): ' + JSON.stringify(await cdnProbe(page)));
       // A restart during stage 2 (a check's stop()): no failure text, then ready.
       await page.waitForFunction(() => !!globalThis.mainPyodide, null, {timeout: TIMEOUT});
       const early = await page.evaluate(() => { const before = globalThis.qpyodideCellsReady; mainPyodide.restart('Stopped by a check.'); return before; });
@@ -217,8 +243,10 @@ async function status(page) {
       await page.close();
       server.close();
     }
+    for (const probe of probes) console.log(probe);
     console.log('Pyodide (step 3) browser checks passed:\n- ' + report.join('\n- '));
   } catch (error) {
+    for (const probe of probes) console.error(probe);
     console.error('Passed so far:\n- ' + report.join('\n- '));
     if (current) console.error('The page at the failure:', JSON.stringify(await dump(current), null, 1));
     throw error;

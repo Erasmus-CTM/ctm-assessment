@@ -98,16 +98,18 @@ async function runSite(o) {
         try {
           await page.goto(base + name, {waitUntil: 'domcontentloaded', timeout: WAIT});
           // The cells may run (1.9: qpyodideCellsReady; 1.8: the proxy) and the
-          // startup phase is over: no output cell waits, no run is in progress,
-          // for a second.
+          // startup phase is over: no output cell waits, no run is in progress
+          // (no Stop button, and not every Run button disabled, as during a
+          // run), for two seconds: 1.8 says "Ready" before its autorun cells.
           await page.waitForFunction(() => (globalThis.qpyodideCellsReady === true || (globalThis.qpyodideCellsReady === undefined && globalThis.mainPyodide))
             && globalThis.qpyodideCellContainer?.cells.length > 0, null, {timeout: WAIT});
           await page.evaluate(async wait => {
+            const buttons = () => [...document.querySelectorAll('.qpyodide-button-run')];
             const busy = () => document.querySelector('.qpyodide-non-interactive-loading-container')
-              || [...document.querySelectorAll('.qpyodide-button-run')].some(button => /Stop|Stopp/.test(button.innerText));
+              || buttons().some(button => /Stop|Stopp/.test(button.innerText)) || (buttons().length > 0 && buttons().every(button => button.disabled));
             const t0 = Date.now();
             let quietSince = Date.now();
-            while (Date.now() - quietSince < 1000) {
+            while (Date.now() - quietSince < 2000) {
               if (Date.now() - t0 > wait) throw new Error('the startup cells did not finish within ' + wait / 1000 + ' s');
               if (busy()) quietSince = Date.now();
               await new Promise(r => setTimeout(r, 100));
@@ -121,6 +123,12 @@ async function runSite(o) {
               const unit = qpyodideCellContainer.cells[index].primaryUnit;
               const code = unit.getCode();
               if (/\binput\s*\(/.test(code)) return 'skipped: input()';
+              // Its Run button is enabled once no other run is in progress.
+              const t0 = Date.now();
+              while (unit.runButton.disabled) {
+                if (Date.now() - t0 > limit) return 'blocked: Run stayed disabled';
+                await new Promise(r => setTimeout(r, 100));
+              }
               const done = unit.runCode(code).then(() => 'ran', error => 'failed: ' + String(error).slice(0, 200));
               const timer = new Promise(r => setTimeout(() => r('timeout'), limit));
               const how = await Promise.race([done, timer]);
