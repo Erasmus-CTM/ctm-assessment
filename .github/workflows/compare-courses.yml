@@ -58,9 +58,12 @@ on:
         description: 'More expect files of tools/compare-rendered/expect/, space-separated (for a migration: step4-migration.yml)'
         default: ''
       browser:
-        description: 'Also compare old and new in Chromium, Firefox and WebKit (tools/compare-browser.mjs)'
+        description: 'Also compare old and new in the browser (tools/compare-browser.mjs)'
         type: boolean
         default: false
+      browsers:
+        description: 'The browsers for that, space-separated'
+        default: 'chromium firefox webkit'
   pull_request:
     paths:
       - integration/feedback/repos.json
@@ -84,7 +87,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: compare-courses-${{ github.ref }}-${{ inputs.course || 'pr' }}
+  # One run per course and ref: a second request for another branch of the same course is not cancelled.
+  group: compare-courses-${{ github.ref }}-${{ inputs.course || 'pr' }}-${{ inputs['course-ref'] }}-${{ inputs['course-base-ref'] }}
   cancel-in-progress: true
 
 jobs:
@@ -94,6 +98,7 @@ jobs:
     outputs:
       matrix: ${{ steps.list.outputs.matrix }}
       browsers: ${{ steps.list.outputs.browsers }}
+      engines: ${{ steps.list.outputs.engines }}
     steps:
       - uses: actions/checkout@v7
       - id: list
@@ -108,6 +113,7 @@ jobs:
           CONVERT: ${{ inputs.convert }}
           EXPECT: ${{ inputs.expect }}
           BROWSER: ${{ inputs.browser }}
+          BROWSERS: ${{ inputs.browsers }}
         run: python3 tools/ci/compare-matrix.py
 
   compare:
@@ -250,7 +256,7 @@ jobs:
       fail-fast: false
       matrix:
         entry: ${{ fromJSON(needs.courses.outputs.browsers) }}
-        browser: [chromium, firefox, webkit]
+        browser: ${{ fromJSON(needs.courses.outputs.engines) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -274,7 +280,7 @@ jobs:
       - name: Report the result as an annotation
         if: always()
         run: |
-          text=$(head -c 6000 "$RUNNER_TEMP/browser/summary.md" 2>/dev/null || echo 'no report')
+          text=$(head -c 20000 "$RUNNER_TEMP/browser/summary.md" 2>/dev/null || echo 'no report')
           level=notice; [ "${{ job.status }}" = success ] || level=error
           printf '::%s title=Browser %s (%s)::%s\n' "$level" "${{ matrix.entry.key }}" "${{ matrix.browser }}" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
       - uses: actions/upload-artifact@v7

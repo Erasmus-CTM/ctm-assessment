@@ -133,11 +133,21 @@ function serve(roots) {
 }
 
 // ---------------------------------------------------------------- in the page
-// What happened on the page: pushState calls and the focus.
+// What happened on the page: pushState calls, and for failure notes a trace
+// of events, scrolls, focus calls and the script's marks.
 const TRACE = `(() => {
-  window.__ctmCompare = {push: 0};
+  const t0 = performance.now(), trace = [];
+  window.__ctmCompare = {push: 0, trace};
+  const log = text => { if (trace.length < 40) trace.push(Math.round(performance.now() - t0) + ' ' + text); };
   const push = history.pushState;
-  history.pushState = function () { window.__ctmCompare.push++; return push.apply(this, arguments); };
+  history.pushState = function () { window.__ctmCompare.push++; log('push'); return push.apply(this, arguments); };
+  for (const type of ['load', 'pageshow', 'hashchange', 'popstate']) addEventListener(type, () => log(type + ' y' + Math.round(scrollY)), true);
+  let scrolls = 0;
+  addEventListener('scroll', () => { if (scrolls++ < 12) log('scroll y' + Math.round(scrollY)); }, {capture: true, passive: true});
+  const focus = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function () { log('focus ' + this.tagName + (this.id ? '#' + this.id : '')); return focus.apply(this, arguments); };
+  const set = Element.prototype.setAttribute;
+  Element.prototype.setAttribute = function (name, value) { if (name === 'data-ctm-nav') log('mark ' + value); return set.apply(this, arguments); };
 })();`;
 
 // The target's state: visible, its panes and <details>, below the header, the
@@ -164,8 +174,10 @@ function stateOf(id) {
     exists: true, visible: target.getClientRects().length > 0, panes, details,
     top: Math.round(shown.getBoundingClientRect().top), headerBottom: Math.round(headerBottom), innerHeight,
     mark: target.getAttribute('data-ctm-nav'), hash: location.hash, push: window.__ctmCompare?.push || 0,
+    trace: (window.__ctmCompare?.trace || []).join(' | '),
     focus: focused === document.body || !focused ? 'BODY' : focused.tagName + (focused.id ? '#' + focused.id : ''),
-    focusInView: !!rect && rect.bottom > Math.max(0, headerBottom - 2) && rect.top < innerHeight,
+    // An empty anchor has no height: its top must be in view.
+    focusInView: !!rect && (rect.height > 0 ? rect.bottom > Math.max(0, headerBottom - 2) : rect.top >= headerBottom - 2) && rect.top < innerHeight,
   };
 }
 const works = s => s.exists && s.visible && s.panes.every(Boolean) && s.details.every(Boolean)
@@ -185,10 +197,14 @@ class Run {
     if (!ok) console.log(`  ${this.browserName} ${check} ${page}: FAILED ${detail.note || ''}`);
   }
 
-  async context(side, contextOptions = {}) {
+  // A fresh browser context. Python (Pyodide) and the code editor (Monaco)
+  // load only for the embedded-content check (`python`): elsewhere they
+  // would only cost time, on both sides alike.
+  async context(side, contextOptions = {}, python = false) {
     const context = await this.browser.newContext({viewport: {width: 1280, height: 900}, serviceWorkers: 'block', ...contextOptions});
     await context.addInitScript(TRACE);
     if (this.o.offline) await context.route(/^https?:\/\/(?!127\.0\.0\.1)/, route => route.abort());
+    else if (!python) await context.route(/\/pyodide\/v[\d.]+\/|\/monaco-editor@/, route => route.abort());
     context.on('page', page => this.watch(page, side));
     return context;
   }
@@ -473,6 +489,7 @@ class Run {
       if (!n.focusInView) problems.push('focus not in view: ' + n.focus);
       if (!works(state.later)) problems.push('not kept in place: 2 s later ' + describeState(state.later));
       const was = dead('old')(link) ? 'dead on old' : works(state.old) ? 'shown on old' : 'not shown on old (' + describeState(state.old) + ')';
+      if (problems.length) problems.push('trace: ' + state.later.trace);
       this.record('link load', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}; ${was}`, expected: dead('old')(link) || undefined,
         previouslyDead: dead('old')(link) || undefined});
     }
@@ -544,6 +561,7 @@ class Run {
         if (!works(history.new.forward)) problems.push('Forward: ' + describeState(history.new.forward));
       }
       const was = !state.old ? 'dead on old' : works(state.old) ? 'shown on old' : 'not shown on old';
+      if (problems.length) problems.push('trace: ' + n.trace);
       this.record('link click', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}${history.new ? ', Back and Forward' : ''}; ${was}`});
     }
     const previously = this.results.filter(r => r.previouslyDead && r.ok).map(r => r.page);
@@ -774,7 +792,7 @@ class Run {
       if (!inv.new.boards && !inv.new.cells) continue;
       const seen = {};
       for (const side of ['old', 'new']) {
-        const context = await this.context(side);
+        const context = await this.context(side, {}, true);
         const tab = await context.newPage();
         tab.setDefaultTimeout(120000);
         await this.load(tab, side, this.url(side, page));

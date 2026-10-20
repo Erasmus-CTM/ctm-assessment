@@ -41,6 +41,7 @@ class CompareMatrix(unittest.TestCase):
                 os.environ.clear()
                 os.environ.update(old)
             values = dict(line.split('=', 1) for line in output.read_text().splitlines())
+            self.engines = json.loads(values['engines'])
             return json.loads(values['matrix']), json.loads(values['browsers'])
 
     def test_pull_requests_compare_the_courses_pinned_package_and_the_fixture_migration(self):
@@ -56,6 +57,7 @@ class CompareMatrix(unittest.TestCase):
         self.assertEqual((fixture['path'], fixture['base'], fixture['convert'], fixture['expect'], fixture['browser']),
                          ('integration/step4-course', 'pin', True, 'step4-migration.yml', True))
         self.assertEqual([entry['key'] for entry in browsers], ['step4-course'])
+        self.assertEqual(self.engines, ['chromium', 'firefox', 'webkit'])
 
     def test_a_dispatch_describes_one_comparison(self):
         matrix, browsers = self.run_main(EVENT='workflow_dispatch', COURSE='aacchhee/ctm-demo', COURSE_REF='step4/migrate',
@@ -66,6 +68,8 @@ class CompareMatrix(unittest.TestCase):
         self.assertEqual((entry['ref'], entry['base_ref'], entry['base'], entry['head'], entry['key']),
                          ('step4/migrate', 'main', 'pin', '', 'ctm-demo-step4-migrate'))
         self.assertEqual(browsers, matrix)
+        self.run_main(EVENT='workflow_dispatch', COURSE='aacchhee/ctm-demo', BROWSER='true', BROWSERS='webkit nonsense')
+        self.assertEqual(self.engines, ['webkit'])
         matrix, _ = self.run_main(EVENT='workflow_dispatch', COURSE='examples', BASE='pin')
         self.assertEqual(matrix[0]['base'], '', 'the example site pins nothing')
         matrix, _ = self.run_main(EVENT='workflow_dispatch', COURSE='step4-course', BASE='pin', CONVERT='true')
