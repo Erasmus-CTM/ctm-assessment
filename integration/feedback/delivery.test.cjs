@@ -23,6 +23,22 @@ const EXPECTED = [
   'math-exercise/matrix-input.css', 'math-exercise/math-exercise.css', 'math-exercise/matrix-input.js', 'math-exercise/math-exercise.js',
   'py-exercise-feedback/py-exercise-feedback.js', 'py-exercise/py-exercise.css', 'py-exercise/py-exercise.js',
 ];
+// pyodide-interaktiv 1.9 (consolidation step 3) runs on ctm-libs: its worker
+// and catalogue are ctm-libs' files, its CSS and modules cacheable files of
+// its own (1.8 inlined them).
+const PYODIDE_19 = [
+  'ctm-worker/pyodide-worker.js', 'ctm-locale-pyodide-interaktiv/pyodide-interaktiv.js',
+  ...['qpyodide-locale.js', 'qpyodide-storage.js', 'qpyodide-document-status.js', 'qpyodide-storage-settings.js', 'qpyodide-worker-plugin.js',
+    'qpyodide-document-engine-initialization.js', 'qpyodide-canvas-plots.js', 'qpyodide-styling.css', 'qpyodide-cell-classes.js',
+    'qpyodide-cell-initialization.js'].map(file => 'pyodide-interaktiv/' + file),
+  'pyodide-interaktiv-feedback/qpyodide-feedback.js',
+];
+// The package's pyodide-interaktiv version (1.8 or 1.9 while step 3 is merged).
+function pyodideAtLeast19() {
+  const manifest = fs.readFileSync(path.join(path.dirname(site), '_extensions/pyodide-interaktiv/_extension.yml'), 'utf8');
+  const [major, minor] = ((manifest.match(/^version:\s*['"]?([\d.]+)/m) || [])[1] || '0.0').split('.').map(Number);
+  return major > 1 || (major === 1 && minor >= 9);
+}
 
 function resources(html) {
   return [...html.matchAll(/<(?:script[^>]*\ssrc|link[^>]*\shref)="([^"]+)"/g)].map(m => m[1]);
@@ -45,7 +61,7 @@ test('each CTM script and style is one cacheable file per page, after its config
     const doc = new JSDOM(html).window.document;
     for (const script of doc.querySelectorAll('script:not([src])')) assert.doesNotMatch(script.textContent, BUNDLES, file);
     // The package's math-exercise grades with ctm-checkers (0.11 and later), which adds its page script.
-    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED, 'ctm-checkers/ctm-checkers.js'].sort());
+    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED, 'ctm-checkers/ctm-checkers.js', ...(pyodideAtLeast19() ? PYODIDE_19 : [])].sort());
   }
   // Library files in the head; each component's script after its inline configuration.
   const html = fs.readFileSync(path.join(site, 'example.html'), 'utf8');

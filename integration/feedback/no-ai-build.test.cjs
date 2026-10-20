@@ -50,12 +50,21 @@ function messages(stderr) {
 function output(dir) {
   return fs.readdirSync(path.join(dir, '_site'), {recursive: true}).map(String).map(name => name.split(path.sep).join('/'));
 }
+// pyodide-interaktiv 1.9 (consolidation step 3) writes none of the AI-only
+// cell fields without AI feedback: no hidden #| task: text, no Pyodide
+// feedback script (E3). 1.8 kept them.
+function pyodideAtLeast19(dir) {
+  const manifest = fs.readFileSync(path.join(dir, '_extensions/pyodide-interaktiv/_extension.yml'), 'utf8');
+  const [major, minor] = ((manifest.match(/^version:\s*['"]?([\d.]+)/m) || [])[1] || '0.0').split('.').map(Number);
+  return major > 1 || (major === 1 && minor >= 9);
+}
 function checkWithout(dir, pages, reason, stderr) {
   assert.deepEqual(output(dir).filter(name => FILES.test(name)), [], 'feedback files in the site');
   for (const page of pages) {
     const html = fs.readFileSync(path.join(dir, '_site', page.replace(/\.qmd$/, '.html')), 'utf8');
     assert.doesNotMatch(html, ABSENT, page);
     assert.doesNotMatch(html, MARKERS, page);
+    if (pyodideAtLeast19(dir)) assert.doesNotMatch(html, /Print two\.|qpyodide-feedback\.js|"policySelection"|"feedbackContext"/, page);
   }
   const html = fs.readFileSync(path.join(dir, '_site', 'all.html'), 'utf8');
   const doc = new JSDOM(html).window.document;
