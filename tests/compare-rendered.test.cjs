@@ -94,6 +94,23 @@ test('a reveal that swallowed the next heading is unexplained (the reviewer\'s m
   }
 });
 
+test('a reveal with a callout that swallowed the next heading is unexplained (the A2c reviewer\'s page)', () => {
+  // tests/swallowed-heading: old.qmd has a callout titled "### Merk" inside
+  // its raw <details>, which a div-aware --reveal-ends does not count ([false],
+  // asserted in test_migrate_course_html.py); new.qmd moved the reveal's
+  // closing fence past "### B". Neither with that record nor without one is it
+  // explained, and nothing is a "heading" case.
+  const read = name => fs.readFileSync(path.join(__dirname, 'swallowed-heading', name), 'utf8');
+  for (const ends of [[false], null]) {
+    const items = compare(read('new.html'), read('old.html'), ends);
+    assert.deepEqual(invariants(items), ['reveal content changed swallowed'], JSON.stringify(ends));
+    assert.ok(!items.some(item => item.category === 'reveal-heading'), 'no "heading" case');
+  }
+  // Only the miscount the review found ([true]: the callout's heading taken
+  // for one that closed the <details>) would have let it pass.
+  assert.deepEqual(invariants(compare(read('new.html'), read('old.html'), [true])), []);
+});
+
 test('a record that counts other <details> than the page has decides nothing', async () => {
   const {closedBySection} = await import('../tools/compare-rendered/reveal-ends.mjs');
   const {JSDOM} = require('jsdom');

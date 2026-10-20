@@ -403,6 +403,31 @@ class Migrate(unittest.TestCase):
         self.assertIn('pages/uke5.html', pages)
         self.assertEqual(self.read('pages/uke7.qmd').count('<details'), 6, 'nothing changed')
 
+    def test_reveal_ends_counts_only_headings_at_the_depth_of_the_details(self):
+        # A heading inside a ::: div (a callout's title) is sectioned inside
+        # that div: it closes neither the section nor the raw <details> around
+        # the div (review A2c S1: linalg-branch's m1_3.md and m2_4.md). A
+        # heading at the depth where the <details> opened, in a tab too, does.
+        (self.dir / 'pages/uke8.qmd').write_text(
+            '---\ntitle: Uke 8\n---\n\n## 8.1 A\n\n<details class="reading-step">\n<summary>Gå i dybden</summary>\n\n'
+            '::: {.callout-important}\n## Viktig\n\nEn.\n:::\n\nTo.\n</details>\n\n'
+            '<details>\n<summary>Kilde</summary>\n\n:::: {.callout-note collapse="true"}\n#### Kilde for formatene\n\n'
+            '::: {.inner}\n## Dypt\n:::\n::::\n\n</details>\n\n'
+            '::: {.panel-tabset}\n\n### Fane 1\n\n<details>\n<summary>I fanen</summary>\n\n'
+            '::: {.callout-tip}\n### Tips\n:::\n\nTre.\n\n### Fane 2\n\n</details>\n\n:::\n\n'
+            '<details>\n<summary>Etter</summary>\n\n::: {.callout-note}\n## Merk\n:::\n\n## 8.2 B\n\n</details>\n', encoding='utf-8')
+        # The reviewer's page: a callout in a reading step, the next heading
+        # after its </details>. Its converted reveal moved past that heading
+        # (new.qmd) fails both comparisons (tests/compare-rendered.test.cjs,
+        # tests/compare-browser.browser.cjs, which use this record).
+        shutil.copy(Path(__file__).resolve().parent / 'swallowed-heading/old.qmd', self.dir / 'pages/zz.qmd')
+        record = self.dir / 'ends.json'
+        status, out = self.run_tool('--ctm-libs', LIBS, '--reveal-ends', str(record))
+        self.assertEqual(status, 0, out)
+        pages = json.loads(record.read_text(encoding='utf-8'))['pages']
+        self.assertEqual(pages['pages/uke8.html'], [False, False, True, True])
+        self.assertEqual(pages['pages/zz.html'], [False])
+
     def test_without_ctm_libs_the_tool_stops(self):
         out = io.StringIO()
         with contextlib.redirect_stderr(out), unittest.mock.patch.dict(os.environ, {'CTM_LIBS_EXTENSION': ''}):

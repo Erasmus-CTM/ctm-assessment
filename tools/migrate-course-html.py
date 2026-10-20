@@ -54,8 +54,10 @@ left to the author.
 
 --reveal-ends FILE records, for the course before its migration, how each
 <details> of each page ends: true when a heading's section closes it before
-its own </details> (a raw <details> with a heading inside: the browser ends
-it there, and the migrated reveal holds that heading), else false; one list
+its own </details> (a raw <details> with a heading inside, at the fenced-div
+depth where it opened: the browser ends it there, and the migrated reveal
+holds that heading; a heading inside a ::: div, such as a callout's title,
+is that div's and closes nothing), else false; one list
 per rendered page, in the page's order, includes put in. The rendered
 comparison (tools/compare-rendered.mjs, tools/compare-browser.mjs
 --reveal-ends) allows a reveal to hold the heading after it only where this
@@ -118,6 +120,8 @@ LENGTH = re.compile(r'^\d+(?:\.\d+)?(?:px|r?em|vh|%)$')
 SHORTCODE = re.compile(r'\{\{<.*>\}\}')
 DETAILS_TAG = re.compile(r'<(/?)details(?=[\s>])', re.I)
 ATX = re.compile(r'^ {0,3}(#{1,6})(?:\s|$)')
+# A fenced div's line: group 1 is what follows an opening fence (empty: a closing one).
+DIV_FENCE = re.compile(r'^\s*:{3,}\s*(\S.*?)?\s*$')
 
 
 class ToolError(Exception):
@@ -361,18 +365,26 @@ class Project:
         ```{=html} blocks, includes put in), in order. A heading of the level
         of the section the <details> opened in, or a higher one, ends that
         section before the <details>' own </details>: the browser closes the
-        <details> there (the end tag is stray)."""
+        <details> there (the end tag is stray). Only a heading at the
+        fenced-div depth where the <details> opened counts: Pandoc makes a
+        section of a heading inside a ::: div within that div (and Quarto a
+        callout's first heading its title), so it closes neither the outer
+        section nor the <details> (review A2c S1)."""
         found = {}
         for page in self.pages():
-            flags, open_, sections = [], [], []
+            flags, open_, sections, depth = [], [], [], 0
             for _, _, text, raw in self.lines(page):
                 if text is None:
+                    continue
+                fence = None if raw else DIV_FENCE.match(text)
+                if fence:
+                    depth = depth + 1 if fence.group(1) else max(0, depth - 1)
                     continue
                 heading = None if raw else ATX.match(text)
                 if heading:
                     level = len(heading.group(1))
-                    for k, opened in open_:
-                        if opened and level <= opened:
+                    for k, opened, at in open_:
+                        if opened and level <= opened and at == depth:
                             flags[k] = True
                     while sections and sections[-1] >= level:
                         sections.pop()
@@ -384,7 +396,7 @@ class Project:
                             open_.pop()
                     else:
                         flags.append(False)
-                        open_.append((len(flags) - 1, sections[-1] if sections else 0))
+                        open_.append((len(flags) - 1, sections[-1] if sections else 0, depth))
             found[re.sub(r'\.(q?md)$', '.html', page)] = flags
         return found
 
