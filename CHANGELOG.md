@@ -78,7 +78,7 @@ commits recorded in `_extensions/ctm-assessment/resolved-repos.json`.
   Before, a starter or test containing `</script>` broke the page.
 
 - **Reveals, the lecture/reading switch, links into tabs and embedded
-  pages, in Markdown** (step 4; ctm-libs 4acb7c6):
+  pages, in Markdown** (step 4; ctm-libs e415cee):
   `::: {.reading-step title="…"}`, `::: {.hint}`, `::: {.solution}` and
   `::: {.details title="…"}` are closed boxes; a page with reading steps
   gets the switch at its top (`::: {.modes}` places it, `ctm-assessment:
@@ -183,3 +183,6 @@ pyodide-interaktiv).
   `--first-visit` mode (no isolation headers, coi-serviceworker active) and
   reads `known-failures` from the expect file; the fixture course has
   tabsets far down a long page with deep links from another page.
+  ctm-libs moves to e415cee (ctm-libs #25: WebKit keeps the tab row of a
+  deep-linked tab title in view; `markdown-lint` resolves nested includes
+  against the page; it also brings ctm-libs #23, ctm.checkers).

@@ -128,15 +128,8 @@ look:
 
 # Failures of new that are known and fixed elsewhere (tools/compare-browser.mjs):
 # they count as expected, and are reported, until the fix is pinned; then the
-# entry goes. `targets: tab-title`: only links to a tab title (an id that
-# tab-ids.lua put on div.ctm-tab-target).
-known-failures:
-  - id: webkit-tab-title
-    title: >-
-      In WebKit a deep link to a tab title far down a page leaves the tab row
-      above the viewport (WebKit's own fragment scroll after ctm-nav.js's;
-      review A2 S5). Fixed in ctm-libs' ctm-nav.js by Erasmus-CTM/ctm-libs#25;
-      remove this entry when CTM Assessment pins that fix
-    browsers: [webkit]
-    checks: [link load, link click]
-    targets: tab-title
+# entry goes. Fields: id, title, browsers, checks, courses, and `targets:
+# tab-title` (only links to an id that tab-ids.lua put on div.ctm-tab-target).
+# None now: WebKit's tab-title links (review A2 S5) work since ctm-libs
+# e415cee (Erasmus-CTM/ctm-libs#25), which CTM Assessment pins.
+known-failures: []
