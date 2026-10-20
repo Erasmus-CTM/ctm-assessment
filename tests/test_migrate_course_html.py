@@ -7,8 +7,11 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 import unittest.mock
 
@@ -372,7 +375,83 @@ class Migrate(unittest.TestCase):
         expanded = [text for _, _, text in project.expanded('pages/uke7.qmd') if text and text.strip()]
         self.assertEqual(expanded[:5], ['## 7.1', 'A.', 'B.', '{{< include c.md >}}', 'A.'])
         self.assertIn('{{< pagebreak >}}', [text for _, _, text in project.expanded('index.qmd')])
-        self.assertEqual([p.name for p in self.dir.rglob('.ctm-include-probe-*')], [], 'probes are removed')
+
+    def tree(self):
+        return sorted((path.relative_to(self.dir).as_posix(), path.stat().st_mtime_ns) for path in self.dir.rglob('*'))
+
+    def test_an_include_outside_the_project_puts_nothing_in(self):
+        # A line that includes a file outside the project brings in nothing
+        # the tool reads, also when that file includes one inside (review A2c
+        # S2: the probes' "second file listed" was then the nested file).
+        shared = Path(tempfile.mkdtemp(prefix='shared-', dir=self.dir.parent))
+        self.addCleanup(shutil.rmtree, shared, True)
+        # (Its include resolves against the page's folder, as every include.)
+        (shared / 's.md').write_text('{{< include ../_includes/x.md >}}\n', encoding='utf-8')
+        (self.dir / '_includes/x.md').write_text('X.\n', encoding='utf-8')
+        line = '{{< include ../../' + shared.name + '/s.md >}}'
+        (self.dir / 'pages/x.qmd').write_text('---\ntitle: X\n---\n\n' + line + '\n', encoding='utf-8')
+        project = self.module.Project(self.dir, LIBS)
+        self.assertIsNone(project.included[('pages', line)])
+        self.assertEqual(project.included[('pages', '{{< include ../_includes/uke5.md >}}')], '_includes/uke5.md')
+
+    def test_the_tool_writes_nothing_into_a_read_only_course(self):
+        # --check (the courses' lint), --dry-run and --reveal-ends read the
+        # course and write nothing into it: they work on a read-only checkout
+        # (review A2c S2; as root, which may write anyway, the tree is compared).
+        before = self.tree()
+        modes = {path: path.stat().st_mode for path in [self.dir, *self.dir.rglob('*')]}
+        for path in modes:
+            path.chmod(0o555 if path.is_dir() else 0o444)
+        try:
+            status, out = self.run_tool('--check')
+            self.assertEqual(status, 0, out)
+            self.assertIn('Raw HTML in Markdown: ', out)
+            status, out = self.run_tool('--dry-run')
+            self.assertIn('Dry run: no file was changed.', out)
+            record = Path(tempfile.mkdtemp(prefix='ends-')) / 'ends.json'
+            self.addCleanup(shutil.rmtree, record.parent, True)
+            self.assertEqual(self.run_tool('--reveal-ends', str(record))[0], 0)
+        finally:
+            for path, mode in modes.items():
+                path.chmod(mode)
+        self.assertEqual(self.tree(), before)
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX signals')
+    def test_an_interrupted_run_leaves_nothing_behind(self):
+        # Killed while ctm-libs reads the includes (SIGTERM, as a CI timeout):
+        # the course is as it was, since nothing was written into it.
+        before = self.tree()
+        seen = self.dir.parent / (self.dir.name + '-seen.txt')
+        self.addCleanup(lambda: seen.unlink(missing_ok=True))
+        slow = self.dir.parent / (self.dir.name + '-quarto.py')
+        self.addCleanup(lambda: slow.unlink(missing_ok=True))
+        # A Quarto that answers the first call (the pages' files) and, on the
+        # second (the include lines), notes the course's files and never answers.
+        slow.write_text('#!/usr/bin/env python3\nimport os, sys, time\nfrom pathlib import Path\n'
+                        f'root, seen, quarto = Path({str(self.dir)!r}), {str(seen)!r}, {QUARTO!r}\n'
+                        "count = Path(seen + '.count')\n"
+                        "if not count.exists():\n    count.write_text('1')\n    os.execv(quarto, [quarto, *sys.argv[1:]])\n"
+                        "Path(seen + '.new').write_text('\\n'.join(sorted(p.relative_to(root).as_posix() for p in root.rglob('*'))))\n"
+                        "os.replace(seen + '.new', seen)\n"
+                        'time.sleep(60)\n', encoding='utf-8')
+        self.addCleanup(lambda: Path(str(seen) + '.count').unlink(missing_ok=True))
+        slow.chmod(0o755)
+        tool = subprocess.Popen([sys.executable, str(SCRIPT), '--project', str(self.dir), '--ctm-libs', LIBS, '--check'],
+                                env=dict(os.environ, QUARTO_BIN=str(slow)), start_new_session=True,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            for _ in range(200):
+                if seen.exists() or tool.poll() is not None:
+                    break
+                time.sleep(0.05)
+            self.assertTrue(seen.exists(), 'the tool ran Quarto')
+            os.killpg(tool.pid, signal.SIGTERM)
+            tool.wait(10)
+        finally:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(tool.pid, signal.SIGKILL)
+        self.assertEqual(seen.read_text(encoding='utf-8').split('\n'), [name for name, _ in before], 'nothing added while it ran')
+        self.assertEqual(self.tree(), before)
 
     def test_the_fixture_course_reads_as_ctm_libs_reads_it(self):
         course = self.dir / 'course'

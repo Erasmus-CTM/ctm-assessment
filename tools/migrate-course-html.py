@@ -140,25 +140,47 @@ def ctm_libs_extension(given=None):
     return folder
 
 
+def run_source_files(libs, root, args, given=None):
+    """tools/source-files.lua's output lines (it reads, never writes)."""
+    quarto = shutil.which(os.environ.get('QUARTO_BIN', 'quarto'))
+    if not quarto:
+        raise ToolError('Quarto is not installed: its Pandoc runs ctm-libs\' include rule (tools/source-files.lua)')
+    done = subprocess.run([quarto, 'pandoc', 'lua', str(SOURCE_FILES), str(libs), str(root), *args],
+                          input=given, capture_output=True, text=True, encoding='utf-8')
+    if done.returncode:
+        raise ToolError(f'tools/source-files.lua failed (exit status {done.returncode}): {done.stderr.strip()}')
+    return done.stdout.splitlines()
+
+
+def inside(file):
+    """A label of ctm-libs for a file in the project (not ../… or absolute)."""
+    return file and not file.startswith('../') and not os.path.isabs(file)
+
+
 def source_files(libs, root, pages):
     """{page: [file, …]}: the files each page shows, as ctm-libs'
     ctm.source.files() gives them (tools/source-files.lua): the page and its
     includes, nested ones too, in order, relative to the project."""
     found = {page: [] for page in pages}
-    if not pages:
-        return found
-    quarto = shutil.which(os.environ.get('QUARTO_BIN', 'quarto'))
-    if not quarto:
-        raise ToolError('Quarto is not installed: its Pandoc runs ctm-libs\' include rule (tools/source-files.lua)')
-    done = subprocess.run([quarto, 'pandoc', 'lua', str(SOURCE_FILES), str(libs), str(root), *pages],
-                          capture_output=True, text=True, encoding='utf-8')
-    if done.returncode:
-        raise ToolError(f'tools/source-files.lua failed (exit status {done.returncode}): {done.stderr.strip()}')
-    for line in done.stdout.splitlines():
+    for line in run_source_files(libs, root, pages) if pages else []:
         page, _, file = line.partition('\t')
-        if page in found and file and not file.startswith('../') and not os.path.isabs(file):
+        if page in found and inside(file):
             found[page].append(file)
     return found
+
+
+def include_files(libs, root, requests):
+    """{(page folder, line): file or None}: the file each include line
+    brings in on a page in that folder, as ctm-libs' ctm.source.files()
+    resolves it (tools/source-files.lua --include serves a page of that one
+    line from memory: nothing is written into the project)."""
+    if not requests:
+        return {}
+    given = ''.join(f'{folder}\t{line}\n' for folder, line in requests)
+    files = run_source_files(libs, root, ['--include'], given)
+    if len(files) != len(requests):
+        raise ToolError(f'tools/source-files.lua --include answered {len(files)} of {len(requests)} include lines')
+    return {request: (file if inside(file) else None) for request, file in zip(requests, files)}
 
 
 # ---------------------------------------------------------------- reading
@@ -287,10 +309,8 @@ class Project:
 
     def resolve(self, libs):
         """{(page folder, line): file or None}: the file that each shortcode
-        line of the shown files puts in, on the pages of that folder. ctm-libs
-        resolves it: each line becomes a probe page of its own in the page's
-        folder (a dot file, removed after), and the first file the probe
-        includes is the line's."""
+        line of the shown files puts in, on the pages of that folder, as
+        ctm-libs resolves it (include_files())."""
         wanted = set()
         for file in self.files:
             lines = (self.root / file).read_text(encoding='utf-8').split('\n')
@@ -298,17 +318,7 @@ class Project:
                 if text is not None and not raw and SHORTCODE.fullmatch(text.strip()):
                     for page in self.shown[file]:
                         wanted.add((Path(page).parent.as_posix(), text.strip()))
-        probes = {}
-        try:
-            for k, (folder, line) in enumerate(sorted(wanted)):
-                probe = (Path(folder) / f'.ctm-include-probe-{os.getpid()}-{k}.md').as_posix()
-                (self.root / probe).write_text(line + '\n', encoding='utf-8')
-                probes[probe] = (folder, line)
-            found = source_files(libs, self.root, list(probes))
-        finally:
-            for probe in probes:
-                (self.root / probe).unlink(missing_ok=True)
-        return {key: (found[probe][1] if len(found[probe]) > 1 else None) for probe, key in probes.items()}
+        return include_files(libs, self.root, sorted(wanted))
 
     def markdown(self):
         for folder, dirs, files in os.walk(self.root):
