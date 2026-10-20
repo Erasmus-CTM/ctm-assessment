@@ -75,7 +75,7 @@ class SourceSelection(unittest.TestCase):
     def test_only_declared_distribution_copies_are_allowed(self):
         repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
         declared = {name: spec['ships-copies'] for name, spec in repositories.items() if 'ships-copies' in spec}
-        self.assertEqual(declared, {'pyodide-interaktiv': ['ai-feedback']})
+        self.assertEqual(declared, {'pyodide-interaktiv': ['ai-feedback', 'ctm-libs']})
 
     def test_update_pins_refuses_a_tip_without_the_pinned_commit(self):
         with patch.object(builder, 'remote_revision', return_value='f' * 40), \
@@ -265,8 +265,8 @@ class SharedFiles(unittest.TestCase):
             self.hashes[name]['ctm-bootstrap.lua'] = self.digest
         self.hashes['pyodide-interaktiv']['feedback-loader.lua'] = 'old loader until step 3'
 
-    def check(self):
-        builder.check_shared_files(self.config, self.sources, self.folders, self.hashes)
+    def check(self, pinned_libs=None):
+        builder.check_shared_files(self.config, self.sources, self.folders, self.hashes, pinned_libs)
 
     def test_identical_copies_pass(self):
         self.check()
@@ -283,6 +283,25 @@ class SharedFiles(unittest.TestCase):
         self.hashes['pyodide-interaktiv']['lua/ctm-bootstrap.lua'] = 'e' * 64
         with self.assertRaisesRegex(SystemExit, r'pyodide-interaktiv/lua/ctm-bootstrap.lua'):
             self.check()
+
+    def test_following_branches_a_copy_may_equal_the_pinned_canonical(self):
+        # Step 3: ctm-libs' tip has a new bootstrap; a component's tip that has
+        # not taken it yet still equals the pinned one. Any other copy fails.
+        import hashlib, tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            pinned = Path(temp) / 'ctm-libs-pinned'
+            (pinned / 'bootstrap').mkdir(parents=True)
+            (pinned / 'bootstrap' / 'ctm-bootstrap.lua').write_text('-- pinned\n')
+            old = hashlib.sha256(b'-- pinned\n').hexdigest()
+            self.hashes['py-exercise']['ctm-bootstrap.lua'] = old
+            with self.assertRaisesRegex(SystemExit, r'py-exercise/ctm-bootstrap.lua='):
+                self.check()
+            self.check(pinned)
+            self.hashes['pyodide-interaktiv']['ctm-bootstrap.lua'] = self.digest
+            self.check(pinned)
+            self.hashes['math-exercise']['ctm-bootstrap.lua'] = 'f' * 64
+            with self.assertRaisesRegex(SystemExit, r'or the pinned ' + old[:12] + r'.*math-exercise/ctm-bootstrap.lua=ffffffffffff'):
+                self.check(pinned)
 
     def test_retired_copies_fail_except_in_pyodide_interaktiv(self):
         for name, path in (('math-exercise', 'feedback-loader.lua'), ('py-exercise', 'shared/pyodide-runtime.js')):
