@@ -1,0 +1,14 @@
+# Expected differences of consolidation step 2 (CTM Assessment 0.10.0,
+# ctm-checkers): a page built with the package before it against one built
+# with 0.10.0, from the same sources (design docs/consolidation/2026-10-step2.md
+# §3.6). math-exercise 0.11 grades with ctm-checkers, the Python checker
+# library, whose page script every page with an exercise loads once, as a
+# cacheable file. The exercise HTML, data-variants and everything else stay
+# unexplained: any other difference fails.
+#
+# Rules: see step1.yml.
+categories:
+  - id: checkers-file
+    title: The checker library as a cacheable file (ctm-checkers' page script on pages with a math exercise)
+    match:
+      - {area: file, change: added, what: '^script ctm-checkers/ctm-checkers\.js$'}

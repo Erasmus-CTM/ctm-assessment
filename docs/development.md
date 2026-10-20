@@ -25,7 +25,9 @@ checker library math-exercise grades with from 0.11 on: the generated
 py-exercise, pyodide-interaktiv and JSXGraph (the upstream
 jsxgraph/jsxgraph-quarto extension). It records revisions and hashes, rejects
 any vendored copy of another component, checks that every `ctm-bootstrap.lua`
-equals ctm-libs' own, and tests installed shared loading, filter order,
+equals ctm-libs' own, keeps checker Python in one home (no packaged folder but
+ctm-checkers defines `_math_check` or `assess_basis`, and math-exercise's only
+Python files are `variants.py` and the `question-tests.py` script), and tests installed shared loading, filter order,
 context reuse and browser behavior. The components' tests run against the
 pinned ctm-libs and ctm-checkers: `CTM_LIBS_EXTENSION` names its
 `_extensions/ctm-libs` folder and `AI_FEEDBACK_EXTENSION` its `feedback`
@@ -232,7 +234,8 @@ two renders page by page: the files a page loads, its configuration objects
 (as JSON), its other inline scripts and its body DOM. Every difference must
 belong to a category of the expectation files in
 `tools/compare-rendered/expect/` (`step1.yml` for the changes of CTM
-Assessment 0.9; one file per course or site where needed). A changed feedback
+Assessment 0.9, `step2.yml` for 0.10's: ctm-checkers' page script on math
+pages; one file per course or site where needed). A changed feedback
 context is checked against the after page itself (`context:` in a rule): it
 must be prose of the exercise's own section (the innermost tab with its label,
 or heading section), without `<details>` blocks and collapsed callouts the
