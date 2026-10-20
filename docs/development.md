@@ -28,8 +28,8 @@ any vendored copy of another component, checks that every `ctm-bootstrap.lua`
 equals ctm-libs' own, keeps checker Python in one home (no packaged folder but
 ctm-checkers defines `_math_check` or `assess_basis` in any file or ships a
 wheel, and math-exercise's only Python files are `variants.py` and the
-`question-tests.py` script; `tests/test_one_home.py`), and tests installed shared loading, filter order,
-context reuse and browser behavior. The components' tests run against the
+`question-tests.py` script; `tests/test_one_home.py`), and tests installed
+shared loading, filter order, context reuse and browser behavior. The components' tests run against the
 pinned ctm-libs and ctm-checkers: `CTM_LIBS_EXTENSION` names its
 `_extensions/ctm-libs` folder and `AI_FEEDBACK_EXTENSION` its `feedback`
 folder (pyodide-interaktiv 1.8's tests load the three feedback files from
@@ -235,8 +235,16 @@ two renders page by page: the files a page loads, its configuration objects
 (as JSON), its other inline scripts and its body DOM. Every difference must
 belong to a category of the expectation files in
 `tools/compare-rendered/expect/` (`step1.yml` for the changes of CTM
-Assessment 0.9, `step2.yml` for 0.10's: ctm-checkers' page script on math
-pages; one file per course or site where needed). A changed feedback
+Assessment 0.9, `step2.yml` for 0.10's (ctm-checkers' page script on math
+pages), `step4.yml` for step 4 on pages without its Markdown,
+`step4-migration.yml` for a course's step-4 migration; one file per course or
+site where needed). A rule matches an item's fields: besides the difference
+(`area`, `change`, `tag`, `attribute`, `before`, `after`, `line`, …), where a
+DOM difference sits (`ancestors`), what an element holds (`content`), the
+words a text lost and gained (`lost`, `gained`), and what the page has
+(`tabsets`, `reveals`, `embeds`, `modes`); an end tag names its element's
+class and id, and an element removed and added unchanged elsewhere is one
+item `moved`. A changed feedback
 context is checked against the after page itself (`context:` in a rule): it
 must be prose of the exercise's own section (the innermost tab with its label,
 or heading section), without `<details>` blocks and collapsed callouts the
@@ -246,12 +254,64 @@ keep all of that prose the old context had. Every
 unchanged context of the after page gets the same check; one that fails it is
 reported too (area `context`). The workflow
 **Compare rendered courses** builds a course with two ctm-assessment refs
-through their own installers and compares them: on pull requests that change
-the package (the example site and every course of
-`integration/pyodide-parity/corpora.json` at its branch: ctm-demo with its
-review build, ingmat3a's `main`, and its `linalg-branch` as an informational
-entry that never fails and is skipped with a notice once the branch no longer
-exists), and on demand for any course, course ref and pair of refs.
+through their own installers and compares them (`tools/ci/compare-matrix.py`
+lists the comparisons):
+
+- on pull requests that change the package: the example site (base against
+  head) and every course of `integration/pyodide-parity/corpora.json` at its
+  branch on its own sources, from the package the course pins in
+  `quarto-extensions.yml` to the head (ctm-demo with its review build,
+  ingmat3a's `main`, and its `linalg-branch` as an informational entry that
+  never fails and is skipped with a notice once the branch no longer exists);
+  and the step-4 fixture course `integration/step4-course` (raw HTML, the
+  courses' site scripts and CSS, its package pinned as the courses' are)
+  against its migration (`build-course.py --convert`: the converter with
+  `--config`, then its `migrated/` folder) with the head, with
+  `expect/step4-migration.yml` and in the browser;
+- on demand for any course: `course-ref` (after) and `course-base-ref`
+  (before), the package per side (`base`, `head`; `pin` is the one the
+  course pins at that side's ref), `convert` (a migration preview of an
+  unmigrated branch), `expect` (more expect files) and `browser`.
+
+A course's migration PR is checked with `course` = the course,
+`course-ref` = the migration branch, `course-base-ref` = `main`,
+`base` = `pin`, `head` = `main`, `expect` = `step4-migration.yml` and
+`browser` on.
+
+### Old against new in the browser
+
+`tools/compare-browser.mjs --old DIR --new DIR --browser chromium|firefox|webkit`
+serves two rendered sites from one origin and compares them with Playwright
+(design §6.3): reveals (kinds, titles, initial state), the switch (per
+block, `aria-pressed`, status texts, kept on reload and on another page, a
+new tab in lecture), the keyboard (Tab to the switch; Enter and Space on
+every summary, as on old; axe-core finds no new violation), every link into
+a page with tabs or reveals on load and on click (the tab and reveal opened,
+the target below the header and still there 2 s later, focus in view, the
+script's mark and a `pushState`, Back and Forward; a link that was dead on
+old and works now is reported), a grouped tabset's stored choice, print,
+screenshots of the switch and of each kind of reveal at 1280 and 390 px
+(at most 0.5 % of the pixels differ, except as `look:` in
+`expect/step4-migration.yml` says), the computed styles of every summary,
+JSXGraph boards and a Python cell inside reveals (not with `--offline`), and
+console errors that only new has. `--shots DIR` keeps the screenshots for the
+pull request's look review. Locally, `CHROMIUM_EXECUTABLE` names a Chromium
+and `--offline` blocks the CDNs.
+
+### Migrating a course to step 4's Markdown
+
+`python tools/migrate-course-html.py --project COURSE --config` turns a
+course's raw HTML into the Markdown forms (reveals, anchors, the embed, the
+switch) in its pages and the files they include, adds the `tab-ids.lua` line
+and `markdown-lint: true` to `_quarto.yml` and drops the courses'
+`learning-mode.html` and `tab-links.html`; it reports what it changed, the
+places where it put a blank line before a fence, and what it left (`--dry-run`
+changes nothing). The course's own CSS for the old classes is the migration
+PR's to remove. Until a course migrates, its CI can run the same tool as a
+lint: `--write-baseline ctm-html-baseline.json` records the raw HTML it has,
+and `--check --baseline ctm-html-baseline.json` gives a warning annotation for
+every construct the baseline does not list (constructs are keyed by file,
+kind and title, id or address, so moved lines are not reported).
 
 ### Releases
 
@@ -284,6 +344,11 @@ and tests against the components' branch tips with `--follow-branches`; it never
 deploys. A red run there means `repos.json` cannot be advanced yet. A pin that
 its branch does not contain stays, with a log line: the JSXGraph pin is the
 fork commit of upstream pull request #2, which upstream `main` lacks.
+The **Quarto versions** workflow (weekly, on demand, and when it or
+`tab-ids.lua` changes) builds and tests with Quarto 1.8.27 and with the
+current release; its first step is the canary for `tab-ids.lua`
+(`integration/feedback/tab-ids.test.cjs` with Quarto alone): the filter keeps
+tab-heading ids only while Quarto parses tabsets after pre-ast filters.
 
 One repository setting is required: **Settings → Pages → Build and deployment →
 Source: GitHub Actions**. The deployment job uses only `pages: write` and

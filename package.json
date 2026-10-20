@@ -10,6 +10,7 @@
     "test:browser": "node integration/feedback/browser-smoke.cjs && node integration/feedback/jsxgraph-layout.cjs"
   },
   "devDependencies": {
+    "axe-core": "^4.14.0",
     "js-yaml": "^4.3.2",
     "jsdom": "^26.1.0",
     "katex": "^0.16.11",

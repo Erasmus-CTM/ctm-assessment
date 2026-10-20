@@ -4,34 +4,67 @@ name: Compare rendered courses
 # ctm-assessment refs, each through its own installer and pins
 # (scripts/build-course.py), and compares the rendered pages
 # (tools/compare-rendered.mjs). Every difference must belong to an expected
-# category of tools/compare-rendered/expect/ (step1.yml, step2.yml and the
-# course's own file); the report is uploaded. On demand for any course and refs, and on
-# pull requests that change the package, its pins or the tool: the example
-# site and every course of integration/pyodide-parity/corpora.json (the one
-# course list) at its branch (ctm-demo with its STACK review build, ingmat3a's
-# main and its linalg-branch; a branch that no longer exists is skipped with
-# a notice); before = the pull request's base, after = its head. A course that
-# follows its branch (no pinned commit: linalg-branch) is informational: its
-# build and comparison never fail the job, a problem is a warning (round-2
-# review N1).
+# category of tools/compare-rendered/expect/ (step4.yml, step2.yml, the
+# course's own file and the files the comparison names); the report is
+# uploaded.
+#
+# On pull requests that change the package, its pins or the tools
+# (tools/ci/compare-matrix.py):
+# - the example site, before = the pull request's base, after = its head;
+# - every course of integration/pyodide-parity/corpora.json (the one course
+#   list) at its branch, on its own sources: before = the package the course
+#   pins in quarto-extensions.yml (a course that follows main: the base),
+#   after = the head. The courses stay pinned until their step-4 migration,
+#   so this shows what their next build would change once they follow main.
+#   A course that follows its branch (ingmat3a's linalg-branch; skipped with
+#   a notice once the branch is gone) is informational: a problem there is a
+#   warning, never a failure (round-2 review N1);
+# - the step-4 fixture course (integration/step4-course): before = as it is,
+#   with its pinned package; after = its migration (migrate-course-html.py
+#   --config and its migrated/ edits) with the head; compared with
+#   expect/step4-migration.yml, then old against new in Chromium, Firefox and
+#   WebKit (tools/compare-browser.mjs, design §6.3).
+# On demand, any course and refs: `course-base-ref` builds another course ref
+# as before (a migration branch against main), `base` and `head` choose the
+# package per side (`pin`: the one the course pins at that side's ref; the
+# hotfix check R2-2 compares pin against a bumped pin), `convert` previews the
+# migration of an unmigrated branch, `expect` adds expect files, `browser`
+# adds the browser comparison.
 on:
   workflow_dispatch:
     inputs:
       course:
-        description: 'Course repository (owner/name), or "examples" for the umbrella example site'
+        description: 'Course repository (owner/name), "examples" (the umbrella example site) or "step4-course" (the step-4 fixture)'
         default: 'aacchhee/ctm-demo'
       course-ref:
-        description: 'Course branch, tag or full commit SHA'
+        description: 'Course branch, tag or full commit SHA built as "after"'
         default: 'main'
+      course-base-ref:
+        description: 'Course ref built as "before" (empty: course-ref)'
+        default: ''
       profile:
         description: 'Quarto profile rendered and compared as well (for example review), or empty'
         default: ''
       base:
-        description: 'ctm-assessment ref built as "before"'
-        default: 'main'
+        description: 'ctm-assessment ref built as "before", or "pin" (the one the course pins at course-base-ref)'
+        default: 'pin'
       head:
-        description: 'ctm-assessment ref built as "after" (empty: the branch this runs on)'
+        description: 'ctm-assessment ref built as "after" (empty: the branch this runs on), or "pin"'
         default: ''
+      convert:
+        description: 'Preview the step-4 migration on the after side (tools/migrate-course-html.py --config)'
+        type: boolean
+        default: false
+      expect:
+        description: 'More expect files of tools/compare-rendered/expect/, space-separated (for a migration: step4-migration.yml)'
+        default: ''
+      browser:
+        description: 'Also compare old and new in the browser (tools/compare-browser.mjs)'
+        type: boolean
+        default: false
+      browsers:
+        description: 'The browsers for that, space-separated'
+        default: 'chromium firefox webkit'
   pull_request:
     paths:
       - integration/feedback/repos.json
@@ -44,15 +77,19 @@ on:
       - scripts/setup-feedback-integration.py
       - scripts/build-course.py
       - tools/**
+      - integration/step4-course/**
       - integration/pyodide-parity/corpora.json
       - integration/pyodide-parity/build-corpora.py
+      - package.json
+      - package-lock.json
       - .github/workflows/compare-courses.yml
 
 permissions:
   contents: read
 
 concurrency:
-  group: compare-courses-${{ github.ref }}-${{ inputs.course || 'pr' }}
+  # One run per course and ref: a second request for another branch of the same course is not cancelled.
+  group: compare-courses-${{ github.ref }}-${{ inputs.course || 'pr' }}-${{ inputs['course-ref'] }}-${{ inputs['course-base-ref'] }}
   cancel-in-progress: true
 
 jobs:
@@ -61,24 +98,28 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.list.outputs.matrix }}
+      browsers: ${{ steps.list.outputs.browsers }}
+      engines: ${{ steps.list.outputs.engines }}
     steps:
       - uses: actions/checkout@v7
       - id: list
         env:
+          EVENT: ${{ github.event_name }}
           COURSE: ${{ inputs.course }}
           COURSE_REF: ${{ inputs['course-ref'] }}
+          COURSE_BASE_REF: ${{ inputs['course-base-ref'] }}
           PROFILE: ${{ inputs.profile }}
-        run: |
-          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
-            python3 -c 'import json, os; print("matrix=" + json.dumps([{"course": os.environ["COURSE"], "ref": os.environ["COURSE_REF"], "profile": os.environ["PROFILE"]}]))' >> "$GITHUB_OUTPUT"
-          else
-            # The example site and the courses of corpora.json, each at its branch.
-            python3 integration/pyodide-parity/build-corpora.py --course-matrix
-          fi
+          BASE: ${{ inputs.base }}
+          HEAD: ${{ inputs.head }}
+          CONVERT: ${{ inputs.convert }}
+          EXPECT: ${{ inputs.expect }}
+          BROWSER: ${{ inputs.browser }}
+          BROWSERS: ${{ inputs.browsers }}
+        run: python3 tools/ci/compare-matrix.py
 
   compare:
     needs: courses
-    name: compare ${{ matrix.course }}${{ matrix.ref && format(' @ {0}', matrix.ref) || '' }}${{ matrix.informational && ' (informational)' || '' }}
+    name: compare ${{ matrix.course }}${{ matrix.ref && format(' @ {0}', matrix.ref) || '' }}${{ matrix.convert && ' (migration)' || '' }}${{ matrix.informational && ' (informational)' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -86,17 +127,47 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.courses.outputs.matrix) }}
     env:
-      BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.base || 'main' }}
-      AFTER: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.head || github.sha }}
       COURSE: ${{ matrix.course }}
+      COURSE_PATH: ${{ matrix.path }}
       COURSE_REF: ${{ matrix.ref }}
+      COURSE_BASE_REF: ${{ matrix.base_ref || matrix.ref }}
       PROFILE: ${{ matrix.profile }}
+      BASE: ${{ matrix.base || (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || 'main' }}
+      HEAD: ${{ matrix.head || (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
+      PR_BASE: ${{ github.event.pull_request.base.sha }}
+      CONVERT: ${{ matrix.convert }}
+      EXPECT: ${{ matrix.expect }}
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      # SymPy: the version Pyodide ships (native build-time checks); Jupyter as the courses' builds install it.
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6' jupyter nbformat
+      - name: The packages of both sides
+        id: refs
+        continue-on-error: ${{ matrix.informational == true }}
+        run: |
+          set -e
+          # "pin": the CTM Assessment ref the course names in quarto-extensions.yml at that side's course ref.
+          pin() {
+            if [ -n "$COURSE_PATH" ]; then python scripts/build-course.py --path "$COURSE_PATH" --pin
+            else python scripts/build-course.py --repo "https://github.com/$COURSE.git" --ref "$1" --pin; fi
+          }
+          before=$BASE; after=$HEAD
+          [ "$BASE" = pin ] && before=$(pin "$COURSE_BASE_REF")
+          [ "$HEAD" = pin ] && after=$(pin "$COURSE_REF")
+          # A course that follows main builds what main is for this run: on a pull request, its base.
+          if [ "$before" = main ] && [ -n "$PR_BASE" ]; then before=$PR_BASE; fi
+          echo "BEFORE=$before" >> "$GITHUB_ENV"
+          echo "AFTER=$after" >> "$GITHUB_ENV"
+          converted=''; [ "$CONVERT" = true ] && converted=', converted (migration preview)'
+          where() { if [ "$COURSE" = examples ]; then echo 'the example site'; elif [ -n "$COURSE_PATH" ]; then echo "$COURSE_PATH"; else echo "the course at $1"; fi; }
+          echo "::notice title=Packages for $COURSE${COURSE_REF:+@$COURSE_REF}::before: ctm-assessment $before ($BASE) with $(where "$COURSE_BASE_REF"); after: $after with $(where "$COURSE_REF")$converted"
       - name: Check out ctm-assessment before and after
         run: |
           for side in before after; do
-            ref=$BASE; [ "$side" = after ] && ref=$AFTER
+            ref=$BEFORE; [ "$side" = after ] && ref=$AFTER
             git init -q "$RUNNER_TEMP/$side"
             git -C "$RUNNER_TEMP/$side" fetch -q --depth 1 "https://github.com/${{ github.repository }}.git" "$ref"
             git -C "$RUNNER_TEMP/$side" checkout -q --detach FETCH_HEAD
@@ -106,11 +177,6 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-      # SymPy: the version Pyodide ships (native build-time checks); Jupyter as the courses' builds install it.
-      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6' jupyter nbformat
       - uses: quarto-dev/quarto-actions/setup@v2
         with:
           version: '1.8.27'
@@ -122,12 +188,14 @@ jobs:
           set -e
           for side in before after; do
             out="$RUNNER_TEMP/out/$side"
+            ref=$COURSE_REF; [ "$side" = before ] && ref=$COURSE_BASE_REF
+            extra=(); [ "$side" = after ] && [ "$CONVERT" = true ] && extra=(--convert)
             if [ "$COURSE" = examples ]; then
               python "$RUNNER_TEMP/$side/scripts/setup-feedback-integration.py" --workspace "$RUNNER_TEMP/ws-$side"
               mkdir -p "$out" && cp -r "$RUNNER_TEMP/ws-$side/site/_site" "$out/_site"
             else
-              python scripts/build-course.py --umbrella "$RUNNER_TEMP/$side" --repo "https://github.com/$COURSE.git" --ref "$COURSE_REF" \
-                --dest "$out" --workspace "$RUNNER_TEMP/ws-$side"
+              if [ -n "$COURSE_PATH" ]; then course=(--path "$COURSE_PATH"); else course=(--repo "https://github.com/$COURSE.git" --ref "$ref"); fi
+              python scripts/build-course.py --umbrella "$RUNNER_TEMP/$side" "${course[@]}" --dest "$out" --workspace "$RUNNER_TEMP/ws-$side" "${extra[@]}"
               if [ -n "$PROFILE" ]; then (cd "$out" && quarto render --profile "$PROFILE"); fi
             fi
           done
@@ -136,7 +204,8 @@ jobs:
         continue-on-error: ${{ matrix.informational == true }}
         run: |
           name=$(basename "$COURSE")
-          expect=(--expect tools/compare-rendered/expect/step1.yml --expect tools/compare-rendered/expect/step2.yml)
+          expect=(--expect tools/compare-rendered/expect/step4.yml --expect tools/compare-rendered/expect/step2.yml)
+          for file in $EXPECT; do expect+=(--expect "tools/compare-rendered/expect/$file"); done
           [ -f "tools/compare-rendered/expect/$name.yml" ] && expect+=(--expect "tools/compare-rendered/expect/$name.yml")
           outputs=(_site)
           if [ -n "$PROFILE" ] && [ -f "$RUNNER_TEMP/out/after/_quarto-$PROFILE.yml" ]; then
@@ -147,7 +216,7 @@ jobs:
           status=0
           for output in "${outputs[@]}"; do
             node tools/compare-rendered.mjs --before "$RUNNER_TEMP/out/before/$output" --after "$RUNNER_TEMP/out/after/$output" "${expect[@]}" \
-              --name "$COURSE${COURSE_REF:+@$COURSE_REF} $output ($BASE -> $AFTER)" --report "$RUNNER_TEMP/reports/$name$output.json" --summary "$RUNNER_TEMP/reports/$name$output.md" || status=1
+              --name "$COURSE${COURSE_REF:+@$COURSE_REF} $output ($BEFORE -> $AFTER)" --report "$RUNNER_TEMP/reports/$name$output.json" --summary "$RUNNER_TEMP/reports/$name$output.md" || status=1
           done
           cat "$RUNNER_TEMP"/reports/*.md
           exit $status
@@ -167,5 +236,56 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: compare-${{ strategy.job-index }}
+          name: compare-${{ matrix.key }}
           path: ${{ runner.temp }}/reports
+      # The browser comparison runs on these sites (job "browser").
+      - uses: actions/upload-artifact@v7
+        if: matrix.browser == true && steps.build.outcome == 'success'
+        with:
+          name: sites-${{ matrix.key }}
+          path: |
+            ${{ runner.temp }}/out/before/_site
+            ${{ runner.temp }}/out/after/_site
+
+  browser:
+    needs: [courses, compare]
+    if: ${{ !cancelled() && needs.courses.result == 'success' && needs.courses.outputs.browsers != '[]' }}
+    name: browser ${{ matrix.entry.course }}${{ matrix.entry.ref && format(' @ {0}', matrix.entry.ref) || '' }} (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        entry: ${{ fromJSON(needs.courses.outputs.browsers) }}
+        browser: ${{ fromJSON(needs.courses.outputs.engines) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - uses: actions/download-artifact@v7
+        with:
+          name: sites-${{ matrix.entry.key }}
+          path: ${{ runner.temp }}/sites
+      - name: Old against new in ${{ matrix.browser }}
+        env:
+          COURSE: ${{ matrix.entry.course }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/browser"
+          node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" \
+            --browser ${{ matrix.browser }} --expect tools/compare-rendered/expect/step4-migration.yml --course "$(basename "$COURSE")" \
+            --shots "$RUNNER_TEMP/browser/shots" --report "$RUNNER_TEMP/browser/report.json" --summary "$RUNNER_TEMP/browser/summary.md"
+      - name: Report the result as an annotation
+        if: always()
+        run: |
+          text=$(head -c 20000 "$RUNNER_TEMP/browser/summary.md" 2>/dev/null || echo 'no report')
+          level=notice; [ "${{ job.status }}" = success ] || level=error
+          printf '::%s title=Browser %s (%s)::%s\n' "$level" "${{ matrix.entry.key }}" "${{ matrix.browser }}" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: browser-${{ matrix.entry.key }}-${{ matrix.browser }}
+          path: ${{ runner.temp }}/browser

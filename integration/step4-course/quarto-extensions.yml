@@ -1,0 +1,6 @@
+# As in the courses: the CTM Assessment commit this course was built with
+# before its step-4 migration (compare-courses.yml builds "before" with it).
+plugins:
+  - name: ctm-assessment
+    repo: https://github.com/Erasmus-CTM/ctm-assessment.git
+    ref: 9ed46a449f41518d98fbd1b0964f6b3dce1ba0d7

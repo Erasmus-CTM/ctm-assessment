@@ -1,0 +1,12 @@
+# ingmat3a_ntnu only (with step1.yml and the step-4 files).
+#
+# The migration (step 4): in project_week7, B2's "Valgfri fordypning" was a
+# raw <details> right after a list line. The browser closed it at the end of
+# that list item, so its content stood outside it, always shown. The
+# converted ::: {.details} holds its content and follows the list (the
+# converter put a blank line before its fence, review M4).
+categories:
+  - id: week7-details-after-a-list
+    title: project_week7 B2's optional <details> no longer cut short by its list item
+    match:
+      - {area: dom, page: '^pages/project_week7\.html$', change: '^(added|removed)$', line: '^</(details|li|ol)( class="ctm-reveal details")?>$', ancestors: 'section#b2\.-del-feilen-i-tapt-signal-og-forsterket-støy\.level3( > ol( > li)?)?$'}

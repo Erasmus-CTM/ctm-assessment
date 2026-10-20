@@ -1,0 +1,5 @@
+/* After the migration: the switch and the boxes come with CTM Assessment
+   (ctm-libs ui/ctm-ui.css); the generic summary rules stay, since they also
+   style the <details> that components make (design §4). */
+main details > summary { cursor: pointer; font-weight: 600; }
+main details[open] > summary { margin-bottom: 0.8rem; }

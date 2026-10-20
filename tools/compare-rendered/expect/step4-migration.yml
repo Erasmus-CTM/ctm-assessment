@@ -1,0 +1,116 @@
+# Expected differences of a course's step-4 migration (design §6.2, "migration
+# PRs"): before = the course's main with the package it pins (what learners
+# see), after = the migration branch (tools/migrate-course-html.py --config)
+# with ctm-assessment main. Used with step4.yml and the expect files of any
+# umbrella change merged between the pin and main. Every data-context, every
+# exercise, cell and anchor id stays as it was: a difference there is
+# unexplained. B4 adds the `store` category (saved answers) with its pins.
+#
+# Rules: see step1.yml and step4.yml. Element lines name the element; an end
+# tag carries its class and id (`</div class="ctm-reveal-body">`), so a
+# wrapper is told apart from what it holds; "moved" is an element removed and
+# added unchanged elsewhere.
+categories:
+  # <details class="reading-step|learning-hint|solution-block"> and plain
+  # <details> become ctm-libs reveals: the class changes and the content gets
+  # a wrapper (Div.ctm-reveal-body, so headings inside stay inside); summary
+  # and content are equal.
+  - id: reveal
+    title: Reveals from ctm-libs (class ctm-reveal <kind>, content in div.ctm-reveal-body); summaries and content unchanged
+    match:
+      - {area: dom, tag: '^details$', change: 'attribute changed', attribute: '^class$', before: '^reading-step$', after: '^ctm-reveal reading-step$'}
+      - {area: dom, tag: '^details$', change: 'attribute changed', attribute: '^class$', before: '^learning-hint$', after: '^ctm-reveal hint$'}
+      - {area: dom, tag: '^details$', change: 'attribute changed', attribute: '^class$', before: '^solution-block$', after: '^ctm-reveal solution$'}
+      - {area: dom, tag: '^details$', change: 'attribute added', attribute: '^class$', after: '^ctm-reveal details$'}
+      - {area: dom, change: '^added$', line: '^</?div class="ctm-reveal-body">$', ancestors: 'details\.ctm-reveal\.(reading-step|hint|solution|details)$'}
+      - {area: file, change: added, what: '^(script ctm-reveal/ctm-reveal\.js|script ctm-nav/ctm-nav\.js|css ctm-ui/ctm-ui\.css)$', reveals: '^[1-9]\d*$'}
+
+  # A heading inside a raw <details>: Pandoc's section for the heading closed
+  # the <details> early, so the heading and what followed escaped it (design
+  # §1.4 item 5; ingmat3a's linalg-branch, uke4). In a reveal they stay inside
+  # its div.ctm-reveal-body. Only where the end tags of the <details> and of
+  # the sections fall changes; the content is the same.
+  - id: reveal-heading
+    title: A heading inside a reveal stays inside it (a raw <details> was closed early by the heading's section)
+    match:
+      - {area: dom, change: removed, line: '^</details( class="(reading-step|learning-hint|solution-block)")?>$', content: '^summary( |$)'}
+      - {area: dom, change: added, line: '^</details class="ctm-reveal (reading-step|hint|solution|details)">$', content: '^summary div$'}
+      - {area: dom, change: removed, line: '^</section( [\w-]+="[^"]*")*>$', content: '(^| )details$'}
+      - {area: dom, change: added, line: '^</section( [\w-]+="[^"]*")*>$', ancestors: 'details\.ctm-reveal\.[\w-]+ > div\.ctm-reveal-body$'}
+
+  # The hand-written switch (<div class="learning-mode" data-learning-mode>,
+  # its buttons in a <p>) becomes ctm-libs' (div.ctm-modes, hidden until its
+  # script runs), at the top of the page or where ::: {.modes} puts it. Its
+  # labels are raw HTML now, so the AI context of an exercise next to it
+  # loses just the two button labels; what sat above the old switch can move
+  # below the new one.
+  - id: modes-switch
+    title: The lecture/reading switch from ctm-libs (div.ctm-modes); AI contexts lose only its two button labels
+    match:
+      - {area: dom, change: '^(added|removed)$', line: '^</?div [^>]*class="(learning-mode|ctm-modes)"'}
+      - {area: dom, change: '^(added|removed|moved)$', ancestors: 'div\.(learning-mode|ctm-modes)( > p)?$'}
+      - {area: dom, tag: '^div$', attribute: '^(class|data-learning-mode|data-reading-label|data-lecture-label|hidden)$', where: {class: '^ctm-modes$'}}
+      - {area: dom, tag: '^span$', attribute: '^(class|role|aria-live|data-lecture|data-reading)$', where: {class: '^ctm-modes-status$'}}
+      - {area: dom, change: moved, ancestors: 'main#quarto-document-content\.content$', to: 'main#quarto-document-content\.content$', modes: '^1$'}
+      - {area: config, path: '(/context|/feedbackContext/text)$', lost: '^(Forelesning Gå i dybden|Førelesing Gå i djupna|Explore Go deeper|Vortrag Vertiefung)$', gained: '^$'}
+      - {area: dom, attribute: '^(data-context|data-ai-feedback-context)$', lost: '^(Forelesning Gå i dybden|Førelesing Gå i djupna|Explore Go deeper|Vortrag Vertiefung)$', gained: '^$'}
+
+  # The courses' include-after-body scripts (_includes/site/learning-mode.html
+  # and tab-links.html) are gone; ctm-libs' ui/ctm-reveal.js and
+  # ui/ctm-nav.js do their work (files added: `reveal`, step4.yml `ctm-nav`).
+  - id: site-scripts
+    title: The courses' inline site scripts (learning-mode.html, tab-links.html) replaced by ctm-libs' ctm-reveal.js and ctm-nav.js
+    match:
+      - {area: inline, change: removed, what: '^code \(\(\) => \{ function init\(\) \{ const controls = '}
+      - {area: inline, change: removed, what: '^code // Shared fragment navigation for all Quarto pages'}
+
+  # tab-ids.lua: a tab heading's id (written or automatic) is now an empty
+  # div.ctm-tab-target at the start of its pane, so links to it work (also
+  # the ids that were dead links). An anchor moved onto a tab heading by hand
+  # becomes that div, with the same id.
+  - id: tab-target
+    title: Tab-heading ids kept as div.ctm-tab-target at the start of their panes (tab-ids.lua)
+    match:
+      - {area: dom, change: added, line: '^<div class="ctm-tab-target"( [\w-]+="[^"]*")*>$', ancestors: 'div(#[\w-]+)?\.tab-pane(\.active)?$'}
+      - {area: dom, change: added, line: '^</div class="ctm-tab-target"( id="[^"]*")?>$', ancestors: 'div(#[\w-]+)?\.tab-pane(\.active)?$'}
+      - {area: dom, tag: '^div$', change: 'attribute added', attribute: '^class$', after: '^ctm-tab-target$'}
+
+  # <iframe> becomes ::: {.embed}: ctm-libs writes iframe.ctm-embed with the
+  # height only; ctm-ui.css draws the rest of the old inline style.
+  - id: embed
+    title: Embedded pages as iframe.ctm-embed (the inline style moved to ctm-ui.css)
+    match:
+      - {area: dom, tag: '^iframe$', change: 'attribute added', attribute: '^class$', after: '^ctm-embed$'}
+      - {area: dom, tag: '^iframe$', change: 'attribute changed', attribute: '^style$', after: '^height:\s*[\d.]+(px|r?em|vh|%);?$'}
+
+# The browser comparison (tools/compare-browser.mjs, design §6.3 item 6):
+# screenshots of the same element, old and new, may differ in at most 0.5 %
+# of their pixels, except as listed here. `height` is the expected change of
+# the element's height in px, as [min, max] (or any); the part both shots have
+# is then compared. `pixels: any` accepts any change (a new look), `styles:
+# any` any change of the summary's computed style. `courses` limits an entry
+# to these courses (the repository name; the umbrella's fixture is
+# step4-course).
+look:
+  - id: open-reveal
+    title: Open reveals are 17 px shorter (the last element in div.ctm-reveal-body has no bottom margin; A1 review M2)
+    shots: [reading-step-open, hint-open, solution-open]
+    height: [-19, -15]
+  - id: switch-shorter
+    title: ingmat3a's switch is 17 px shorter (its status line sat in a <p>; A1 review M2)
+    shots: [switch]
+    courses: [ingmat3a_ntnu, step4-course]
+    height: [-19, -15]
+    pixels: any
+  - id: switch-height
+    title: ctm-demo's switch differs by a few px in height (A1 deviation 6; 7 px shorter at 1280 px)
+    shots: [switch]
+    courses: [ctm-demo]
+    height: [-10, 10]
+    pixels: any
+  - id: details-look
+    title: .details is related to the reading steps but clearly distinct (dashed border, no fill, normal-weight summary; D2)
+    shots: [details-closed, details-open]
+    height: any
+    pixels: any
+    styles: any

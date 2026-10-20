@@ -1,0 +1,68 @@
+---
+title: Tab-heading ids
+---
+
+Links: [polynomials](#uke3-del5), [a tab by its automatic id](#plain-tab),
+[an inner tab](#inner-two).
+
+::: {.panel-tabset}
+
+## Plain tab
+
+An automatic id.
+
+## 3.5 Polynomer {#uke3-del5 quiz="m1-2" data-note="kept"}
+
+A written id with attributes.
+
+## Starts active {#starts-active .active}
+
+Quarto shows this tab first.
+
+::: {.panel-tabset}
+
+### Inner one
+
+Inner text.
+
+### Inner two {#inner-two}
+
+#### Not a tab {#not-a-tab}
+
+A heading inside a tab keeps its id where it is.
+
+:::
+
+## Plot {#fig-plot}
+
+A figure prefix.
+
+## Main theorem {#thm-main}
+
+A theorem prefix.
+
+## Equation {#eq-one}
+
+An equation prefix.
+
+## Part {#sec-part}
+
+A section prefix.
+
+## Video {#vid-intro}
+
+A custom cross-reference category.
+
+:::
+
+::: {.callout-note}
+## A callout
+
+::: {.panel-tabset}
+
+## In a callout {#in-callout}
+
+Tabs inside a callout.
+
+:::
+:::

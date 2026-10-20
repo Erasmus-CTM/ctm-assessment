@@ -8,5 +8,6 @@ math-exercise:
 ---
 
 ```{math-exercise}
+#| label: sum
 Compute $2+2$: _[4]
 ```
