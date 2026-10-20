@@ -17,11 +17,11 @@ TEMPLATE = ROOT / 'integration' / 'feedback'
 # The components share one copy of ctm-libs' bootstrap (the file that finds
 # ctm-libs); each must equal the canonical copy in the ctm-libs repository.
 BOOTSTRAP = 'ctm-bootstrap.lua'
-BOOTSTRAP_COMPONENTS = ('math-exercise', 'py-exercise')
-# Copies that moved into ctm-libs in consolidation step 1. pyodide-interaktiv
-# keeps its own loader until it ships ctm-libs (step 3).
+BOOTSTRAP_COMPONENTS = ('math-exercise', 'py-exercise', 'pyodide-interaktiv')
+# Copies that moved into ctm-libs in consolidation step 1; pyodide-interaktiv
+# dropped its loader with 1.9 (step 3), so no component keeps one.
 RETIRED_COPIES = ('feedback-loader.lua', 'shared/pyodide-runtime.js')
-KEEPS_RETIRED_COPIES = ('pyodide-interaktiv',)
+KEEPS_RETIRED_COPIES = ()
 # The last standalone ai-feedback release (0.8.1) before it became ctm-libs:
 # tests check that such a copy next to the package is ignored or stops a page.
 LEGACY_AI_FEEDBACK = ('Erasmus-CTM/ctm-libs', '79103a6a829b9c5cf62f645857ca7f8330ff7be2')
@@ -125,8 +125,9 @@ def tracked_extensions(source, local, own):
 def extension_folders(config):
     """{repository name: [extension folders it owns]}; the first is its main folder.
 
-    `extensions` lists several folders (ctm-libs ships its library and the
-    ai-feedback alias), `extension` names one, the default is the name.
+    `extensions` lists several folders (CTM Assessment 0.9 and 0.10 packaged
+    ctm-libs' library and its ai-feedback alias), `extension` names one, the
+    default is the name.
     """
     folders = {name: list(spec.get('extensions', [spec.get('extension', name)]))
                for name, spec in config['repositories'].items()}
@@ -420,7 +421,7 @@ def main():
     check_one_home(extensions, extensions_root)
     # Licence notices travel with the package (`quarto add` installs only
     # _extensions/): each repository's licence, when its main extension folder
-    # has none of its own (ctm-libs' notice also covers its ai-feedback alias).
+    # has none of its own.
     licence_notices = extensions_root / 'ctm-assessment' / 'licenses'
     for name, source in sources.items():
         if any(p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING')) for p in (extensions_root / extensions[name][0]).iterdir()):
@@ -437,10 +438,11 @@ def main():
     for name, source in sources.items():
         own = set(extensions[name])
         shipped = tracked_extensions(source, name in local, extensions[name])
-        # A declared distribution copy next to the component (pyodide-interaktiv
-        # ships ai-feedback for its existing projects, and from 1.9 a generated
-        # ctm-libs for standalone use) is allowed; the package copies only the
-        # component's own folders, so it never installs it.
+        # A declared distribution copy next to the component is allowed: the
+        # package copies only the component's own folders, so it never installs
+        # it. pyodide-interaktiv 1.9 ships a generated ctm-libs for standalone
+        # use and the ai-feedback forwarder; ctm-libs keeps its ai-feedback
+        # alias until L3x deletes it, no longer packaged (step 3).
         foreign = shipped - own - set(config['repositories'][name].get('ships-copies', []))
         # A copy inside one of the component's own folders would be shipped: never allowed.
         foreign |= {other for other in owned - own
@@ -469,8 +471,8 @@ def main():
         libs = sources['ctm-libs'] / '_extensions' / 'ctm-libs'
         # CTM_LIBS_EXTENSION: ctm-libs' extension folder (the components' tests
         # load its runtime, catalogues and feedback files); AI_FEEDBACK_EXTENSION:
-        # its three self-contained feedback files, which pyodide-interaktiv 1.8's
-        # tests load on their own. ctm-checkers, the Python checker library
+        # its three self-contained feedback files (the umbrella's own tests read
+        # them; it goes with U3c). ctm-checkers, the Python checker library
         # (math-exercise 0.11 grades with it): CTM_CHECKERS_EXTENSION names the
         # packaged _extensions/ctm-checkers folder (math-exercise's tests),
         # CTM_CHECKERS_SOURCE its repository (ctm-libs' tests install from it).

@@ -18,9 +18,12 @@ class SourceSelection(unittest.TestCase):
         # ctm-checkers, the Python checker library math-exercise grades with: its generated extension folder.
         self.assertEqual(repositories['ctm-checkers']['repository'], 'Erasmus-CTM/ctm-checkers')
         self.assertEqual(repositories['jsxgraph']['extension'], 'jsxgraph')
-        # ai-feedback became ctm-libs: one repository, its library and the alias extension.
+        # ai-feedback became ctm-libs: one repository. Its alias extension is
+        # no longer packaged (step 3, U3b) but still in the repository until
+        # L3x: a declared copy. The old name stays a review-ref alias.
         self.assertEqual(repositories['ctm-libs']['repository'], 'Erasmus-CTM/ctm-libs')
-        self.assertEqual(repositories['ctm-libs']['extensions'], ['ctm-libs', 'ai-feedback'])
+        self.assertEqual(repositories['ctm-libs']['extensions'], ['ctm-libs'])
+        self.assertEqual(repositories['ctm-libs']['ships-copies'], ['ai-feedback'])
         self.assertEqual(repositories['ctm-libs']['review-ref-aliases'], ['ai-feedback'])
         for name, source in repositories.items():
             with self.subTest(repository=name):
@@ -75,7 +78,9 @@ class SourceSelection(unittest.TestCase):
     def test_only_declared_distribution_copies_are_allowed(self):
         repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
         declared = {name: spec['ships-copies'] for name, spec in repositories.items() if 'ships-copies' in spec}
-        self.assertEqual(declared, {'pyodide-interaktiv': ['ai-feedback', 'ctm-libs']})
+        # pyodide-interaktiv 1.9 ships a generated ctm-libs and the ai-feedback
+        # forwarder (N1: kept through U3b and U3c); ctm-libs its alias until L3x.
+        self.assertEqual(declared, {'pyodide-interaktiv': ['ai-feedback', 'ctm-libs'], 'ctm-libs': ['ai-feedback']})
 
     def test_update_pins_refuses_a_tip_without_the_pinned_commit(self):
         with patch.object(builder, 'remote_revision', return_value='f' * 40), \
@@ -171,10 +176,11 @@ class SourceSelection(unittest.TestCase):
                 remote.assert_not_called()
                 write.assert_not_called()
 
-    def test_ctm_libs_owns_its_library_and_the_alias(self):
+    def test_ctm_libs_owns_its_library_only(self):
         config = json.loads((builder.TEMPLATE / 'repos.json').read_text())
         folders = builder.extension_folders(config)
-        self.assertEqual(folders['ctm-libs'], ['ctm-libs', 'ai-feedback'])
+        self.assertEqual(folders['ctm-libs'], ['ctm-libs'])
+        self.assertEqual(folders['pyodide-interaktiv'], ['pyodide-interaktiv'])
         self.assertEqual(folders['jsxgraph'], ['jsxgraph'])
         self.assertEqual(folders['math-exercise'], ['math-exercise'])
         self.assertEqual(folders['ctm-checkers'], ['ctm-checkers'])
@@ -261,9 +267,8 @@ class SharedFiles(unittest.TestCase):
         self.folders = builder.extension_folders(self.config)
         self.sources = {'ctm-libs': libs}
         self.hashes = {folder: {'_extension.yml': 'x'} for folders in self.folders.values() for folder in folders}
-        for name in ('math-exercise', 'py-exercise'):
+        for name in ('math-exercise', 'py-exercise', 'pyodide-interaktiv'):
             self.hashes[name]['ctm-bootstrap.lua'] = self.digest
-        self.hashes['pyodide-interaktiv']['feedback-loader.lua'] = 'old loader until step 3'
 
     def check(self, pinned_libs=None):
         builder.check_shared_files(self.config, self.sources, self.folders, self.hashes, pinned_libs)
@@ -297,14 +302,21 @@ class SharedFiles(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, r'py-exercise/ctm-bootstrap.lua='):
                 self.check()
             self.check(pinned)
-            self.hashes['pyodide-interaktiv']['ctm-bootstrap.lua'] = self.digest
+            self.hashes['pyodide-interaktiv']['ctm-bootstrap.lua'] = old
             self.check(pinned)
             self.hashes['math-exercise']['ctm-bootstrap.lua'] = 'f' * 64
             with self.assertRaisesRegex(SystemExit, r'or the pinned ' + old[:12] + r'.*math-exercise/ctm-bootstrap.lua=ffffffffffff'):
                 self.check(pinned)
 
-    def test_retired_copies_fail_except_in_pyodide_interaktiv(self):
-        for name, path in (('math-exercise', 'feedback-loader.lua'), ('py-exercise', 'shared/pyodide-runtime.js')):
+    def test_pyodide_interaktiv_needs_the_bootstrap_too(self):
+        # From 1.9 (step 3) pyodide-interaktiv loads ctm-libs through the bootstrap.
+        del self.hashes['pyodide-interaktiv']['ctm-bootstrap.lua']
+        with self.assertRaisesRegex(SystemExit, r'pyodide-interaktiv/ctm-bootstrap.lua=missing'):
+            self.check()
+
+    def test_retired_copies_fail_everywhere(self):
+        for name, path in (('math-exercise', 'feedback-loader.lua'), ('py-exercise', 'shared/pyodide-runtime.js'),
+                           ('pyodide-interaktiv', 'feedback-loader.lua')):
             with self.subTest(component=name):
                 self.hashes[name][path] = 'x'
                 with self.assertRaisesRegex(SystemExit, f'{name} still ships {name}/{path}'):
