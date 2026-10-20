@@ -31,10 +31,7 @@ name: Compare rendered courses
 # hotfix check R2-2 compares pin against a bumped pin), `convert` previews the
 # migration of an unmigrated branch, `expect` adds expect files, `browser`
 # adds the browser comparison, `review-refs` builds the after side with
-# unmerged component commits (a preview of a fix, never a pin). On a pull
-# request, the head commit's `CTM-Review-Refs` trailer does the same for the
-# after side, the head (tools/ci/review-dependencies.py, as in the other
-# workflows); the before side keeps its pins.
+# unmerged component commits (a preview of a fix, never a pin).
 on:
   workflow_dispatch:
     inputs:
@@ -151,12 +148,6 @@ jobs:
       EXPECT: ${{ matrix.expect }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 2
-      - name: Select explicit review dependencies (main keeps normal defaults)
-        env:
-          REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: python3 tools/ci/review-dependencies.py
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -204,12 +195,8 @@ jobs:
         continue-on-error: ${{ matrix.informational == true }}
         env:
           REVIEW_REFS: ${{ inputs['review-refs'] }}
-          EVENT: ${{ github.event_name }}
         run: |
           set -e
-          # A pull request's head commit names its unmerged component commits in a
-          # CTM-Review-Refs trailer (CTM_REVIEW_REFS, step above): the head is built with them.
-          if [ -z "$REVIEW_REFS" ] && [ "$EVENT" = pull_request ] && [ -n "$CTM_REVIEW_REFS" ] && [ "$CTM_REVIEW_REFS" != '{}' ]; then REVIEW_REFS=$CTM_REVIEW_REFS; fi
           for side in before after; do
             out="$RUNNER_TEMP/out/$side"
             ref=$COURSE_REF; [ "$side" = before ] && ref=$COURSE_BASE_REF

@@ -280,6 +280,4 @@ pyodide-interaktiv).
   `ctm.ui.rawHTML()`, `ctm.ui.defaultTitle()`, ctm-libs #28), run by
   `tools/markdown-lines.lua` through `quarto pandoc lua`; the tool needs a
   ctm-libs with them. Its results on ingmat3a (`main`, `linalg-branch`),
-  ctm-demo and the fixture course are unchanged. **Compare rendered
-  courses** builds a pull request's head with the component commits of its
-  `CTM-Review-Refs` trailer, as the other workflows do.
+  ctm-demo and the fixture course are unchanged.

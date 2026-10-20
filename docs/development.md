@@ -372,7 +372,7 @@ names, by rule and line: what `--check` and the baseline count), and gives
 `ctm.ui.defaultTitle()` and `ctm.locale.language()` (a title that is its
 kind's default in the page's language is left out). The tool therefore needs
 Quarto and ctm-libs' extension folder at the commit the umbrella pins, one
-that has these functions (ctm-libs #28): `--ctm-libs DIR`, or
+that has these functions (ctm-libs #28; the umbrella pins one): `--ctm-libs DIR`, or
 `CTM_LIBS_EXTENSION` (`scripts/build-course.py --convert` passes the copy it
 has just installed; a course's CI that runs the lint passes the ctm-libs of
 the ctm-assessment ref it fetches the tool from). Both drivers take their
