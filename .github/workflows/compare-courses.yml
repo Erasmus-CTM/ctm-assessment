@@ -300,9 +300,12 @@ jobs:
       - name: Report the result as an annotation
         if: always()
         run: |
-          text=$(cat "$RUNNER_TEMP/browser/summary.md" "$RUNNER_TEMP/browser/first-visit.md" 2>/dev/null | head -c 20000 || echo 'no report')
           level=notice; [ "${{ job.status }}" = success ] || level=error
-          printf '::%s title=Browser %s (%s)::%s\n' "$level" "${{ matrix.entry.key }}" "${{ matrix.browser }}" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+          # One annotation per pass, so that the first visit's failures are not cut off.
+          for pass in summary first-visit; do
+            text=$(head -c 20000 "$RUNNER_TEMP/browser/$pass.md" 2>/dev/null || echo 'no report')
+            printf '::%s title=Browser %s (%s, %s)::%s\n' "$level" "${{ matrix.entry.key }}" "${{ matrix.browser }}" "$pass" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
+          done
       - uses: actions/upload-artifact@v7
         if: always()
         with:

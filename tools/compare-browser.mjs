@@ -289,10 +289,11 @@ class Run {
   url(side, page, hash = '') { return this.base + side + '/' + page + (hash ? '#' + encodeURIComponent(hash) : ''); }
 
   // --first-visit: on a page with coi-serviceworker, wait for the worker's
-  // reload (crossOriginIsolated); "none" on a page without it.
+  // reload (crossOriginIsolated), as long as a reader would see it happen
+  // (5 s; WebKit is not isolated by it); "none" on a page without it.
   async isolation(page) {
     // The worker's reload may destroy the page's context while we ask: ask again.
-    for (let k = 0; k < 50; k++) {
+    for (let k = 0; k < 17; k++) {
       const seen = await page.evaluate(() => ({coi: !!document.querySelector('script[src*="coi-serviceworker"]'),
         isolated: window.crossOriginIsolated, ready: document.readyState === 'complete'})).catch(() => null);
       if (seen?.isolated && seen.ready) return 'isolated';
