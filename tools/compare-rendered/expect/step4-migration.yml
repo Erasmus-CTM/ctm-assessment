@@ -25,6 +25,19 @@ categories:
       - {area: dom, change: '^added$', line: '^</?div class="ctm-reveal-body">$', ancestors: 'details\.ctm-reveal\.(reading-step|hint|solution|details)$'}
       - {area: file, change: added, what: '^(script ctm-reveal/ctm-reveal\.js|script ctm-nav/ctm-nav\.js|css ctm-ui/ctm-ui\.css)$', reveals: '^[1-9]\d*$'}
 
+  # A heading inside a raw <details>: Pandoc's section for the heading closed
+  # the <details> early, so the heading and what followed escaped it (design
+  # §1.4 item 5; ingmat3a's linalg-branch, uke4). In a reveal they stay inside
+  # its div.ctm-reveal-body. Only where the end tags of the <details> and of
+  # the sections fall changes; the content is the same.
+  - id: reveal-heading
+    title: A heading inside a reveal stays inside it (a raw <details> was closed early by the heading's section)
+    match:
+      - {area: dom, change: removed, line: '^</details( class="(reading-step|learning-hint|solution-block)")?>$', content: '^summary( |$)'}
+      - {area: dom, change: added, line: '^</details class="ctm-reveal (reading-step|hint|solution|details)">$', content: '^summary div$'}
+      - {area: dom, change: removed, line: '^</section( [\w-]+="[^"]*")*>$', content: '(^| )details$'}
+      - {area: dom, change: added, line: '^</section( [\w-]+="[^"]*")*>$', ancestors: 'details\.ctm-reveal\.[\w-]+ > div\.ctm-reveal-body$'}
+
   # The hand-written switch (<div class="learning-mode" data-learning-mode>,
   # its buttons in a <p>) becomes ctm-libs' (div.ctm-modes, hidden until its
   # script runs), at the top of the page or where ::: {.modes} puts it. Its
