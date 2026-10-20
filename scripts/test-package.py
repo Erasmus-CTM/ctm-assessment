@@ -7,6 +7,7 @@ setup-feedback-integration.py --test.
 """
 from pathlib import Path
 import base64
+import hashlib
 import json
 import os
 import re
@@ -56,6 +57,23 @@ with tempfile.TemporaryDirectory(prefix='ctm-install-', dir=archive.parent) as t
     libs_version = version(extensions / 'ctm-libs')
     assert version(extensions / 'ai-feedback') == libs_version, 'the ai-feedback alias must have the version of ctm-libs'
     assert not (extensions / 'math-exercise' / 'feedback-loader.lua').exists()
+    # ctm-checkers, the Python checker library that math-exercise 0.11 and
+    # later grade with: its folder with the manifest, the wheel it names and the
+    # page script that carries that wheel.
+    checkers = extensions / 'ctm-checkers'
+    assert record['repositories']['ctm-checkers']['extensions'] == ['ctm-checkers']
+    manifest = json.loads((checkers / 'checkers.json').read_text())
+    wheel = (checkers / manifest['wheel']).read_bytes()
+    assert hashlib.sha256(wheel).hexdigest() == manifest['sha256'], 'ctm-checkers: the wheel is not the one checkers.json names'
+    payload = (checkers / manifest['script']).read_text()
+    carried = re.search(r"\bdata: '([A-Za-z0-9+/=]+)'", payload)
+    assert 'sha256: ' + json.dumps(manifest['sha256']) in payload and carried and base64.b64decode(carried.group(1)) == wheel, \
+        'ctm-checkers: the page script does not carry the wheel of checkers.json'
+    # A math-exercise that grades with ctm-checkers (0.11 and later) loads its
+    # page script on every page with an exercise, once.
+    uses_checkers = 'ctm.checkers' in (extensions / 'math-exercise' / 'math-exercise.lua').read_text()
+    if uses_checkers:
+        SCRIPTS.append(('ctm-checkers', manifest['script']))
     (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [example.qmd]\nfilters: [ctm-assessment]\npy-exercise:\n  feedback: true\npyodide:\n  feedback: true\n')
     (course / 'example.qmd').write_text('''---
 format: html
@@ -153,6 +171,19 @@ assert answer() == 2
 ''')
     result = render(course, expect_ok=False)
     assert result.returncode != 0 and 'combines filters that use different ai-feedback versions' in result.stderr, result.stderr
+    # Without ctm-checkers, a page with an exercise of a math-exercise that
+    # grades with it stops with the install command; a page without one renders.
+    if uses_checkers:
+        away = course / 'ctm-checkers-away'
+        shutil.move(extensions / 'ctm-checkers', away)
+        (course / 'python.qmd').write_text('---\nformat: html\n---\n\n```{py-exercise}\n#| task: Return two.\n'
+                                           'def answer():\n    return 2\n## TESTS ##\nassert answer() == 2\n```\n')
+        for page in ('mixed.qmd', 'python.qmd'):
+            (course / '_quarto.yml').write_text(f'project:\n  type: default\n  render: [{page}]\nfilters: [ctm-assessment]\n')
+            result = render(course, expect_ok=page == 'python.qmd')
+            if page == 'mixed.qmd':
+                assert result.returncode != 0 and 'needs ctm-checkers' in result.stderr and INSTALL in result.stderr, result.stderr
+        shutil.move(away, extensions / 'ctm-checkers')
     # Without ctm-libs, a component stops with the install command (decision 3).
     shutil.rmtree(extensions / 'Erasmus-CTM')
     shutil.rmtree(extensions / 'ctm-libs')

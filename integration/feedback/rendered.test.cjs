@@ -70,7 +70,7 @@ test('common page renders the active extensions and keeps local dependencies res
     assert.ok(fs.existsSync(path.resolve(site, resource.split('?')[0])), 'Missing ' + resource);
   }
   const record = JSON.parse(fs.readFileSync(path.join(site, 'resolved-repos.json'), 'utf8'));
-  assert.deepEqual(Object.keys(record.repositories).sort(), ['ctm-assessment', 'ctm-libs', 'jsxgraph', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
+  assert.deepEqual(Object.keys(record.repositories).sort(), ['ctm-assessment', 'ctm-checkers', 'ctm-libs', 'jsxgraph', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
   assert.equal(panels[2].querySelectorAll('.math-exercise-cell').length, 7);
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'repos.json'), 'utf8'));
   for (const [name, source] of Object.entries(record.repositories)) {
@@ -245,7 +245,8 @@ test('individually listed math-exercise and both shared-filter orders load one u
   const dir = fs.mkdtempSync(path.join(path.dirname(site), 'filter-order-'));
   try {
     const source = path.join(path.dirname(site), '_extensions');
-    for (const name of ['ctm-assessment', 'ctm-libs', 'ai-feedback', 'math-exercise'])
+    // ctm-checkers: math-exercise 0.11 and later grade with it (unused with 0.10).
+    for (const name of ['ctm-assessment', 'ctm-libs', 'ai-feedback', 'math-exercise', 'ctm-checkers'])
       fs.cpSync(path.join(source, name), path.join(dir, '_extensions', name), {recursive: true});
     if (legacy) fs.cpSync(legacy, path.join(dir, '_extensions/Erasmus-CTM/ai-feedback'), {recursive: true});
     const orders = [['math-exercise'], ['ai-feedback', 'math-exercise'], ['math-exercise', 'ai-feedback']];

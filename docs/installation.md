@@ -9,7 +9,9 @@ JSXGraph** (the upstream
 [jsxgraph/jsxgraph-quarto](https://github.com/jsxgraph/jsxgraph-quarto)
 extension) with **ctm-libs**, their internal library: settings, languages, the
 Python runtime of the page and AI feedback (formerly the ai-feedback
-extension). Install it once in your Quarto project:
+extension). **ctm-checkers** is the Python checker library: from math-exercise
+0.11 on, math-exercise grades with it, in the browser and at build time.
+Install it once in your Quarto project:
 
 ```sh
 quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz
@@ -34,8 +36,9 @@ fetched when you render. `_extensions/ctm-assessment/resolved-repos.json`
 [example site](https://erasmus-ctm.github.io/ctm-assessment/resolved-repos.json))
 lists the package version, those commits and the SHA-256 of every installed
 file. The package installs the folders `ctm-assessment`, `ctm-libs`,
-`ai-feedback` (a thin alias of ctm-libs for 0.9), `jsxgraph`, `math-exercise`,
-`py-exercise` and `pyodide-interaktiv`; authors list only `ctm-assessment`.
+`ai-feedback` (a thin alias of ctm-libs for 0.9), `ctm-checkers`, `jsxgraph`,
+`math-exercise`, `py-exercise` and `pyodide-interaktiv`; authors list only
+`ctm-assessment`.
 
 **Versions.** The URL above is the latest build of `main`. Each release is
 also a GitHub release asset ([changes](../CHANGELOG.md)); to stay on one
@@ -140,8 +143,8 @@ Use the `NAME=SHA` form in Windows PowerShell 5.1, which removes the inner
 quotes of the JSON form. ctm-assessment itself cannot be set this way: the
 installer always builds the checkout it is part of, so fetch the ref you want.
 The names are those of `repos.json`: `ctm-libs`, `math-exercise`,
-`py-exercise`, `pyodide-interaktiv`, `jsxgraph`; `ai-feedback=` is read as
-`ctm-libs` in 0.9.
+`ctm-checkers`, `py-exercise`, `pyodide-interaktiv`, `jsxgraph`;
+`ai-feedback=` is read as `ctm-libs` in 0.9.
 
 **Windows paths.** The build folder defaults to
 `.private-extensions/ctm-assessment-build` inside the course, and component

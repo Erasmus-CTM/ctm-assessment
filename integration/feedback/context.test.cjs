@@ -3,7 +3,8 @@ const {spawnSync}=require('node:child_process'),{JSDOM}=require('jsdom');
 const site=process.env.CTM_INTEGRATION_SITE;
 // ctm-libs (with its ai-feedback alias) and the components; the package's own folder
 // (ctm-assessment) is installed unqualified, as `quarto add <archive>` does.
-const names=['ctm-libs','ai-feedback','math-exercise','py-exercise','pyodide-interaktiv'];
+// ctm-checkers: math-exercise 0.11 and later grade with it (the folder is unused with 0.10).
+const names=['ctm-libs','ai-feedback','math-exercise','ctm-checkers','py-exercise','pyodide-interaktiv'];
 function fixture(filters){
  let q=`---\nformat: html\n${filters.length ? 'filters: ['+filters.join(', ')+']\n' : ''}py-exercise:\n  feedback: true\npyodide:\n  feedback: true\n---\n`;
  for(const mode of ['auto','none','shared']){
