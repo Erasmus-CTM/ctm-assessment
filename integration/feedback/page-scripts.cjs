@@ -48,4 +48,20 @@ function run(w, htmlFile, dependencies = LIBRARY, {config = true, transform = {}
   return loaded;
 }
 
-module.exports = {FEEDBACK, LIBRARY, MATH, CONFIG, dependency, scriptsOf, run};
+// The version of an installed extension (`extensionsDir/<name>/_extension.yml`)
+// as [major, minor, patch]; [0, 0, 0] when it names none.
+function extensionVersion(extensionsDir, name) {
+  const manifest = fs.readFileSync(path.join(extensionsDir, name, '_extension.yml'), 'utf8');
+  const version = ((manifest.match(/^version:\s*['"]?([\d.]+)/m) || [])[1] || '0.0.0').split('.').map(Number);
+  return [0, 1, 2].map(i => version[i] || 0);
+}
+// Whether that version is at least major.minor.
+function atLeast(extensionsDir, name, major, minor) {
+  const [a, b] = extensionVersion(extensionsDir, name);
+  return a > major || (a === major && b >= minor);
+}
+// pyodide-interaktiv 1.9 (consolidation step 3) or later; the tests' 1.8
+// branches go once the package pins 1.9 (U3b).
+const pyodideAtLeast19 = extensionsDir => atLeast(extensionsDir, 'pyodide-interaktiv', 1, 9);
+
+module.exports = {FEEDBACK, LIBRARY, MATH, CONFIG, dependency, scriptsOf, run, extensionVersion, atLeast, pyodideAtLeast19};
