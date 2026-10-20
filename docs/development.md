@@ -19,16 +19,22 @@ In VS Code, **Terminal → Run Task…** offers the same commands (`.vscode/task
 
 The builder renders one `example.html` from `example.qmd` and topic includes,
 using the components pinned in `integration/feedback/repos.json`: ctm-libs (the
-library, with its `ai-feedback` alias), math-exercise, py-exercise,
-pyodide-interaktiv and JSXGraph (the upstream jsxgraph/jsxgraph-quarto
-extension). It records revisions and hashes, rejects any vendored copy of
-another component, checks that every `ctm-bootstrap.lua` equals ctm-libs' own,
-and tests installed shared loading, filter order, context reuse and browser
-behavior. The components' tests run against the pinned ctm-libs:
-`CTM_LIBS_EXTENSION` names its `_extensions/ctm-libs` folder and
-`AI_FEEDBACK_EXTENSION` its `feedback` folder (pyodide-interaktiv 1.8's tests
-load the three feedback files from there); they get a temporary folder outside
-this checkout. See the [workbench guide](../integration/feedback/README.md) for
+library, with its `ai-feedback` alias), math-exercise, ctm-checkers (the Python
+checker library math-exercise grades with from 0.11 on: the generated
+`_extensions/ctm-checkers` folder with its wheel and page script),
+py-exercise, pyodide-interaktiv and JSXGraph (the upstream
+jsxgraph/jsxgraph-quarto extension). It records revisions and hashes, rejects
+any vendored copy of another component, checks that every `ctm-bootstrap.lua`
+equals ctm-libs' own, and tests installed shared loading, filter order,
+context reuse and browser behavior. The components' tests run against the
+pinned ctm-libs and ctm-checkers: `CTM_LIBS_EXTENSION` names its
+`_extensions/ctm-libs` folder and `AI_FEEDBACK_EXTENSION` its `feedback`
+folder (pyodide-interaktiv 1.8's tests load the three feedback files from
+there), `CTM_CHECKERS_EXTENSION` the packaged `_extensions/ctm-checkers`
+folder and `CTM_CHECKERS_SOURCE` the ctm-checkers checkout (ctm-libs' tests
+install it from there); they get a temporary folder outside this checkout.
+`--test` also runs ctm-checkers' `tools/build.py --check`: the packaged folder
+is the one its sources build. See the [workbench guide](../integration/feedback/README.md) for
 local source overrides. Generated files (shipped policies, feedback interface
 strings, versions) and the message catalogues belong to ctm-libs; the builder
 runs its `sync-feedback-defaults.py --check` and `check-locales.py` before the
@@ -42,7 +48,11 @@ delivery of scripts as files and with `embed-resources` (`delivery`), and a
 build without AI feedback (`no-ai-build`, fixture `integration/feedback/no-ai`,
 built with `--profile no-ai` and `CTM_FEEDBACK=off`). `scripts/test-package.py`
 installs the archive in a fresh course, also next to separately added copies
-and an old ai-feedback 0.8.1.
+and an old ai-feedback 0.8.1, and checks the ctm-checkers folder (its wheel
+and page script agree with `checkers.json`; with a math-exercise that grades
+with it, its page script loads once per page, and without the folder such a
+page stops with the install command while a page without math-exercise
+renders).
 
 ### Pyodide parity, build comparison and golden capture
 

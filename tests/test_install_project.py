@@ -13,7 +13,7 @@ spec = importlib.util.spec_from_file_location('install_project', Path(__file__).
 installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
 
-KNOWN = {'ctm-libs', 'math-exercise', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'}
+KNOWN = {'ctm-libs', 'math-exercise', 'ctm-checkers', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'}
 RENAMED = {'ai-feedback': 'ctm-libs'}
 A, B = 'a' * 40, 'b' * 40
 
@@ -97,7 +97,7 @@ class Release(unittest.TestCase):
     """--release vX.Y.Z: the checkout is that release, built from pins only."""
 
     def manifest(self, **changes):
-        repositories = {name: {'commit': c * 40} for name, c in zip(sorted(KNOWN - {'ctm-assessment'}), 'abcde')}
+        repositories = {name: {'commit': c * 40} for name, c in zip(sorted(KNOWN - {'ctm-assessment'}), 'abcdef')}
         repositories['ctm-assessment'] = {'branch': 'main'}
         for name, spec in changes.items():
             repositories[name] = spec

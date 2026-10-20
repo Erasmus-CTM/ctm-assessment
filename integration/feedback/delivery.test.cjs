@@ -38,7 +38,10 @@ test('each CTM script and style is one cacheable file per page, after its config
     }
     const doc = new JSDOM(html).window.document;
     for (const script of doc.querySelectorAll('script:not([src])')) assert.doesNotMatch(script.textContent, BUNDLES, file);
-    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED].sort());
+    // A math-exercise that grades with ctm-checkers (0.11 and later) adds its page script.
+    const checkers = fs.readFileSync(path.join(path.dirname(site), '_extensions/math-exercise/math-exercise.lua'), 'utf8').includes('ctm.checkers')
+      ? ['ctm-checkers/ctm-checkers.js'] : [];
+    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED, ...checkers].sort());
   }
   // Library files in the head; each component's script after its inline configuration.
   const html = fs.readFileSync(path.join(site, 'example.html'), 'utf8');
