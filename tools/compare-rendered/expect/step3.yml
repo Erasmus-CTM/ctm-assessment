@@ -1,0 +1,29 @@
+# Expected differences of consolidation step 3 (pyodide-interaktiv 1.9 on
+# ctm-libs): a page built with the package before it (pyodide-interaktiv 1.8)
+# against one built with step 3's package, from the same sources (design
+# docs/consolidation/2026-10-step3.md §11, §18.7). The cells' data
+# (qpyodideCellDetails), the cell markup and every other value of the
+# settings script stay unexplained: any other difference fails.
+#
+# pyodide-interaktiv's settings script is compared by its values, as the
+# configuration object qpyodideSettings (tools/compare-rendered.mjs); its
+# comments and its script type (1.9 writes a classic script, so it runs
+# before every module) are not compared.
+#
+# Rules: see step1.yml.
+categories:
+  - id: D1-pyodide
+    title: pyodide-interaktiv's scripts and styles as cacheable files (its modules were inline); its worker and catalogue are ctm-libs' files
+    match:
+      - {area: file, change: added, what: '^(script|css) (ctm-worker|ctm-locale-pyodide-interaktiv|pyodide-interaktiv|pyodide-interaktiv-feedback)/[\w.-]+$'}
+      - {area: inline, change: removed, what: '^pyodide-interaktiv: '}
+
+  - id: pyodide-ui-language
+    title: The feedback's interface language in pyodide-interaktiv's settings (new, uiLanguage), in every build with AI feedback
+    match:
+      - {area: config, object: '^qpyodideSettings$', path: '^/\d+/qpyodideFeedbackOptions/uiLanguage$', after: '^(en|de|sv|nb|da)$'}
+
+  - id: pyodide-lang
+    title: pyodide-interaktiv names Bokmål nb, not no (the catalogue's language code; the same texts)
+    match:
+      - {area: config, object: '^qpyodideSettings$', path: '^/\d+/qpyodideLang$', before: '^no$', after: '^nb$'}

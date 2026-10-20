@@ -64,8 +64,23 @@ function noiseFree(name, value) {
 // Inline scripts: configuration objects as JSON, everything else by kind.
 // pyodide-interaktiv writes its cells' data into its settings script.
 const CELL_DETAILS = /^globalThis\.qpyodideCellDetails = (\[.*\]);$/m;
+// pyodide-interaktiv's settings script (qpyodide-document-settings.js) only
+// assigns globals: its values are compared as one configuration object,
+// qpyodideSettings (the cells as qpyodideCellDetails), and its comments and
+// layout not at all (step 3: 1.9 writes it as a classic script).
+function pyodideSettings(t) {
+  if (!t.startsWith('// qpyodide-document-settings.js')) return null;
+  const scope = {};
+  try { vm.runInNewContext(t, scope, {timeout: 1000}); } catch (_) { return null; }
+  const json = JSON.parse(JSON.stringify(scope));
+  const cells = json.qpyodideCellDetails || null;
+  delete json.qpyodideCellDetails;
+  return {kind: 'qpyodideSettings', json, cells};
+}
 function inlineScript(text) {
   let t = text.trim(), cells = null;
+  const settings = pyodideSettings(t);
+  if (settings) return settings;
   const details = CELL_DETAILS.exec(t);
   if (details && !t.startsWith('globalThis.qpyodideCellDetails')) {
     try { cells = JSON.parse(details[1]); t = t.replace(CELL_DETAILS, 'globalThis.qpyodideCellDetails = <cells>;'); } catch (_) { cells = null; }
