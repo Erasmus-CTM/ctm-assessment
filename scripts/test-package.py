@@ -69,9 +69,11 @@ with tempfile.TemporaryDirectory(prefix='ctm-install-', dir=archive.parent) as t
     carried = re.search(r"\bdata: '([A-Za-z0-9+/=]+)'", payload)
     assert 'sha256: ' + json.dumps(manifest['sha256']) in payload and carried and base64.b64decode(carried.group(1)) == wheel, \
         'ctm-checkers: the page script does not carry the wheel of checkers.json'
-    # A math-exercise that grades with ctm-checkers (0.11 and later) loads its
-    # page script on every page with an exercise, once.
-    uses_checkers = 'ctm.checkers' in (extensions / 'math-exercise' / 'math-exercise.lua').read_text()
+    # A math-exercise that grades with ctm-checkers (0.11 and later, by the
+    # version in its manifest) loads its page script on every page with an
+    # exercise, once.
+    math_version = tuple(int(part) for part in re.findall(r'\d+', version(extensions / 'math-exercise').strip('\'"'))[:2])
+    uses_checkers = math_version >= (0, 11)
     if uses_checkers:
         SCRIPTS.append(('ctm-checkers', manifest['script']))
     (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [example.qmd]\nfilters: [ctm-assessment]\npy-exercise:\n  feedback: true\npyodide:\n  feedback: true\n')

@@ -12,3 +12,15 @@ categories:
     title: The checker library as a cacheable file (ctm-checkers' page script on pages with a math exercise)
     match:
       - {area: file, change: added, what: '^script ctm-checkers/ctm-checkers\.js$'}
+
+  # The ctm-libs pin (40bad7d, the merge of ctm-libs #23 with ctm.checkers)
+  # comes after step 4's ctm-libs commits (#22, #24), so 0.10.0 also gets
+  # their links into tabs, on by default: pages with a tabset load
+  # ui/ctm-nav.js and ui/ctm-ui.css. This is the category `ctm-nav` of step
+  # 4's expectations (ctm-assessment #16, expect/step4.yml), without its
+  # `tabsets` field, which the comparison tool learns there; once #16 is
+  # merged, step4.yml explains it and this category goes.
+  - id: ctm-nav
+    title: Links into tabs (ctm-libs ui/ctm-nav.js and ui/ctm-ui.css), on by default since ctm-libs' step-4 commits
+    match:
+      - {area: file, change: added, what: '^(script ctm-nav/ctm-nav\.js|css ctm-ui/ctm-ui\.css)$'}
