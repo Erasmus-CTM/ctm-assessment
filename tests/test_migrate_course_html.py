@@ -291,6 +291,74 @@ class Migrate(unittest.TestCase):
         self.assertIn('Not in the baseline', reported[0])
         self.assertIn('Found: details.reading-step: Gå i dybden: ny', reported[0])
 
+    def test_nested_includes_resolve_against_the_page(self):
+        # Quarto resolves an include inside an included file against the page's
+        # folder (review A2 S2): ../_includes/… from pages/, not from _includes/.
+        week = self.dir / '_includes/uke5.md'
+        week.write_text(week.read_text(encoding='utf-8') + '\n{{< include ../_includes/oppgaver/uke5_ex.md >}}\n', encoding='utf-8')
+        nested = self.dir / '_includes/oppgaver/uke5_ex.md'
+        nested.parent.mkdir(parents=True)
+        nested.write_text('## Oppgaver\n\n<div id="uke5-oppg"></div>\n\n'
+                          '{{< include ../_includes/oppgaver/deeper.md >}}\n', encoding='utf-8')
+        (self.dir / '_includes/oppgaver/deeper.md').write_text(
+            '<details class="learning-hint">\n<summary>Hint til 5.1</summary>\n\nDypt.\n</details>\n', encoding='utf-8')
+        status, out = self.run_tool('--check')
+        self.assertIn('_includes/oppgaver/uke5_ex.md:3: ', out)
+        self.assertIn('_includes/oppgaver/deeper.md:1: ', out)
+        self.assertEqual(self.module.Project(self.dir).languages['_includes/oppgaver/deeper.md'], {'nb'})
+        # The lint: a construct added to a nested file is new to the baseline.
+        baseline = self.dir / 'ctm-html-baseline.json'
+        self.run_tool('--write-baseline', str(baseline))
+        self.assertIn('anchor #uke5-oppg', json.loads(baseline.read_text(encoding='utf-8'))['constructs']['_includes/oppgaver/uke5_ex.md'])
+        nested.write_text(nested.read_text(encoding='utf-8') + '\n<details>\n<summary>Ny</summary>\n\nNy.\n</details>\n', encoding='utf-8')
+        status, out = self.run_tool('--check', '--baseline', str(baseline), '--strict')
+        self.assertEqual(status, 1)
+        self.assertIn('_includes/oppgaver/uke5_ex.md:7: Not in the baseline', out)
+        # The conversion reaches them too.
+        self.run_tool()
+        self.assertIn('::: {#uke5-oppg}\n:::\n', nested.read_text(encoding='utf-8'))
+        self.assertEqual(self.read('_includes/oppgaver/deeper.md'), '::: {.hint title="Hint til 5.1"}\n\nDypt.\n:::\n')
+
+    def test_an_anchor_that_repeats_its_tab_heading_id_is_removed_with_the_tab_ids_line(self):
+        # A hand anchor first in a tab whose heading has the same id (written or
+        # automatic, also across an include): with tab-ids.lua the page would
+        # have the id twice (review A2 S3), so --config removes it.
+        (self.dir / 'pages/uke6.qmd').write_text(
+            '---\ntitle: "Uke 6"\n---\n\n::: {.panel-tabset}\n\n'
+            '## 6.1 Del {#uke6-del1}\n\n<div id="uke6-del1"></div>\n\nTekst.\n\n'
+            '## 6.2 Fikspunkt og konvergens\n{{< include ../_includes/m6.md >}}\n\n'
+            '## 6.3 Annet {#uke6-annet}\n\n<div id="uke6-annet-start"></div>\n\n'
+            '## 6.4 Delt\n{{< include ../_includes/shared.md >}}\n\n:::\n\n'
+            '<div id="uke6-slutt"></div>\n', encoding='utf-8')
+        (self.dir / '_includes/m6.md').write_text('<div id="fikspunkt-og-konvergens"></div>\n\nInnhold.\n', encoding='utf-8')
+        # A file that another page shows without that tab heading keeps its anchor.
+        (self.dir / '_includes/shared.md').write_text('<div id="delt"></div>\n\nDelt.\n', encoding='utf-8')
+        (self.dir / 'pages/delt.qmd').write_text('---\ntitle: Delt\n---\n\n{{< include ../_includes/shared.md >}}\n', encoding='utf-8')
+        self.assertEqual(self.module.Project(self.dir).tab_anchor_duplicates(),
+                         {'pages/uke6.qmd': {8: 'uke6-del1'}, '_includes/m6.md': {0: 'fikspunkt-og-konvergens'}})
+        # Without the tab-ids.lua line: converted as any anchor, and named.
+        status, out = self.run_tool()
+        self.assertIn('\n::: {#uke6-del1}\n:::\n', self.read('pages/uke6.qmd'))
+        self.assertIn('pages/uke6.qmd:9: the anchor #uke6-del1 repeats the id of the tab heading it follows', out)
+        # With it (--config): removed, also in the ::: {#…} form; the others stay.
+        status, out = self.run_tool('--config')
+        page = self.read('pages/uke6.qmd')
+        self.assertIn('## 6.1 Del {#uke6-del1}\n\nTekst.\n', page)
+        self.assertNotIn('{#uke6-del1}\n:::', page)
+        self.assertIn('::: {#uke6-annet-start}\n:::\n', page)
+        self.assertIn('::: {#uke6-slutt}\n:::\n', page)
+        self.assertEqual(self.read('_includes/m6.md'), 'Innhold.\n')
+        self.assertTrue(self.read('_includes/shared.md').startswith('::: {#delt}\n:::\n'))
+        self.assertIn('2  anchor removed: its tab heading has the same id (tab-ids.lua)', out)
+        self.assertIn('_includes/m6.md:1: removed the anchor #fikspunkt-og-konvergens', out)
+
+    def test_heading_ids(self):
+        heading_id = self.module.heading_id
+        self.assertEqual(heading_id('3.3 Beskriv bilder {#uke3-del2 .unnumbered}'), 'uke3-del2')
+        self.assertEqual(heading_id('2.4 Feil, residual og toleranse'), 'feil-residual-og-toleranse')
+        self.assertEqual(heading_id('Støtte: *Æ* og `ø`'), 'støtte-æ-og-ø')
+        self.assertEqual(heading_id('1.2 {.unnumbered}'), 'section')
+
     def test_github_annotations(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):

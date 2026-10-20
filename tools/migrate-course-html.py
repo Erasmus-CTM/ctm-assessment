@@ -8,7 +8,8 @@
 A maintainer tool of ctm-assessment (not part of the package; Python 3.9+,
 standard library only). It reads the project's pages (project: render:, or
 every .qmd and .md outside folders that start with _ or .) and the files they
-include, or the FILEs given, outside code blocks, HTML comments and front
+include (nested includes too, resolved against the page's folder as Quarto
+does), or the FILEs given, outside code blocks, HTML comments and front
 matter, rewrites in place, and reports what it did and what it left:
 
   <details class="reading-step">     ->  ::: {.reading-step title="…"}   (the <summary> is the title)
@@ -17,6 +18,9 @@ matter, rewrites in place, and reports what it did and what it left:
   <details>                          ->  ::: {.details title="…"}
   </details>                         ->  :::
   <div id="x"></div>                 ->  ::: {#x} and :::
+                                         (removed when it is the first thing in a tab whose
+                                         heading has the same id: tab-ids.lua puts that id first
+                                         in the tab, and the page would have it twice)
   <iframe src="…" title="…" style="…height:920px…"></iframe>
                                      ->  ::: {.embed src="…" title="…" height="920px"} and :::
   the hand-written lecture/reading switch (<div … data-learning-mode …> … </div>)
@@ -177,6 +181,23 @@ def normalized(lang):
     return {'no': 'nb', 'nob': 'nb', 'nno': 'nn'}.get(lang, lang)
 
 
+def heading_id(text):
+    """A heading's id: its {#id}, else Pandoc's automatic one (auto_identifiers)."""
+    attrs = re.search(r'\s*\{([^{}]*)\}\s*$', text)
+    if attrs:
+        written = re.search(r'(?:^|\s)#([^\s}]+)', attrs.group(1))
+        if written:
+            return written.group(1)
+        text = text[:attrs.start()]
+    text = re.sub(r'!?\[([^\]]*)\]\([^)]*\)', r'\1', text)  # links and images: their text
+    text = re.sub(r'[*`$]|(?<!\w)_|_(?!\w)', '', text)       # emphasis, code and maths marks
+    text = re.sub(r'<[^>]+>', '', text)
+    kept = ''.join(c for c in text if c.isalnum() or c in '_-.' or c.isspace())
+    identifier = '-'.join(kept.lower().split())
+    first = next((k for k, c in enumerate(identifier) if c.isalpha()), None)
+    return identifier[first:] if first is not None else 'section'
+
+
 class Project:
     """The project's pages, the Markdown files they show (includes,
     transitively; posix paths relative to the project) and their languages."""
@@ -188,8 +209,13 @@ class Project:
         found = re.search(r'^lang:\s*["\']?([\w-]+)', self.config, re.M)
         self.lang = found.group(1) if found else None
         self.languages = {}
+        self.shown = {}  # file -> the pages that show it
         for page in self.pages():
             lang = self.page_lang(page)
+            # Quarto resolves every include of a page, nested ones too,
+            # against the page's folder (`/`: the project root), not against
+            # the including file.
+            folder = (root / page).parent
             todo, seen = [page], set()
             while todo:
                 current = todo.pop()
@@ -197,7 +223,8 @@ class Project:
                     continue
                 seen.add(current)
                 self.languages.setdefault(current, set()).add(lang)
-                todo.extend(self.includes(current))
+                self.shown.setdefault(current, set()).add(page)
+                todo.extend(self.includes(current, folder))
         self.files = sorted(self.languages)
 
     def markdown(self):
@@ -222,7 +249,8 @@ class Project:
             chosen = chosen - matched if remove else chosen | {m for m in matched if m.endswith(('.md', '.qmd'))}
         return sorted(chosen)
 
-    def includes(self, relative):
+    def includes(self, relative, folder):
+        """The files that `relative` includes, as the page in `folder` resolves them."""
         path = self.root / relative
         try:
             text = path.read_text(encoding='utf-8')
@@ -231,12 +259,92 @@ class Project:
         found = []
         for target in re.findall(r'\{\{<\s*include\s+(.+?)\s*>\}\}', text):
             target = target.strip().strip('"\'')
-            full = (self.root / target.lstrip('/')) if target.startswith('/') else (path.parent / target)
+            full = (self.root / target.lstrip('/')) if target.startswith('/') else (folder / target)
             try:
                 found.append(Path(os.path.normpath(full)).relative_to(self.root).as_posix())
             except ValueError:
                 continue
         return found
+
+    def expanded(self, page):
+        """The page's Markdown with its includes put in, nested ones too, as
+        (file, index, text) for each line: `text` as scan() gives it (None for
+        code and front matter)."""
+        folder = (self.root / page).parent
+        out = []
+
+        def walk(relative, trail):
+            path = self.root / relative
+            try:
+                lines = path.read_text(encoding='utf-8').split('\n')
+            except OSError:
+                return
+            for index, (line, (text, raw)) in enumerate(zip(lines, scan(lines))):
+                found = re.match(r'^\s*\{\{<\s*include\s+(.+?)\s*>\}\}\s*$', text or '') if not raw else None
+                if found:
+                    target = found.group(1).strip().strip('"\'')
+                    full = (self.root / target.lstrip('/')) if target.startswith('/') else (folder / target)
+                    try:
+                        inner = Path(os.path.normpath(full)).relative_to(self.root).as_posix()
+                    except ValueError:
+                        continue
+                    if inner not in trail:
+                        walk(inner, trail | {inner})
+                    continue
+                out.append((relative, index, None if raw else text))
+        walk(page, {page})
+        return out
+
+    def tab_anchor_duplicates(self):
+        """The hand-written anchors that repeat the id of the tab heading they
+        follow (<div id="x"></div>, or ::: {#x} and :::, first in the tab):
+        with tab-ids.lua the tab's pane starts with that id, so the page
+        would have it twice. {file: {line index: id}} for anchors that do so
+        on every page that shows their file."""
+        hits = {}  # (file, index) -> (id, pages)
+        for page in self.pages():
+            entries = self.expanded(page)
+            stack = []  # open divs: [is a tabset, its tab level]
+            for k, (file, index, text) in enumerate(entries):
+                if text is None:
+                    continue
+                fence = re.match(r'^\s*(:{3,})\s*(.*?)\s*$', text)
+                if fence:
+                    if fence.group(2):
+                        stack.append([bool(re.search(r'(^|[\s{.])panel-tabset\b', fence.group(2))), None])
+                    elif stack:
+                        stack.pop()
+                    continue
+                heading = re.match(r'^(#{1,6})\s+(.*?)\s*$', text)
+                if not heading or not stack or not stack[-1][0]:
+                    continue
+                level = len(heading.group(1))
+                if stack[-1][1] is None:
+                    stack[-1][1] = level
+                if level != stack[-1][1]:
+                    continue
+                identifier = heading_id(heading.group(2))
+                # The first content of the tab: blank lines and comments do not count.
+                for j in range(k + 1, len(entries)):
+                    later = entries[j][2]
+                    if later is not None and not later.strip():
+                        continue
+                    if later is None:
+                        break
+                    anchor = ANCHOR.match(later)
+                    marker = re.match(r'^\s*:::+\s*\{#([^\s}]+)\}\s*$', later)
+                    if marker and not (j + 1 < len(entries) and re.match(r'^\s*:::+\s*$', entries[j + 1][2] or '')):
+                        marker = None
+                    found = (anchor.group(2) if anchor else marker.group(1) if marker else None)
+                    if found and found == identifier:
+                        key = (entries[j][0], entries[j][1])
+                        hits.setdefault(key, (found, set()))[1].add(page)
+                    break
+        result = {}
+        for (file, index), (identifier, pages) in hits.items():
+            if pages >= self.shown.get(file, set()):
+                result.setdefault(file, {})[index] = identifier
+        return result
 
     def page_lang(self, relative):
         lang = front_matter_lang((self.root / relative).read_text(encoding='utf-8'))
@@ -320,9 +428,11 @@ def front_matter_end(lines):
     return 0
 
 
-def convert_file(path, lines, scanned, languages, switch, report):
-    """(converted lines, indexes of the converted constructs' first lines, why others were left)."""
+def convert_file(path, lines, scanned, languages, switch, report, drop=None):
+    """(converted lines, indexes of the converted constructs' first lines, why others were left).
+    `drop`: the indexes of anchors that repeat their tab heading's id (removed)."""
     out, done, why = [], set(), {}
+    drop = drop or {}
     closes = {}  # index of a </details> line -> the indent of its fence
     # Markdown lines (outside code, comments and front matter); `usable`: also
     # without inline code or a comment on the line. A <summary> line may hold
@@ -397,7 +507,19 @@ def convert_file(path, lines, scanned, languages, switch, report):
                 continue
             why[index] = converted
 
-        match = ANCHOR.match(line) if usable[index] else None
+        marker = index in drop and re.match(r'^\s*:::+\s*\{#[^\s}]+\}\s*$', line) and index + 1 < len(lines)
+        match = ANCHOR.match(line) if usable[index] or marker else None
+        if (match or marker) and index in drop:
+            # The tab heading carries this id (tab-ids.lua puts it first in the
+            # pane), so the anchor would repeat it: removed, links still work.
+            report.counts['anchor removed: its tab heading has the same id (tab-ids.lua)'] += 1
+            report.note(path, index + 1, f'removed the anchor #{drop[index]}: the tab heading it follows has that id, '
+                                         'which tab-ids.lua puts first in the tab (the page would have it twice)')
+            done.add(index)
+            index += 1 if match else 2
+            if (not out or not out[-1].strip()) and index < len(lines) and not lines[index].strip():
+                index += 1
+            continue
         if match:
             fence_after_blank(index)
             out += [f'{match.group(1)}::: {{#{match.group(2)}}}', match.group(1) + ':::']
@@ -578,6 +700,10 @@ def main(argv=None):
             files.append(full.relative_to(root).as_posix())
     records = {}
     report = Report()
+    # Anchors that repeat their tab heading's id: removed when the project
+    # has (or --config adds) the tab-ids.lua line, else reported.
+    duplicates = project.tab_anchor_duplicates()
+    tab_ids = args.config or TAB_IDS in project.config
     for key in files:
         path = root / key
         lines = path.read_text(encoding='utf-8').split('\n')
@@ -585,10 +711,15 @@ def main(argv=None):
         found = constructs(lines, scanned)
         if found:
             records[key] = found
-        if args.write_baseline or not found:
+        if args.write_baseline or not (found or (tab_ids and not args.check and duplicates.get(key))):
             continue
+        drop = duplicates.get(key, {}) if tab_ids else {}
+        if not tab_ids and not args.check:
+            for index, identifier in sorted(duplicates.get(key, {}).items()):
+                report.note(key, index + 1, f'the anchor #{identifier} repeats the id of the tab heading it follows: '
+                                            'remove it once _quarto.yml has the tab-ids.lua line (--config adds it)')
         converted, done, why = convert_file(key, lines, scanned, project.languages, args.switch,
-                                            Report() if args.check else report)
+                                            Report() if args.check else report, drop)
         if args.check:
             for construct in found:
                 if construct.line - 1 not in done:
