@@ -151,3 +151,16 @@ known-failures:
     frame: '^iframe: JSXGraph board \(jsxgraph-quarto\)$'
     note: 'ResizeObserver loop'
 
+  # WebKit's own jump to the fragment comes late, after ctm-nav.js has
+  # focused a tab title's heading, and runs the focusing steps of "scroll to
+  # the fragment": the tab title's target cannot take focus, so nothing is
+  # left focused (linalg-branch uke3, preview 39484760055, 2 of its tab-title
+  # loads). The link is otherwise handled: shown, marked, kept in place. Only
+  # a failure whose one problem is that, after ctm-nav.js focused, matches.
+  - id: webkit-focus-fragment-jump
+    title: In WebKit the late jump to a tab title's fragment leaves nothing focused after ctm-nav.js focused the tab
+    fix: Erasmus-CTM/ctm-libs#29 (ctm-nav.js puts the focus back while the page settles); remove this entry when CTM Assessment pins it
+    browsers: [webkit]
+    checks: [link load, link click]
+    targets: tab-title
+    note: '^focus not in view: BODY; trace: .*\d+ focus (H[1-6]|DIV)\b'
