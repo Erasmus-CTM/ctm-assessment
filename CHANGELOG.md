@@ -262,3 +262,8 @@ pyodide-interaktiv).
   `compare-browser.mjs --shard I/N` splits a large course into jobs, the
   first visit is sampled and keeps Pyodide and Monaco blocked, console
   errors name their frame, and a link in a collapsed callout is clicked.
+  After the A2c review: a heading inside a `:::` div (a callout's title)
+  closes no raw `<details>` in `--reveal-ends`; the converter resolves
+  include lines from memory and writes nothing into a course it only reads;
+  a console message is put down to an iframe only from the same page load;
+  the first visit loads a target of every kind of place on each page.

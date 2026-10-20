@@ -305,14 +305,21 @@ Pages does, without the cross-origin isolation headers and with service
 workers allowed, so a page with Python cells isolates itself with
 coi-serviceworker (a reload) before the links are loaded; the workflow runs
 the link loads a second time this way (no clicks, no console comparison),
-sampled: one load per page and every tab title. On a first visit Pyodide and
+sampled by kind: on each page, one target of each kind of place (a tab title,
+or in a tab pane, a nested pane, a `<details>`, a collapsed callout, linked
+from its own page or another) and every tab title; the summary names the
+kinds loaded, and a kind left out fails the run. On a first visit Pyodide and
 Monaco are blocked in the served files, since Playwright's routes do not see
 the fetches coi-serviceworker makes. `--shard I/N` runs the I-th of N parts
 (the workflow's `shards`; by default 4 jobs per browser for ingmat3a's
 `linalg-branch`, 2 for its other refs): every part reads every page, so links
 into other parts' pages are checked, and the screenshots go to part 1. A
 console error names its frame (the page, or an iframe such as a JSXGraph
-board). `known-failures:` in the expect file lists failures that are fixed
+board): each frame reports its own errors and `console.error` calls, and a
+message without its frame is an iframe's only when an iframe of the same page
+load reported that very text and the page did not.
+`tests/compare-browser.browser.cjs` (`npm run test:browser`) runs the tool in
+Chromium on small sites. `known-failures:` in the expect file lists failures that are fixed
 elsewhere and not pinned yet (browsers and checks, both required; optional
 courses, `targets: tab-title`, `frame` and `note` patterns): they count as
 expected and are reported.
@@ -322,7 +329,8 @@ expected category can explain: each `<details>` keeps its words (more only as
 its old words followed by what followed it on old: `reveal: heading` when
 that starts with a heading and old's `<details>` was closed by that heading's
 section, that is, had no `</details>` of its own before it in the old
-course's Markdown; `swallowed`, never explained, when it had one; `grown`
+course's Markdown (a heading at the fenced-div depth where the `<details>`
+opened: a callout's title, inside its `:::` div, closes nothing); `swallowed`, never explained, when it had one; `grown`
 otherwise), the new switch stands where
 the old one stood or at the top of the page, and no id occurs more often than
 on old. Quarto writes a page's HTML out again, without the stray
@@ -354,12 +362,15 @@ kind and title, id or address, so moved lines are not reported).
 Which files a page includes (nested includes too) is ctm-libs' rule, not the
 tool's: `tools/source-files.lua` runs ctm-libs' own `ctm.source.files()`, the
 one `markdown-lint` reads, with `quarto pandoc lua`, and the tool asks it for
-each page and each include line. The tool therefore needs Quarto and ctm-libs'
+each page and each include line (a page of that one line, served from
+memory: the tool writes nothing into the course unless it converts it, so
+`--check` works on a read-only checkout). The tool therefore needs Quarto and ctm-libs'
 extension folder at the commit the umbrella pins: `--ctm-libs DIR`, or
 `CTM_LIBS_EXTENSION` (`scripts/build-course.py --convert` passes the copy it
 has just installed; a course's CI that runs the lint passes the ctm-libs of
 the ctm-assessment ref it fetches the tool from). `tests/test_migrate_course_html.py`
-fails if the two stop agreeing.
+fails if the files a page's expanded Markdown reaches stop being exactly the
+ones ctm-libs lists.
 
 ### Releases
 
