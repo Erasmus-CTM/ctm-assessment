@@ -6,7 +6,7 @@
 //
 //   node tools/compare-browser.mjs --old DIR --new DIR [--browser chromium] [--browser firefox] ...
 //     [--expect tools/compare-rendered/expect/step4-migration.yml] [--course NAME] [--pages a.html,b.html]
-//     [--offline] [--first-visit] [--shard I/N] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
+//     [--offline] [--first-visit] [--shard I/N] [--reveal-ends FILE] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
 //
 // Checks, on the pages with reveals, the switch or links into tabs:
 //  1. reveals: count per kind, summary texts and initial state equal; each
@@ -14,7 +14,8 @@
 //     only as old's words followed by exactly what came after it there,
 //     and when that starts with a heading, only if old's <details> was
 //     closed by that heading's section (a raw <details> closed early; not
-//     one that had its own </details> before the heading);
+//     one that had its own </details> before the heading): --reveal-ends
+//     FILE, from tools/migrate-course-html.py --reveal-ends on the old course;
 //  2. the switch: reading opens and lecture closes every reading step, per
 //     block; aria-pressed and the status text equal; the mode survives a
 //     reload and another page; a new tab starts in lecture; it stands where
@@ -71,7 +72,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import {createRequire} from 'node:module';
-import {closedBySection} from './compare-rendered/details-close.mjs';
+import {COMPONENTS, closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 const require = createRequire(import.meta.url);
 const {JSDOM} = require('jsdom');
 const yaml = require('js-yaml');
@@ -94,6 +95,7 @@ function options(argv) {
       if (!(Number.isInteger(index) && Number.isInteger(count) && index >= 1 && index <= count)) throw new Error('--shard I/N: 1 <= I <= N');
       o.shard = {index, count};
     }
+    else if (flag === '--reveal-ends') o.revealEnds = value;
     else if (['--old', '--new', '--expect', '--course', '--shots', '--report', '--summary'].includes(flag)) o[flag.slice(2)] = value;
     else throw new Error('Unknown option ' + flag);
   }
@@ -106,8 +108,6 @@ function options(argv) {
 
 // ---------------------------------------------------------------- the sites
 const OLD_REVEALS = {'reading-step': 'reading-step', 'learning-hint': 'hint', 'solution-block': 'solution'};
-// Elements that components make: their <details> are not the course's reveals.
-const COMPONENTS = '.math-exercise-cell, .py-exercise-cell, .ai-feedback-activity, [id^="qpyodide-insertion-location-"], .qpyodide-cell';
 const norm = text => String(text || '').replace(/\s+/g, ' ').trim();
 
 function htmlPages(root) {
@@ -118,13 +118,12 @@ function htmlPages(root) {
 
 // What a page holds, from its HTML: reveals (old: the courses' <details>; new:
 // ctm-libs' reveals), the switch, ids, tabsets and the links to ids.
-function inventory(root, page, side) {
-  const html = fs.readFileSync(path.join(root, page), 'utf8');
-  const doc = new JSDOM(html).window.document;
+function inventory(root, page, side, ends) {
+  const doc = new JSDOM(fs.readFileSync(path.join(root, page), 'utf8')).window.document;
   const reveals = [];
-  // How each <details> ended in the source (unknown when the start tags and the DOM disagree).
-  const all = [...doc.querySelectorAll('details')], ends = closedBySection(html);
-  const bySection = details => ends.length === all.length && ends[all.indexOf(details)];
+  // How each old <details> ended (--reveal-ends; unknown: not by a section).
+  const all = [...doc.body.querySelectorAll('details')], closed = closedBySection(side === 'old' ? ends : null, page, all);
+  const bySection = details => closed[all.indexOf(details)];
   for (const details of doc.querySelectorAll('main details')) {
     if (details.closest(COMPONENTS)) continue;
     let kind = null;
@@ -1092,12 +1091,12 @@ async function main() {
       throw new Error(`known-failures ${entry.id || JSON.stringify(entry)}: name its browsers and checks (lists)`);
   }
   const pages = o.pages || [...new Set([...htmlPages(o.old), ...htmlPages(o.new)])];
-  const inventories = {};
+  const inventories = {}, ends = loadRevealEnds(o.revealEnds);
   for (const page of pages) {
     inventories[page] = {};
     for (const side of ['old', 'new']) {
       const root = side === 'old' ? o.old : o.new;
-      if (fs.existsSync(path.join(root, page))) inventories[page][side] = inventory(root, page, side);
+      if (fs.existsSync(path.join(root, page))) inventories[page][side] = inventory(root, page, side, ends);
     }
   }
   const server = await serve({old: o.old, new: o.new}, !o.firstVisit);

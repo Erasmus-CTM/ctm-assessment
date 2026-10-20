@@ -383,6 +383,26 @@ class Migrate(unittest.TestCase):
         for page in project.pages():
             self.assertEqual({file for file, _, _ in project.expanded(page)}, set(listed[page]), page)
 
+    def test_reveal_ends_records_which_details_a_heading_closed(self):
+        # For the rendered comparison (review A2b S1): a raw <details> with a
+        # heading of its section's level (or higher) inside is closed by the
+        # browser at that heading; one closed before the heading, or with a
+        # deeper heading inside (a section within it), is not.
+        (self.dir / 'pages/uke7.qmd').write_text(
+            '---\ntitle: Uke 7\n---\n\n## 7.1 A\n\n<details class="reading-step">\n<summary>Gå i dybden</summary>\n\nEn.\n\n'
+            '## 7.2 B\n\nTo.\n</details>\n\n<details>\n<summary>Lukket</summary>\n\nTre.\n</details>\n\n## 7.3 C\n\n'
+            '<details>\n<summary>Ytre</summary>\n\n### 7.3.1 Dypere\n\n<details><summary>Indre</summary>\n\n## 7.4 D\n\n'
+            '</details>\n</details>\n\n```{=html}\n<details><summary>Rå</summary></details>\n```\n\n'
+            '```python\n# <details> in code\n```\n\n{{< include ../_includes/uke7.md >}}\n', encoding='utf-8')
+        (self.dir / '_includes/uke7.md').write_text('<details>\n<summary>Inkludert</summary>\n\n# Øverst\n\n</details>\n', encoding='utf-8')
+        record = self.dir / 'ends.json'
+        status, out = self.run_tool('--ctm-libs', LIBS, '--reveal-ends', str(record))
+        self.assertEqual(status, 0)
+        pages = json.loads(record.read_text(encoding='utf-8'))['pages']
+        self.assertEqual(pages['pages/uke7.html'], [True, False, True, True, False, True])
+        self.assertIn('pages/uke5.html', pages)
+        self.assertEqual(self.read('pages/uke7.qmd').count('<details'), 6, 'nothing changed')
+
     def test_without_ctm_libs_the_tool_stops(self):
         out = io.StringIO()
         with contextlib.redirect_stderr(out), unittest.mock.patch.dict(os.environ, {'CTM_LIBS_EXTENSION': ''}):

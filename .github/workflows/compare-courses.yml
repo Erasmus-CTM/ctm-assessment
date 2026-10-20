@@ -225,6 +225,13 @@ jobs:
             [ -n "$dir" ] && [ "$dir" != _site ] && outputs+=("$dir")
           fi
           mkdir -p "$RUNNER_TEMP/reports"
+          # How the old course's <details> end (a heading inside a raw one), from
+          # its Markdown: the rendered HTML no longer tells (review A2b S1).
+          libs="$RUNNER_TEMP/out/after/_extensions/ctm-libs"
+          if [ "$COURSE" != examples ] && [ -f "$libs/lua/source.lua" ]; then
+            python tools/migrate-course-html.py --project "$RUNNER_TEMP/out/before" --ctm-libs "$libs" --reveal-ends "$RUNNER_TEMP/out/reveal-ends.json"
+            expect+=(--reveal-ends "$RUNNER_TEMP/out/reveal-ends.json")
+          fi
           status=0
           for output in "${outputs[@]}"; do
             node tools/compare-rendered.mjs --before "$RUNNER_TEMP/out/before/$output" --after "$RUNNER_TEMP/out/after/$output" "${expect[@]}" \
@@ -258,6 +265,7 @@ jobs:
           path: |
             ${{ runner.temp }}/out/before/_site
             ${{ runner.temp }}/out/after/_site
+            ${{ runner.temp }}/out/reveal-ends.json
 
   browser:
     needs: [courses, compare]
@@ -290,7 +298,8 @@ jobs:
           SHARD: ${{ matrix.entry.shard }}
         run: |
           mkdir -p "$RUNNER_TEMP/browser"
-          node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" ${SHARD:+--shard "$SHARD"} \
+          ends=(); [ -f "$RUNNER_TEMP/sites/reveal-ends.json" ] && ends=(--reveal-ends "$RUNNER_TEMP/sites/reveal-ends.json")
+          node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" ${SHARD:+--shard "$SHARD"} "${ends[@]}" \
             --browser ${{ matrix.browser }} --expect tools/compare-rendered/expect/step4-migration.yml --course "$(basename "$COURSE")" \
             --shots "$RUNNER_TEMP/browser/shots" --report "$RUNNER_TEMP/browser/report.json" --summary "$RUNNER_TEMP/browser/summary.md"
       # The link loads again on a first visit as GitHub Pages serves a course:

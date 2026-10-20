@@ -4,6 +4,7 @@
     python migrate-course-html.py [--project DIR] [--ctm-libs DIR] [--config] [--switch auto|marker|remove] [--dry-run] [FILE ...]
     python migrate-course-html.py [--project DIR] [--ctm-libs DIR] --check [--baseline FILE] [--strict] [FILE ...]
     python migrate-course-html.py [--project DIR] [--ctm-libs DIR] --write-baseline FILE [FILE ...]
+    python migrate-course-html.py [--project DIR] [--ctm-libs DIR] --reveal-ends FILE
 
 A maintainer tool of ctm-assessment (not part of the package; Python 3.9+,
 standard library only, and Quarto). It reads the project's pages (project:
@@ -50,6 +51,16 @@ extension folder (default: $CTM_LIBS_EXTENSION), the one the umbrella pins
 the courses' _includes/site/learning-mode.html and tab-links.html (deleted
 when nothing else names them). The course's own CSS for the old classes is
 left to the author.
+
+--reveal-ends FILE records, for the course before its migration, how each
+<details> of each page ends: true when a heading's section closes it before
+its own </details> (a raw <details> with a heading inside: the browser ends
+it there, and the migrated reveal holds that heading), else false; one list
+per rendered page, in the page's order, includes put in. The rendered
+comparison (tools/compare-rendered.mjs, tools/compare-browser.mjs
+--reveal-ends) allows a reveal to hold the heading after it only where this
+says so: the rendered HTML cannot tell, since Quarto writes it out again
+without the stray </details>. It changes no file.
 
 --check reports the raw HTML that the conversion handles, as warning
 annotations in GitHub Actions (file:line lines otherwise), with the Markdown
@@ -105,6 +116,8 @@ LENGTH = re.compile(r'^\d+(?:\.\d+)?(?:px|r?em|vh|%)$')
 # A shortcode alone on its line: where an include puts its file (ctm-libs
 # decides whether it is one, and which file).
 SHORTCODE = re.compile(r'\{\{<.*>\}\}')
+DETAILS_TAG = re.compile(r'<(/?)details(?=[\s>])', re.I)
+ATX = re.compile(r'^ {0,3}(#{1,6})(?:\s|$)')
 
 
 class ToolError(Exception):
@@ -318,7 +331,11 @@ class Project:
     def expanded(self, page):
         """The page's Markdown with its includes put in, nested ones too, as
         (file, index, text) for each line: `text` as scan() gives it (None for
-        code and front matter)."""
+        code, front matter and ```{=html} blocks)."""
+        return [(file, index, None if raw else text) for file, index, text, raw in self.lines(page)]
+
+    def lines(self, page):
+        """As expanded(), as (file, index, text, raw): `raw` for ```{=html} blocks, whose text is kept."""
         folder = Path(page).parent.as_posix()
         out = []
 
@@ -334,9 +351,42 @@ class Project:
                     if inner not in trail:
                         walk(inner, trail | {inner})
                     continue
-                out.append((relative, index, None if raw else text))
+                out.append((relative, index, text, raw))
         walk(page, {page})
         return out
+
+    def reveal_ends(self):
+        """--reveal-ends: {rendered page: [closed by a heading's section, …]},
+        one entry per <details> start tag of the page (Markdown and
+        ```{=html} blocks, includes put in), in order. A heading of the level
+        of the section the <details> opened in, or a higher one, ends that
+        section before the <details>' own </details>: the browser closes the
+        <details> there (the end tag is stray)."""
+        found = {}
+        for page in self.pages():
+            flags, open_, sections = [], [], []
+            for _, _, text, raw in self.lines(page):
+                if text is None:
+                    continue
+                heading = None if raw else ATX.match(text)
+                if heading:
+                    level = len(heading.group(1))
+                    for k, opened in open_:
+                        if opened and level <= opened:
+                            flags[k] = True
+                    while sections and sections[-1] >= level:
+                        sections.pop()
+                    sections.append(level)
+                    continue
+                for tag in DETAILS_TAG.finditer(text):
+                    if tag.group(1):
+                        if open_:
+                            open_.pop()
+                    else:
+                        flags.append(False)
+                        open_.append((len(flags) - 1, sections[-1] if sections else 0))
+            found[re.sub(r'\.(q?md)$', '.html', page)] = flags
+        return found
 
     def tab_anchor_duplicates(self):
         """The hand-written anchors that repeat the id of the tab heading they
@@ -725,6 +775,7 @@ def main(argv=None):
     parser.add_argument('--baseline', type=Path, help='With --check: report only what this baseline does not list')
     parser.add_argument('--write-baseline', type=Path, metavar='FILE', help='Record the raw HTML of the project in FILE')
     parser.add_argument('--strict', action='store_true', help='With --check: exit 1 when something is reported')
+    parser.add_argument('--reveal-ends', type=Path, metavar='FILE', help='Record how each page\'s <details> end (see above)')
     parser.add_argument('--format', choices=('github', 'text'),
                         default='github' if os.environ.get('GITHUB_ACTIONS') == 'true' else 'text',
                         help='--check output: GitHub annotations (default in GitHub Actions) or file:line lines')
@@ -738,6 +789,13 @@ def main(argv=None):
         project = Project(root, ctm_libs_extension(args.ctm_libs))
     except ToolError as error:
         parser.exit(2, f'{parser.prog}: error: {error}\n')
+    if args.reveal_ends:
+        record = {'tool': 'ctm-assessment tools/migrate-course-html.py --reveal-ends', 'version': 1, 'pages': project.reveal_ends()}
+        args.reveal_ends.write_text(json.dumps(record, indent=1) + '\n', encoding='utf-8')
+        closed = sum(sum(flags) for flags in record['pages'].values())
+        print(f'{args.reveal_ends}: {sum(len(flags) for flags in record["pages"].values())} <details> in '
+              f'{len(record["pages"])} pages, {closed} closed by a heading\'s section')
+        return 0
     files = project.files
     if args.files:
         files = []

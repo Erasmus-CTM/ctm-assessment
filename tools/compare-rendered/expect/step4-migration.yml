@@ -36,8 +36,9 @@ categories:
   # the sections fall changes; the content is the same. `reveal: heading`:
   # the reveal holds the old <details>' words followed by exactly the words
   # that followed it on the old page, starting with a heading, and old's
-  # <details> had no </details> of its own before that heading's section
-  # (compare-rendered.mjs; a reveal with fewer or other words than before, or
+  # <details> had no </details> of its own before that heading's section in
+  # the course's Markdown (--reveal-ends; compare-rendered.mjs; a reveal with
+  # fewer or other words than before, or
   # one that took in a heading old's <details> had ended before, "swallowed",
   # is always unexplained, reviews A2 S1 and A2b S1).
   - id: reveal-heading

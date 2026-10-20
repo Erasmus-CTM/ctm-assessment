@@ -321,10 +321,16 @@ expected and are reported.
 expected category can explain: each `<details>` keeps its words (more only as
 its old words followed by what followed it on old: `reveal: heading` when
 that starts with a heading and old's `<details>` was closed by that heading's
-section, that is, had no `</details>` of its own before it in old's HTML;
-`swallowed`, never explained, when it had one; `grown` otherwise), the new switch stands where
+section, that is, had no `</details>` of its own before it in the old
+course's Markdown; `swallowed`, never explained, when it had one; `grown`
+otherwise), the new switch stands where
 the old one stood or at the top of the page, and no id occurs more often than
-on old.
+on old. Quarto writes a page's HTML out again, without the stray
+`</details>`, so only the Markdown tells how a `<details>` ended:
+`tools/migrate-course-html.py --reveal-ends FILE`, run on the old course,
+records it per page, and both tools take the record as `--reveal-ends FILE`
+(the workflow writes it for every course; without it no reveal may take in
+a heading).
 
 ### Migrating a course to step 4's Markdown
 

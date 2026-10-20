@@ -24,16 +24,20 @@ const reveal = body => `<details class="ctm-reveal reading-step"><summary>Gå i 
 const OLD = page(`<p>Innledning.</p>${OLD_SWITCH}<section id="a" class="level2"><h2>A</h2>`
   + '<details class="reading-step"><summary>Gå i dybden</summary><p>En.</p><p>To.</p><p>Tre.</p></details><p>Etter.</p></section>');
 
-function compare(after, before = OLD) {
+// `ends`: the old course's record of how its <details> ended
+// (migrate-course-html.py --reveal-ends), for uke6.html.
+function compare(after, before = OLD, ends = null) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-rendered-'));
   try {
     for (const [side, html] of [['before', before], ['after', after]]) {
       fs.mkdirSync(path.join(dir, side));
       fs.writeFileSync(path.join(dir, side, 'uke6.html'), html);
     }
+    const record = path.join(dir, 'reveal-ends.json');
+    if (ends) fs.writeFileSync(record, JSON.stringify({version: 1, pages: {'uke6.html': ends}}));
     const report = path.join(dir, 'report.json');
     const result = spawnSync(process.execPath, [TOOL, '--before', path.join(dir, 'before'), '--after', path.join(dir, 'after'),
-      ...EXPECT.flatMap(file => ['--expect', file]), '--report', report], {encoding: 'utf8'});
+      ...EXPECT.flatMap(file => ['--expect', file]), '--report', report, ...(ends ? ['--reveal-ends', record] : [])], {encoding: 'utf8'});
     assert.ok(result.status === 0 || result.status === 1, result.stderr);
     return JSON.parse(fs.readFileSync(report, 'utf8')).items;
   } finally {
@@ -63,35 +67,41 @@ test('a reveal that holds other words is unexplained', () => {
   assert.deepEqual(invariants(items), ['reveal content changed changed']);
 });
 
-// Old as Pandoc writes a raw <details> whose </details> comes after a
-// heading: the heading's section ends the <details> (the browser closes it
-// there), and its </details> stands stray in the next section.
+// Old as the browser (and Quarto's output) has it: the <details> ends where
+// the section does, and the heading after it stands outside. On new the
+// reveal holds that heading.
+const BEFORE_HEADING = page(`${OLD_SWITCH}<section id="a" class="level3"><h3>A</h3><details class="reading-step"><summary>Gå i dybden</summary>`
+  + '<p>En.</p></details></section><section id="b" class="level3"><h3>B</h3><p>To.</p></section><p>Etter.</p>');
 const AFTER_HEADING = page(`${NEW_SWITCH}<section id="a" class="level3"><h3>A</h3>`
   + reveal('<p>En.</p><section id="b" class="level3"><h3>B</h3><p>To.</p></section>') + '</section><p>Etter.</p>');
 
 test('a heading that escaped a raw <details> and is inside the reveal now: "heading", explained', () => {
-  const before = page(`${OLD_SWITCH}<section id="a" class="level3"><h3>A</h3><details class="reading-step"><summary>Gå i dybden</summary>`
-    + '\n<p>En.</p>\n</section>\n<section id="b" class="level3">\n<h3>B</h3>\n<p>To.</p>\n</details>\n</section><p>Etter.</p>');
-  const items = compare(AFTER_HEADING, before);
+  // The course's Markdown had the heading inside the raw <details> (--reveal-ends: true).
+  const items = compare(AFTER_HEADING, BEFORE_HEADING, [true]);
   assert.deepEqual(invariants(items), []);
   const ends = items.filter(item => /^<\/details/.test(item.line || ''));
   assert.ok(ends.length >= 2 && ends.every(item => item.reveal === 'heading' && item.category === 'reveal-heading'), JSON.stringify(ends));
 });
 
 test('a reveal that swallowed the next heading is unexplained (the reviewer\'s mutation of week6_preconditioning)', () => {
-  // Old's <details> ended before the heading (its own </details>): a closing
-  // fence moved past the heading, not a raw <details> closed early.
-  const before = page(`${OLD_SWITCH}<section id="a" class="level3"><h3>A</h3><details class="reading-step"><summary>Gå i dybden</summary>`
-    + '\n<p>En.</p>\n</details>\n</section>\n<section id="b" class="level3">\n<h3>B</h3>\n<p>To.</p>\n</section><p>Etter.</p>');
-  const items = compare(AFTER_HEADING, before);
-  assert.deepEqual(invariants(items), ['reveal content changed swallowed']);
-  assert.ok(!items.some(item => item.category === 'reveal-heading'), 'no "heading" case');
+  // The same pages, but old's <details> had its own </details> before the
+  // heading: a closing fence moved past the heading, not a raw <details>
+  // closed early. Without the record, nothing may take in a heading either.
+  for (const ends of [[false], null]) {
+    const items = compare(AFTER_HEADING, BEFORE_HEADING, ends);
+    assert.deepEqual(invariants(items), ['reveal content changed swallowed'], JSON.stringify(ends));
+    assert.ok(!items.some(item => item.category === 'reveal-heading'), 'no "heading" case');
+  }
 });
 
-test('the source tells how each <details> ends', async () => {
-  const {closedBySection} = await import('../tools/compare-rendered/details-close.mjs');
-  assert.deepEqual(closedBySection('<details><p>a</p></details><section><details><details></details></section>'
-    + '<script>"<details>"</script><!-- <details> --><details></section></details>'), [false, true, false, true]);
+test('a record that counts other <details> than the page has decides nothing', async () => {
+  const {closedBySection} = await import('../tools/compare-rendered/reveal-ends.mjs');
+  const {JSDOM} = require('jsdom');
+  const doc = new JSDOM('<details id="a"></details><div class="py-exercise-cell"><details id="c"></details></div><details id="b"></details>').window.document;
+  const all = [...doc.querySelectorAll('details')];
+  assert.deepEqual(closedBySection({'p.html': [false, true]}, 'p.html', all), [false, false, true], 'component <details> are not counted');
+  assert.deepEqual(closedBySection({'p.html': [true]}, 'p.html', all), [false, false, false]);
+  assert.deepEqual(closedBySection(null, 'p.html', all), [false, false, false]);
 });
 
 test('a switch moved down the page is unexplained; one moved to the top is not', () => {
