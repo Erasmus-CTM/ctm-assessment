@@ -63,7 +63,9 @@ component repository that ships another component's extension folder in any
 layout (`_extensions/<x>`, `_extensions/<owner>/<x>`, or nested inside its own
 folder) fails the build. The one deliberate shared file, `ctm-bootstrap.lua`
 (how math-exercise and py-exercise find ctm-libs), must be byte-identical to
-ctm-libs' `bootstrap/ctm-bootstrap.lua`, and no component but
+ctm-libs' `bootstrap/ctm-bootstrap.lua` (with `--follow-branches`, a copy may
+also equal the pinned ctm-libs' file, while a new bootstrap is merged
+component by component), and no component but
 pyodide-interaktiv may still ship `feedback-loader.lua` or
 `shared/pyodide-runtime.js`, which ctm-libs provides.
 

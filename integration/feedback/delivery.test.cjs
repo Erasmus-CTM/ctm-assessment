@@ -13,7 +13,9 @@ const page = require('./page-scripts.cjs');
 const site = process.env.CTM_INTEGRATION_SITE;
 
 // Code of ctm-libs or a component that must come from a file, never inline.
-const BUNDLES = /MathExerciseRuntime\s*=|CTMLocales\.add\(|root\.AIFeedback\s*=|var ME_CFG =|var MODULE_PY = \[|root\.PyExerciseFeedback\s*=|function setupExercise\(/;
+const BUNDLES = /MathExerciseRuntime\s*=|CTMLocales\.add\(|root\.AIFeedback\s*=|root\.CTMWorker\s*=|var ME_CFG =|var MODULE_PY = \[|root\.PyExerciseFeedback\s*=|function setupExercise\(/;
+// pyodide-interaktiv 1.9's modules (1.8 inlined them): a line of each.
+const PYODIDE_19_BUNDLES = /globalThis\.QP_L\s*=|globalThis\.qpyodideStorage\s*=|qpyodideStartupMessage\s*=\s*document\.createElement|globalThis\.QPYODIDE_WORKER_PLUGIN\s*=|globalThis\.qpyodideCellsReady\s*=|class CellContainer\b|qpyodideCellContainer\.addCell\(|function buildStorageSection\(|globalThis\.qpyodideCanvasPlots\s*=|root\.qpyodideFeedback\s*=/;
 // The mixed example page (activities, mathematics, Python, Pyodide, JSXGraph;
 // its tabsets load ctm-libs' links into tabs, on by default since step 4).
 const EXPECTED = [
@@ -23,16 +25,27 @@ const EXPECTED = [
   'math-exercise/matrix-input.css', 'math-exercise/math-exercise.css', 'math-exercise/matrix-input.js', 'math-exercise/math-exercise.js',
   'py-exercise-feedback/py-exercise-feedback.js', 'py-exercise/py-exercise.css', 'py-exercise/py-exercise.js',
 ];
+// pyodide-interaktiv 1.9 (consolidation step 3) runs on ctm-libs: its worker
+// and catalogue are ctm-libs' files, its CSS and modules cacheable files of
+// its own (1.8 inlined them).
+const PYODIDE_19 = [
+  'ctm-worker/pyodide-worker.js', 'ctm-locale-pyodide-interaktiv/pyodide-interaktiv.js',
+  ...['qpyodide-locale.js', 'qpyodide-storage.js', 'qpyodide-document-status.js', 'qpyodide-storage-settings.js', 'qpyodide-worker-plugin.js',
+    'qpyodide-document-engine-initialization.js', 'qpyodide-canvas-plots.js', 'qpyodide-styling.css', 'qpyodide-cell-classes.js',
+    'qpyodide-cell-initialization.js'].map(file => 'pyodide-interaktiv/' + file),
+  'pyodide-interaktiv-feedback/qpyodide-feedback.js',
+];
+// The package's pyodide-interaktiv version (1.8 or 1.9 while step 3 is merged).
+const pyodideAtLeast19 = () => page.pyodideAtLeast19(path.join(path.dirname(site), '_extensions'));
 
 function resources(html) {
   return [...html.matchAll(/<(?:script[^>]*\ssrc|link[^>]*\shref)="([^"]+)"/g)].map(m => m[1]);
 }
 
 test('each CTM script and style is one cacheable file per page, after its configuration', {skip: !site}, () => {
-  const manifest = fs.readFileSync(path.join(path.dirname(site), '_extensions/math-exercise/_extension.yml'), 'utf8');
-  const mathVersion = (manifest.match(/^version:\s*['"]?([\d.]+)/m) || [])[1] || '';
-  const [major, minor] = mathVersion.split('.').map(Number);
-  assert.ok(major > 0 || minor >= 11, `math-exercise ${mathVersion} does not grade with ctm-checkers; the package ships 0.11 or later`);
+  const extensions = path.join(path.dirname(site), '_extensions');
+  assert.ok(page.atLeast(extensions, 'math-exercise', 0, 11),
+    `math-exercise ${page.extensionVersion(extensions, 'math-exercise').join('.')} does not grade with ctm-checkers; the package ships 0.11 or later`);
   assert.ok(fs.existsSync(path.join(path.dirname(site), '_extensions/ctm-checkers/checkers.json')), 'ctm-checkers is not installed');
   for (const file of ['example.html', 'index.html', 'examples.html']) {
     const html = fs.readFileSync(path.join(site, file), 'utf8');
@@ -43,9 +56,12 @@ test('each CTM script and style is one cacheable file per page, after its config
       assert.ok(fs.existsSync(path.resolve(site, src.split('?')[0])), file + ': missing ' + src);
     }
     const doc = new JSDOM(html).window.document;
-    for (const script of doc.querySelectorAll('script:not([src])')) assert.doesNotMatch(script.textContent, BUNDLES, file);
+    for (const script of doc.querySelectorAll('script:not([src])')) {
+      assert.doesNotMatch(script.textContent, BUNDLES, file);
+      if (pyodideAtLeast19()) assert.doesNotMatch(script.textContent, PYODIDE_19_BUNDLES, file + ': a pyodide-interaktiv module is inlined');
+    }
     // The package's math-exercise grades with ctm-checkers (0.11 and later), which adds its page script.
-    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED, 'ctm-checkers/ctm-checkers.js'].sort());
+    if (file === 'example.html') assert.deepEqual([...ours].sort(), [...EXPECTED, 'ctm-checkers/ctm-checkers.js', ...(pyodideAtLeast19() ? PYODIDE_19 : [])].sort());
   }
   // Library files in the head; each component's script after its inline configuration.
   const html = fs.readFileSync(path.join(site, 'example.html'), 'utf8');

@@ -25,7 +25,8 @@ checker library math-exercise grades with from 0.11 on: the generated
 py-exercise, pyodide-interaktiv and JSXGraph (the upstream
 jsxgraph/jsxgraph-quarto extension). It records revisions and hashes, rejects
 any vendored copy of another component, checks that every `ctm-bootstrap.lua`
-equals ctm-libs' own, keeps checker Python in one home (no packaged folder but
+equals ctm-libs' own (with `--follow-branches`, a copy may also equal the
+pinned ctm-libs' file), keeps checker Python in one home (no packaged folder but
 ctm-checkers defines `_math_check` or `assess_basis` in any file or ships a
 wheel, and math-exercise's only Python files are `variants.py` and the
 `question-tests.py` script; `tests/test_one_home.py`), and tests installed
