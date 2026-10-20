@@ -22,7 +22,9 @@
 -- An id with a cross-reference prefix (fig-, thm-, sec-, …, and the custom
 -- categories of `crossref: custom:`) is not moved: Quarto would turn the
 -- block into an empty figure or theorem. Such an id stays dead, as without
--- the filter, with one warning each. The tab level is that of the tabset's
+-- the filter, with one warning each. So is an id of Quarto's own pane form
+-- tabset-N-M, which Quarto gives the tab panes (the page would have it
+-- twice). The tab level is that of the tabset's
 -- first heading, as in Quarto's parse_tabset_contents. The metadata flag
 -- ctm-tab-ids tells ctm-libs' markdown-lint that the project has this line.
 
@@ -50,6 +52,16 @@ local function warnSkipped(id, prefix)
     .. "Use an id without a cross-reference prefix to link to this tab.")
 end
 
+-- Quarto names the panes of a page's tabsets tabset-N-M.
+local function paneId(id)
+  return id:match("^tabset%-%d+%-%d+$") ~= nil
+end
+
+local function warnPaneId(id)
+  quarto.log.warning("tab-ids.lua: the tab heading id #" .. id .. " has the form of Quarto's own tab pane ids "
+    .. "(tabset-N-M), so it is not kept (the page would have the id twice). Use another id to link to this tab.")
+end
+
 local function tabset(div)
   if not div.classes:includes("panel-tabset") then return nil end
   local level = tabLevel(div.content)
@@ -62,6 +74,9 @@ local function tabset(div)
       local prefix = id ~= "" and crossrefPrefix(id) or nil
       if prefix then
         warnSkipped(id, prefix)
+        id = ""
+      elseif paneId(id) then
+        warnPaneId(id)
         id = ""
       else
         block.identifier = ""
