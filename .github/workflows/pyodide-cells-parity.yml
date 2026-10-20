@@ -150,7 +150,7 @@ jobs:
             isolate=yes; [ "$engine" = webkit ] && isolate=no
             node tools/pyodide-cells.mjs run --site "$site" --out "$RUNNER_TEMP/cells/$engine.json" --runs 1 --browser $engine --isolate $isolate
             node tools/pyodide-cells.mjs compare --old "$RUNNER_TEMP/cells/chromium.json" --new "$RUNNER_TEMP/cells/$engine.json" \
-              --summary "$RUNNER_TEMP/cells/$engine.md" --name "examples, $engine against chromium" || status=1
+              --summary "$RUNNER_TEMP/cells/$engine.md" --name "examples, $engine against chromium" --page-errors report || status=1
           done
           exit $status
       - name: Report the result as an annotation

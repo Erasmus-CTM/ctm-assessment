@@ -4,7 +4,7 @@
 // §18.7). Works with pyodide-interaktiv 1.8 and 1.9.
 //
 //   node tools/pyodide-cells.mjs run --site DIR --out FILE [--runs N] [--browser chromium|firefox|webkit] [--pages a.html,b.html] [--isolate yes|no]
-//   node tools/pyodide-cells.mjs compare --old FILE --new FILE [--summary OUT.md] [--name LABEL]
+//   node tools/pyodide-cells.mjs compare --old FILE --new FILE [--summary OUT.md] [--name LABEL] [--page-errors fail|report]
 //
 // run: serves DIR with cross-origin isolation headers (--isolate no: without,
 // as GitHub Pages serves a site; service workers stay blocked), opens every page with
@@ -20,7 +20,9 @@
 // compare: a cell whose output differs between the old file's runs (random
 // numbers, times) is compared only for errors (a traceback or not); every
 // other cell must give the same record in the new file. Any other difference,
-// and a page or cell only one side has, is unexplained; exit 1.
+// a page or cell only one side has, and (unless --page-errors report, for two
+// browser engines, whose own messages differ) a page error only the new side
+// has, is unexplained; exit 1.
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
@@ -89,8 +91,9 @@ async function runSite(o) {
       const record = {};
       for (const name of pages) {
         const page = await context.newPage();
-        const errors = [];
+        const errors = [], consoleMessages = [];
         page.on('pageerror', error => errors.push(String(error.message).split('\n')[0].slice(0, 200)));
+        page.on('console', message => { if (/warning|error/.test(message.type()) && consoleMessages.length < 20) consoleMessages.push(message.type() + ': ' + message.text().slice(0, 400)); });
         const started = Date.now();
         try {
           await page.goto(base + name, {waitUntil: 'domcontentloaded', timeout: WAIT});
@@ -127,9 +130,10 @@ async function runSite(o) {
             runs.push({index: cell.index, outcome});
           }
           const after = await page.evaluate(recordCells);
-          record[name] = {seconds: Math.round((Date.now() - started) / 1000), errors, startup, cells: after.map(cell => ({...cell, outcome: runs.find(r => r.index === cell.index)?.outcome || 'startup'}))};
+          const status = await page.evaluate(() => document.querySelector('#qpyodide-status-message-text')?.innerText || '');
+          record[name] = {seconds: Math.round((Date.now() - started) / 1000), errors, console: consoleMessages, status, startup, cells: after.map(cell => ({...cell, outcome: runs.find(r => r.index === cell.index)?.outcome || 'startup'}))};
         } catch (error) {
-          record[name] = {error: String(error.message || error).split('\n')[0].slice(0, 300), errors};
+          record[name] = {error: String(error.message || error).split('\n')[0].slice(0, 300), errors, console: consoleMessages};
         }
         console.log(`[run ${run + 1}] ${name}: ${record[name].error || (record[name].cells.length + ' cells, ' + record[name].seconds + ' s')}`);
         await page.close();
@@ -149,7 +153,7 @@ const same = (a, b) => KEYS.every(key => JSON.stringify(a[key]) === JSON.stringi
 
 function compare(o) {
   const old = JSON.parse(fs.readFileSync(o.old, 'utf8')), now = JSON.parse(fs.readFileSync(o.new, 'utf8'));
-  const problems = [], unstable = [];
+  const problems = [], unstable = [], notes = [];
   let cells = 0;
   const first = old.runs[0], second = old.runs[1] || old.runs[0], latest = now.runs[0];
   for (const name of [...new Set([...Object.keys(first), ...Object.keys(latest)])].sort()) {
@@ -171,11 +175,14 @@ function compare(o) {
         problems.push(`${name} cell ${i} (${cell.context}): ${keys.map(key => `${key}: ${JSON.stringify(cell[key]).slice(-200)} -> ${JSON.stringify(next[key]).slice(-200)}`).join('; ')}`);
       }
     }
+    if (problems.some(p => p.startsWith(name + ' ')) && (b.status || b.console?.length))
+      problems.push(`${name} (new side's status and console): ${b.status || ''} | ${(b.console || []).slice(0, 4).join(' | ')}`.slice(0, 1500));
     const newErrors = b.errors.filter(error => !a.errors.includes(error) && !/KeyboardInterrupt/.test(error));
-    if (newErrors.length) problems.push(`${name}: page errors only on new: ${newErrors.join(' | ')}`);
+    if (newErrors.length) (o['page-errors'] === 'report' ? notes : problems).push(`${name}: page errors only on new: ${newErrors.join(' | ')}`);
   }
   const md = [`### Pyodide cells${o.name ? ' ' + o.name : ''}: ${Object.keys(latest).length} pages, ${cells} cells, ${unstable.length} unstable on old (errors compared), ${problems.length} unexplained`, ''];
   if (unstable.length) md.push('Unstable on old: ' + unstable.slice(0, 40).join(', ') + (unstable.length > 40 ? ', …' : ''), '');
+  if (notes.length) md.push('Reported, not compared:', ...notes.map(n => '- ' + n), '');
   if (problems.length) md.push('**Unexplained differences:**', ...problems.slice(0, 80).map(p => '- ' + p));
   const text = md.join('\n') + '\n';
   if (o.summary) fs.writeFileSync(o.summary, text);

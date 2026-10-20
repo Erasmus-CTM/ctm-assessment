@@ -16,6 +16,9 @@ categories:
     title: pyodide-interaktiv's scripts and styles as cacheable files (its modules were inline); its worker and catalogue are ctm-libs' files
     match:
       - {area: file, change: added, what: '^(script|css) (ctm-worker|ctm-locale-pyodide-interaktiv|pyodide-interaktiv|pyodide-interaktiv-feedback)/[\w.-]+$'}
+      # ctm-libs' runtime (the Pyodide version) and catalogue core, which a
+      # page with only Pyodide cells did not load before.
+      - {area: file, change: added, what: '^script (ctm-runtime/pyodide-runtime\.js|ctm-locale/(ctm-locale|common)\.js)$'}
       - {area: inline, change: removed, what: '^pyodide-interaktiv: '}
 
   - id: pyodide-ui-language

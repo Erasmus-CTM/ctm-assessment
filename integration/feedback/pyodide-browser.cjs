@@ -67,6 +67,9 @@ function serve(root, {isolate}) {
 // (the same worker code as pyodide-interaktiv 1.8; the run itself ends normally).
 function pageErrors(page) {
   const errors = [];
+  // The worker's and the cells' warnings, for a failure's report.
+  page.__console = [];
+  page.on('console', message => { if (/warning|error/.test(message.type())) page.__console.push(message.type() + ': ' + message.text().slice(0, 600)); });
   page.on('pageerror', error => { if (!/^Traceback[\s\S]*\nKeyboardInterrupt\s*$/.test(error.message)) errors.push(error.message); });
   return errors;
 }
@@ -95,7 +98,8 @@ async function idle(page) {
 async function dump(page) {
   return page.evaluate(() => ({status: document.querySelector('#qpyodide-status-message-text')?.innerText,
     buttons: [...document.querySelectorAll('.qpyodide-button-run')].map(b => b.innerText.trim() + (b.disabled ? ' (disabled)' : '')),
-    outputs: [...document.querySelectorAll('.qpyodide-output-code-area')].map(o => o.innerText.slice(-300))})).catch(error => String(error));
+    outputs: [...document.querySelectorAll('.qpyodide-output-code-area')].map(o => o.innerText.slice(-300))}))
+    .then(state => ({...state, console: (page.__console || []).slice(-15)}), error => String(error));
 }
 async function status(page) {
   return (await page.locator('#qpyodide-status-message-text').innerText()).trim();
