@@ -82,6 +82,22 @@ class SourceSelection(unittest.TestCase):
         # forwarder (N1: kept through U3b and U3c); ctm-libs its alias until L3x.
         self.assertEqual(declared, {'pyodide-interaktiv': ['ai-feedback', 'ctm-libs'], 'ctm-libs': ['ai-feedback']})
 
+    def test_check_pins_names_the_pins_not_on_their_branch(self):
+        # A stacked set pins reviewed heads; after its merges each is on its branch.
+        def tip(name, spec, review_ref=None, follow=False):
+            return spec['commit'] if name == 'jsxgraph' else 'f' * 40
+        with patch.object(builder, 'remote_revision', side_effect=tip), \
+             patch.object(builder, 'descends', side_effect=lambda repository, ancestor, head: 'math-exercise' not in repository), \
+             patch.object(builder.Path, 'write_text') as write, \
+             patch('sys.argv', ['setup', '--check-pins']):
+            with self.assertRaises(SystemExit) as stop:
+                builder.main()
+            self.assertEqual(str(stop.exception), 'Pins not on their branch: math-exercise (merge the set, or pin commits of the branch).')
+            write.assert_not_called()
+        with patch.object(builder, 'remote_revision', side_effect=tip), patch.object(builder, 'descends', return_value=True), \
+             patch('sys.argv', ['setup', '--check-pins']):
+            builder.main()
+
     def test_update_pins_refuses_a_tip_without_the_pinned_commit(self):
         with patch.object(builder, 'remote_revision', return_value='f' * 40), \
              patch.object(builder, 'descends', return_value=False), \

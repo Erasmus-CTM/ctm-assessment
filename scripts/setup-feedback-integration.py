@@ -273,6 +273,7 @@ def main():
     parser.add_argument('--refresh', action='store_true', help='Compatibility option without effect: every component is pinned by commit')
     parser.add_argument('--follow-branches', action='store_true', help='Resolve each component\'s branch tip instead of its pinned commit (early warning; not a release build); a pin its branch does not contain is kept')
     parser.add_argument('--update-pins', action='store_true', help='Write the current branch tips into repos.json and stop; then run --test')
+    parser.add_argument('--check-pins', action='store_true', help='Check that every pin is a commit of its branch (after a stacked set merged: each pin is on its dependency\'s main) and stop')
     parser.add_argument('--only', metavar='NAME[,NAME]', help='With --update-pins: re-pin only these repositories (others, such as the JSXGraph fork pin, stay as they are)')
     parser.add_argument('--ref', action='append', default=[], metavar='NAME=BRANCH', help='Use a review branch for a dependency without changing normal build defaults')
     parser.add_argument('--review-refs', default='{}', help='Explicit JSON dependency SHA map for coordinated review builds; normal defaults stay unchanged')
@@ -288,6 +289,21 @@ def main():
     config = json.loads((TEMPLATE / 'repos.json').read_text())
     extensions = extension_folders(config)
     notices = set()
+    if args.check_pins:
+        # Stacked sets (merge protocol, AC 20 Oct): the pins are the reviewed
+        # heads; once the set has merged, each must be on its branch.
+        off = []
+        for name, spec in config['repositories'].items():
+            if name == 'ctm-assessment' or not spec.get('commit'):
+                continue
+            tip = remote_revision(name, spec, follow=True)
+            on = tip == spec['commit'] or descends(spec['repository'], spec['commit'], tip)
+            print(f'{name}: {spec["commit"][:12]} {"is" if on else "is NOT"} on {spec["branch"]} ({tip[:12]})', flush=True)
+            if not on:
+                off.append(name)
+        if off:
+            raise SystemExit('Pins not on their branch: ' + ', '.join(off) + ' (merge the set, or pin commits of the branch).')
+        return
     if args.update_pins:
         only = None
         if args.only:
