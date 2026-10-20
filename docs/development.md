@@ -359,18 +359,28 @@ and `--check --baseline ctm-html-baseline.json` gives a warning annotation for
 every construct the baseline does not list (constructs are keyed by file,
 kind and title, id or address, so moved lines are not reported).
 
-Which files a page includes (nested includes too) is ctm-libs' rule, not the
-tool's: `tools/source-files.lua` runs ctm-libs' own `ctm.source.files()`, the
-one `markdown-lint` reads, with `quarto pandoc lua`, and the tool asks it for
-each page and each include line (a page of that one line, served from
-memory: the tool writes nothing into the course unless it converts it, so
-`--check` works on a read-only checkout). The tool therefore needs Quarto and ctm-libs'
-extension folder at the commit the umbrella pins: `--ctm-libs DIR`, or
+How a course reads is ctm-libs' rule, not the tool's: the tool keeps no copy
+of it (AC's decision P1) and runs ctm-libs' own Lua with `quarto pandoc lua`.
+`tools/source-files.lua` runs `ctm.source.files()`, the one `markdown-lint`
+reads, for each page and each include line (a page of that one line, served
+from memory: the tool writes nothing into the course unless it converts it,
+so `--check` works on a read-only checkout). `tools/markdown-lines.lua` runs,
+for every file, `ctm.source.read()` (which lines are Markdown, outside code,
+comments and front matter) and `ctm.ui.rawHTML()` (the raw HTML the lint
+names, by rule and line: what `--check` and the baseline count), and gives
+`ctm.ui.defaultTitle()` and `ctm.locale.language()` (a title that is its
+kind's default in the page's language is left out). The tool therefore needs
+Quarto and ctm-libs' extension folder at the commit the umbrella pins, one
+that has these functions (ctm-libs #28): `--ctm-libs DIR`, or
 `CTM_LIBS_EXTENSION` (`scripts/build-course.py --convert` passes the copy it
 has just installed; a course's CI that runs the lint passes the ctm-libs of
-the ctm-assessment ref it fetches the tool from). `tests/test_migrate_course_html.py`
-fails if the files a page's expanded Markdown reaches stop being exactly the
-ones ctm-libs lists.
+the ctm-assessment ref it fetches the tool from). Both drivers take their
+lists on standard input: Quarto's Pandoc 3.6 crashes when `pandoc lua` gets
+more than 82 arguments. `tests/test_migrate_course_html.py` fails if the
+files a page's expanded Markdown reaches stop being exactly the ones ctm-libs
+lists, and runs the tool with copies of ctm-libs whose rules are changed (a
+comment, indented code, a lint rule and its state, a kind's title, the
+catalogue, a language): the tool's result must change with each.
 
 ### Releases
 
