@@ -9,7 +9,11 @@
 # Rules: see step1.yml and step4.yml. Element lines name the element; an end
 # tag carries its class and id (`</div class="ctm-reveal-body">`), so a
 # wrapper is told apart from what it holds; "moved" is an element removed and
-# added unchanged elsewhere.
+# added unchanged elsewhere. Three invariants are checked on every page and
+# no category can explain a breach: each reveal keeps its words (field
+# `reveal`: same, heading, grown; never shrunk or changed), the switch keeps
+# its place or goes to the top, and no id occurs more often than before
+# (hand anchors that repeat a tab heading's id, review A2 S3).
 categories:
   # <details class="reading-step|learning-hint|solution-block"> and plain
   # <details> become ctm-libs reveals: the class changes and the content gets
@@ -29,21 +33,28 @@ categories:
   # the <details> early, so the heading and what followed escaped it (design
   # §1.4 item 5; ingmat3a's linalg-branch, uke4). In a reveal they stay inside
   # its div.ctm-reveal-body. Only where the end tags of the <details> and of
-  # the sections fall changes; the content is the same.
+  # the sections fall changes; the content is the same. `reveal: heading`:
+  # the reveal holds the old <details>' words followed by exactly the words
+  # that followed it on the old page, starting with a heading
+  # (compare-rendered.mjs; a reveal with fewer or other words than before is
+  # always unexplained, review A2 S1).
   - id: reveal-heading
     title: A heading inside a reveal stays inside it (a raw <details> was closed early by the heading's section)
     match:
-      - {area: dom, change: removed, line: '^</details( class="(reading-step|learning-hint|solution-block)")?>$', content: '^summary( |$)'}
-      - {area: dom, change: added, line: '^</details class="ctm-reveal (reading-step|hint|solution|details)">$', content: '^summary div$'}
-      - {area: dom, change: removed, line: '^</section( [\w-]+="[^"]*")*>$', content: '(^| )details$'}
-      - {area: dom, change: added, line: '^</section( [\w-]+="[^"]*")*>$', ancestors: 'details\.ctm-reveal\.[\w-]+ > div\.ctm-reveal-body$'}
+      - {area: dom, change: removed, line: '^</details( class="(reading-step|learning-hint|solution-block)")?>$', content: '^summary( |$)', reveal: '^heading$'}
+      - {area: dom, change: added, line: '^</details class="ctm-reveal (reading-step|hint|solution|details)">$', content: '^summary div$', reveal: '^heading$'}
+      - {area: dom, change: removed, line: '^</section( [\w-]+="[^"]*")*>$', content: '(^| )details$', reveal: '^heading$'}
+      - {area: dom, change: added, line: '^</section( [\w-]+="[^"]*")*>$', ancestors: 'details\.ctm-reveal\.[\w-]+ > div\.ctm-reveal-body$', reveal: '^heading$'}
 
   # The hand-written switch (<div class="learning-mode" data-learning-mode>,
   # its buttons in a <p>) becomes ctm-libs' (div.ctm-modes, hidden until its
   # script runs), at the top of the page or where ::: {.modes} puts it. Its
   # labels are raw HTML now, so the AI context of an exercise next to it
   # loses just the two button labels; what sat above the old switch can move
-  # below the new one.
+  # below the new one (`switchOrder: above-to-below`, when the switch went to
+  # the top of the page). The new switch must stand where the old one stood
+  # (the same words before it) or at the top of the page; anywhere else is
+  # always unexplained (compare-rendered.mjs, review A2 S1).
   - id: modes-switch
     title: The lecture/reading switch from ctm-libs (div.ctm-modes); AI contexts lose only its two button labels
     match:
@@ -51,7 +62,7 @@ categories:
       - {area: dom, change: '^(added|removed|moved)$', ancestors: 'div\.(learning-mode|ctm-modes)( > p)?$'}
       - {area: dom, tag: '^div$', attribute: '^(class|data-learning-mode|data-reading-label|data-lecture-label|hidden)$', where: {class: '^ctm-modes$'}}
       - {area: dom, tag: '^span$', attribute: '^(class|role|aria-live|data-lecture|data-reading)$', where: {class: '^ctm-modes-status$'}}
-      - {area: dom, change: moved, ancestors: 'main#quarto-document-content\.content$', to: 'main#quarto-document-content\.content$', modes: '^1$'}
+      - {area: dom, change: moved, ancestors: 'main#quarto-document-content\.content$', to: 'main#quarto-document-content\.content$', modes: '^1$', switchOrder: '^above-to-below$'}
       - {area: config, path: '(/context|/feedbackContext/text)$', lost: '^(Forelesning Gå i dybden|Førelesing Gå i djupna|Explore Go deeper|Vortrag Vertiefung)$', gained: '^$'}
       - {area: dom, attribute: '^(data-context|data-ai-feedback-context)$', lost: '^(Forelesning Gå i dybden|Førelesing Gå i djupna|Explore Go deeper|Vortrag Vertiefung)$', gained: '^$'}
 
@@ -114,3 +125,18 @@ look:
     height: any
     pixels: any
     styles: any
+
+# Failures of new that are known and fixed elsewhere (tools/compare-browser.mjs):
+# they count as expected, and are reported, until the fix is pinned; then the
+# entry goes. `targets: tab-title`: only links to a tab title (an id that
+# tab-ids.lua put on div.ctm-tab-target).
+known-failures:
+  - id: webkit-tab-title
+    title: >-
+      In WebKit a deep link to a tab title far down a page leaves the tab row
+      above the viewport (ctm-nav.js scrolls, then focus scrolls again; review
+      A2 S5). Fixed in ctm-libs' ctm-nav.js; remove this entry when
+      CTM Assessment pins that fix
+    browsers: [webkit]
+    checks: [link load, link click]
+    targets: tab-title

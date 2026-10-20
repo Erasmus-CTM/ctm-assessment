@@ -8,6 +8,9 @@ Lenker fra en annen side: [egenverdiene](uke1.qmd#uke1-egen), [metodefanen](uke1
 [fanen 1.1](uke1.qmd#uke1-egenverdier), [forklaringen i lesesteget](uke1.qmd#uke1-dypt) og
 [langt ned](uke1.qmd#uke1-langt).
 
+Faner langt nede på en lang side: [3.2 Andre del](uke3.qmd#uke3-del2),
+[3.3 Tredje del](uke3.qmd#tredje-del) og [eksemplet i 3.3](uke3.qmd#uke3-eksempel).
+
 <details class="reading-step">
 <summary>Gå i dybden: et steg til</summary>
 

@@ -6,15 +6,21 @@
 //
 //   node tools/compare-browser.mjs --old DIR --new DIR [--browser chromium] [--browser firefox] ...
 //     [--expect tools/compare-rendered/expect/step4-migration.yml] [--course NAME] [--pages a.html,b.html]
-//     [--offline] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
+//     [--offline] [--first-visit] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
 //
 // Checks, on the pages with reveals, the switch or links into tabs:
-//  1. reveals: count per kind, summary texts and initial state equal;
+//  1. reveals: count per kind, summary texts and initial state equal; each
+//     reveal holds the words it held on old (more only as old's words
+//     followed by what came after it there: a heading that escaped a raw
+//     <details>), never fewer or others;
 //  2. the switch: reading opens and lecture closes every reading step, per
 //     block; aria-pressed and the status text equal; the mode survives a
-//     reload and another page; a new tab starts in lecture;
-//  3. keyboard: Tab reaches both buttons; each summary takes focus and Enter
-//     and Space toggle it, as on old; axe-core finds no new violation;
+//     reload and another page; a new tab starts in lecture; it stands where
+//     the old one stood (the same words before it in main, outside the
+//     title block) or at the top of the page;
+//  3. keyboard: Tab reaches both buttons, in no more presses than on old;
+//     each summary takes focus and Enter and Space toggle it, as on old;
+//     axe-core finds no new violation;
 //  4. links: every link to an id on a page of the site, on load and on click:
 //     the right (nested) tab and every <details> around the target open, the
 //     target below the header and still there 2 s later (pinned while the
@@ -34,6 +40,16 @@
 //  8. embedded content (not --offline): JSXGraph boards in reveals have a
 //     finite size once opened; a Python cell in a reveal runs;
 //  9. no console error on new that old did not have.
+//
+// --first-visit serves both sides without the cross-origin isolation headers
+// and lets service workers run, so a page with Python cells isolates itself
+// with coi-serviceworker on a first visit (it registers the worker and
+// reloads), as on GitHub Pages; the links are then followed on that visit.
+//
+// `known-failures` in the expect file lists failures of new that are known
+// and fixed elsewhere (a browser, the checks, which targets, and the fix):
+// such a failure counts as expected and is reported, until the fix is
+// pinned and the entry removed.
 // Exit status: 0 when every check passes, 1 otherwise, 2 on errors.
 import fs from 'node:fs';
 import http from 'node:http';
@@ -46,10 +62,11 @@ const playwright = require('playwright');
 
 // ---------------------------------------------------------------- options
 function options(argv) {
-  const o = {browsers: [], pages: null, checks: null, offline: false, maxLinks: 0, expect: null, course: '', shots: null, report: null, summary: null};
+  const o = {browsers: [], pages: null, checks: null, offline: false, firstVisit: false, maxLinks: 0, expect: null, course: '', shots: null, report: null, summary: null};
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i], value = argv[i + 1];
     if (flag === '--offline') { o.offline = true; continue; }
+    if (flag === '--first-visit') { o.firstVisit = true; continue; }
     i++;
     if (flag === '--browser') o.browsers.push(value);
     else if (flag === '--pages') o.pages = value.split(',').filter(Boolean);
@@ -108,6 +125,8 @@ function inventory(root, page, side) {
   return {reveals, links, groups, switch: !!doc.querySelector(side === 'new' ? '.ctm-modes' : '[data-learning-mode]'),
     nav: !!doc.querySelector('script[src*="ctm-nav"]'), toggle: !!doc.querySelector('.quarto-color-scheme-toggle'),
     tabsets: doc.querySelectorAll('.panel-tabset').length, ids: new Set([...doc.querySelectorAll('[id]')].map(el => el.id)),
+    tabTitles: new Set([...doc.querySelectorAll('.ctm-tab-target[id]')].map(el => el.id)),
+    coi: !!doc.querySelector('script[src*="coi-serviceworker"]'),
     inTabs: new Set([...doc.querySelectorAll('.tab-pane [id], details [id]')].map(el => el.id)),
     boards: doc.querySelectorAll('main details iframe[name^="iframeJXG"]').length,
     cells: doc.querySelectorAll('main details [id^="qpyodide-insertion-location-"]').length};
@@ -117,7 +136,7 @@ function inventory(root, page, side) {
 const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff': 'font/woff',
   '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.ttf': 'font/ttf', '.gif': 'image/gif', '.ico': 'image/x-icon'};
-function serve(roots) {
+function serve(roots, isolated = true) {
   const server = http.createServer((request, response) => {
     const parts = decodeURIComponent(new URL(request.url, 'http://x').pathname).split('/');
     const root = roots[parts[1]];
@@ -125,8 +144,9 @@ function serve(roots) {
     if (root && fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
     else if (root && !fs.existsSync(file) && fs.existsSync(file + '.html')) file += '.html';
     if (!root || !file.startsWith(root) || !fs.existsSync(file)) { response.writeHead(404); response.end(); return; }
+    // Without the isolation headers (--first-visit), as GitHub Pages serves a course.
     response.writeHead(200, {'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
-      'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'credentialless'});
+      ...(isolated ? {'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'credentialless'} : {})});
     response.end(fs.readFileSync(file));
   });
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
@@ -180,6 +200,33 @@ function stateOf(id) {
     focusInView: !!rect && (rect.height > 0 ? rect.bottom > Math.max(0, headerBottom - 2) : rect.top >= headerBottom - 2) && rect.top < innerHeight,
   };
 }
+// In the page: the words of an element (outside script and style), and the
+// words in main before the switch (outside the title block).
+function wordsIn(el) {
+  const out = [];
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.parentElement?.closest('script, style, template, noscript')) continue;
+    out.push(...node.textContent.split(/\s+/).filter(Boolean));
+  }
+  return out;
+}
+const WORDS_IN = wordsIn.toString();
+function switchPlace([selector, wordsInSource]) {
+  const wordsIn = new Function('return ' + wordsInSource)();
+  const box = document.querySelector(selector);
+  if (!box) return null;
+  const main = box.closest('main') || document.body, title = main.querySelector('#title-block-header');
+  const range = document.createRange();
+  range.setStart(main, 0);
+  range.setEndBefore(box);
+  const holder = document.createElement('div');
+  holder.append(range.cloneContents());
+  holder.querySelector('#title-block-header')?.remove();
+  holder.querySelectorAll('script, style, template, noscript').forEach(el => el.remove());
+  return wordsIn(holder).join(' ');
+}
+
 const works = s => s.exists && s.visible && s.panes.every(Boolean) && s.details.every(Boolean)
   && s.top >= s.headerBottom - 2 && s.top < s.innerHeight;
 const describeState = s => s.exists ? `visible ${s.visible}, panes ${JSON.stringify(s.panes)}, details ${JSON.stringify(s.details)}, top ${s.top} (header ${s.headerBottom}), focus ${s.focus}${s.focusInView ? ' in view' : ' not in view'}, mark ${s.mark}` : 'no such id';
@@ -193,6 +240,14 @@ class Run {
   }
 
   record(check, page, ok, detail = {}) {
+    // A known failure (expect file `known-failures`) is expected until its fix is pinned.
+    const known = ok ? null : (this.known || []).find(k => (!k.browsers || k.browsers.includes(this.browserName))
+      && (!k.checks || k.checks.includes(check)) && (!k.courses || k.courses.includes(this.o.course))
+      && (!k.targets || k.targets !== 'tab-title' || detail.tabTitle));
+    if (known) {
+      ok = true;
+      detail = {...detail, expected: true, known: known.id, note: `known failure (${known.id}: ${known.title}): ${detail.note || ''}`};
+    }
     this.results.push({browser: this.browserName, check, page, ok, ...detail});
     if (!ok) console.log(`  ${this.browserName} ${check} ${page}: FAILED ${detail.note || ''}`);
   }
@@ -201,7 +256,7 @@ class Run {
   // load only for the embedded-content check (`python`): elsewhere they
   // would only cost time, on both sides alike.
   async context(side, contextOptions = {}, python = false) {
-    const context = await this.browser.newContext({viewport: {width: 1280, height: 900}, serviceWorkers: 'block', ...contextOptions});
+    const context = await this.browser.newContext({viewport: {width: 1280, height: 900}, serviceWorkers: this.o.firstVisit ? 'allow' : 'block', ...contextOptions});
     await context.addInitScript(TRACE);
     if (this.o.offline) await context.route(/^https?:\/\/(?!127\.0\.0\.1)/, route => route.abort());
     else if (!python) await context.route(/\/pyodide\/v[\d.]+\/|\/monaco-editor@/, route => route.abort());
@@ -227,6 +282,19 @@ class Run {
 
   url(side, page, hash = '') { return this.base + side + '/' + page + (hash ? '#' + encodeURIComponent(hash) : ''); }
 
+  // --first-visit: on a page with coi-serviceworker, wait for the worker's
+  // reload (crossOriginIsolated); "none" on a page without it.
+  async isolation(page) {
+    const coi = await page.evaluate(() => !!document.querySelector('script[src*="coi-serviceworker"]')).catch(() => false);
+    if (!coi) return 'none';
+    for (let k = 0; k < 50; k++) {
+      const isolated = await page.evaluate(() => window.crossOriginIsolated).catch(() => null);
+      if (isolated) { await page.waitForLoadState('load').catch(() => {}); return 'isolated'; }
+      await page.waitForTimeout(300);
+    }
+    return 'not isolated';
+  }
+
   async settle(page, ms = 700) {
     await page.waitForTimeout(ms);
   }
@@ -236,6 +304,7 @@ class Run {
     // A page may still be navigating (Firefox interrupts one about:blank by another).
     await page.goto('about:blank').catch(() => page.waitForTimeout(300));
     await page.goto(url, {waitUntil: 'load', timeout: 60000}).catch(() => {});
+    if (this.o.firstVisit) page.ctmIsolated = await this.isolation(page);
     if (id && side === 'new') {
       await page.waitForFunction(id => document.getElementById(id)?.getAttribute('data-ctm-nav') === 'load', id, {timeout: 10000}).catch(() => {});
     }
@@ -283,25 +352,40 @@ class Run {
         const context = await this.context(side);
         const tab = await context.newPage();
         await this.load(tab, side, this.url(side, page));
-        seen[side] = await tab.evaluate(([side, components, kinds]) => [...document.querySelectorAll('main details')]
+        seen[side] = await tab.evaluate(([side, components, kinds, wordsSource]) => [...document.querySelectorAll('main details')]
           .filter(d => !d.closest(components))
           .map(d => {
             let kind = null;
             if (side === 'new') kind = d.classList.contains('ctm-reveal') ? d.classList[1] : null;
             else if (!d.className.trim()) kind = 'details';
             else for (const [c, k] of Object.entries(kinds)) if (d.classList.contains(c)) kind = k;
-            return kind && {kind, summary: (d.querySelector(':scope > summary')?.textContent || '').replace(/\s+/g, ' ').trim(), open: d.open};
-          }).filter(Boolean), [side, COMPONENTS, OLD_REVEALS]);
+            const words = new Function('return ' + wordsSource)()(d);
+            return kind && {kind, summary: (d.querySelector(':scope > summary')?.textContent || '').replace(/\s+/g, ' ').trim(), open: d.open, words};
+          }).filter(Boolean), [side, COMPONENTS, OLD_REVEALS, WORDS_IN]);
         await context.close();
       }
-      const same = JSON.stringify(seen.old) === JSON.stringify(seen.new);
+      const head = r => r && {kind: r.kind, summary: r.summary, open: r.open};
+      const same = JSON.stringify(seen.old.map(head)) === JSON.stringify(seen.new.map(head));
       const counts = side => Object.entries(seen[side].reduce((c, r) => ({...c, [r.kind]: (c[r.kind] || 0) + 1}), {})).map(([k, n]) => `${n} ${k}`).join(', ');
       let note = same ? counts('new') : '';
       if (!same) {
-        const k = seen.old.findIndex((r, i) => JSON.stringify(r) !== JSON.stringify(seen.new[i]));
-        note = `old ${counts('old')} / new ${counts('new')}; first difference at ${k}: ${JSON.stringify(seen.old[k])} -> ${JSON.stringify(seen.new[k])}`;
+        const k = seen.old.findIndex((r, i) => JSON.stringify(head(r)) !== JSON.stringify(head(seen.new[i])));
+        note = `old ${counts('old')} / new ${counts('new')}; first difference at ${k}: ${JSON.stringify(head(seen.old[k]))} -> ${JSON.stringify(head(seen.new[k]))}`;
       }
-      this.record('reveals', page, same, {note});
+      // Each reveal keeps its words: more only as a prefix of old's (the words
+      // that followed a raw <details> closed early), never fewer or others.
+      const problems = [];
+      let grown = 0;
+      if (same) seen.old.forEach((o, k) => {
+        const n = seen.new[k], ow = o.words.join(' '), nw = n.words.join(' ');
+        if (ow === nw) return;
+        if (nw.startsWith(ow + ' ')) { grown++; return; }
+        problems.push(`"${o.summary}" (${k + 1}) holds ${n.words.length} words, on old ${o.words.length}`
+          + (ow.startsWith(nw) ? ': it ends early' : ': other words'));
+      });
+      if (problems.length) note = problems.join('; ');
+      else if (grown) note += `; ${grown} hold more than on old (what followed a raw <details> closed early)`;
+      this.record('reveals', page, same && !problems.length, {note});
     }
   }
 
@@ -330,7 +414,7 @@ class Run {
             status: (status?.textContent || '').trim(),
             steps: [...document.querySelectorAll('main details.reading-step')].map(d => d.open)};
         }, [sw]);
-        const result = {initial: await read()};
+        const result = {initial: await read(), place: await tab.evaluate(switchPlace, [sw, WORDS_IN]).catch(() => null)};
         await tab.click(sw + ' button[data-mode="reading"]');
         await tab.waitForTimeout(250);
         result.reading = await read();
@@ -374,6 +458,8 @@ class Run {
         if (key !== 'initial' && n[key].status !== o[key].status) problems.push(`status text after ${key}: old "${o[key].status}" new "${n[key].status}"`);
       }
       if (JSON.stringify(n.initial.labels) !== JSON.stringify(o.initial.labels)) problems.push(`labels: old ${o.initial.labels} new ${n.initial.labels}`);
+      // Where the old one stood, or at the top of the page.
+      if (n.place && n.place !== o.place) problems.push(`the switch moved: on old after "${(o.place || '').slice(-80)}", on new after "${n.place.slice(-80)}"`);
       this.record('switch', page, !problems.length, {note: problems.join('; ') || `${n.reading.steps.length} reading steps follow the switch; mode kept on reload${n.other ? ' and another page' : ''}`});
     }
   }
@@ -438,6 +524,8 @@ class Run {
       if (seen.old.buttons && seen.new.buttons) {
         if (seen.old.buttons.reached && !seen.new.buttons.reached) problems.push('Tab does not reach the switch');
         if (seen.old.buttons.second && !seen.new.buttons.second) problems.push('Tab does not go on to the second button');
+        if (seen.old.buttons.reached && seen.new.buttons.reached && seen.new.buttons.presses > seen.old.buttons.presses)
+          problems.push(`Tab reaches the switch later than on old (${seen.new.buttons.presses} presses, old ${seen.old.buttons.presses}): it moved down`);
       }
       if (JSON.stringify(seen.old.summaries) !== JSON.stringify(seen.new.summaries)) {
         problems.push(`summaries [focus, Enter toggles, Space toggles]: old ${JSON.stringify(seen.old.summaries)} new ${JSON.stringify(seen.new.summaries)}`);
@@ -478,6 +566,7 @@ class Run {
         await this.load(tab, side, this.url(side, link.target, link.id), link.id);
         state[side] = await tab.evaluate(stateOf, link.id);
         if (side === 'new') {
+          state.isolation = tab.ctmIsolated;
           await tab.waitForTimeout(2200);
           state.later = await tab.evaluate(stateOf, link.id);
         }
@@ -490,8 +579,9 @@ class Run {
       if (!works(state.later)) problems.push('not kept in place: 2 s later ' + describeState(state.later));
       const was = dead('old')(link) ? 'dead on old' : works(state.old) ? 'shown on old' : 'not shown on old (' + describeState(state.old) + ')';
       if (problems.length) problems.push('trace: ' + state.later.trace);
-      this.record('link load', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}; ${was}`, expected: dead('old')(link) || undefined,
-        previouslyDead: dead('old')(link) || undefined});
+      const visit = this.o.firstVisit ? `; first visit: ${state.isolation}` : '';
+      this.record('link load', name, !problems.length, {note: (problems.join('; ') || `shown, focus ${n.focus}; ${was}`) + visit, expected: dead('old')(link) || undefined,
+        previouslyDead: dead('old')(link) || undefined, tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined});
     }
     // On click, from the page with the link; Back and Forward for the first link of each page.
     const backTried = new Set();
@@ -531,6 +621,7 @@ class Run {
           samePage ? Promise.resolve() : tab.waitForEvent('load', {timeout: 30000}).catch(() => {}),
           tab.click('[data-ctm-compare-link]', {timeout: 10000}).catch(() => {}),
         ]);
+        if (this.o.firstVisit && !samePage) await this.isolation(tab);
         if (side === 'new') {
           await tab.waitForFunction(([id, how]) => document.getElementById(id)?.getAttribute('data-ctm-nav') === how,
             [link.id, samePage ? 'link' : 'load'], {timeout: 10000}).catch(() => {});
@@ -562,7 +653,8 @@ class Run {
       }
       const was = !state.old ? 'dead on old' : works(state.old) ? 'shown on old' : 'not shown on old';
       if (problems.length) problems.push('trace: ' + n.trace);
-      this.record('link click', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}${history.new ? ', Back and Forward' : ''}; ${was}`});
+      this.record('link click', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}${history.new ? ', Back and Forward' : ''}; ${was}`,
+        tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined});
     }
     const previously = this.results.filter(r => r.previouslyDead && r.ok).map(r => r.page);
     this.record('links', '-', true, {note: `${chosen.length} links to ${targets.length} targets; previously dead, now working: ${previously.join(', ') || 'none'}`});
@@ -832,7 +924,8 @@ class Run {
 // ---------------------------------------------------------------- main
 async function main() {
   const o = options(process.argv.slice(2));
-  const look = o.expect ? (yaml.load(fs.readFileSync(o.expect, 'utf8')) || {}).look || [] : [];
+  const expect = o.expect ? yaml.load(fs.readFileSync(o.expect, 'utf8')) || {} : {};
+  const look = expect.look || [], known = expect['known-failures'] || [];
   const pages = o.pages || [...new Set([...htmlPages(o.old), ...htmlPages(o.new)])];
   const inventories = {};
   for (const page of pages) {
@@ -842,12 +935,13 @@ async function main() {
       if (fs.existsSync(path.join(root, page))) inventories[page][side] = inventory(root, page, side);
     }
   }
-  const server = await serve({old: o.old, new: o.new});
+  const server = await serve({old: o.old, new: o.new}, !o.firstVisit);
   const base = `http://127.0.0.1:${server.address().port}/`;
   const results = [];
   try {
     for (const browserName of o.browsers) {
       const run = new Run(o, browserName, base, inventories, look);
+      run.known = known;
       await run.run();
       results.push(...run.results);
     }
@@ -855,7 +949,8 @@ async function main() {
     server.close();
   }
   const failed = results.filter(r => !r.ok);
-  const lines = [`### Browser comparison${o.course ? ' of ' + o.course : ''}, old against new (${o.browsers.join(', ')}): ${results.length} checks, ${failed.length} failed`, ''];
+  const knownFailures = results.filter(r => r.known).length;
+  const lines = [`### Browser comparison${o.course ? ' of ' + o.course : ''}, old against new (${o.browsers.join(', ')}${o.firstVisit ? ', first visit without isolation headers' : ''}): ${results.length} checks, ${failed.length} failed${knownFailures ? `, ${knownFailures} known failures` : ''}`, ''];
   const byCheck = {};
   for (const r of results) {
     const key = r.browser + ' ' + r.check;

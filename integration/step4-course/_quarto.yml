@@ -21,6 +21,7 @@ website:
       - index.qmd
       - pages/uke1.qmd
       - pages/uke2.qmd
+      - pages/uke3.qmd
       - pages/losning.qmd
       - pages/grupper.qmd
 

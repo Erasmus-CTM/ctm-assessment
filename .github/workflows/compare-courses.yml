@@ -22,7 +22,8 @@ name: Compare rendered courses
 #   with its pinned package; after = its migration (migrate-course-html.py
 #   --config and its migrated/ edits) with the head; compared with
 #   expect/step4-migration.yml, then old against new in Chromium, Firefox and
-#   WebKit (tools/compare-browser.mjs, design §6.3).
+#   WebKit (tools/compare-browser.mjs, design §6.3), and the links once more
+#   on a first visit without isolation headers (coi-serviceworker).
 # On demand, any course and refs: `course-base-ref` builds another course ref
 # as before (a migration branch against main), `base` and `head` choose the
 # package per side (`pin`: the one the course pins at that side's ref; the
@@ -277,10 +278,20 @@ jobs:
           node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" \
             --browser ${{ matrix.browser }} --expect tools/compare-rendered/expect/step4-migration.yml --course "$(basename "$COURSE")" \
             --shots "$RUNNER_TEMP/browser/shots" --report "$RUNNER_TEMP/browser/report.json" --summary "$RUNNER_TEMP/browser/summary.md"
+      # The links again on a first visit as GitHub Pages serves a course: no
+      # isolation headers, coi-serviceworker registers and reloads (review A2 S5).
+      - name: First visit in ${{ matrix.browser }} (coi-serviceworker, no isolation headers)
+        if: success() || failure()
+        env:
+          COURSE: ${{ matrix.entry.course }}
+        run: |
+          node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" --first-visit --checks links \
+            --browser ${{ matrix.browser }} --expect tools/compare-rendered/expect/step4-migration.yml --course "$(basename "$COURSE")" \
+            --report "$RUNNER_TEMP/browser/first-visit.json" --summary "$RUNNER_TEMP/browser/first-visit.md"
       - name: Report the result as an annotation
         if: always()
         run: |
-          text=$(head -c 20000 "$RUNNER_TEMP/browser/summary.md" 2>/dev/null || echo 'no report')
+          text=$(cat "$RUNNER_TEMP/browser/summary.md" "$RUNNER_TEMP/browser/first-visit.md" 2>/dev/null | head -c 20000 || echo 'no report')
           level=notice; [ "${{ job.status }}" = success ] || level=error
           printf '::%s title=Browser %s (%s)::%s\n' "$level" "${{ matrix.entry.key }}" "${{ matrix.browser }}" "$(printf '%s' "$text" | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\n/%0A/g')"
       - uses: actions/upload-artifact@v7
