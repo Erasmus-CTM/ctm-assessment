@@ -45,6 +45,7 @@
 // and lets service workers run, so a page with Python cells isolates itself
 // with coi-serviceworker on a first visit (it registers the worker and
 // reloads), as on GitHub Pages; the links are then followed on that visit.
+// Console errors are not compared then: the reload aborts loads at random.
 //
 // `known-failures` in the expect file lists failures of new that are known
 // and fixed elsewhere (a browser, the checks, which targets, and the fix):
@@ -334,10 +335,17 @@ class Run {
           this.record(name, '-', false, {note: 'the check stopped: ' + (error.stack || error.message).split('\n').slice(0, 3).join(' ')});
         }
       }
-      for (const [key, page] of this.errors.new) {
-        if (!this.errors.old.has(key)) this.record('console', page, false, {note: 'a console error new has and old had not: ' + key});
+      // On a first visit the worker's reload aborts whatever is loading, at
+      // a moment that differs from load to load: the console is compared in
+      // the run without --first-visit.
+      if (this.o.firstVisit) {
+        this.record('console', '-', true, {note: `not compared on a first visit (${this.errors.new.size} distinct console errors on new, ${this.errors.old.size} on old)`});
+      } else {
+        for (const [key, page] of this.errors.new) {
+          if (!this.errors.old.has(key)) this.record('console', page, false, {note: 'a console error new has and old had not: ' + key});
+        }
+        this.record('console', '-', true, {note: `${this.errors.new.size} distinct console errors on new, ${this.errors.old.size} on old`});
       }
-      this.record('console', '-', true, {note: `${this.errors.new.size} distinct console errors on new, ${this.errors.old.size} on old`});
     } finally {
       await this.browser.close();
     }
