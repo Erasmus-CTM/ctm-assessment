@@ -311,7 +311,8 @@ class Run {
     await context.exposeBinding('__ctmCompareError', async ({frame}, text) => {
       if (!frame || !frame.parentFrame() || !text) return;
       const label = await this.frameLabel(frame);
-      if (!this.frameErrors[side].has(norm(text))) this.frameErrors[side].set(norm(text), label);
+      const n = norm(text).replace(/^(Uncaught\s+)?(\w*Error:\s+)?/, '');
+      if (!this.frameErrors[side].has(n)) this.frameErrors[side].set(n, label);
       this.errors[side].push({text, page: frame.page().url(), frame: label});
     });
     await context.addInitScript(TRACE);
@@ -338,9 +339,10 @@ class Run {
   consoleErrors(side) {
     const found = new Map();
     for (const {text, page, frame} of this.errors[side]) {
-      const n = norm(text);
+      // An error event says "Uncaught Error: x" where the page error says "x": one error.
+      const n = norm(text).replace(/^(Uncaught\s+)?(\w*Error:\s+)?/, '');
       const known = frame || (n.length > 8 ? [...this.frameErrors[side]].find(([t]) => n.includes(t) || t.includes(n))?.[1] : undefined);
-      const key = (known ? `[${known}] ` : '') + norm(text).replace(/https?:\/\/127\.0\.0\.1:\d+\/((old|new)\/)?/g, '/')
+      const key = (known ? `[${known}] ` : '') + n.replace(/https?:\/\/127\.0\.0\.1:\d+\/((old|new)\/)?/g, '/')
         .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<id>').replace(/:\d+:\d+/g, '').slice(0, 200);
       if (!found.has(key)) found.set(key, {page: page.replace(this.base + side + '/', ''), frame: known || 'page'});
     }
