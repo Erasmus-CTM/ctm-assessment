@@ -36,9 +36,10 @@ fetched when you render. `_extensions/ctm-assessment/resolved-repos.json`
 [example site](https://erasmus-ctm.github.io/ctm-assessment/resolved-repos.json))
 lists the package version, those commits and the SHA-256 of every installed
 file. The package installs the folders `ctm-assessment`, `ctm-libs`,
-`ai-feedback` (a thin alias of ctm-libs for 0.9), `ctm-checkers`, `jsxgraph`,
-`math-exercise`, `py-exercise` and `pyodide-interaktiv`; authors list only
-`ctm-assessment`.
+`ctm-checkers`, `jsxgraph`, `math-exercise`, `py-exercise` and
+`pyodide-interaktiv`; authors list only `ctm-assessment`. (Packages before
+step 3 also installed `ai-feedback`, a thin alias of ctm-libs; an old copy left
+in a course is inert.)
 
 **Versions.** The URL above is the latest build of `main`. Each release is
 also a GitHub release asset ([changes](../CHANGELOG.md)); to stay on one
@@ -187,8 +188,13 @@ package, they stop the render with the install command. Their repositories
 keep their own tests and example builds for development, against a ctm-libs
 installation (`quarto add Erasmus-CTM/ctm-libs`) with `CTM_COMPONENT_DEV=1`;
 see each component's development guide. pyodide-interaktiv is the exception
-and still works on its own
+and still works on its own: from 1.9 it runs on ctm-libs too, and
+`quarto add Erasmus-CTM/pyodide-interaktiv` installs a copy of ctm-libs next to
+it (and a thin `ai-feedback` forwarder for projects set up for 1.8)
 ([installation](https://github.com/Erasmus-CTM/pyodide-interaktiv/blob/feature/shared-feedback-integration/docs/installation.md)).
+Inside the package, the package's ctm-libs serves it; its settings under
+`pyodide:` combine key by key across levels, and builds without AI feedback
+leave out its Feedback buttons and every AI-only cell option.
 
 **Separately added copies next to the package do not conflict.** The
 package installs its folders directly under `_extensions/`, while
@@ -201,11 +207,12 @@ filters on a page, not both. A page that combines the package with a separately
 added ai-feedback 0.8 (the version before ctm-libs) stops with a message naming
 both: a page uses one version.
 
-**Projects set up for ai-feedback.** `quarto add Erasmus-CTM/ai-feedback`
-still works (GitHub redirects the renamed repository, and Quarto installs both
-of its extensions, ctm-libs and the ai-feedback alias), and so does
-`filters: [ai-feedback]`, with one build warning: use `filters:
-[ctm-assessment]`. The alias goes when pyodide-interaktiv ships ctm-libs.
+**Projects set up for ai-feedback.** The package no longer installs the
+`ai-feedback` alias (step 3): list `filters: [ctm-assessment]`. `quarto add
+Erasmus-CTM/ai-feedback` still installs ctm-libs and, until ctm-libs deletes
+it, the alias, with which `filters: [ai-feedback]` keeps working with one
+build warning. An old ai-feedback 0.8 listed next to the package's components
+stops the page with what to do.
 
 **JSXGraph is part of the package.** Do not also run `quarto add
 jsxgraph/jsxgraph-quarto` in the same project: Quarto would place that copy
