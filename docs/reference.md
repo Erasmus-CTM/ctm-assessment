@@ -25,6 +25,9 @@ wins over `ctm-assessment:` at any level.
 ctm-assessment:
   stop-after: 30    # seconds before a long check offers Stop, all components (default 20)
   lang: nb          # interface language of all components: en, de, nb (nn and no give nb)
+  tab-links: true   # links into tabs and reveals (default true)
+  modes: true       # the lecture/reading switch on pages with reading steps (default true)
+  markdown-lint: false  # warn about raw HTML that has a Markdown form (default false)
 ```
 
 `ai-feedback: enabled: false` at any level (or `CTM_FEEDBACK=off`) builds the
@@ -36,6 +39,54 @@ The render stops when a CTM section holds a key that looks like a credential
 its value: learners enter their own key in the Feedback settings. Unknown
 `ai-feedback:` and `ctm-assessment:` options, and values that were accepted
 loosely before, give a warning that they become errors in 1.0.
+
+## Reveals, the switch and links into tabs
+
+| Markdown | In the page |
+|---|---|
+| `::: {.reading-step title="…"}` … `:::` | a closed box that follows the lecture/reading switch |
+| `::: {.hint}`, `::: {.solution}` … `:::` | a closed box (`title="…"` optional; `.solution` also takes `name="…"`) |
+| `::: {.details title="…"}` … `:::` | a closed box, drawn related but distinct (it does not follow the switch) |
+| `::: {.modes}` + `:::` | where the switch goes (else the top of a page with reading steps) |
+| `::: {#name}` + `:::` | an anchor, a link target |
+| `::: {.embed src="…" title="…" height="920px"}` + `:::` | an embedded page; `src` and `title` required, `height` a length (default 600px) |
+
+- **Titles** are inline Markdown. Pandoc reads attribute values with
+  backslash escapes, so TeX takes doubled backslashes
+  (`title="Bruk $\\mathbf{A}\\,x$"`). Default titles: `.reading-step` "Go
+  deeper" / "Vertiefung" / "Gå i dybden" / "Gå i djupna" (en, de, nb, nn);
+  `.solution` "Solution" / "Lösungsvorschlag" / "Løsningsforslag" /
+  "Løysingsforslag"; `.hint` "Hint" / "Hinweis"; `.details` "Details" /
+  "Detaljer" / "Detaljar" (say what it holds instead).
+- **A heading inside a block** stays inside it. AI feedback reads a block as
+  closed material: its content is context only for an exercise inside it.
+- **Other formats** (PDF, Word) show the blocks open, with the title in
+  bold; `.solution` stays Quarto's Solution there, and `.embed` a link.
+- **The switch** keeps its mode while the student stays in the course (the
+  browser tab), opens the reading steps for printing and is hidden in print.
+  `modes: false` leaves it out.
+- **Links into tabs and reveals** (`tab-links: true`, the default): a link
+  to an id inside tabs or closed blocks, in the page, from another page,
+  Back/Forward or a reload, opens every enclosing tab and block, scrolls the
+  target below the header, keeps it in place while the page settles, and
+  focuses it. It wins over a grouped tabset's remembered tab without
+  changing it. A site that still has its own tab-link script sets
+  `tab-links: false` until it removes it.
+- **Tab headings keep their ids and attributes** with the project-level
+  filter `_extensions/ctm-assessment/tab-ids.lua`, listed before
+  `ctm-assessment` with `at: pre-ast` (extensions cannot run at pre-ast).
+  The id moves onto an empty `div.ctm-tab-target` at the start of the tab's
+  pane, so a link to it opens the tab; classes such as `.active` stay on the
+  heading. An id with a cross-reference prefix (`fig-`, `tbl-`, `thm-`,
+  `sec-`, `eq-`, … and the keys of `crossref: custom:`) is not moved, with a
+  warning: Quarto would turn the block into an empty figure or theorem. A
+  package older than this file stops the render of a project with the line.
+- **`markdown-lint: true`** warns at render time, naming files and lines,
+  about raw `<details>`/`<summary>`, `<div id="…"></div>`, `<iframe>`, a
+  hand-written switch (`data-learning-mode`), a page with tabsets in a
+  project without the `tab-ids.lua` line, and a `.details` without a title.
+- **Reserved class names:** `reading-step`, `hint`, `solution`, `details`,
+  `embed` and `modes` on a div make it one of these blocks.
 
 ## Author text, translation and image tasks
 

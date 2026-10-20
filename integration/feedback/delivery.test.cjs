@@ -14,10 +14,11 @@ const site = process.env.CTM_INTEGRATION_SITE;
 
 // Code of ctm-libs or a component that must come from a file, never inline.
 const BUNDLES = /MathExerciseRuntime\s*=|CTMLocales\.add\(|root\.AIFeedback\s*=|var ME_CFG =|var MODULE_PY = \[|root\.PyExerciseFeedback\s*=|function setupExercise\(/;
-// The mixed example page (activities, mathematics, Python, Pyodide, JSXGraph).
+// The mixed example page (activities, mathematics, Python, Pyodide, JSXGraph;
+// its tabsets load ctm-libs' links into tabs, on by default since step 4).
 const EXPECTED = [
   'ai-feedback/feedback-core.js', 'ai-feedback/feedback-dom.js', 'ai-feedback/ai-feedback.js', 'ai-feedback/ai-feedback.css',
-  'ctm-runtime/pyodide-runtime.js', 'ctm-locale/ctm-locale.js', 'ctm-locale/common.js',
+  'ctm-runtime/pyodide-runtime.js', 'ctm-locale/ctm-locale.js', 'ctm-locale/common.js', 'ctm-nav/ctm-nav.js', 'ctm-ui/ctm-ui.css',
   'ctm-locale-math-exercise/math-exercise.js', 'ctm-locale-py-exercise/py-exercise.js',
   'math-exercise/matrix-input.css', 'math-exercise/math-exercise.css', 'math-exercise/matrix-input.js', 'math-exercise/math-exercise.js',
   'py-exercise-feedback/py-exercise-feedback.js', 'py-exercise/py-exercise.css', 'py-exercise/py-exercise.js',

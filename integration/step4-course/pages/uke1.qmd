@@ -1,0 +1,7 @@
+---
+title: "Uke 1 – egenverdier"
+resources:
+  - ../assets/embed.html
+---
+
+{{< include ../_includes/uke1.md >}}

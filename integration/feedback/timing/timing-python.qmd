@@ -5,6 +5,7 @@ filters: [py-exercise]
 ---
 
 ```{py-exercise}
+#| label: answer
 def answer():
     return 0
 ## TESTS ##

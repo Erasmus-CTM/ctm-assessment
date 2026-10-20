@@ -5,8 +5,11 @@ name: Quarto versions
 # release. Quarto 1.10 sends pages with hyphenated blocks such as
 # {math-exercise} to Jupyter (reported upstream; see the audit report), so the
 # release job installs Jupyter, as courses building with 1.10 must, and notes
-# when the workaround is still needed. On demand, weekly, and when this file
-# changes.
+# when the workaround is still needed. The canary step renders the tab-ids.lua
+# fixture with Quarto alone first: the filter keeps tab-heading ids only while
+# Quarto parses tabsets after pre-ast filters, and a release that changed this
+# would make it silently do nothing (step 4, design §6.1). On demand, weekly,
+# and when this file or the filter changes.
 on:
   workflow_dispatch:
   schedule:
@@ -14,6 +17,9 @@ on:
   push:
     paths:
       - .github/workflows/quarto-versions.yml
+      - _extensions/ctm-assessment/tab-ids.lua
+      - integration/feedback/tab-ids.test.cjs
+      - integration/feedback/tab-ids/**
 
 permissions:
   contents: read
@@ -44,6 +50,14 @@ jobs:
       - uses: quarto-dev/quarto-actions/setup@v2
         with:
           version: ${{ matrix.quarto }}
+      - name: Canary - tab-heading ids at pre-ast with Quarto ${{ matrix.quarto }}
+        run: |
+          npm ci --ignore-scripts
+          node --test integration/feedback/tab-ids.test.cjs 2>&1 | tee "$RUNNER_TEMP/canary.log"
+          if grep -q '^not ok' "$RUNNER_TEMP/canary.log"; then
+            echo "::error title=tab-ids.lua canary (Quarto $(quarto --version))::the tab-ids.lua fixture failed (log above): tab-heading ids may no longer be kept with this Quarto (tabsets parsed before pre-ast filters?)"
+            exit 1
+          fi
       - name: Build and test with Quarto ${{ matrix.quarto }}
         run: |
           set -o pipefail

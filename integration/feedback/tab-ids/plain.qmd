@@ -1,0 +1,7 @@
+---
+title: Without tabsets
+---
+
+## A section {#a-section}
+
+No tabs on this page.

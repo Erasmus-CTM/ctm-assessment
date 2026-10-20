@@ -32,6 +32,63 @@ an attempt. A feedback policy is simply a named set of instructions for this
 kind of help. Keep those instructions in a YAML file, then select the name in
 an exercise. [Learn how to choose and reuse feedback instructions](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/authoring.md#choose-the-kind-of-help).
 
+## Show explanations step by step
+
+Hide what students should try first, in plain Markdown:
+
+```markdown
+::: {.reading-step title="Gå i dybden: skaler uten å dreie"}
+The worked explanation: text, maths, code cells, exercises, even headings.
+:::
+
+::: {.hint title="Hint for problem 1"}
+A nudge.
+:::
+
+::: {.solution}
+The worked solution.
+:::
+
+::: {.details title="SciPy lookup: calls and results"}
+Material that stays closed until opened.
+:::
+```
+
+Each block is closed until a student opens it. Without `title`, a block
+shows its kind in the page's language ("Gå i dybden", "Løsningsforslag",
+"Hint"; give a `.details` a title that says what it holds). The title is
+Markdown; write a TeX backslash twice there: `title="$\\mathbf{A}$"`.
+
+A page with `.reading-step` blocks gets a **lecture/reading switch** at the
+top ("Forelesning" / "Gå i dybden"; in English "Explore" / "Go deeper"):
+lecture closes the reading steps, reading opens them all, and the choice
+lasts while the student stays in the course. Put `::: {.modes}` and `:::` on
+two lines where the switch should go instead, or set
+`ctm-assessment: modes: false` to leave it out.
+
+**Links into tabs and reveals.** A link to a heading, an anchor
+(`::: {#name}` and `:::`) or an exercise inside tabs or a closed block opens
+them, from the same page or another one. Quarto drops the ids of tab
+headings themselves; to link to a tab, add this line to `_quarto.yml` once:
+
+```yaml
+filters:
+  - path: _extensions/ctm-assessment/tab-ids.lua
+    at: pre-ast
+  - ctm-assessment
+```
+
+Then `## 3.5 Polynomer {#uke3-del5}` in a tabset is a link target too.
+
+**Embed a page** (an applet, a visualisation) with
+`::: {.embed src="../assets/visualizer.html" title="What it shows" height="920px"}`
+and `:::`; the title names it for screen readers.
+
+Write these forms rather than HTML (`<details>`, `<summary>`, `<iframe>`,
+`<div id="…"></div>`): `ctm-assessment: markdown-lint: true` names any raw
+HTML that has a Markdown form, when the page renders.
+[More detail](reference.md#reveals-the-switch-and-links-into-tabs).
+
 ## Adapt an example
 
 - [Writing and images](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/authoring.md)

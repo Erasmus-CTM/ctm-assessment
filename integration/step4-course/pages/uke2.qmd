@@ -1,0 +1,5 @@
+---
+title: "Uke 2 – lenker fra en annen side"
+---
+
+{{< include ../_includes/uke2.md >}}

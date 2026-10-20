@@ -77,6 +77,43 @@ commits recorded in `_extensions/ctm-assessment/resolved-repos.json`.
   scripts with `<`, `>` and `&` escaped, as ctm-libs does for feedback data.
   Before, a starter or test containing `</script>` broke the page.
 
+- **Reveals, the lecture/reading switch, links into tabs and embedded
+  pages, in Markdown** (step 4; ctm-libs 4acb7c6):
+  `::: {.reading-step title="…"}`, `::: {.hint}`, `::: {.solution}` and
+  `::: {.details title="…"}` are closed boxes; a page with reading steps
+  gets the switch at its top (`::: {.modes}` places it, `ctm-assessment:
+  modes: false` leaves it out); `::: {.embed src title height}` embeds a
+  page. See the [authoring guide](docs/authoring.md#show-explanations-step-by-step).
+- **Links into tabs and reveals are on by default:** every page with a
+  tabset (or a reveal) loads ctm-libs' `ctm-ui.css` and `ctm-nav.js`, which
+  open the tabs and reveals around a link's target, from the page or another
+  page, and focus it. `ctm-assessment: tab-links: false` turns them off; a
+  site that still has its own tab-link script sets it until it removes the
+  script.
+- **Ids on tab headings** with the project-level filter
+  `_extensions/ctm-assessment/tab-ids.lua` (`filters: - path: …, at: pre-ast`
+  before `- ctm-assessment` in `_quarto.yml`): a tab heading's id and
+  attributes move to the start of its pane, so links to a tab work (and
+  `quiz=` reaches the filters). Ids with a cross-reference prefix are not
+  moved, with a warning. A project with the line stops with an older package.
+- **Reveals take over six class names** (backwards-incompatible for a site
+  that uses them; none of the CTM courses, this package or its components
+  does): in HTML a div with `.reading-step`, `.hint`, `.solution` (Quarto's
+  visible *Solution.* before) or `.details` becomes a closed reveal, `.embed`
+  an embedded page (it needs `src` and `title`) and `.modes` the place of the
+  switch.
+- **`ctm-assessment: markdown-lint: true`** warns at render time about raw
+  HTML that has a Markdown form (`<details>`, `<summary>`, `<div id>`
+  anchors, `<iframe>`, a hand-written switch), tabsets in a project without
+  the `tab-ids.lua` line and a `.details` without a title, with files and
+  lines.
+- **A build without AI feedback stops at exercises that only AI feedback can
+  assess** (ctm-libs #21; breaking for builds without AI feedback): `.ai-feedback`
+  activities (and, with component versions that ask ctm-libs, exercises
+  without a static check) are named in one error. `ai-feedback: without-ai: text` (or `self-check`) shows them
+  as text with a note, `drop` removes them. Builds with AI feedback are
+  unchanged.
+
 ### Unchanged
 
 The author syntax of every component, grading (no checker changed), the
@@ -119,3 +156,15 @@ pyodide-interaktiv).
 - Release workflow on tags `v*.*.*` (`scripts/release-check.py`: the tag
   names the package version, every component is pinned, the release notes are
   this file's section).
+- Step 4 (A2): `tools/migrate-course-html.py` converts a course's raw HTML
+  to the Markdown forms (`--config` also edits `_quarto.yml`) and, with
+  `--check --baseline`, lints a course that has not migrated yet;
+  **Compare rendered courses** compares each course from the package it
+  pins to the pull request's head, takes `course-base-ref`, a package per
+  side (`pin`), `convert`, `expect` and `browser` on demand, and checks the
+  fixture course `integration/step4-course` against its migration
+  (`expect/step4-migration.yml`) and in Chromium, Firefox and WebKit
+  (`tools/compare-browser.mjs`); `expect/step4.yml` lists step 4's
+  differences on pages without its Markdown. The Quarto-release canary runs
+  the `tab-ids.lua` test first. The umbrella's own unlabelled exercises got
+  labels.

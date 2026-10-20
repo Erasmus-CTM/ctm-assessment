@@ -1,0 +1,10 @@
+---
+title: "Steg 4-kurs"
+---
+
+Et lite kurs med lesesteg, faner og lenker.
+
+- [Uke 1](pages/uke1.qmd)
+- [Uke 1, metodefanen](pages/uke1.qmd#uke1-metode)
+- [Uke 1, forklaringen i lesesteget](pages/uke1.qmd#uke1-dypt)
+- [Grupperte faner, Python](pages/grupper.qmd#i-python)
