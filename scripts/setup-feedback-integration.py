@@ -156,12 +156,20 @@ def canonical_name(name, config, option, notices):
     return name
 
 
-def check_shared_files(config, sources, extensions, hashes):
-    """The shared bootstrap is byte-identical everywhere; retired copies are gone."""
+def check_shared_files(config, sources, extensions, hashes, pinned_libs=None):
+    """The shared bootstrap is byte-identical everywhere; retired copies are gone.
+
+    `pinned_libs`: with --follow-branches, the pinned ctm-libs when its branch
+    tip is another commit. A copy may then also equal the pinned canonical
+    bootstrap: a component's tip that has not yet taken a new bootstrap from
+    ctm-libs' tip is not an error (consolidation step 3, U3a)."""
     canonical = sources['ctm-libs'] / 'bootstrap' / BOOTSTRAP
     if not canonical.is_file():
         raise SystemExit(f'ctm-libs has no bootstrap/{BOOTSTRAP} to compare the components\' copies with.')
     expected = hashlib.sha256(canonical.read_bytes()).hexdigest()
+    accepted = {expected}
+    if pinned_libs is not None and (pinned_libs / 'bootstrap' / BOOTSTRAP).is_file():
+        accepted.add(hashlib.sha256((pinned_libs / 'bootstrap' / BOOTSTRAP).read_bytes()).hexdigest())
     digests = {}
     for name in config['repositories']:
         for folder in extensions[name]:
@@ -170,9 +178,10 @@ def check_shared_files(config, sources, extensions, hashes):
                     digests[f'{folder}/{path}'] = digest
     for name in BOOTSTRAP_COMPONENTS:
         digests.setdefault(f'{extensions[name][0]}/{BOOTSTRAP}', None)
-    differ = {path: digest for path, digest in digests.items() if digest != expected}
+    differ = {path: digest for path, digest in digests.items() if digest not in accepted}
     if differ:
-        raise SystemExit(f'Copies of {BOOTSTRAP} must equal ctm-libs\' bootstrap/{BOOTSTRAP} ({expected[:12]}): '
+        raise SystemExit(f'Copies of {BOOTSTRAP} must equal ctm-libs\' bootstrap/{BOOTSTRAP} ({expected[:12]}'
+                         + ''.join(f' or the pinned {digest[:12]}' for digest in sorted(accepted - {expected})) + '): '
                          + ', '.join(f'{path}={(digest or "missing")[:12]}' for path, digest in sorted(differ.items())))
     for name in config['repositories']:
         if name in KEEPS_RETIRED_COPIES:
@@ -400,7 +409,14 @@ def main():
             hashes[folder] = {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(destination.rglob('*')) if p.is_file()}
     # The one deliberate shared copy (ctm-libs' bootstrap in every component)
     # stays byte-identical; copies that moved into ctm-libs are gone.
-    check_shared_files(config, sources, extensions, hashes)
+    # Following branch tips, a component may still carry the bootstrap of the
+    # pinned ctm-libs while ctm-libs' tip has a new one (any merge order of
+    # ctm-libs and the components keeps the tracker green).
+    pinned_libs = None
+    libs_pin = config['repositories']['ctm-libs'].get('commit')
+    if args.follow_branches and libs_pin and revisions['ctm-libs']['commit'] != libs_pin:
+        pinned_libs = snapshot(config['repositories']['ctm-libs']['repository'], libs_pin, cache)
+    check_shared_files(config, sources, extensions, hashes, pinned_libs)
     check_one_home(extensions, extensions_root)
     # Licence notices travel with the package (`quarto add` installs only
     # _extensions/): each repository's licence, when its main extension folder
@@ -422,8 +438,9 @@ def main():
         own = set(extensions[name])
         shipped = tracked_extensions(source, name in local, extensions[name])
         # A declared distribution copy next to the component (pyodide-interaktiv
-        # ships ai-feedback for its existing projects) is allowed; the package
-        # copies only the component's own folders, so it never installs it.
+        # ships ai-feedback for its existing projects, and from 1.9 a generated
+        # ctm-libs for standalone use) is allowed; the package copies only the
+        # component's own folders, so it never installs it.
         foreign = shipped - own - set(config['repositories'][name].get('ships-copies', []))
         # A copy inside one of the component's own folders would be shipped: never allowed.
         foreign |= {other for other in owned - own

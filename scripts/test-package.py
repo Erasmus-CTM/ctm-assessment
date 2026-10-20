@@ -57,6 +57,18 @@ with tempfile.TemporaryDirectory(prefix='ctm-install-', dir=archive.parent) as t
     libs_version = version(extensions / 'ctm-libs')
     assert version(extensions / 'ai-feedback') == libs_version, 'the ai-feedback alias must have the version of ctm-libs'
     assert not (extensions / 'math-exercise' / 'feedback-loader.lua').exists()
+    # pyodide-interaktiv 1.9 (consolidation step 3) loads ctm-libs through the
+    # shared bootstrap (the build compares the copy) instead of its own
+    # loader, and its scripts are cacheable files; 1.8 inlined them.
+    pyodide = extensions / 'pyodide-interaktiv'
+    pyodide_19 = tuple(int(part) for part in re.findall(r'\d+', version(pyodide).strip('\'"'))[:2]) >= (1, 9)
+    if pyodide_19:
+        assert (pyodide / 'ctm-bootstrap.lua').is_file(), 'pyodide-interaktiv 1.9 without its ctm-bootstrap.lua'
+        assert not (pyodide / 'feedback-loader.lua').exists(), 'pyodide-interaktiv 1.9 still has feedback-loader.lua'
+        assert not any((pyodide / name).exists() for name in ('ctm-libs', 'ai-feedback', '_extensions')), 'the package must not install pyodide-interaktiv\'s shipped copies'
+        SCRIPTS.extend([('ctm-worker', 'pyodide-worker.js'), ('ctm-locale-pyodide-interaktiv', 'pyodide-interaktiv.js'),
+                        ('pyodide-interaktiv', 'qpyodide-locale.js'), ('pyodide-interaktiv', 'qpyodide-document-engine-initialization.js'),
+                        ('pyodide-interaktiv', 'qpyodide-cell-classes.js'), ('pyodide-interaktiv-feedback', 'qpyodide-feedback.js')])
     # ctm-checkers, the Python checker library that math-exercise 0.11 and
     # later grade with: its folder with the manifest, the wheel it names and the
     # page script that carries that wheel.
@@ -199,7 +211,7 @@ assert answer() == 2
     # Without ctm-libs, a component stops with the install command (decision 3).
     shutil.rmtree(extensions / 'Erasmus-CTM')
     shutil.rmtree(extensions / 'ctm-libs')
-    for filters in ('math-exercise', 'py-exercise'):
+    for filters in ('math-exercise', 'py-exercise') + (('pyodide-interaktiv',) if pyodide_19 else ()):
         (course / '_quarto.yml').write_text(f'project:\n  type: default\n  render: [mixed.qmd]\nfilters: [{filters}]\n')
         result = render(course, expect_ok=False)
         assert result.returncode != 0 and 'needs its library ctm-libs' in result.stderr and INSTALL in result.stderr, result.stderr

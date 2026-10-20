@@ -15,7 +15,7 @@ Assessment, as before:
 quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz
 ```
 
-Components: ctm-libs 0.9.0 at e415cee, math-exercise 0.11.0, ctm-checkers
+Components: ctm-libs 0.9.0 at 8c7e5f6, math-exercise 0.11.0, ctm-checkers
 0.1.1.dev0 at 4bd916d (new), py-exercise, pyodide-interaktiv and JSXGraph
 unchanged, at the commits recorded in
 `_extensions/ctm-assessment/resolved-repos.json`.
@@ -59,7 +59,14 @@ ctm-libs moves from 4acb7c6 to 40bad7d: `ctm.checkers` (it finds, installs
 and calls ctm-checkers for components; ctm-libs #23), then to e415cee
 (ctm-libs #25, step 4 follow-ups): in WebKit a deep link to a tab title far
 down a page keeps the tab row in view, and `markdown-lint` resolves nested
-includes against the page, as Quarto does.
+includes against the page, as Quarto does; then to 8c7e5f6, the head of
+step 4's set (ctm-libs #29 on #28, with #26 merged before them): the focus
+stays where a deep link put it when WebKit's late jump to the fragment drops
+it (#29); `markdown-lint`'s reading as an API for maintainer tools,
+`ctm.source.read()`, `ctm.ui.rawHTML()` and `ctm.ui.defaultTitle()` (#28,
+no change to a page); ctm-checkers' STACK engine as a part of its own, one
+install per runtime and payload (#26, step 2; math-exercise's runtime
+tests pass with the pinned ctm-checkers 0.1, as #26 reports).
 
 ### For maintainers
 

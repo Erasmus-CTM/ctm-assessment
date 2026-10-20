@@ -4,7 +4,7 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "e415cee65f95bbb5e659d01633295b7ba0698cd0",
+      "commit": "8c7e5f607b21136e71a510c8fe8385de26493712",
       "extensions": [
         "ctm-libs",
         "ai-feedback"
@@ -33,7 +33,8 @@
       "branch": "feature/shared-feedback-integration",
       "commit": "8a16aa73bc1eea241ee1407525d8657c4c8b287b",
       "ships-copies": [
-        "ai-feedback"
+        "ai-feedback",
+        "ctm-libs"
       ]
     },
     "jsxgraph": {

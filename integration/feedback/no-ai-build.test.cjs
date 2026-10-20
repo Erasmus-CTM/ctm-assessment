@@ -12,7 +12,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
+const vm = require('node:vm');
 const {JSDOM} = require('jsdom');
+const page = require('./page-scripts.cjs');
 const site = process.env.CTM_INTEGRATION_SITE;
 const QUARTO = process.env.QUARTO_BIN || 'quarto';
 const FIXTURE = path.join(__dirname, 'no-ai');
@@ -50,13 +52,33 @@ function messages(stderr) {
 function output(dir) {
   return fs.readdirSync(path.join(dir, '_site'), {recursive: true}).map(String).map(name => name.split(path.sep).join('/'));
 }
+// pyodide-interaktiv 1.9 (consolidation step 3) writes none of the AI-only
+// cell options without AI feedback, not even empty (E3): no task,
+// feedback-policy or feedback-context key, so no hidden #| task: text; and no
+// Pyodide feedback script. 1.8 kept them.
+const AI_ONLY = ['task', 'feedback-policy', 'feedback-context'];
+// The Pyodide cells of a page (its settings script, evaluated), or [].
+function pyodideCells(html) {
+  const script = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(text => text.includes('globalThis.qpyodideCellDetails ='));
+  if (!script) return [];
+  const context = {};
+  context.globalThis = context;
+  vm.runInNewContext(script, context);
+  return context.qpyodideCellDetails;
+}
 function checkWithout(dir, pages, reason, stderr) {
   assert.deepEqual(output(dir).filter(name => FILES.test(name)), [], 'feedback files in the site');
-  for (const page of pages) {
-    const html = fs.readFileSync(path.join(dir, '_site', page.replace(/\.qmd$/, '.html')), 'utf8');
-    assert.doesNotMatch(html, ABSENT, page);
-    assert.doesNotMatch(html, MARKERS, page);
+  const page19 = page.pyodideAtLeast19(path.join(dir, '_extensions'));
+  for (const name of pages) {
+    const html = fs.readFileSync(path.join(dir, '_site', name.replace(/\.qmd$/, '.html')), 'utf8');
+    assert.doesNotMatch(html, ABSENT, name);
+    assert.doesNotMatch(html, MARKERS, name);
+    if (page19) {
+      assert.doesNotMatch(html, /Print two\.|qpyodide-feedback\.js|"policySelection"|"feedbackContext"/, name);
+      for (const cell of pyodideCells(html)) assert.deepEqual(AI_ONLY.filter(key => key in cell.options), [], name + ': AI-only keys of cell ' + cell.id);
+    }
   }
+  if (page19) assert.ok(pyodideCells(fs.readFileSync(path.join(dir, '_site', 'all.html'), 'utf8')).length > 0, 'all.html has Pyodide cells');
   const html = fs.readFileSync(path.join(dir, '_site', 'all.html'), 'utf8');
   const doc = new JSDOM(html).window.document;
   const task = doc.querySelector('#essay');
