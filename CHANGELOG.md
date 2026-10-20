@@ -16,7 +16,7 @@ quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz
 ```
 
 Components: ctm-libs 0.9.0 at 8c7e5f6, math-exercise 0.11.0, ctm-checkers
-0.1.1.dev0 at 4bd916d (new), py-exercise, pyodide-interaktiv and JSXGraph
+0.2.0 at 8c3db5e (new), py-exercise, pyodide-interaktiv and JSXGraph
 unchanged, at the commits recorded in
 `_extensions/ctm-assessment/resolved-repos.json`.
 
@@ -65,8 +65,12 @@ stays where a deep link put it when WebKit's late jump to the fragment drops
 it (#29); `markdown-lint`'s reading as an API for maintainer tools,
 `ctm.source.read()`, `ctm.ui.rawHTML()` and `ctm.ui.defaultTitle()` (#28,
 no change to a page); ctm-checkers' STACK engine as a part of its own, one
-install per runtime and payload (#26, step 2; math-exercise's runtime
-tests pass with the pinned ctm-checkers 0.1, as #26 reports).
+install per runtime and payload (#26, step 2). With it ctm-checkers moves
+from 4bd916d (0.1.1.dev0) to 8c3db5e (0.2.0, ctm-checkers #3 and #4), the
+commit ctm-libs' own tests use since #26: its STACK engine is a wheel and
+page script of their own, which math pages do not load, and its install
+code leaves no name behind; math-exercise's verdicts are unchanged (the
+parity check).
 
 ### For maintainers
 

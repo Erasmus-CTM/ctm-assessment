@@ -26,7 +26,7 @@
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
       "branch": "main",
-      "commit": "4bd916d74c10afb82dae9003b3baf5564d19e09b"
+      "commit": "8c3db5e670684aeb5e31fcb5b3823e97ca23ae63"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
