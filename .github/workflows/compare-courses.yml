@@ -4,8 +4,9 @@ name: Compare rendered courses
 # ctm-assessment refs, each through its own installer and pins
 # (scripts/build-course.py), and compares the rendered pages
 # (tools/compare-rendered.mjs). Every difference must belong to an expected
-# category of tools/compare-rendered/expect/ (step4.yml, the course's own file
-# and the files the comparison names); the report is uploaded.
+# category of tools/compare-rendered/expect/ (step4.yml, step2.yml, the
+# course's own file and the files the comparison names); the report is
+# uploaded.
 #
 # On pull requests that change the package, its pins or the tools
 # (tools/ci/compare-matrix.py):
@@ -211,7 +212,7 @@ jobs:
         continue-on-error: ${{ matrix.informational == true }}
         run: |
           name=$(basename "$COURSE")
-          expect=(--expect tools/compare-rendered/expect/step4.yml)
+          expect=(--expect tools/compare-rendered/expect/step4.yml --expect tools/compare-rendered/expect/step2.yml)
           for file in $EXPECT; do expect+=(--expect "tools/compare-rendered/expect/$file"); done
           [ -f "tools/compare-rendered/expect/$name.yml" ] && expect+=(--expect "tools/compare-rendered/expect/$name.yml")
           outputs=(_site)

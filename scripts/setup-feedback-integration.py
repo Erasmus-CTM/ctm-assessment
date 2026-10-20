@@ -184,6 +184,39 @@ def check_shared_files(config, sources, extensions, hashes):
                                  'which ctm-libs provides now; remove the copy.')
 
 
+# Checker Python has one home, ctm-checkers (step-2 design §3.6): no other
+# packaged folder defines math-exercise's checks or the basis helper (in any
+# file: scripts, modules, JSON, also inside an escaped string) or ships a
+# wheel, and math-exercise's only Python files are its variant generator and
+# the question-test script that runs ctm-checkers.
+CHECKER_DEFINITIONS = re.compile(rb'(?:(?<![\w\\])|(?<=\\[nrt]))def(?:\s|\\[nrt])+(_math_check|assess_basis)\b')
+MATH_EXERCISE_PYTHON = {'variants.py', 'question-tests.py'}
+
+
+def check_one_home(extensions, extensions_root):
+    """No checker code outside ctm-checkers."""
+    problems = []
+    for name, folders in extensions.items():
+        if name == 'ctm-checkers':
+            continue
+        for folder in folders:
+            for path in sorted((extensions_root / folder).rglob('*')):
+                if not path.is_file():
+                    continue
+                where = f'{folder}/{path.relative_to(extensions_root / folder)}'
+                if path.suffix == '.whl':
+                    problems.append(f'{where} is a wheel outside ctm-checkers')
+                    continue
+                if CHECKER_DEFINITIONS.search(path.read_bytes()):
+                    problems.append(f'{where} defines checker code')
+    for folder in extensions.get('math-exercise', []):
+        extra = sorted(str(path.relative_to(extensions_root / folder)) for path in (extensions_root / folder).rglob('*.py')
+                       if path.name not in MATH_EXERCISE_PYTHON or path.parent != extensions_root / folder)
+        problems += [f'{folder}/{path} is Python besides variants.py and question-tests.py' for path in extra]
+    if problems:
+        raise SystemExit('Checker code belongs in ctm-checkers only: ' + '; '.join(problems) + '.')
+
+
 def package_version():
     """The CTM Assessment version (`version:` of the package manifest)."""
     manifest = (ROOT / '_extensions' / 'ctm-assessment' / '_extension.yml').read_text(encoding='utf-8')
@@ -368,6 +401,7 @@ def main():
     # The one deliberate shared copy (ctm-libs' bootstrap in every component)
     # stays byte-identical; copies that moved into ctm-libs are gone.
     check_shared_files(config, sources, extensions, hashes)
+    check_one_home(extensions, extensions_root)
     # Licence notices travel with the package (`quarto add` installs only
     # _extensions/): each repository's licence, when its main extension folder
     # has none of its own (ctm-libs' notice also covers its ai-feedback alias).

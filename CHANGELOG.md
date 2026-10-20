@@ -1,5 +1,76 @@
 # Changes
 
+## 0.10.0
+
+Consolidation step 2: math-exercise grades with **ctm-checkers**, the
+package's new Python checker library, instead of checker code of its own.
+**Nothing changes in grading**: every exercise of the umbrella's example
+site, math-exercise's example site, ctm-demo (with its review build) and
+ingmat3a gets the same status, score, details and feedback as with 0.9.0
+(CI compares both builds of all four), and ctm-checkers' golden tables
+reproduce math-exercise 0.10's verdicts. Authors install and list only CTM
+Assessment, as before:
+
+```sh
+quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz
+```
+
+Components: ctm-libs 0.9.0 at e415cee, math-exercise 0.11.0, ctm-checkers
+0.1.1.dev0 at 4bd916d (new), py-exercise, pyodide-interaktiv and JSXGraph
+unchanged, at the commits recorded in
+`_extensions/ctm-assessment/resolved-repos.json`.
+
+### Changed for authors
+
+- **New folder `_extensions/ctm-checkers`**, installed with the package: the
+  checks of every math-exercise mode, custom checkers, `assess_basis` and
+  `graph_from_response`, for the browser (its page script `ctm-checkers.js`,
+  about 40 KB, loaded once on a page with an exercise and cached like the
+  other files) and for build time (question tests, rounding of generated
+  variants). `math-exercise.js` is about 20 KB smaller. A course repository
+  that keeps installed extensions out of git adds
+  `/_extensions/ctm-checkers/` to its `.gitignore`.
+- **Without ctm-checkers** (a partial installation), a page with a math
+  exercise stops rendering with the install command; pages without one
+  render.
+- **The exercise syntax, the HTML of exercises, generated variants, the
+  question-test command and every interface text are unchanged.**
+
+### math-exercise 0.11 for learners and authors
+
+- **Stop**: a check waiting behind the one a learner stops is now stopped
+  too ("Stopped. Python was restarted …"; the next Check runs on the
+  restarted Python). In 0.10 it ran after the restart. A runtime that stops
+  answering after Stop no longer holds up later checks.
+- Learner code in a Pyodide cell that rebinds `__import__` or `globals` no
+  longer stops every check on the page.
+- **A build without AI feedback stops at an exercise in `mode: custom`
+  without a `checker`** (breaking for builds without AI feedback): such an
+  exercise (assessed by AI feedback only) follows ctm-libs'
+  `ai-feedback: without-ai` (the build stops and names it, unless the
+  setting says `text`, `self-check` or `drop`). Builds with AI feedback
+  are unchanged.
+- `question-tests.py` runs the question tests in ctm-checkers, with the same
+  output and exit status.
+
+### ctm-libs
+
+ctm-libs moves from 4acb7c6 to 40bad7d: `ctm.checkers` (it finds, installs
+and calls ctm-checkers for components; ctm-libs #23), then to e415cee
+(ctm-libs #25, step 4 follow-ups): in WebKit a deep link to a tab title far
+down a page keeps the tab row in view, and `markdown-lint` resolves nested
+includes against the page, as Quarto does.
+
+### For maintainers
+
+- `integration/feedback/repos.json` pins ctm-checkers (U2a) and the package
+  builder keeps checker Python in one home: no packaged folder but
+  ctm-checkers defines `_math_check` or `assess_basis` (in any file) or
+  ships a wheel, and math-exercise's only Python files are `variants.py`
+  and `question-tests.py`.
+- `tools/compare-rendered/expect/step2.yml`: the one expected rendered
+  difference, ctm-checkers' page script on pages with a math exercise.
+
 ## 0.9.0
 
 CTM Assessment 0.9.0 is the first versioned release of the package. The
@@ -78,7 +149,7 @@ commits recorded in `_extensions/ctm-assessment/resolved-repos.json`.
   Before, a starter or test containing `</script>` broke the page.
 
 - **Reveals, the lecture/reading switch, links into tabs and embedded
-  pages, in Markdown** (step 4; ctm-libs e415cee):
+  pages, in Markdown** (step 4; ctm-libs 4acb7c6):
   `::: {.reading-step title="…"}`, `::: {.hint}`, `::: {.solution}` and
   `::: {.details title="…"}` are closed boxes; a page with reading steps
   gets the switch at its top (`::: {.modes}` places it, `ctm-assessment:
@@ -183,6 +254,3 @@ pyodide-interaktiv).
   `--first-visit` mode (no isolation headers, coi-serviceworker active) and
   reads `known-failures` from the expect file; the fixture course has
   tabsets far down a long page with deep links from another page.
-  ctm-libs moves to e415cee (ctm-libs #25: WebKit keeps the tab row of a
-  deep-linked tab title in view; `markdown-lint` resolves nested includes
-  against the page; it also brings ctm-libs #23, ctm.checkers).
