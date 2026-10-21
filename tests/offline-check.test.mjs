@@ -50,7 +50,7 @@ test('every nested hidden board, inline board and smaller board passes all five 
 });
 
 test('production math caption markup opens its visibility-hidden board through the actual toggle state', {timeout: 60000}, async () => {
-  const {context} = await offlineContext(browser, server.baseURL);
+  const {context, drain, evidence: network} = await offlineContext(browser, server.baseURL);
   try {
     const page = await context.newPage();
     page.setDefaultTimeout(10000);
@@ -65,7 +65,11 @@ test('production math caption markup opens its visibility-hidden board through t
     assert.equal(await page.locator('.math-exercise-toggle').getAttribute('aria-expanded'), 'true');
     assert.equal(await page.locator('.math-exercise-body').getAttribute('aria-hidden'), 'false');
     assert.equal(await page.locator('iframe').isVisible(), true);
-  } finally { await context.close(); }
+  } finally {
+    await drain();
+    await context.close();
+    for (const key of ['external', 'responses', 'failed', 'errors']) assert.deepEqual(network[key], [], key);
+  }
 });
 
 test('opacity-zero board and frame ancestors fail despite positive geometry', {timeout: 60000}, async () => {
@@ -93,14 +97,18 @@ test('zero SVG, wrong-size SVG and empty ink controls fail every load for their 
 });
 
 test('known board iframe without a board is a failure rather than a vacuous pass', {timeout: 180000}, async () => {
-  const {context} = await offlineContext(browser, server.baseURL);
+  const {context, drain, evidence: network} = await offlineContext(browser, server.baseURL);
   try {
     const page = await context.newPage();
     await page.goto(server.baseURL + 'missing.html');
     const result = await checkBoards(page, {attachTimeoutMs: 200});
     assert.equal(result.length, 1);
     assert.deepEqual(result[0].errors, ['board iframe contains no board box']);
-  } finally { await context.close(); }
+  } finally {
+    await drain();
+    await context.close();
+    for (const key of ['external', 'responses', 'failed', 'errors']) assert.deepEqual(network[key], [], key);
+  }
 });
 
 test('external requests in document, worker and opaque frame are recorded and fail the offline run', {timeout: 180000}, async () => {
@@ -154,7 +162,7 @@ test('local string/URL/Request and opaque-frame requests succeed; data URLs are 
 });
 
 test('registration is refused without probing an opaque navigator.serviceWorker getter', {timeout: 30000}, async () => {
-  const {context, drain, evidence: observed} = await offlineContext(browser, server.baseURL);
+  const {context, drain, evidence: network} = await offlineContext(browser, server.baseURL);
   try {
     const page = await context.newPage();
     await page.goto(server.baseURL + 'positive.html');
@@ -167,9 +175,13 @@ test('registration is refused without probing an opaque navigator.serviceWorker 
     assert.deepEqual(result, {refusal: {name: 'NotAllowedError', message: 'Service workers are blocked by offline checks'}, registrations: 0});
     assert.equal(context.serviceWorkers().length, 0);
     await drain();
-    assert.deepEqual(observed.errors, [], 'opaque frames must not receive an instrumentation getter exception');
-    assert.ok(observed.attempts.some(attempt => attempt.kind === 'service-worker' && attempt.url === server.baseURL + 'service-worker.js'));
-  } finally { await context.close(); }
+    assert.deepEqual(network.errors, [], 'opaque frames must not receive an instrumentation getter exception');
+    assert.ok(network.attempts.some(attempt => attempt.kind === 'service-worker' && attempt.url === server.baseURL + 'service-worker.js'));
+  } finally {
+    await drain();
+    await context.close();
+    for (const key of ['external', 'responses', 'failed', 'errors']) assert.deepEqual(network[key], [], key);
+  }
 });
 
 test('HTTP errors and browser exceptions independently fail', {timeout: 180000}, async () => {
@@ -186,7 +198,7 @@ test('real JSXGraph hidden-frame mechanism: blank negative every time; >=20 plai
   for (const [mode, loads] of [['always-blank-real', 5], ['plain-hidden', 20], ['refresh-model', 5]]) {
     const outcomes = [];
     for (let i = 0; i < loads; i++) {
-      const {context, evidence: network} = await offlineContext(browser, server.baseURL);
+      const {context, drain, evidence: network} = await offlineContext(browser, server.baseURL);
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(30000);
@@ -201,12 +213,17 @@ test('real JSXGraph hidden-frame mechanism: blank negative every time; >=20 plai
         const boards = await checkBoards(page);
         const blank = boards.some(board => board.errors.some(error => /SVG (width|height)/.test(error)));
         assert.equal(boards.length, 1);
+        await drain();
         assert.deepEqual(network.external, []);
         assert.deepEqual(network.responses, []);
         assert.deepEqual(network.failed, []);
         assert.deepEqual(network.errors, []);
         outcomes.push({load: i + 1, blank, boards});
-      } finally { await context.close(); }
+      } finally {
+        await drain();
+        await context.close();
+        for (const key of ['external', 'responses', 'failed', 'errors']) assert.deepEqual(network[key], [], key);
+      }
     }
     mechanism.modes[mode] = outcomes;
     if (mode === 'always-blank-real') assert.ok(outcomes.every(run => run.blank), 'deterministic negative must fail every load');
