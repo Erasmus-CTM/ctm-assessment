@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "entries": {
+    "python-stdlib": {
+      "licence": "PSF-2.0",
+      "file": "integration/assets-licences/cpython.txt",
+      "source": "https://github.com/python/cpython/blob/v3.13.2/LICENSE",
+      "git_blob_sha1": "14603b95c2e23b5a4cd6ff93f50348d1817f7638",
+      "version_basis": "https://github.com/pyodide/pyodide/blob/0.28.3/Makefile.envs",
+      "applies_to": [
+        "python_stdlib.zip",
+        "pyodide.asm.wasm"
+      ]
+    },
+    "emscripten": {
+      "licence": "MIT OR UIUC",
+      "file": "integration/assets-licences/emscripten.txt",
+      "source": "https://github.com/emscripten-core/emscripten/blob/4.0.9/LICENSE",
+      "git_blob_sha1": "70cabe388d27da221bd769c50b427a35354f4f1d",
+      "version_basis": "https://github.com/pyodide/pyodide/blob/0.28.3/Makefile.envs",
+      "applies_to": [
+        "pyodide.asm.js",
+        "pyodide.asm.wasm"
+      ]
+    }
+  }
+}
