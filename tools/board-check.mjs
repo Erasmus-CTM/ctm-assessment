@@ -16,7 +16,7 @@ async function reveal(element) {
       try {
         const toggle = await node.evaluateHandle(n => {
           if (n.matches('details:not([open])')) return n.querySelector(':scope > summary');
-          if (n.matches('.math-exercise') && !n.classList.contains('math-exercise-open'))
+          if (n.matches('.math-exercise-cell') && !n.classList.contains('math-exercise-open'))
             return n.querySelector('.math-exercise-toggle[aria-expanded="false"]');
           if (n.matches('.tab-pane:not(.active), .collapse:not(.show)')) {
             return [...document.querySelectorAll('[data-bs-target], [data-target], a[href^="#"]')].find(t => {
@@ -53,7 +53,12 @@ async function revealFrame(frame) {
   try {
     await reveal(element);
     await element.scrollIntoViewIfNeeded();
-    if (!await element.isVisible()) throw new Error('board iframe remains hidden: ' + frame.url());
+    const opaque = await element.evaluate(el => {
+      for (let node = el; node; node = node.parentElement)
+        if (Number(getComputedStyle(node).opacity) === 0) return false;
+      return true;
+    });
+    if (!await element.isVisible() || !opaque) throw new Error('board iframe remains hidden or transparent: ' + frame.url());
   } finally { await element.dispose(); }
 }
 
@@ -106,15 +111,20 @@ export async function checkBoards(page, {settleMs = 1200, attachTimeoutMs = 3000
         const svg = el.querySelector('svg');
         // Client rect measures the actual SVG viewport, not a viewBox or frame.
         const viewport = svg?.getBoundingClientRect();
+        const opaque = node => {
+          for (let ancestor = node; ancestor; ancestor = ancestor.parentElement)
+            if (Number(getComputedStyle(ancestor).opacity) === 0) return false;
+          return true;
+        };
         const drawn = svg ? [...svg.querySelectorAll('path, text, line, circle, ellipse, polygon, polyline, rect, image, use')]
           .some(n => {
             if (n.closest('defs, clipPath, marker, pattern')) return false;
             const r = n.getBoundingClientRect(), s = getComputedStyle(n);
-            return (r.width > 0 || r.height > 0) && s.display !== 'none' && s.visibility === 'visible' && Number(s.opacity) > 0;
+            return (r.width > 0 || r.height > 0) && s.display !== 'none' && s.visibility === 'visible' && opaque(n);
           }) : false;
         return {board: el.id || null, box: {width: box.width, height: box.height},
           svg: viewport ? {width: viewport.width, height: viewport.height} : null,
-          visible: style.visibility === 'visible' && style.display !== 'none' && el.getClientRects().length > 0,
+          visible: style.visibility === 'visible' && style.display !== 'none' && el.getClientRects().length > 0 && opaque(el),
           drawn};
       });
       record.frame = frame.url();

@@ -49,6 +49,37 @@ test('every nested hidden board, inline board and smaller board passes all five 
   }
 });
 
+test('production math caption markup opens its visibility-hidden board through the actual toggle state', {timeout: 60000}, async () => {
+  const {context} = await offlineContext(browser, server.baseURL);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(10000);
+    await page.goto(server.baseURL + 'math-collapsed.html');
+    assert.equal(await page.locator('.math-exercise').count(), 0, 'obsolete checker selector must not match the fixture');
+    assert.equal(await page.locator('.math-exercise-body').getAttribute('aria-hidden'), 'true');
+    assert.equal(await page.locator('iframe').isVisible(), false);
+    const boards = await checkBoards(page);
+    assert.equal(boards.length, 1);
+    assert.deepEqual(boards[0].errors, []);
+    assert.equal(await page.locator('.math-exercise-cell').getAttribute('class'), 'math-exercise-cell math-exercise-open');
+    assert.equal(await page.locator('.math-exercise-toggle').getAttribute('aria-expanded'), 'true');
+    assert.equal(await page.locator('.math-exercise-body').getAttribute('aria-hidden'), 'false');
+    assert.equal(await page.locator('iframe').isVisible(), true);
+  } finally { await context.close(); }
+});
+
+test('opacity-zero board and frame ancestors fail despite positive geometry', {timeout: 60000}, async () => {
+  for (const name of ['board-opacity', 'frame-opacity']) {
+    const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL, pages: [{path: name + '.html', boards: 1}]});
+    evidence.contracts.push(result);
+    assert.equal(result.results.length, 5);
+    for (const load of result.results) {
+      assert.equal(load.ok, false);
+      assert.match(load.problems.join(';'), /hidden|transparent/);
+    }
+  }
+});
+
 test('zero SVG, wrong-size SVG and empty ink controls fail every load for their own reason', {timeout: 180000}, async () => {
   for (const [name, reason] of [['blank', /SVG width is zero/], ['mismatch', /width differs/], ['empty', /no drawn/]]) {
     const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL, pages: [{path: name + '.html', boards: 1}]});
