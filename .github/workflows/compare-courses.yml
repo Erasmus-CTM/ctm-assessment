@@ -69,6 +69,10 @@ on:
       convert:
         type: boolean
         default: false
+      emit-converted-source:
+        description: 'Log the converted tracked source for connector-only migration recovery'
+        type: boolean
+        default: false
       expect:
         type: string
         default: ''
@@ -106,6 +110,10 @@ on:
         default: ''
       convert:
         description: 'Preview the step-4 migration on the after side (tools/migrate-course-html.py --config)'
+        type: boolean
+        default: false
+      emit-converted-source:
+        description: 'Log the converted tracked source (only with convert)'
         type: boolean
         default: false
       expect:
@@ -273,6 +281,9 @@ jobs:
               if [ -n "$PROFILE" ]; then (cd "$out" && quarto render --profile "$PROFILE"); fi
             fi
           done
+      - name: Log converted tracked source for connector recovery
+        if: ${{ inputs['emit-converted-source'] && matrix.convert == true }}
+        run: python tools/ci/emit-converted-source.py "$RUNNER_TEMP/out/after"
       - name: Compare the rendered pages
         id: compare
         continue-on-error: ${{ matrix.informational == true }}
