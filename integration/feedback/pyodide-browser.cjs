@@ -179,7 +179,8 @@ async function status(page) {
     // 1b. WebKit: the worker cannot isolate the page and a reload reads as
     // navigation type "navigate", so coi-serviceworker.js does not see that
     // its check reload failed. The page reloads once and says input() is
-    // unavailable; it used to reload every two seconds (set review S10).
+    // unavailable for 24 hours; it used to reload every two seconds (set
+    // review S10, S12).
     {
       const server = await serve(out, {isolate: false, weakWorker: true});
       const context = await browser.newContext({serviceWorkers: 'allow'});
@@ -196,7 +197,9 @@ async function status(page) {
       await page.waitForTimeout(8000);
       assert.equal(navigations, 2, 'the page did not reload again');
       assert.equal(await page.evaluate(() => globalThis.crossOriginIsolated), false);
-      assert.equal(await page.evaluate(origin => localStorage.getItem('qpyodide-coi-unavailable-' + origin), origin), '1', 'the verdict is kept for the origin');
+      const failedAt = Number(await page.evaluate(() => localStorage.getItem('qpyodide-coi-check-failed')));
+      assert.ok(failedAt > Date.now() - 60000 && failedAt <= Date.now(), 'the failed check is kept, with its time');
+      assert.equal(await page.evaluate(origin => localStorage.getItem('qpyodide-coi-unavailable-' + origin), origin), null, 'the permanent verdict of coi-serviceworker.js is not set by the page');
       report.push('an engine that reports the check reload as "navigate" and cannot isolate: one reload, input() unavailable, no endless reloading');
       await context.close();
       server.close();

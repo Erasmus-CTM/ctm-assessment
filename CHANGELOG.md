@@ -29,7 +29,9 @@ and JSXGraph unchanged, at the commits recorded in
   so that the service worker can isolate it. WebKit cannot be isolated this
   way and reports that reload as a plain navigation; the page then reloaded
   every two seconds. It now reloads once and `input()` stays unavailable
-  there, as in other browsers that cannot isolate.
+  there, as in other browsers that cannot isolate. A hard reload (which
+  bypasses the worker) is not taken for the failed check, and the failure is
+  remembered for 24 hours, not for good.
 - **pyodide-interaktiv's scripts are cacheable files** (they were inline),
   and pages with `embed-resources: true` work with Pyodide cells.
 - **`pyodide:` settings combine key by key** across `_quarto.yml`, profiles,
