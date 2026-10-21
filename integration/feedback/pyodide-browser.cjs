@@ -5,6 +5,8 @@
 //   unchanged URL and scope; the page reloads once and is cross-origin
 //   isolated; Run, input(), Stop by interrupt (also while input() waits;
 //   variables are kept) and plots work;
+// - an engine that cannot isolate and reports a reload as navigation type
+//   "navigate" (WebKit): the page reloads once, not again and again;
 // - without isolation (service workers blocked, no headers): input()'s hint
 //   and its end-of-file path, Stop by restart (Run waits for the new start),
 //   and a restart during stage 2, which is no failure;
@@ -49,7 +51,9 @@ function project() {
 }
 
 // isolate: COOP/COEP headers from the server (as the smoke server sends them).
-function serve(root, {isolate}) {
+// weakWorker: the service worker file without its COOP/COEP lines: an engine
+// that ignores COEP credentialless (WebKit) is not isolated by the worker.
+function serve(root, {isolate, weakWorker = false}) {
   const server = http.createServer((req, res) => {
     const requested = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     const file = path.resolve(root, '.' + (requested.endsWith('/') ? requested + 'index.html' : requested));
@@ -57,6 +61,10 @@ function serve(root, {isolate}) {
     const headers = {'Content-Type': types[path.extname(file)] || 'application/octet-stream'};
     if (isolate) Object.assign(headers, {'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'credentialless'});
     res.writeHead(200, headers);
+    if (weakWorker && path.basename(file) === 'coi-serviceworker.js') {
+      res.end(fs.readFileSync(file, 'utf8').replace(/^\s*headers\.set\("Cross-Origin-(Opener|Embedder)-Policy".*$/gm, ''));
+      return;
+    }
     res.end(fs.readFileSync(file));
   });
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
@@ -164,6 +172,32 @@ async function status(page) {
       await page.waitForFunction(() => document.querySelectorAll('.qpyodide-output-graph-area')[3].querySelector('img, canvas'), null, {timeout: TIMEOUT});
       assert.deepEqual(errors, []);
       report.push('service worker (no headers): one reload, isolated, Run, input(), Stop while input() waits, Stop by interrupt keeps variables, a plot');
+      await context.close();
+      server.close();
+    }
+
+    // 1b. WebKit: the worker cannot isolate the page and a reload reads as
+    // navigation type "navigate", so coi-serviceworker.js does not see that
+    // its check reload failed. The page reloads once and says input() is
+    // unavailable; it used to reload every two seconds (set review S10).
+    {
+      const server = await serve(out, {isolate: false, weakWorker: true});
+      const context = await browser.newContext({serviceWorkers: 'allow'});
+      await context.addInitScript(() => Object.defineProperty(PerformanceNavigationTiming.prototype, 'type', {get: () => 'navigate'}));
+      const page = current = await context.newPage();
+      page.setDefaultTimeout(TIMEOUT);
+      let navigations = 0;
+      page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
+      const origin = `http://127.0.0.1:${server.address().port}`;
+      await page.goto(`${origin}/sub/cells.html`);
+      await page.waitForFunction(() => globalThis.qpyodideInputState === 'unavailable' && navigator.serviceWorker.controller, null, {timeout: 60000});
+      assert.equal(navigations, 2, 'the page reloaded once');
+      // Another reload would have come within a few seconds (the worker is ready again by then).
+      await page.waitForTimeout(8000);
+      assert.equal(navigations, 2, 'the page did not reload again');
+      assert.equal(await page.evaluate(() => globalThis.crossOriginIsolated), false);
+      assert.equal(await page.evaluate(origin => localStorage.getItem('qpyodide-coi-unavailable-' + origin), origin), '1', 'the verdict is kept for the origin');
+      report.push('an engine that reports the check reload as "navigate" and cannot isolate: one reload, input() unavailable, no endless reloading');
       await context.close();
       server.close();
     }

@@ -24,6 +24,12 @@ and JSXGraph unchanged, at the commits recorded in
   so a cell that uses their names never runs before them. If they cannot be loaded, the status line says that plots
   are not available (naming the package), that other Python code works
   normally, and offers Retry.
+- **A page that cannot be isolated is reloaded once, not again and again.**
+  Where a host sends no COOP/COEP headers (GitHub Pages) the page reloads once
+  so that the service worker can isolate it. WebKit cannot be isolated this
+  way and reports that reload as a plain navigation; the page then reloaded
+  every two seconds. It now reloads once and `input()` stays unavailable
+  there, as in other browsers that cannot isolate.
 - **pyodide-interaktiv's scripts are cacheable files** (they were inline),
   and pages with `embed-resources: true` work with Pyodide cells.
 - **`pyodide:` settings combine key by key** across `_quarto.yml`, profiles,
