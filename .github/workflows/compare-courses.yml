@@ -79,6 +79,10 @@ on:
       browser:
         type: boolean
         default: false
+      emit-browser-shots:
+        description: 'Log six selected Chromium PNGs for cloud visual review'
+        type: boolean
+        default: false
       browsers:
         type: string
         default: 'chromium firefox webkit'
@@ -121,6 +125,10 @@ on:
         default: ''
       browser:
         description: 'Also compare old and new in the browser (tools/compare-browser.mjs)'
+        type: boolean
+        default: false
+      emit-browser-shots:
+        description: 'Log six selected Chromium PNGs for cloud visual review'
         type: boolean
         default: false
       browsers:
@@ -176,8 +184,10 @@ jobs:
           repository: Erasmus-CTM/ctm-assessment
           ref: ${{ inputs['tooling-ref'] }}
           persist-credentials: false
-      - name: Verify converted-source recovery
-        run: python3 -m unittest discover -s tests -p test_emit_converted_source.py
+      - name: Verify CI log transports
+        run: |
+          python3 -m unittest discover -s tests -p test_emit_converted_source.py
+          python3 -m unittest discover -s tests -p test_emit_browser_shots.py
       - id: list
         env:
           EVENT: ${{ inputs['tooling-ref'] && 'workflow_call' || github.event_name }}
@@ -393,6 +403,11 @@ jobs:
           node tools/compare-browser.mjs --old "$RUNNER_TEMP/sites/before/_site" --new "$RUNNER_TEMP/sites/after/_site" --first-visit --checks links ${SHARD:+--shard "$SHARD"} \
             --browser ${{ matrix.browser }} --expect tools/compare-rendered/expect/step4-migration.yml --course "$(basename "$COURSE")" \
             --report "$RUNNER_TEMP/browser/first-visit.json" --summary "$RUNNER_TEMP/browser/first-visit.md"
+      - name: Log selected browser screenshots for cloud review
+        if: ${{ always() && inputs['emit-browser-shots'] && matrix.browser == 'chromium' && (!matrix.entry.shard || startsWith(matrix.entry.shard, '1/')) }}
+        env:
+          COURSE_REF: ${{ matrix.entry.ref }}
+        run: python tools/ci/emit-browser-shots.py "$RUNNER_TEMP/browser/shots" "$COURSE_REF"
       - name: Report the result as an annotation
         if: always()
         run: |
