@@ -12,7 +12,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import re
 import ssl
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 COMPRESSIBLE = {".wasm", ".js", ".mjs", ".json", ".css"}
 MIME = {".wasm": "application/wasm", ".mjs": "text/javascript",
@@ -83,7 +83,10 @@ class OfflineHandler(SimpleHTTPRequestHandler):
 
     def is_asset(self):
         # Also applies to encoded paths and errors below the asset directory.
-        return unquote(urlsplit(getattr(self, "path", "")).path).startswith("/_ctm-assets/")
+        try:
+            return unquote(urlsplit(getattr(self, "path", "")).path).startswith("/_ctm-assets/")
+        except ValueError:
+            return False
 
     def do_GET(self):
         self.serve_file(head=False)
@@ -97,27 +100,51 @@ class OfflineHandler(SimpleHTTPRequestHandler):
             self.send_error(HTTPStatus.HTTP_VERSION_NOT_SUPPORTED)
             return
         root = Path(self.directory).resolve()
-        request_path = unquote(urlsplit(self.path).path)
+        try:
+            target = urlsplit(self.path)
+            request_path = unquote(target.path)
+        except ValueError:
+            self.send_error(HTTPStatus.BAD_REQUEST)
+            return
         # Reject traversal instead of normalizing it into a different resource.
         if "\x00" in request_path or "\\" in request_path or ".." in request_path.split("/"):
             self.send_error(HTTPStatus.FORBIDDEN)
             return
-        candidate = (root / request_path.lstrip("/")).resolve()
-        if not candidate.is_relative_to(root):
+        try:
+            candidate = (root / request_path.lstrip("/")).resolve()
+            if not candidate.is_relative_to(root):
+                self.send_error(HTTPStatus.FORBIDDEN)
+                return
+            if candidate.is_dir():
+                if not request_path.endswith("/"):
+                    # A relative, encoded location cannot redirect to another
+                    # host even when the request contains an encoded slash.
+                    location = quote("/" + request_path.lstrip("/"), safe="/") + "/"
+                    if target.query:
+                        location += "?" + quote(target.query, safe="=&;%:+,?/@")
+                    self.send_response(HTTPStatus.MOVED_PERMANENTLY)
+                    self.send_header("Location", location)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                candidate = (candidate / "index.html").resolve()
+            if not candidate.is_relative_to(root) or not candidate.is_file():
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+        except (OSError, RuntimeError):
             self.send_error(HTTPStatus.FORBIDDEN)
-            return
-        if candidate.is_dir():
-            candidate = (candidate / "index.html").resolve()
-        if not candidate.is_relative_to(root) or not candidate.is_file():
-            self.send_error(HTTPStatus.NOT_FOUND)
             return
         content_type = MIME.get(candidate.suffix.lower()) or self.guess_type(str(candidate))
         vary = candidate.suffix.lower() in COMPRESSIBLE
         compressed = False
         if vary and accepts_gzip(self.headers.get("Accept-Encoding", "")):
-            gz = Path(str(candidate) + ".gz").resolve()
-            if gz.is_relative_to(root) and gz.is_file():
-                candidate, compressed = gz, True
+            try:
+                gz = Path(str(candidate) + ".gz").resolve()
+                if gz.is_relative_to(root) and gz.is_file():
+                    candidate, compressed = gz, True
+            except (OSError, RuntimeError):
+                self.send_error(HTTPStatus.FORBIDDEN)
+                return
         try:
             source = candidate.open("rb")
         except OSError:

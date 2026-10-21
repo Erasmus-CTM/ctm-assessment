@@ -216,6 +216,37 @@ class OfflineHTTPTests(unittest.TestCase):
         self.assertIn(b"Cross-Origin-Embedder-Policy: require-corp", raw)
         self.assertIn(b"Cache-Control: no-cache", raw)
 
+    def test_malformed_target_returns_header_bearing_bad_request(self):
+        status, headers, _ = self.request("http://[")
+        self.assertEqual(status, 400)
+        self.check_headers(headers)
+        self.assertEqual(headers["Cache-Control"], "no-cache")
+
+    def test_directory_redirect_preserves_relative_assets_and_query(self):
+        directory = self.root / "subdir"
+        directory.mkdir(exist_ok=True)
+        (directory / "index.html").write_text("subdirectory")
+        for method in ["GET", "HEAD"]:
+            status, headers, body = self.request("/subdir?view=exam", method=method)
+            self.assertEqual(status, 301)
+            self.assertEqual(headers["Location"], "/subdir/?view=exam")
+            self.assertEqual(body, b"")
+            self.check_headers(headers)
+            self.assertEqual(headers["Cache-Control"], "no-cache")
+        status, _, body = self.request("/subdir/")
+        self.assertEqual((status, body), (200, b"subdirectory"))
+
+    def test_symlink_loop_is_a_header_bearing_error(self):
+        loop = self.root / "_ctm-assets" / "loop"
+        try:
+            loop.symlink_to(loop)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks unavailable on this platform")
+        status, headers, _ = self.request("/_ctm-assets/loop")
+        self.assertEqual(status, 403)
+        self.check_headers(headers, assets=True)
+        self.assertEqual(headers["Cache-Control"], "no-cache")
+
     def test_encoded_traversal_and_symlink_escape(self):
         status, _, _ = self.request("/%2e%2e/secret")
         self.assertEqual(status, 403)
