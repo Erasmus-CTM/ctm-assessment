@@ -356,7 +356,10 @@ function diffLines(a, b) {
   let endA = a.length, endB = b.length;
   while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
   const x = a.slice(start, endA), y = b.slice(start, endB), n = x.length, m = y.length;
-  if (n * m > 6e7) return [{removed: x, added: y, at: start, addedAt: y.map((_, k) => start + k)}];
+  // A long page (the table is n * m): Myers' diff, which needs time and memory
+  // in proportion to the differences, not to the page. Only a page that
+  // differs by more than MYERS_LIMIT lines is one hunk.
+  if (n * m > 6e7) return myersHunks(x, y, start) || [{removed: x, added: y, at: start, addedAt: y.map((_, k) => start + k)}];
   const dp = Array.from({length: n + 1}, () => new Uint32Array(m + 1));
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = x[i] === y[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
   const hunks = [];
@@ -366,6 +369,42 @@ function diffLines(a, b) {
     if (i < n && j < m && x[i] === y[j]) { flush(); i++; j++; }
     else if (j >= m || (i < n && dp[i + 1][j] >= dp[i][j + 1])) { (hunk ||= {removed: [], added: [], addedAt: [], at: start + i}).removed.push(x[i++]); }
     else { (hunk ||= {removed: [], added: [], addedAt: [], at: start + i}).added.push(y[j]); hunk.addedAt.push(start + j++); }
+  }
+  flush();
+  return hunks;
+}
+// Myers' O(ND) difference of two long line lists, as the hunks diffLines
+// returns; null when the lists differ by more than MYERS_LIMIT lines.
+const MYERS_LIMIT = 6000;
+function myersHunks(x, y, start) {
+  const n = x.length, m = y.length, off = MYERS_LIMIT + 1, v = new Int32Array(2 * MYERS_LIMIT + 3), trace = [];
+  let found = -1;
+  for (let d = 0; d <= MYERS_LIMIT && found < 0; d++) {
+    trace.push(v.slice(off - d - 1, off + d + 2));
+    for (let k = -d; k <= d; k += 2) {
+      let i = k === -d || (k !== d && v[off + k - 1] < v[off + k + 1]) ? v[off + k + 1] : v[off + k - 1] + 1, j = i - k;
+      while (i < n && j < m && x[i] === y[j]) { i++; j++; }
+      v[off + k] = i;
+      if (i >= n && j >= m) { found = d; break; }
+    }
+  }
+  if (found < 0) return null;
+  const removed = new Set(), added = new Set();
+  let i = n, j = m;
+  for (let d = found; d > 0; d--) {
+    const before = trace[d], k = i - j;
+    const prevK = k === -d || (k !== d && before[k - 1 + d + 1] < before[k + 1 + d + 1]) ? k + 1 : k - 1;
+    const prevI = before[prevK + d + 1], prevJ = prevI - prevK;
+    if (prevK === k + 1) added.add(prevJ); else removed.add(prevI);
+    i = prevI; j = prevJ;
+  }
+  const hunks = [];
+  let a = 0, b = 0, hunk = null;
+  const flush = () => { if (hunk) { hunks.push(hunk); hunk = null; } };
+  while (a < n || b < m) {
+    if (a < n && b < m && !removed.has(a) && !added.has(b)) { flush(); a++; b++; }
+    else if (a < n && removed.has(a)) { (hunk ||= {removed: [], added: [], addedAt: [], at: start + a}).removed.push(x[a++]); }
+    else { (hunk ||= {removed: [], added: [], addedAt: [], at: start + a}).added.push(y[b]); hunk.addedAt.push(start + b++); }
   }
   flush();
   return hunks;

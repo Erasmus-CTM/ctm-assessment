@@ -212,3 +212,26 @@ test('a course that is not migrated on either side keeps its hand-written switch
   // ... but loses nothing silently when it goes.
   assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${OLD_BODY_FOR_ANCHORS}`), before)), ['switch dropped']);
 });
+
+// A page that grew long (ingmat3a's weeks 8 to 12 after their restructuring:
+// about 12000 lines in the table of the difference) is compared line by line,
+// not as one changed block (the line table was capped at 6e7 cells, and a
+// longer page became one hunk that nothing could explain).
+test('a long page: only what the migration changed differs, and a real change in it is found', () => {
+  const steps = 40, per = 100;
+  const paragraphs = k => Array.from({length: per}, (_, i) => `<p>Avsnitt ${k}.${i} med litt tekst.</p>`).join('');
+  const body = make => Array.from({length: steps}, (_, k) => make(k) + paragraphs(k)).join('');
+  const oldStep = k => `<details class="reading-step"><summary>Gå i dybden</summary><p>Trinn ${k}.</p></details>`;
+  const newStep = k => reveal(`<p>Trinn ${k}.</p>`);
+  const before = page(`<p>Innledning.</p>${OLD_SWITCH}<section id="a" class="level2"><h2>A</h2>${body(oldStep)}</section>`);
+  const after = page(`<p>Innledning.</p>${NEW_SWITCH}<section id="a" class="level2"><h2>A</h2>${body(newStep)}</section>`);
+  const items = compare(after, before);
+  assert.ok(items.length > 0 && items.length < 2000, 'the differences are the migration\'s, not the page: ' + items.length);
+  assert.deepEqual(items.filter(item => !item.category && !item.invariant).slice(0, 3), []);
+  assert.deepEqual(invariants(items), []);
+  // One paragraph in the middle of the page changes: it is reported, and only it.
+  const changed = compare(after.replace('Avsnitt 20.50 med litt tekst.', 'Avsnitt 20.50 med andre ord.'), before);
+  const unexplained = changed.filter(item => !item.category && !item.invariant);
+  assert.ok(unexplained.length > 0 && unexplained.length <= 4, 'the changed paragraph: ' + unexplained.length);
+  assert.ok(JSON.stringify(unexplained).includes('andre ord'));
+});

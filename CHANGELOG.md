@@ -40,6 +40,15 @@ pyodide-interaktiv and JSXGraph unchanged, at the commits recorded in
   and the new page no longer has (`anchor dropped`; the id may move to
   `ctm-tab-target`). Tests: `tests/compare-rendered.test.cjs` (each new
   check has a mutation that the old tool did not report).
+- **`compare-rendered.mjs` compares long pages line by line.** Its line
+  table was capped at 6e7 cells (a page of some 7700 lines or more on each
+  side after the first and before the last difference), and a longer page
+  became one changed block that no category could explain. ingmat3a's
+  `linalg-branch` crossed that line when its weeks 8 to 12 were restructured
+  (3336 unexplained differences on the same migration that had none). Pages
+  over the cap now go through Myers' difference, which takes time and memory
+  in proportion to the differences (one block only beyond 6000 changed
+  lines). Test: a page of 12000 lines with 40 migrated reveals.
 - **The known failure `collapsed-callout-target` is gone** from
   `tools/compare-rendered/expect/step4-migration.yml`: the ctm-nav fix makes
   the callout-target pages equal. The course comparison of the migration now
