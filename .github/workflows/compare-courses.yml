@@ -176,6 +176,8 @@ jobs:
           repository: Erasmus-CTM/ctm-assessment
           ref: ${{ inputs['tooling-ref'] }}
           persist-credentials: false
+      - name: Verify converted-source recovery
+        run: python3 -m unittest discover -s tests -p test_emit_converted_source.py
       - id: list
         env:
           EVENT: ${{ inputs['tooling-ref'] && 'workflow_call' || github.event_name }}
