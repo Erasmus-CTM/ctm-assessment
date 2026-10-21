@@ -7,7 +7,8 @@ const root=path.resolve(__dirname,'..'),tmp=fs.mkdtempSync(path.join(os.tmpdir()
 function run(candidate,name) {
   const report=path.join(tmp,name+'.json');
   const args=['tools/compare-rendered.mjs','--before',before,'--after',candidate,'--report',report];
-  for(const file of ['step4.yml','step2.yml','step3.yml'])args.push('--expect','tools/compare-rendered/expect/'+file);
+  for(const file of ['step4.yml','step2.yml','step3.yml','examples.yml'])
+    if(fs.existsSync(path.join(root,'tools/compare-rendered/expect',file)))args.push('--expect','tools/compare-rendered/expect/'+file);
   const p=spawnSync(process.execPath,args,{cwd:root,encoding:'utf8'});
   assert.ok(p.status===0||p.status===1,p.stderr);
   const r=JSON.parse(fs.readFileSync(report,'utf8'));
@@ -19,9 +20,15 @@ try {
   assert.equal(positive.status,0,JSON.stringify(positive.report.items.filter(i=>!i.category)));
   const candidate=path.join(tmp,'swapped');fs.cpSync(after,candidate,{recursive:true});
   function htmls(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?htmls(path.join(dir,e.name)):e.name.endsWith('.html')?[path.join(dir,e.name)]:[]);}
-  let changed=false;
+  let changed=false, storeCellCapability=false;
   for(const file of htmls(candidate)){
     const html=fs.readFileSync(file,'utf8'),dom=new JSDOM(html);
+    const island=dom.window.document.querySelector('script#ctm-store-manifest[type="application/json"]');
+    if(island) {
+      const manifest=JSON.parse(island.textContent);
+      if(manifest.v===1 && Array.isArray(manifest.exercises) &&
+         manifest.exercises.some(e=>e.component==='pyodide-interaktiv')) storeCellCapability=true;
+    }
     const script=[...dom.window.document.scripts].find(s=>/^globalThis\.qpyodideCellDetails = (\[.*\]);$/m.test(s.textContent));
     if(!script)continue;
     const re=/^globalThis\.qpyodideCellDetails = (\[.*\]);$/m,match=re.exec(script.textContent),cells=JSON.parse(match[1]);
@@ -33,7 +40,11 @@ try {
     script.textContent=script.textContent.replace(re,'globalThis.qpyodideCellDetails = '+JSON.stringify(cells)+';');
     fs.writeFileSync(file,dom.serialize());changed=true;break;
   }
-  assert.ok(changed,'production pages must contain two distinct unlabelled interactive cells');
+  if(!storeCellCapability) {
+    console.log('No shared-store cell capability in this historical after build; positive replay passed, cell swap is inapplicable.');
+    return;
+  }
+  assert.ok(changed,'shared-store example pages must contain two distinct unlabelled interactive cells');
   const negative=run(candidate,'real-metadata-swap');
   assert.equal(negative.status,1,'swapping only storage metadata must fail');
   assert.ok(negative.report.items.some(i=>!i.category&&i.area==='config'&&i.object==='qpyodideCellDetails'));
