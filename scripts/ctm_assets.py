@@ -191,6 +191,8 @@ def inventory(root: Path) -> dict[str, str]:
             raise AssetError(f"Bundle contains a symlink: {file}")
         if file.is_file():
             out[file.relative_to(root).as_posix()] = digest(file.read_bytes())
+        elif not file.is_dir():
+            raise AssetError(f"Bundle contains a special filesystem entry: {file}")
     return out
 
 
@@ -235,20 +237,26 @@ def build_from_lock(lock: dict, destination: Path, cache: Path, *, accepted_lice
     if lock.get("v") != 1 or not lock.get("archives"):
         raise AssetError("Unsupported or empty asset lock")
     destination, cache = Path(destination), Path(cache)
+    # Reusing a verified bundle must not bypass the caller's licence policy.
+    accepted_licences = tuple(accepted_licences)
+    for archive in lock["archives"]:
+        allow_licence(archive["id"], archive.get("licence"), accepted_licences)
+        if archive.get("licence") in set(accepted_licences) and not archive.get("source_offer"):
+            raise AssetError(f'{archive["id"]}: accepted copyleft licence needs a source offer')
+        if not archive.get("licence_files"):
+            raise AssetError(f'{archive["id"]}: licence text is required')
     if destination.exists():
         verify_bundle(destination, lock)
         return destination
     cache.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="ctm-assets-", dir=cache) as temporary:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    # Cache and project may be on different drives; atomic publication must
+    # stage on the destination filesystem rather than alongside the downloads.
+    with tempfile.TemporaryDirectory(prefix=".ctm-assets-", dir=destination.parent) as temporary:
         stage = Path(temporary) / "bundle"
         stage.mkdir()
         notices = ["# Third-party notices", ""]
         for archive in lock["archives"]:
-            allow_licence(archive["id"], archive.get("licence"), accepted_licences)
-            if archive.get("licence") in set(accepted_licences) and not archive.get("source_offer"):
-                raise AssetError(f'{archive["id"]}: accepted copyleft licence needs a source offer')
-            if not archive.get("licence_files"):
-                raise AssetError(f'{archive["id"]}: licence text is required')
             archive_file = cache / ("archive-" + digest(json_bytes({k: archive.get(k) for k in ("url", "sha256", "integrity")})))
             download(archive["url"], archive_file, sha256=archive.get("sha256"), integrity=archive.get("integrity"))
             extract_selected(archive_file, stage, archive["files"], prefix=archive.get("prefix", "package/"))

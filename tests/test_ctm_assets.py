@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import tarfile
 import tempfile
@@ -161,6 +162,88 @@ class AssetsTests(unittest.TestCase):
             lock["files"] = A.inventory(root)
             with self.assertRaisesRegex(A.AssetError, "full Pyodide lock"):
                 A.verify_bundle(root, lock)
+
+    def build_fixture(self, root):
+        """Independent expected inventory for a tiny reviewed archive."""
+        tar = root / "official.tgz"
+        code, licence = b"fixture code", b"Fixture MIT licence text"
+        archive(tar, [("package/dist/app.js", code), ("package/LICENSE", licence)])
+        app, text = "npm/demo@1.0.0/dist/app.js", "LICENSES/demo/LICENSE"
+        notices = "# Third-party notices\n\n## demo\nLicence: MIT\n\nLICENSES/demo/LICENSE\n\n"
+        buffer = io.BytesIO()
+        with gzip.GzipFile(fileobj=buffer, mode="wb", filename="", mtime=0) as out:
+            out.write(code)
+        files = {app: A.digest(code), app + ".gz": A.digest(buffer.getvalue()),
+                 text: A.digest(licence), "THIRD-PARTY-NOTICES.md": A.digest(notices.encode())}
+        manifest = {"v": 1, "versions": {"demo": "1.0.0"}, "files": dict(files)}
+        files["manifest.json"] = A.digest(A.json_bytes(manifest))
+        lock = {"v": 1, "versions": manifest["versions"], "files": files,
+                "archives": [{"id": "demo", "url": "https://registry.npmjs.org/demo/-/demo-1.0.0.tgz",
+                              "sha256": A.digest(tar.read_bytes()), "licence": "MIT", "licence_files": [text],
+                              "files": [{"member": "dist/app.js", "path": app, "sha256": A.digest(code)},
+                                        {"member": "LICENSE", "path": text, "sha256": A.digest(licence)}]}]}
+        def downloaded(url, destination, **checks):
+            data = tar.read_bytes()
+            A.verify_bytes(data, **checks)
+            destination.write_bytes(data)
+            return destination
+        return lock, downloaded
+
+    def test_successful_build_stages_on_target_filesystem_and_reuses_verified_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            target, cache = root / "project/_ctm-assets", root / "other-drive-cache"
+            rename = Path.rename
+            def same_filesystem(source, destination):
+                self.assertEqual(source.parent.parent, target.parent,
+                                 "publication stage must be under destination.parent, not cache")
+                return rename(source, destination)
+            with patch.object(A, "download", side_effect=downloaded) as fetch, patch.object(Path, "rename", same_filesystem):
+                self.assertEqual(A.build_from_lock(lock, target, cache), target)
+                A.verify_bundle(target, lock)
+                self.assertEqual(A.build_from_lock(lock, target, cache), target)
+                self.assertEqual(fetch.call_count, 1)
+            self.assertEqual(list(target.parent.glob(".ctm-assets-*")), [])
+            (target / "npm/demo@1.0.0/dist/app.js").write_bytes(b"tamper")
+            with self.assertRaisesRegex(A.AssetError, "sha256"):
+                A.build_from_lock(lock, target, cache)
+
+    def test_existing_bundle_does_not_bypass_licence_consent_or_source_offer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            target, cache = root / "bundle", root / "cache"
+            with patch.object(A, "download", side_effect=downloaded):
+                A.build_from_lock(lock, target, cache)
+            lock["archives"][0]["licence"] = "LGPL-2.1"
+            with self.assertRaises(A.AssetError):
+                A.build_from_lock(lock, target, cache)
+            with self.assertRaisesRegex(A.AssetError, "source offer"):
+                A.build_from_lock(lock, target, cache, accepted_licences=["LGPL-2.1"])
+            lock["archives"][0]["licence"] = "MIT"
+            lock["archives"][0]["licence_files"] = []
+            with self.assertRaisesRegex(A.AssetError, "licence text"):
+                A.build_from_lock(lock, target, cache)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "POSIX special-entry fixture")
+    def test_carried_bundle_rejects_fifo_without_reading_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            os.mkfifo(root / "pipe")
+            with self.assertRaisesRegex(A.AssetError, "special filesystem"):
+                A.inventory(root)
+
+    def test_selected_hardlink_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            file = root / "hardlink.tgz"
+            with tarfile.open(file, "w:gz") as out:
+                item = tarfile.TarInfo("package/app.js")
+                item.type, item.linkname = tarfile.LNKTYPE, "package/other.js"
+                out.addfile(item)
+            with self.assertRaises(A.AssetError):
+                A.extract_selected(file, root / "out", [{"member": "app.js", "path": "app.js", "sha256": A.digest(b"x")}])
 
     def test_cache_key_changes_with_any_reviewed_lock_change(self):
         self.assertEqual(A.cache_key({"v": 1, "a": 2}), A.cache_key({"a": 2, "v": 1}))
