@@ -217,10 +217,19 @@ class OfflineHTTPTests(unittest.TestCase):
         self.assertIn(b"Cache-Control: no-cache", raw)
 
     def test_malformed_target_returns_header_bearing_bad_request(self):
-        status, headers, _ = self.request("http://[")
-        self.assertEqual(status, 400)
-        self.check_headers(headers)
-        self.assertEqual(headers["Cache-Control"], "no-cache")
+        # http.client validates this target itself; send raw bytes so this
+        # regression reaches the actual server parser.
+        with socket.create_connection(("127.0.0.1", self.server.server_port), timeout=5) as connection:
+            connection.sendall(b"GET http://[ HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n")
+            parts = []
+            while part := connection.recv(8192):
+                parts.append(part)
+        raw = b"".join(parts)
+        self.assertIn(b"400 Bad Request", raw)
+        self.assertIn(b"Cross-Origin-Opener-Policy: same-origin", raw)
+        self.assertIn(b"Cross-Origin-Embedder-Policy: require-corp", raw)
+        self.assertIn(b"Cross-Origin-Resource-Policy: cross-origin", raw)
+        self.assertIn(b"Cache-Control: no-cache", raw)
 
     def test_directory_redirect_preserves_relative_assets_and_query(self):
         directory = self.root / "subdir"
