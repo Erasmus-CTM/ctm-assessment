@@ -81,6 +81,15 @@ parity check).
   and `question-tests.py`.
 - `tools/compare-rendered/expect/step2.yml`: the one expected rendered
   difference, ctm-checkers' page script on pages with a math exercise.
+- `tools/compare-browser.mjs` checks a page that only the new site has (a
+  course's test page) on its own (check `new-only`): reveals closed at
+  first, the switch, Enter and Space on every summary, print and embedded
+  pages; its links and console are checked as before. `expect/ctm-demo.yml`
+  explains ctm-demo's migration: its step-4 UI test pages, the index
+  page's link to them and the updated help page. A `known-failures` entry
+  can name the `place` of a link's target; `collapsed-callout-target` (in
+  `step4-migration.yml`) records that ctm-nav.js does not open a collapsed
+  callout around a target.
 
 ## 0.9.0
 
