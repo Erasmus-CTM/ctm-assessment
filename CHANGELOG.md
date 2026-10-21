@@ -6,7 +6,7 @@ Shared saved answers, progress and quizzes across maths and Python exercises, wi
 
 Copy controls are always available. “Export my answers” opens selectable text with “Copy all” first; Markdown and HTML downloads are secondary. Pyodide cells save code only; current output and plots can be copied or exported without storing output.
 
-Pins for this review set: ctm-libs 6d5fe6f, math-exercise 1bf1acf, py-exercise c543f45 and pyodide-interaktiv 6580e9c. The checker and JSXGraph pins are unchanged. The step-4 design clarifies that correctness rules supplied outside a block participate in its source hash.
+Pins for this review set: ctm-libs 6d5fe6f, math-exercise 1bf1acf, py-exercise b7f525c and pyodide-interaktiv 6580e9c. The checker and JSXGraph pins are unchanged. The step-4 design clarifies that correctness rules supplied outside a block participate in its source hash.
 
 ## 0.12.0
 
