@@ -13,7 +13,7 @@ const svg = (w, h, drawn = true) => '<svg xmlns="http://www.w3.org/2000/svg" wid
   (drawn ? '<path d="M10 10 L80 50" stroke="black"/>' : '') + '</svg>';
 const box = (id, w = 240, h = 140, shape = svg(w, h)) => '<div class="jxgbox" id="' + id +
   '" style="width:' + w + 'px;height:' + h + 'px">' + shape + '</div>';
-const firstScript = '<script>window.__ctmFirstScriptAudit={fetch:typeof fetch,drain:typeof __ctmOfflineDrainAttempts,binding:typeof __ctmOfflineRecordAttempt,baseURI:document.baseURI,installed:window.__ctmOfflineAudit?.installed===true,wrapped:fetch.__ctmOfflineAuditWrapped===true,transport:typeof __ctmOfflineRecordAttempt==="function"?"binding":window.parent!==window?"parent-bridge":"none"};</script>';
+const firstScript = '<script>window.__ctmFirstScriptAudit={fetch:typeof fetch,drain:typeof __ctmOfflineDrainAttempts,binding:typeof __ctmOfflineRecordAttempt,baseURI:document.baseURI,installed:window.__ctmOfflineAudit?.installed===true,serialized:window.__ctmOfflineEarlyAudit?.executed===true,wrapped:fetch.__ctmOfflineAuditWrapped===true,transport:typeof __ctmOfflineRecordAttempt==="function"?"binding":window.parent!==window?"parent-bridge":"none"};</script>';
 const frame = (id, content) => '<iframe data-ctm-board name="iframeJXG-' + id +
   '" sandbox="allow-scripts" style="width:300px;height:180px;border:0" srcdoc="' +
   quote('<!doctype html><html><body style="margin:0">' + firstScript + content + '</body></html>') + '"></iframe>';

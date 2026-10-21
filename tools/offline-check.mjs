@@ -18,7 +18,13 @@ export async function launchOfflineBrowser() {
       '--disable-background-networking', '--no-proxy-server']});
 }
 
-export function installOfflineAudit({channel}) {
+export function installOfflineAudit({channel, early = false, sourceOnly = false}) {
+    const canonicalScript = '(' + installOfflineAudit.toString() + ')(' + JSON.stringify({channel, early: true}) + ');';
+    if (sourceOnly) return canonicalScript;
+    if (early && document.currentScript === document.scripts[0] &&
+        document.currentScript?.matches('script[data-ctm-offline-audit]') &&
+        document.currentScript.textContent === canonicalScript)
+      globalThis.__ctmOfflineEarlyAudit = {channel, executed: true};
     if (globalThis.__ctmOfflineAudit?.installed) return;
     globalThis.__ctmOfflineAudit = {version: 1, installed: false};
     const pending = new Set(), auditErrors = [];
@@ -87,7 +93,10 @@ export function installOfflineAudit({channel}) {
           html = /;base64$/i.test(value.slice(0, comma)) ? atob(value.slice(comma + 1)) : decodeURIComponent(value.slice(comma + 1));
         } catch { auditErrors.push('unaudited opaque document: invalid data HTML'); return; }
       }
-      if (!html.includes('data-ctm-offline-audit') || !html.includes(JSON.stringify(channel)))
+      const template = document.createElement('template');
+      template.innerHTML = html; // Inert fragment: scripts and resources never execute.
+      const first = template.content.querySelector('script');
+      if (!first?.matches('script[data-ctm-offline-audit]') || first.textContent !== canonicalScript)
         auditErrors.push('unaudited opaque document: dynamic ' + kind + ' is refused');
     };
     const checkFrame = frame => {
@@ -190,7 +199,8 @@ export async function offlineContext(browser, baseURL) {
   if (allowed.hostname !== '127.0.0.1') throw new Error('offline harness server must use 127.0.0.1');
   const context = await browser.newContext({serviceWorkers: 'allow', viewport: {width: 1280, height: 900}});
   const channel = 'ctm-offline-' + randomUUID();
-  const script = '<script data-ctm-offline-audit>(' + installOfflineAudit.toString() + ')(' + JSON.stringify({channel}) + ');</script>';
+  const canonicalScript = installOfflineAudit({channel, sourceOnly: true});
+  const script = '<script data-ctm-offline-audit>' + canonicalScript + '</script>';
   const errors = [], external = [], responses = [], failed = [], attempts = [];
   const documents = new Map(), verified = new Set(), committed = new Set();
   // Playwright 1.55's serviceWorkers:'block' script reads navigator.serviceWorker,
@@ -205,9 +215,10 @@ export async function offlineContext(browser, baseURL) {
   const drain = async () => {
     for (const page of context.pages()) for (const frame of page.frames()) {
       try {
-        const state = await frame.evaluate(async expectedChannel => {
-          const early = [...document.querySelectorAll('script[data-ctm-offline-audit]')]
-            .some(script => script.textContent.includes(JSON.stringify(expectedChannel)));
+        const state = await frame.evaluate(async expected => {
+          const first = document.querySelector('script');
+          const early = first?.matches('script[data-ctm-offline-audit]') && first.textContent === expected.script &&
+            globalThis.__ctmOfflineEarlyAudit?.executed === true && globalThis.__ctmOfflineEarlyAudit.channel === expected.channel;
           if (!early) return {installed: false, reason: 'unaudited opaque or replaced document', documentURL: document.URL};
           if (globalThis.__ctmOfflineAudit?.version !== 1 || !globalThis.__ctmOfflineAudit.installed ||
               typeof globalThis.__ctmOfflineDrainAttempts !== 'function') {
@@ -215,7 +226,7 @@ export async function offlineContext(browser, baseURL) {
               fetch: typeof globalThis.fetch, binding: typeof globalThis.__ctmOfflineRecordAttempt};
           }
           return {installed: true, problems: await globalThis.__ctmOfflineDrainAttempts()};
-        }, channel);
+        }, {channel, script: canonicalScript});
         if (!state.installed) failed.push({url: frame.url(), error: 'request audit not installed: ' + JSON.stringify(state)});
         else {
           verified.add(frame);

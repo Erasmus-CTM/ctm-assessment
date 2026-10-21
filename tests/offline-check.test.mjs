@@ -146,7 +146,7 @@ test('caught opaque fetch/XHR attempts are audited even with zero page errors', 
     probes: [async page => {
       const frame = page.frames().find(frame => frame.parentFrame());
       const first = await frame.evaluate(() => window.__ctmFirstScriptAudit);
-      assert.ok(first?.installed && first.wrapped && first.drain === 'function' && ['binding', 'parent-bridge'].includes(first.transport), JSON.stringify(first));
+      assert.ok(first?.installed && first.serialized && first.wrapped && first.drain === 'function' && ['binding', 'parent-bridge'].includes(first.transport), JSON.stringify(first));
       await frame.waitForFunction(() => document.body.dataset.caught === 'true');
     }]});
   evidence.contracts.push(result);
@@ -167,7 +167,7 @@ test('caught data-frame requests are audited before the first author script with
       assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts');
       const frame = page.frames().find(frame => frame.parentFrame());
       const first = await frame.evaluate(() => window.__ctmFirstScriptAudit);
-      assert.ok(first?.installed && first.wrapped && first.transport !== 'none', JSON.stringify(first));
+      assert.ok(first?.installed && first.serialized && first.wrapped && first.transport !== 'none', JSON.stringify(first));
       await frame.waitForFunction(() => document.body.dataset.caught === 'true');
     }]});
   evidence.contracts.push(result);
@@ -194,20 +194,69 @@ test('failed caught opaque image loads have actual buffered resource URL evidenc
   }
 });
 
-test('unaudited dynamic opaque documents are refused even after removal or srcdoc reassignment', {timeout: 120000}, async () => {
+test('unaudited dynamic opaque documents are refused after completed append/remove/reassign lifecycles', {timeout: 120000}, async () => {
   for (const mode of ['append', 'remove', 'reassign']) {
-    const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL,
-      pages: [{path: 'dynamic-' + mode + '.html'}], probes: [async page => {
+    const result = {scope: 'checker-contract', loads: 5, results: []};
+    for (let load = 1; load <= 5; load++) {
+      const {context, drain, evidence: observed} = await offlineContext(browser, server.baseURL);
+      const record = {path: 'dynamic-' + mode + '.html', load, boards: [], evidence: observed, ok: false};
+      result.results.push(record);
+      try {
+        const page = await context.newPage();
+        await page.goto(server.baseURL + record.path);
         await page.waitForFunction(() => document.body.dataset.dynamicDone === 'true');
-        return JSON.parse(await page.locator('body').getAttribute('data-dynamic-first'));
-      }]});
-    evidence.contracts.push(result);
-    for (const load of result.results) {
-      assert.equal(load.ok, false, JSON.stringify(load));
-      assert.deepEqual(load.evidence.errors, [], 'caught child errors must not drive refusal');
-      assert.ok(load.evidence.failed.some(failure => /unaudited/.test(failure.error)), JSON.stringify(load));
+        record.firstScript = JSON.parse(await page.locator('body').getAttribute('data-dynamic-first'));
+        assert.equal(record.firstScript.fetch, 'function');
+        assert.equal(typeof record.firstScript.installed, 'boolean');
+        assert.equal(record.firstScript.serialized, false, 'the dynamic source had no early serialized audit');
+        if (mode === 'remove') assert.equal(await page.locator('iframe').count(), 0, 'the child actually removed itself before verification');
+        else {
+          assert.equal(await page.locator('iframe').count(), 1);
+          const frame = page.frames().find(frame => frame.parentFrame());
+          assert.equal(await frame.locator('.jxgbox').getAttribute('id'), 'dynamic-' + mode);
+        }
+        await drain();
+        assert.deepEqual(observed.errors, [], 'caught child errors must not drive refusal');
+        assert.ok(observed.failed.some(failure => /unaudited/.test(failure.error)), JSON.stringify(record));
+      } finally { await drain(); await context.close(); }
     }
+    evidence.contracts.push(result);
   }
+});
+
+test('an author script prepended before a copied canonical prefix is explicitly refused', {timeout: 60000}, async () => {
+  const result = {scope: 'checker-contract', loads: 5, results: []};
+  for (let load = 1; load <= 5; load++) {
+    const {context, drain, evidence: observed} = await offlineContext(browser, server.baseURL);
+    const record = {path: 'copied-prefix-prepend', load, boards: [], evidence: observed, ok: false};
+    result.results.push(record);
+    try {
+      const page = await context.newPage();
+      await page.goto(server.baseURL + 'positive.html');
+      await page.evaluate(() => {
+        const canonical = document.querySelector('script[data-ctm-offline-audit]').outerHTML;
+        const frame = document.createElement('iframe');
+        frame.setAttribute('sandbox', 'allow-scripts');
+        const author = '<script>window.firstBeforeAudit={installed:window.__ctmOfflineAudit?.installed===true,serialized:window.__ctmOfflineEarlyAudit?.executed===true};' +
+          'fetch("https://offline.invalid/copied-prefix").catch(function(){parent.postMessage({copiedPrefixDone:true,first:window.firstBeforeAudit},"*");});<\/script>';
+        window.addEventListener('message', event => {
+          if (event.data?.copiedPrefixDone) {
+            document.body.dataset.copiedPrefixFirst = JSON.stringify(event.data.first);
+            document.body.dataset.copiedPrefixDone = 'true';
+          }
+        });
+        frame.srcdoc = '<!doctype html><html><body>' + author + canonical + '</body></html>';
+        document.body.append(frame);
+      });
+      await page.waitForFunction(() => document.body.dataset.copiedPrefixDone === 'true');
+      record.firstScript = JSON.parse(await page.locator('body').getAttribute('data-copied-prefix-first'));
+      assert.equal(record.firstScript.serialized, false, 'the author script ran before the serialized audit');
+      await drain();
+      assert.deepEqual(observed.errors, []);
+      assert.ok(observed.failed.some(failure => /unaudited/.test(failure.error)), JSON.stringify(record));
+    } finally { await drain(); await context.close(); }
+  }
+  evidence.contracts.push(result);
 });
 
 test('local string/URL/Request and opaque-frame requests succeed; data URLs are not external attempts', {timeout: 60000}, async () => {
@@ -217,7 +266,7 @@ test('local string/URL/Request and opaque-frame requests succeed; data URLs are 
       await page.waitForFunction(() => document.body.dataset.parentLocal === 'local request works');
       const frame = page.frames().find(frame => frame.parentFrame());
       const first = await frame.evaluate(() => window.__ctmFirstScriptAudit);
-      assert.ok(first?.installed && first.wrapped && first.drain === 'function' && ['binding', 'parent-bridge'].includes(first.transport), JSON.stringify(first));
+      assert.ok(first?.installed && first.serialized && first.wrapped && first.drain === 'function' && ['binding', 'parent-bridge'].includes(first.transport), JSON.stringify(first));
       await frame.waitForFunction(() => document.body.dataset.local === 'local request works|local request works|inline|local request works');
     }]});
   evidence.contracts.push(result);
