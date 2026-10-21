@@ -36,8 +36,33 @@ jobs:
           persist-credentials: false
       - name: Collect official registry and release digests
         run: |
-          python scripts/ctm_assets.py metadata --libs .asset-sources/libs/_extensions/ctm-libs --source-ref ctm-libs=2ed1a3381bb6b606e3a913905095eadd8aee0988 --output .asset-report-helper/assets-metadata.json
+          python scripts/ctm_assets.py metadata --libs .asset-sources/libs/_extensions/ctm-libs --source-ref ctm-libs=2ed1a3381bb6b606e3a913905095eadd8aee0988 --resolve-board-lines --output .asset-report-helper/assets-metadata.json
       - name: Emit one checksummed report without runner commits
+        run: |
+          git -C .asset-report-helper add -N -- assets-metadata.json
+          python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
+  archive-inspection:
+    needs: fixture-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 4edd42835a8923ebeac1a44b158add3c2698b75c
+          path: .asset-report-helper
+          persist-credentials: false
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache
+          key: ctm-official-archives-${{ hashFiles('integration/assets-metadata.json') }}
+      - name: Inspect verified official archives for licence and selection review
+        run: |
+          python scripts/ctm_assets.py inspect --metadata integration/assets-metadata.json --cache .asset-cache --output .asset-report-helper/assets-metadata.json
+      - name: Emit one checksummed review report without runner commits
         run: |
           git -C .asset-report-helper add -N -- assets-metadata.json
           python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper

@@ -309,6 +309,40 @@ class MetadataTests(unittest.TestCase):
             self.assertEqual(report["source_refs"]["ctm-libs"], "b" * 40)
             self.assertIn("still require verification", report["status"])
 
+    def test_board_candidates_stay_in_approved_major_lines(self):
+        integrity = "sha512-" + base64.b64encode(hashlib.sha512(b"archive").digest()).decode()
+        def metadata(url):
+            package = A.urllib.parse.unquote(url.split("registry.npmjs.org/", 1)[1])
+            if re := __import__("re").search(r"/(\d+\.\d+\.\d+)$", package):
+                version = re.group(1)
+                return {"name": package[:re.start()], "version": version, "license": "MIT",
+                        "dist": {"integrity": integrity, "tarball": "https://registry.npmjs.org/a/-/a.tgz"}}
+            return {"versions": {v: {} for v in ("1.9.0", "1.10.0", "1.10.1-beta", "4.0.0", "4.1.2", "5.0.0")}}
+        with patch.object(A, "fetch_json", side_effect=metadata):
+            candidates = A.resolve_board_metadata()
+        self.assertEqual([item["version"] for item in candidates], ["1.10.0", "4.1.2", "4.1.2"])
+        self.assertEqual([item["id"] for item in candidates], ["jsxgraph", "mathjax4", "mathjax-newcm-font"])
+
+    def test_archive_inspection_verifies_bytes_and_reports_licence_texts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tar = root / "source.tgz"
+            archive(tar, [("package/LICENSE", b"fixture MIT text"), ("package/dist/app.js", b"code")])
+            entry = {"id": "fixture", "url": "https://registry.npmjs.org/demo/-/demo.tgz", "sha256": A.digest(tar.read_bytes())}
+            def downloaded(url, destination, **checks):
+                data = tar.read_bytes()
+                A.verify_bytes(data, **checks)
+                destination.write_bytes(data)
+            with patch.object(A, "download", side_effect=downloaded):
+                report = A.inspect_archives({"archives": [entry], "sources": {}}, root / "cache")
+                self.assertEqual(report["archives"][0]["texts"], {"package/LICENSE": "fixture MIT text"})
+                members = report["archives"][0]["members"]
+                self.assertEqual({x["member"]: x["sha256"] for x in members},
+                                 {"package/LICENSE": A.digest(b"fixture MIT text"), "package/dist/app.js": A.digest(b"code")})
+                entry["sha256"] = "0" * 64
+                with self.assertRaises(A.AssetError):
+                    A.inspect_archives({"archives": [entry], "sources": {}}, root / "cache")
+
     def test_missing_official_digest_never_becomes_a_guessed_lock_hash(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -377,6 +377,71 @@ def collect_metadata(library: Path, *, source_refs=None) -> dict:
             "archives": archives, "status": "archive bytes, licence texts and bundle file hashes still require verification"}
 
 
+def resolve_board_metadata() -> list[dict]:
+    """Propose exact versions only within the approved production major lines."""
+    result = []
+    for name, package, major in (("jsxgraph", "jsxgraph", 1), ("mathjax4", "mathjax", 4),
+                                 ("mathjax-newcm-font", "@mathjax/mathjax-newcm-font", 4)):
+        root_url = "https://registry.npmjs.org/" + urllib.parse.quote(package, safe="@")
+        registry = fetch_json(root_url)
+        versions = [value for value in registry.get("versions", {})
+                    if re.fullmatch(str(major) + r"\.\d+\.\d+", value)]
+        if not versions:
+            raise AssetError(f"{name}: no stable release in approved major line {major}")
+        version = max(versions, key=lambda value: tuple(map(int, value.split("."))))
+        url = root_url + "/" + version
+        metadata = fetch_json(url)
+        if metadata.get("name") != package or metadata.get("version") != version:
+            raise AssetError(f"{name}: exact registry metadata mismatch")
+        integrity = metadata.get("dist", {}).get("integrity", "")
+        if not re.fullmatch(r"sha512-[A-Za-z0-9+/]+={0,2}", integrity) or len(base64.b64decode(integrity[7:], validate=True)) != 64:
+            raise AssetError(f"{name}: official SHA-512 integrity missing")
+        result.append({"id": name, "npm": package, "version": version, "integrity": integrity,
+                       "url": checked_url(metadata["dist"]["tarball"]), "metadata_url": url,
+                       "reported_licence": metadata.get("license")})
+    return result
+
+
+def inspect_archives(metadata: dict, cache: Path) -> dict:
+    """Inspect verified source bytes for review; never publish a bundle or lock."""
+    cache = Path(cache)
+    cache.mkdir(parents=True, exist_ok=True)
+    inspected = []
+    for entry in metadata["archives"]:
+        archive_file = cache / ("archive-" + digest(json_bytes({k: entry.get(k) for k in ("url", "sha256", "integrity")})))
+        download(entry["url"], archive_file, sha256=entry.get("sha256"), integrity=entry.get("integrity"))
+        members, texts, seen = [], {}, set()
+        with tarfile.open(archive_file, "r|*") as archive:
+            for member in archive:
+                name = member.name.rstrip("/")
+                relative_path(name)
+                if name in seen:
+                    raise AssetError(f"Repeated archive member: {name}")
+                seen.add(name)
+                if member.isdir():
+                    continue
+                if not member.isfile():
+                    raise AssetError(f"Non-regular archive member: {name}")
+                stream = archive.extractfile(member)
+                if stream is None:
+                    raise AssetError(f"Unreadable archive member: {name}")
+                data = stream.read()
+                members.append({"member": name, "bytes": len(data), "sha256": digest(data)})
+                basename = PurePosixPath(name).name.lower()
+                if (basename in {"package.json", "pyodide-lock.json"}
+                        or re.search(r"(^|[/_.-])(licen[cs]e|copying|notice|thirdpartynotices)([/_.-]|$)", name, re.I)):
+                    if len(data) > 2_000_000:
+                        raise AssetError(f"Review text exceeds inspection limit: {name}")
+                    try:
+                        texts[name] = data.decode("utf-8")
+                    except UnicodeDecodeError:
+                        pass
+        inspected.append({**entry, "members": members, "texts": texts})
+    return {"v": 1, "kind": "verified-archive-inspection", "source_refs": metadata.get("source_refs", {}),
+            "sources": metadata["sources"], "archives": inspected,
+            "status": "archive digests verified; file selection and licence policy still require review"}
+
+
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
@@ -385,6 +450,11 @@ def main(argv=None):
     metadata.add_argument("--libs", type=Path, required=True, help="ctm-libs extension folder")
     metadata.add_argument("--output", type=Path, required=True)
     metadata.add_argument("--source-ref", action="append", default=[], metavar="NAME=SHA")
+    metadata.add_argument("--resolve-board-lines", action="store_true", help="Report exact candidates in approved board major lines")
+    inspection = sub.add_parser("inspect", help="Inspect verified archives for lock and licence review")
+    inspection.add_argument("--metadata", type=Path, required=True)
+    inspection.add_argument("--cache", type=Path, required=True)
+    inspection.add_argument("--output", type=Path, required=True)
     verify = sub.add_parser("verify", help="Verify a carried bundle against the reviewed external lock")
     verify.add_argument("--lock", type=Path, required=True)
     verify.add_argument("--bundle", type=Path, required=True)
@@ -392,6 +462,13 @@ def main(argv=None):
     if args.command == "metadata":
         refs = dict(value.split("=", 1) for value in args.source_ref)
         result = collect_metadata(args.libs, source_refs=refs)
+        if args.resolve_board_lines:
+            result["archives"].extend(resolve_board_metadata())
+            result["status"] += "; board candidates require exact pin review"
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_bytes(json_bytes(result))
+    elif args.command == "inspect":
+        result = inspect_archives(json.loads(args.metadata.read_text(encoding="utf-8")), args.cache)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_bytes(json_bytes(result))
     else:
