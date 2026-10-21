@@ -220,7 +220,7 @@ class OfflineHTTPTests(unittest.TestCase):
         # http.client validates this target itself; send raw bytes so this
         # regression reaches the actual server parser.
         with socket.create_connection(("127.0.0.1", self.server.server_port), timeout=5) as connection:
-            connection.sendall(b"GET http://[ HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n")
+            connection.sendall(b"GET http://[ HTTP/1.1\r\nHost: localhost\r\n\r\n")
             parts = []
             while part := connection.recv(8192):
                 parts.append(part)
