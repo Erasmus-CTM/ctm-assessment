@@ -9,6 +9,15 @@ AC'S UPDATED PRIORITY (21 October 2026; binding)
 - Use all available workers where independent work permits. Development: GPT-6.1 Sol medium, up to xhigh for difficult work. Every independent review: Astra xhigh; never review one's own code.
 - AC alone merges. Never merge PRs, force-push or create tags. Review, exact-head combined CI and final head/base checks precede sending a set to AC.
 
+AUTHORITATIVE LATEST STATUS — 21 October 2026 (supersedes older checkpoint statuses below)
+- Course set READY: assessment#25 @4edd42835a8923ebeac1a44b158add3c2698b75c → ingmat3a#16 @a99c8b52ce422e34da1b426909197e545ef9a931. All15 checks plus all12 browser shards green; draft=false; final head/base checks ahead4/behind0. AC alone merges in that order.
+- Store assessment#28 @290: source PASS, HOLD. Actual remote clear leaves stale UI in library6f5 in all3 browsers; confirmed bug. Core is preparing reset-intent handling and a progress-quota stub correction; exact reruns required.
+- Shared question tests checker#14 @9b8979b40f5f1c2569a2b974dd4f3de333ea41d9: SOURCE PASS, native Python3.9/3.12/3.13 each85/85, all6 canonical generated records verified. Publication incomplete: connector approval-service timeout after only3 of6 blobs; do not claim the generated payload is published.
+- Math assets math#29 @058df22dbfe07aa510904cef461c178a5f4a4dd6: SOURCE PASS, exact CI pending. All substantial collector/KaTeX resolver/module-control source committed; API3+assets candidate0328 pinned. Store/question branches untouched.
+- Offline checker assessment#30 @419ccd741792d7856f28ba4fadf02d5678af4815: SOURCE + exact full-Chromium CI PASS17/17 (run39687271868/job119524411770). Dynamic append/remove/reassign and copied-prefix controls each5 loads rejected; actual caught-image URL evidence retained; model always-blank5/5, plain-hidden20/20 blank, refresh0/5 blank. This proves bounded checker contracts and a mechanism MODEL, never the upstream fork fix or complete course/offline acceptance.
+- Assets scanner: four independent findings have fixes prepared but unpublished. Assets API c44: all20 checks green. API3+assets union0328: actual native296 tests passed; remaining exact checks and later locale-only refresh stay separate gates.
+- H1 OptionB preparation is READ-ONLY until the reviewed canonical variants/question payload and root-provided new-branch base are published. No production grader semantics, smaller STACK fixes, golden rows or LowestTerms work is authorized in this waiting window.
+
 DURABLE CHECKPOINT — 21 October, cloud continuation
 This checkpoint supersedes stale status/head numbers in the original instructions below; their design and safety requirements remain binding. All repository handoffs and relevant designs were already read by this team. Read them before taking over unfamiliar work.
 
