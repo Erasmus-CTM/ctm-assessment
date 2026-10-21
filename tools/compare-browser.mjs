@@ -8,7 +8,8 @@
 //     [--expect tools/compare-rendered/expect/step4-migration.yml] [--course NAME] [--pages a.html,b.html]
 //     [--offline] [--first-visit] [--shard I/N] [--reveal-ends FILE] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
 //
-// Checks, on the pages with reveals, the switch or links into tabs:
+// Checks, on the pages with reveals, the switch or links into tabs (a page
+// that only new has, such as a course's test page, by itself: see 10.):
 //  1. reveals: count per kind, summary texts and initial state equal; each
 //     reveal holds the words it held on old, never fewer or others; more
 //     only as old's words followed by exactly what came after it there,
@@ -43,6 +44,16 @@
 //  7. computed styles of every summary equal (component <details> included);
 //  8. embedded content (not --offline): JSXGraph boards in reveals have a
 //     finite size once opened; a Python cell in a reveal runs;
+// 10. a page only new has, with reveals, the switch or embedded pages, has
+//     no old to compare with and is checked on its own (`new-only`): every
+//     reveal starts closed, with a summary and its body; the switch is shown,
+//     reading opens and lecture closes every reading step, leaves the other
+//     reveals as they are, sets aria-pressed and the status line, and its
+//     mode survives a reload; each summary takes focus and Enter and Space
+//     toggle it; print opens the reading steps and hides the switch, and
+//     afterprint restores them; each embedded page loads. Its links are
+//     checked by 4. and its console by 9.; with --shots, its switch and the
+//     first reveal of each kind, open, at 1280 and 390 px (not compared);
 //  9. no console error on new that old did not have; each error names the
 //     frame it comes from (the page, or an iframe such as a JSXGraph board):
 //     every frame reports its uncaught errors and console.error calls, and a
@@ -70,7 +81,9 @@
 //
 // `known-failures` in the expect file lists failures of new that are known
 // and fixed elsewhere (the browsers and the checks, both required; the
-// courses, `targets: tab-title`, a `frame` and a `note` pattern, optional;
+// courses, `targets: tab-title`, a `place` pattern (where a link's target
+// stands: "collapsed callout", "pane + details", ...), a `target` pattern
+// (the target as page#id), a `frame` and a `note` pattern, optional;
 // and the fix): such a failure counts as expected and is reported, until the
 // fix is pinned and the entry removed.
 // Exit status: 0 when every check passes, 1 otherwise, 2 on errors.
@@ -164,6 +177,7 @@ export function inventory(root, page, side, ends) {
     coi: !!doc.querySelector('script[src*="coi-serviceworker"]'),
     inTabs: new Set([...doc.querySelectorAll('.tab-pane [id], details [id]')].map(el => el.id)),
     boards: doc.querySelectorAll('main details iframe[name^="iframeJXG"]').length,
+    embeds: doc.querySelectorAll('main iframe.ctm-embed').length,
     cells: doc.querySelectorAll('main details [id^="qpyodide-insertion-location-"]').length};
 }
 
@@ -176,7 +190,8 @@ function placeOf(el) {
   for (let node = el.parentElement; node; node = node.parentElement) {
     if (node.classList.contains('tab-pane')) panes++;
     if (node.tagName === 'DETAILS') details = true;
-    if (node.classList.contains('collapse')) collapse = true;
+    // A callout Quarto renders collapsed (an expanded one, `collapse show`, hides nothing).
+    if (node.classList.contains('collapse') && !node.classList.contains('show')) collapse = true;
   }
   if (el.classList.contains('ctm-tab-target')) return panes ? 'nested tab title' : 'tab title';
   const parts = [];
@@ -354,7 +369,8 @@ class Run {
     // A known failure (expect file `known-failures`) is expected until its fix is pinned.
     const known = ok ? null : (this.known || []).find(k => k.browsers.includes(this.browserName)
       && k.checks.includes(check) && (!k.courses || k.courses.includes(this.o.course))
-      && (!k.targets || k.targets !== 'tab-title' || detail.tabTitle)
+      && (!k.targets || k.targets !== 'tab-title' || detail.tabTitle) && (!k.place || new RegExp(k.place).test(detail.place || ''))
+      && (!k.target || new RegExp(k.target).test(detail.target || ''))
       && (!k.frame || new RegExp(k.frame).test(detail.frame || '')) && (!k.note || new RegExp(k.note).test(detail.note || '')));
     if (known) {
       ok = true;
@@ -482,7 +498,8 @@ class Run {
       ...(process.env.CTM_BROWSER_PROXY ? {proxy: {server: process.env.CTM_BROWSER_PROXY, bypass: '127.0.0.1,localhost'}} : {})});
     try {
       for (const [name, check] of [['reveals', this.reveals], ['switch', this.switches], ['keyboard', this.keyboard], ['links', this.links],
-        ['groups', this.groups], ['print', this.print], ['look', this.looks], ['styles', this.styles], ['embedded', this.embedded]]) {
+        ['groups', this.groups], ['print', this.print], ['look', this.looks], ['styles', this.styles], ['embedded', this.embedded],
+        ['new-only', this.newOnly]]) {
         if (this.o.checks && !this.o.checks.includes(name)) continue;
         console.log(`${this.browserName}: ${name}`);
         try {
@@ -792,7 +809,8 @@ class Run {
       if (problems.length) problems.push('trace: ' + state.later.trace);
       const visit = this.o.firstVisit ? `; first visit: ${state.isolation}` : '';
       this.record('link load', name, !problems.length, {note: (problems.join('; ') || `shown, focus ${n.focus}; ${was}`) + visit, expected: dead('old')(link) || undefined,
-        previouslyDead: dead('old')(link) || undefined, tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined});
+        previouslyDead: dead('old')(link) || undefined, tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined,
+        place: this.inventories[link.target]?.new?.places.get(link.id), target: link.target + '#' + link.id});
     }
     // On click, from the page with the link; Back and Forward for the first
     // link of each page. Not on a first visit: a click comes from a page the
@@ -873,7 +891,8 @@ class Run {
       const was = !state.old ? 'dead on old' : works(state.old) ? 'shown on old' : 'not shown on old';
       if (problems.length) problems.push('trace: ' + n.trace);
       this.record('link click', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}${history.new ? ', Back and Forward' : ''}; ${was}`,
-        tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined});
+        tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined, place: this.inventories[link.target]?.new?.places.get(link.id),
+        target: link.target + '#' + link.id});
     }
     const previously = this.results.filter(r => r.previouslyDead && r.ok).map(r => r.page);
     const part = this.o.shard ? ` (part ${this.o.shard.index}/${this.o.shard.count} of them)` : '';
@@ -1098,6 +1117,162 @@ class Run {
         }
       }
       this.record('styles', page, !problems.length, {note: problems.join('; ') || `${seen.new.length} summaries, the same computed styles`});
+    }
+  }
+
+  // 10. Pages only new has (a course's test page): new on its own.
+  newOnlyPages() {
+    return Object.entries(this.inventories).filter(([page, v]) => this.minePage(page) && v.new && !v.old
+      && (v.new.reveals.length || v.new.switch || v.new.embeds)).map(([page]) => page);
+  }
+
+  async newOnly() {
+    for (const page of this.newOnlyPages()) {
+      const inv = this.inventories[page].new, problems = [];
+      const context = await this.context('new');
+      const tab = await context.newPage();
+      await this.load(tab, 'new', this.url('new', page));
+      const read = () => tab.evaluate(() => {
+        const box = document.querySelector('.ctm-modes');
+        return {switch: box && {visible: box.getClientRects().length > 0 && getComputedStyle(box).visibility !== 'hidden',
+          pressed: [...box.querySelectorAll('button[data-mode]')].map(b => b.getAttribute('data-mode') + '=' + b.getAttribute('aria-pressed')).join(' '),
+          status: (box.querySelector('.ctm-modes-status')?.textContent || '').trim()},
+        reveals: [...document.querySelectorAll('main details.ctm-reveal')].map(d => ({kind: d.classList[1], open: d.open,
+          summary: (d.querySelector(':scope > summary')?.textContent || '').replace(/\s+/g, ' ').trim(), body: !!d.querySelector(':scope > .ctm-reveal-body')}))};
+      });
+      const steps = state => state.reveals.filter(r => r.kind === 'reading-step').map(r => r.open);
+      const initial = await read();
+      if (initial.reveals.length !== inv.reveals.length) problems.push(`${initial.reveals.length} reveals in the browser, ${inv.reveals.length} in the HTML`);
+      initial.reveals.forEach((r, k) => {
+        if (r.open) problems.push(`${r.kind} ${k + 1} ("${r.summary}") starts open`);
+        if (!r.summary) problems.push(`${r.kind} ${k + 1} has no summary text`);
+        if (!r.body) problems.push(`${r.kind} ${k + 1} has no div.ctm-reveal-body`);
+      });
+      let modes = 'no switch';
+      if (inv.switch && !initial.switch?.visible) {
+        // Its script did not run: nothing to click (the other checks go on).
+        problems.push('the switch is not shown');
+        modes = 'the switch is not shown';
+      } else if (inv.switch) {
+        if (initial.switch.pressed !== 'lecture=true reading=false') problems.push('aria-pressed at the start: ' + initial.switch.pressed);
+        const others = () => tab.evaluate(() => [...document.querySelectorAll('main details.ctm-reveal:not(.reading-step)')].map(d => d.open));
+        // A hint (solution, details) opened by the reader stays open, the others closed, whatever the mode.
+        await tab.evaluate(() => { const d = document.querySelector('main details.ctm-reveal:not(.reading-step)'); if (d) d.open = true; });
+        const before = await others();
+        await tab.click('.ctm-modes button[data-mode="reading"]');
+        await tab.waitForTimeout(250);
+        const reading = await read();
+        if (!steps(reading).every(Boolean)) problems.push('reading leaves a reading step closed');
+        if (JSON.stringify(await others()) !== JSON.stringify(before)) problems.push('reading changed a hint, solution or details block');
+        if (reading.switch.pressed !== 'lecture=false reading=true') problems.push('aria-pressed in reading: ' + reading.switch.pressed);
+        if (!reading.switch.status || reading.switch.status === initial.switch.status) problems.push('the status line does not change');
+        await tab.reload();
+        await this.settle(tab);
+        if (!steps(await read()).every(Boolean)) problems.push('reading mode is lost on reload');
+        await tab.evaluate(() => { const d = document.querySelector('main details.ctm-reveal:not(.reading-step)'); if (d) d.open = true; });
+        await tab.click('.ctm-modes button[data-mode="lecture"]');
+        await tab.waitForTimeout(250);
+        const lecture = await read();
+        if (steps(lecture).some(Boolean)) problems.push('lecture leaves a reading step open');
+        if (JSON.stringify(await others()) !== JSON.stringify(before)) problems.push('lecture changed a hint, solution or details block');
+        if (lecture.switch.status !== initial.switch.status) problems.push(`status line in lecture: "${lecture.switch.status}", at the start "${initial.switch.status}"`);
+        modes = `the switch opens and closes ${steps(lecture).length} reading steps, keeps the mode on reload`;
+      }
+      // Keyboard: each summary, shown as a reader would (its tabs and <details> opened).
+      await tab.reload();
+      await this.settle(tab);
+      const count = initial.reveals.length;
+      let keys = 0;
+      for (let k = 0; k < count; k++) {
+        const summary = (await tab.evaluateHandle(k => {
+          const d = [...document.querySelectorAll('main details.ctm-reveal')][k];
+          for (let node = d.parentElement; node; node = node.parentElement) {
+            if (node.tagName === 'DETAILS') node.open = true;
+            if (node.classList?.contains('collapse') && !node.classList.contains('show')) node.classList.add('show');
+            if (node.classList?.contains('tab-pane') && !node.classList.contains('active') && node.id) {
+              const t = document.querySelector(`[data-bs-target="#${CSS.escape(node.id)}"], [href="#${CSS.escape(node.id)}"]`);
+              if (t && window.bootstrap?.Tab) window.bootstrap.Tab.getOrCreateInstance(t).show(); else t?.click();
+            }
+          }
+          return d.querySelector(':scope > summary');
+        }, k)).asElement();
+        if (!summary) continue;
+        await tab.waitForTimeout(50);
+        await summary.evaluate(s => { s.scrollIntoView({block: 'center'}); s.focus(); });
+        const open = () => summary.evaluate(s => s.parentElement.open);
+        if (!await summary.evaluate(s => document.activeElement === s)) { problems.push(`summary ${k + 1} takes no focus`); continue; }
+        const before = await open();
+        await tab.keyboard.press('Enter');
+        await tab.waitForTimeout(80);
+        const enter = (await open()) !== before;
+        await tab.keyboard.press(' ');
+        await tab.waitForTimeout(80);
+        const space = (await open()) === before;
+        if (!enter || !space) problems.push(`summary ${k + 1}: Enter ${enter ? 'toggles' : 'does nothing'}, Space ${space ? 'toggles' : 'does nothing'}`);
+        else keys++;
+      }
+      // Print.
+      if (inv.reveals.some(r => r.kind === 'reading-step')) {
+        await tab.reload();
+        await this.settle(tab);
+        const printState = () => tab.evaluate(() => ({steps: [...document.querySelectorAll('main details.reading-step')].map(d => d.open),
+          switch: document.querySelector('.ctm-modes') ? getComputedStyle(document.querySelector('.ctm-modes')).display : 'none'}));
+        const before = await printState();
+        await tab.emulateMedia({media: 'print'});
+        await tab.evaluate(() => dispatchEvent(new Event('beforeprint')));
+        await tab.waitForTimeout(150);
+        const printing = await printState();
+        await tab.evaluate(() => dispatchEvent(new Event('afterprint')));
+        await tab.emulateMedia({media: 'screen'});
+        await tab.waitForTimeout(150);
+        if (!printing.steps.every(Boolean)) problems.push('a reading step stays closed in print');
+        if (printing.switch !== 'none') problems.push('the switch is printed');
+        if (JSON.stringify((await printState()).steps) !== JSON.stringify(before.steps)) problems.push('the reading steps are not restored after printing');
+      }
+      // Embedded pages: each loads (lazily: scrolled to first).
+      let embeds = 0;
+      for (const frame of await tab.$$('main iframe.ctm-embed')) {
+        await frame.evaluate(el => el.scrollIntoView({block: 'center'}));
+        await tab.waitForTimeout(800);
+        // Its address answers (a browser shows its own page for a 404), and
+        // the frame shows something: a picture or text.
+        const found = await frame.evaluate(el => fetch(el.src).then(response => response.ok).catch(() => false));
+        const loaded = found && await (await frame.contentFrame())?.evaluate(() => !!document.querySelector('svg, img, canvas, video')
+          || (document.body?.textContent || '').trim().length > 0).catch(() => false);
+        if (loaded) embeds++;
+        else problems.push(`embedded page ${await frame.getAttribute('src')} does not load`);
+      }
+      await context.close();
+      if (this.o.shots && (!this.o.shard || this.o.shard.index === 1)) await this.newOnlyShots(page);
+      const kinds = Object.entries(initial.reveals.reduce((n, r) => ({...n, [r.kind]: (n[r.kind] || 0) + 1}), {})).map(([k, n]) => `${n} ${k}`).join(', ');
+      this.record('new-only', page, !problems.length, {note: problems.join('; ')
+        || `only on new: ${kinds || 'no reveals'}, all closed at first; ${modes}; ${keys} summaries toggle by Enter and Space; ${embeds} embedded pages load`});
+    }
+  }
+
+  // Screenshots of a new-only page (not compared): the switch, then the first
+  // reveal of each kind, open, at 1280 and 390 px.
+  async newOnlyShots(page) {
+    fs.mkdirSync(this.o.shots, {recursive: true});
+    const slug = page.replace(/\.html$/, '').replace(/[^\w-]+/g, '_');
+    for (const width of [1280, 390]) {
+      const context = await this.context('new', {viewport: {width, height: 900}});
+      const tab = await context.newPage();
+      await this.load(tab, 'new', this.url('new', page));
+      await tab.addStyleTag({content: '#quarto-header, .headroom, #quarto-sidebar-toggle-title, .quarto-secondary-nav { visibility: hidden !important; }'});
+      for (const [shot, selector] of [['switch', '.ctm-modes'], ...['reading-step', 'hint', 'solution', 'details'].map(kind => [kind + '-open', 'main details.ctm-reveal.' + kind])]) {
+        const element = (await tab.evaluateHandle(selector => {
+          const el = document.querySelector(selector);
+          if (el?.tagName === 'DETAILS') el.open = true;
+          el?.scrollIntoView({block: 'center'});
+          return el || null;
+        }, selector)).asElement();
+        if (!element) continue;
+        await tab.waitForTimeout(300);
+        const image = await element.screenshot({animations: 'disabled', timeout: 15000}).catch(() => null);
+        if (image) fs.writeFileSync(path.join(this.o.shots, `${this.browserName}-${width}-new-only-${slug}-${shot}.png`), image);
+      }
+      await context.close();
     }
   }
 
