@@ -84,9 +84,12 @@ export async function checkBoards(page, {settleMs = 1200, attachTimeoutMs = 3000
     const frameElement = parent ? await frame.frameElement() : null;
     const expected = frameElement ? await frameElement.evaluate((el, selector) => el.matches(selector), BOARD_FRAMES) : false;
     if (frameElement) await frameElement.dispose();
-    if (expected) await frame.locator('.jxgbox, [data-ctm-board-box]').first().waitFor({state: 'attached', timeout: attachTimeoutMs}).catch(() => {});
+    if (expected) {
+      await revealFrame(frame);
+      await frame.locator('.jxgbox, [data-ctm-board-box]').first().waitFor({state: 'attached', timeout: attachTimeoutMs}).catch(() => {});
+    }
     const count = await frame.locator('.jxgbox, [data-ctm-board-box]').count();
-    if (parent && (expected || count)) await revealFrame(frame);
+    if (parent && count && !expected) await revealFrame(frame);
     if (expected && !count) {
       records.push({frame: frame.url(), board: null, errors: ['board iframe contains no board box']});
       continue;

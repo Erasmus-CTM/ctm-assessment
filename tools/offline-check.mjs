@@ -8,6 +8,8 @@ import {chromium} from 'playwright';
 import {checkBoards} from './board-check.mjs';
 
 export async function launchOfflineBrowser() {
+  if (/headless[-_]?shell/i.test(process.env.CHROMIUM_EXECUTABLE || ''))
+    throw new Error('headless shell cannot establish the hidden-frame mechanism; use full Chromium');
   return chromium.launch({headless: true,
     ...(process.env.CHROMIUM_EXECUTABLE ? {executablePath: process.env.CHROMIUM_EXECUTABLE} : {channel: 'chromium'}),
     args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
