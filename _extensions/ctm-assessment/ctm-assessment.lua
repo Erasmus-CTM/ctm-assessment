@@ -25,13 +25,20 @@ end
 
 function Meta(meta)
   warnNestedJsxgraph()
+  -- Recomputed from the keys this invocation actually fills. Never accept an
+  -- author-supplied marker as evidence that a CDN URL came from this hook.
+  local defaults = pandoc.MetaMap({})
+  meta["_ctm-assessment-pin-defaults"] = defaults
   local pins = pinnedJsxgraph()
   if pins then
     local own = meta.jsxgraph
     -- A string or list value (`jsxgraph: plain`) is not a settings map.
     if pandoc.utils.type(own) ~= "table" then own = pandoc.MetaMap({}) end
     for key, value in pairs(pins) do
-      if own[key] == nil then own[key] = value end
+      if own[key] == nil then
+        own[key] = value
+        defaults[key] = value
+      end
     end
     meta.jsxgraph = own
   end
