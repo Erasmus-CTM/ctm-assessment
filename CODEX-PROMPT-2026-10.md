@@ -3,6 +3,21 @@ You are taking over the CTM Assessment consolidation, a set of Quarto extensions
 - Erasmus-CTM: ctm-assessment (the umbrella package), ctm-libs (shared library), ctm-checkers (all checker Python, including the STACK engine), math-exercise, py-exercise, pyodide-interaktiv (working branch `feature/shared-feedback-integration`) and stack-sympy.
 - aacchhee: ctm-demo (test course), ingmat3a_ntnu (real course) and the fork aacchhee/jsxgraph-quarto (PR #2 to upstream jsxgraph/jsxgraph-quarto).
 
+AC'S UPDATED PRIORITY AND DURABLE CHECKPOINT (21 Oct 2026; binding)
+
+- Keep all substantial work committed on non-main branches through the GitHub connector, and update this prompt as work proceeds so a stalled chat can be resumed. AC authorizes writing and opening PRs in every repository listed above.
+- Use the author/committer identity supplied by the GitHub connector; do not pause over identity differences. This supersedes older exact-identity requirements. Do not prepare handoff packages.
+- Prioritize completion of all remaining non-STACK-sympy work: the course migration and shared CTM platform consolidation come first. Then return to the smaller STACK-specific issues. Significant ctm-checkers changes that other components need must still be implemented; do not defer shared checker work merely because it is in ctm-checkers.
+- Use more parallel workers where the work permits. Engineering: 6.1 Sol, medium, up to xhigh for difficult work; independent reviews: Astra, xhigh. AC alone merges; never merge, force-push or tag.
+
+Current checkpoint:
+- Step-4 final set is REVIEWED, GREEN AND MERGED by AC: ctm-libs #30 reviewed head 1f7a3a5de7b765d108fe2ca4ec98b36635c6814f, merge 45bcb2a51257151f89bbe706142f22abcd1b5a0c; ctm-assessment #24 reviewed head d47ccc5a492d3df0cade62f9bc21beb63511846f, merge 3d9ebd94565ca302724dc619092ad9d043c1497f. Both merge trees were checked equal to reviewed head trees. All package pins were checked reachable from their designated branches (recorded JSXGraph fork exception retained). Final combined cells run 39660903087 is green: each ingmat3a comparison 24 pages, 320 cells, zero unstable and zero unexplained.
+- Task C is now ACTIVE on aacchhee/ingmat3a_ntnu branch consolidation/2026-10-step4-migration, starting at 5ad31abf3a1ccb9befaf3687b24d66b659713068. Main is a0a34ee508fdd4d00e78e7ea782b00a343fcf682. First commit ref: main and ctm-checkers ignore are done. Conversion, manual construct audit, zero-warning build, three-engine sharded comparison and desktop/390 px screenshots still need completion. No migration PR yet at this checkpoint.
+- Migration comparison must use actual migrated course PR sources (convert=false), course-base-ref a0a34ee, base=pin (9ed46a4), new package 3d9ebd9, step4-migration.yml, Chromium/Firefox/WebKit, four shards. Existing compare-courses workflow has no workflow_call; prepare reusable invocation without copying comparison implementation.
+- STACK set review found two concrete issues: S-11 FacForm can hide author configuration errors when the student answer is a non-expression; stack-sympy #28's section-wide rendered expectations can hide unrelated text/UI additions. Current native CI covers only STACK 4.13.1 and does not replay these changed grading rows at both required native versions. Focused fixes and an additive oracle collector are being checkpointed, then deferred behind non-STACK work. Do not call this set merge-ready. LowestTerms behavior is unchanged; discuss before any change. Previously accepted options, scores, message discrepancy and hyperbolic deferral stay accepted.
+- Remaining non-STACK work retains the approved designs' dependency order: L3x/U3c alias removal; step-4 phase B store/answers/progress/quizzes/export; step-5 runtime/offline/exam; shared question tests, variants and shared checker work where required; phase C languages; other non-STACK consolidation. JSXGraph repinning remains gated on AC telling us upstream PR #2 merged.
+- After each substantial commit, replace this checkpoint with current branch/head/PR links, actual test results, outstanding reviews/CI and the next concrete action. Record unrun checks as needed, never as results.
+
 AGENTS AND MODELS (AC's instruction)
 - For software development (engineering subagents), use model 6.1 Sol at medium reasoning. Raise it, up to xhigh, for difficult cases: concurrency and runtime races, browser timing bugs, golden-table or grading changes, and cross-repo set mechanics.
 - For every independent review, use Astra at xhigh. A reviewer never reviews its own code.
@@ -19,7 +34,7 @@ BINDING RULES (summary; the handoff files have the details)
   - One combined CI run must test the whole set.
   - AC merges the set in one sitting, in the order you state.
   - Check before sending: head SHAs unchanged and not behind. Check after AC merges: each merge tree equals its head tree.
-- Commits are authored AND committed as `Andrey Chesnokov <aacchhee@gmail.com>`, with a trailer naming you as co-author.
+- Use the GitHub connector app and accept the author/committer identity it supplies (AC, 21 Oct 2026). Do not pause over author or email differences; this overrides earlier exact-identity requirements.
 - Every PR gets an independent review: a reviewer that did not write the code, at maximum effort. Repeat it until nothing substantive remains, and watch CI until it is green. Only then send the PR to AC.
 - No code duplication across repos: one home per piece of code. Generated copies are made and CI-checked by script.
 - No backwards-compatibility break without AC's approval.
