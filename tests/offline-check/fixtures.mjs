@@ -98,13 +98,17 @@ document.addEventListener('click', event => {
     const child = '<!doctype html><html><body>' + firstScript + box('dynamic-' + mode) +
       '<script>fetch("https://offline.invalid/dynamic-' + mode + '").catch(function(){parent.postMessage({dynamicDone:true,first:window.__ctmFirstScriptAudit},"*");});</script></body></html>';
     const encoded = JSON.stringify(child).replaceAll('</script', '<\\/script');
-    const initial = mode === 'reassign' ? frame('reassigned', box('initial')) : '';
-    const setup = mode === 'reassign' ? 'var iframe=document.querySelector("iframe");' :
+    const setup = mode === 'reassign' ? 'var iframe=document.querySelector("iframe");document.body.dataset.dynamicInitialLoaded="true";' :
       'var iframe=document.createElement("iframe");iframe.setAttribute("sandbox","allow-scripts");iframe.setAttribute("data-ctm-board","");document.body.append(iframe);';
-    fs.writeFileSync(path.join(root, 'dynamic-' + mode + '.html'), html(initial +
-      '<script>window.addEventListener("message",function(e){if(e.data?.dynamicDone){document.body.dataset.dynamicFirst=JSON.stringify(e.data.first);' +
+    const listener = '<script>window.addEventListener("message",function(e){if(e.data?.dynamicDone){document.body.dataset.dynamicFirst=JSON.stringify(e.data.first);' +
       (mode === 'remove' ? 'document.querySelector("iframe")?.remove();' : '') +
-      'document.body.dataset.dynamicDone="true";}});setTimeout(function(){' + setup + 'iframe.srcdoc=' + encoded + ';},10);</script>'));
+      'document.body.dataset.dynamicDone="true";}});window.startDynamic=function(){' + setup + 'iframe.srcdoc=' + encoded + ';};</script>';
+    // Reassignment must follow the initial document's actual load. A timer can
+    // race its first navigation, so it does not establish a replacement at all.
+    const body = mode === 'reassign' ? listener + frame('reassigned', box('initial')).replace('<iframe ',
+      '<iframe onload="if(!this.dataset.reassigned){this.dataset.reassigned=1;window.startDynamic();}" ') :
+      listener + '<script>setTimeout(window.startDynamic,10);</script>';
+    fs.writeFileSync(path.join(root, 'dynamic-' + mode + '.html'), html(body));
   }
   fs.writeFileSync(path.join(root, 'same-origin.html'), html('<script>fetch("_ctm-assets/local.txt").then(function(r){return r.text();}).then(function(t){document.body.dataset.parentLocal=t;});</script>' + frame('same-origin', box('same-origin') +
     '<script>Promise.all([fetch(new URL("__BASE___ctm-assets/local.txt")).then(function(r){return r.text();}),' +

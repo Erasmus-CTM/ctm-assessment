@@ -197,6 +197,7 @@ test('failed caught opaque image loads have actual buffered resource URL evidenc
 test('unaudited dynamic opaque documents are refused after completed append/remove/reassign lifecycles', {timeout: 120000}, async () => {
   for (const mode of ['append', 'remove', 'reassign']) {
     const result = {scope: 'checker-contract', loads: 5, results: []};
+    evidence.contracts.push(result);
     for (let load = 1; load <= 5; load++) {
       const {context, drain, evidence: observed} = await offlineContext(browser, server.baseURL);
       const record = {path: 'dynamic-' + mode + '.html', load, boards: [], evidence: observed, ok: false};
@@ -204,7 +205,15 @@ test('unaudited dynamic opaque documents are refused after completed append/remo
       try {
         const page = await context.newPage();
         await page.goto(server.baseURL + record.path);
-        await page.waitForFunction(() => document.body.dataset.dynamicDone === 'true');
+        try {
+          await page.waitForFunction(() => document.body.dataset.dynamicDone === 'true');
+        } catch (error) {
+          record.state = await page.evaluate(() => ({readyState: document.readyState, body: {...document.body.dataset},
+            frames: [...document.querySelectorAll('iframe')].map(frame => ({srcdoc: frame.getAttribute('srcdoc'), data: {...frame.dataset}}))}));
+          console.error('dynamic lifecycle did not complete', JSON.stringify(record));
+          throw error;
+        }
+        if (mode === 'reassign') assert.equal(await page.locator('body').getAttribute('data-dynamic-initial-loaded'), 'true', 'the initial document loaded before reassignment');
         record.firstScript = JSON.parse(await page.locator('body').getAttribute('data-dynamic-first'));
         assert.equal(record.firstScript.fetch, 'function');
         assert.equal(typeof record.firstScript.installed, 'boolean');
@@ -220,7 +229,6 @@ test('unaudited dynamic opaque documents are refused after completed append/remo
         assert.ok(observed.failed.some(failure => /unaudited/.test(failure.error)), JSON.stringify(record));
       } finally { await drain(); await context.close(); }
     }
-    evidence.contracts.push(result);
   }
 });
 
