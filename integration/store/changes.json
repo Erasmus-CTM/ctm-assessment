@@ -1,0 +1,18 @@
+[
+  {
+    "before": "Same scalar task: _[2].",
+    "after": "Changed scalar task: _[3]."
+  },
+  {
+    "before": "Second pool task: _[20].",
+    "after": "Second pool task changed: _[21]."
+  },
+  {
+    "before": "assert stored_add(1, 2) == 3",
+    "after": "assert stored_add(1, 2) == 4"
+  },
+  {
+    "before": "#| task: Add two numbers.",
+    "after": "#| task: Return one more than the sum."
+  }
+]
