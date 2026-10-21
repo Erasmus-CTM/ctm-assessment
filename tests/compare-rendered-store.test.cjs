@@ -300,3 +300,97 @@ test('only verified chrome leaves switch-position accounting; real authored move
   rejects(mutate(after, d => d.querySelector('[data-ctm-export]').append(d.querySelector('#prose'))), before,
     'unverified bar cannot hide absorbed authored prose');
 });
+
+test('new metadata cannot swap two unchanged unlabelled cells', () => {
+  const f = fixture();
+  function add(html, after) { return mutate(html, d => {
+    const script = [...d.scripts].find(s => s.textContent.startsWith('globalThis.qpyodideCellDetails'));
+    const cells = JSON.parse(script.textContent.slice(script.textContent.indexOf('=') + 1, -1));
+    const source = hash('print(3)\n{"label":"","save":""}\n'), id = 'cell:' + source;
+    cells.push({id: 2, code: 'print(3)', options: {label: '', ...(after ? {save: '',
+      'ctm-store-id': id, 'ctm-store-source': source, 'ctm-store-save': true,
+      'ctm-extra-source': hash(source + ':extra'), 'ctm-extra-save': true} : {})}});
+    script.textContent = 'globalThis.qpyodideCellDetails = ' + JSON.stringify(cells) + ';';
+    const root = d.createElement('div'); root.id = 'qpyodide-insertion-location-2'; d.querySelector('main').append(root);
+    if (after) {
+      const node = d.querySelector('#ctm-store-manifest'), m = JSON.parse(node.textContent);
+      for (const [extra, runtime, order] of [[false, 'ctm-runtime-5', 5], [true, 'ctm-runtime-6', 6]])
+        m.exercises.push({component: 'pyodide-interaktiv', id: (extra ? 'extra:' : '') + id,
+          source: extra ? hash(source + ':extra') : source, save: true, runtimeId: runtime, order});
+      node.textContent = JSON.stringify(m);
+    }
+  }); }
+  const before = add(f.before, false), after = add(f.after, true);
+  assert.equal(compare(after, before).summary.unexpected, 0);
+  rejects(mutate(after, d => {
+    const script = [...d.scripts].find(s => s.textContent.startsWith('globalThis.qpyodideCellDetails'));
+    const cells = JSON.parse(script.textContent.slice(script.textContent.indexOf('=') + 1, -1));
+    for (const key of ['ctm-store-id','ctm-store-source','ctm-store-save','ctm-extra-source','ctm-extra-save'])
+      [cells[0].options[key], cells[1].options[key]] = [cells[1].options[key], cells[0].options[key]];
+    script.textContent = 'globalThis.qpyodideCellDetails = ' + JSON.stringify(cells) + ';';
+  }), before, 'metadata-only swap across original code and insertion roots');
+});
+
+test('read-only primary is disabled while its extra slot remains registered', () => {
+  const f = fixture();
+  const readonly = (html, after, save = false) => mutate(html, d => {
+    const script = [...d.scripts].find(s => s.textContent.startsWith('globalThis.qpyodideCellDetails'));
+    const cells = JSON.parse(script.textContent.slice(script.textContent.indexOf('=') + 1, -1));
+    const o = cells[0].options; o['read-only'] = 'true';
+    if (after) {
+      const source = hash('print(2)\n{"label":"","read-only":"true","save":""}\n');
+      o['ctm-store-id'] = 'cell:' + source; o['ctm-store-source'] = source; o['ctm-store-save'] = save;
+      o['ctm-extra-source'] = hash(source + ':extra');
+      const node = d.querySelector('#ctm-store-manifest'), m = JSON.parse(node.textContent);
+      for (const e of m.exercises.filter(e => e.component === 'pyodide-interaktiv')) {
+        const extra = e.id.startsWith('extra:');
+        e.id = (extra ? 'extra:' : '') + 'cell:' + source;
+        e.source = extra ? hash(source + ':extra') : source; e.save = extra ? true : save;
+      }
+      node.textContent = JSON.stringify(m);
+    }
+    script.textContent = 'globalThis.qpyodideCellDetails = ' + JSON.stringify(cells) + ';';
+  });
+  assert.equal(compare(readonly(f.after, true), readonly(f.before, false)).summary.unexpected, 0);
+  rejects(readonly(f.after, true, true), readonly(f.before, false), 'read-only primary cannot save');
+});
+
+test('pool descriptors bind exact existing questions and grading, including legacy variants', () => {
+  const f = fixture();
+  const grading = {mode:'equivalent',reject:'',tolerance:'',decplaces:'',sigfigs:'',form:'',vars:'',response:'',
+    formCredit:'0.5',vecdir:'row',checker:false,packages:[],fieldLabels:[],partialCredit:false};
+  // Independent fixture encoder follows the documented typed-key tuple format.
+  function encode(v) {
+    if (!v || typeof v !== 'object') return JSON.stringify(v);
+    const entries = Object.entries(v).map(([k,x]) => [(Array.isArray(v) ? 'number:' + (+k+1) : 'string:' + k),x]);
+    return '[' + entries.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0).map(([k,x])=>'['+JSON.stringify(k)+','+encode(x)+']').join(',') + ']';
+  }
+  for (const generated of [false, true]) {
+    const records = generated ? [{id:'v-first',question:'x+1',solution:'2'}, {id:'v-next',question:'x+2',solution:'3'}] : null;
+    const tasks = ['x+1','x+2'];
+    const descriptors = tasks.map((question,i) => {
+      const record = records?.[i], h = hash(encode({question,solution:record?.solution || '',context:'',
+        parameters:false,derived:false,variantId:record?.id || false,grading}));
+      return {id:record?.id || 'pool:'+h,hash:h,...(generated?{}:{n:i+1})};
+    });
+    const decorate = (html, after) => mutate(html,d => {
+      const node=d.querySelector('.math-exercise-cell');
+      node.setAttribute('data-pool',JSON.stringify(tasks)); node.removeAttribute('data-variants');
+      if(records) node.setAttribute('data-variants',JSON.stringify({variants:records}));
+      for(const [key,value] of Object.entries(grading)) {
+        const attr = {formCredit:'form-credit',fieldLabels:'field-labels',partialCredit:'partial-credit'}[key] || key;
+        node.setAttribute('data-'+attr, ['checker','packages','fieldLabels'].includes(key)?JSON.stringify(value):String(value));
+      }
+      if(after) node.setAttribute('data-storage-variants',JSON.stringify(descriptors));
+    });
+    const before=decorate(f.before,false), after=decorate(f.after,true);
+    assert.equal(compare(after,before).summary.unexpected,0);
+    for(const change of [
+      ds=>{ds[0].hash=A;},ds=>{ds[0].id='unrelated';},ds=>{ds.pop();},ds=>{ds[0].n=99;}
+    ]) rejects(mutate(after,d=>{
+      const n=d.querySelector('.math-exercise-cell'),ds=JSON.parse(n.getAttribute('data-storage-variants'));
+      change(ds);n.setAttribute('data-storage-variants',JSON.stringify(ds));
+    }),before,'invalid descriptor '+String(change));
+    rejects(after.replace('data-tolerance=""','data-tolerance="1"'),before,'grading changed with descriptors unchanged');
+  }
+});
