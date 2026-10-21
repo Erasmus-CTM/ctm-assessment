@@ -26,7 +26,7 @@ async function context(extra) {
   ctx.on('page',page=>{
     page.setDefaultTimeout(90000);
     page.on('dialog',dialog=>dialog.accept());
-    page.on('pageerror',error=>errors.push({page:page.url(),message:error.message}));
+    page.on('pageerror',error=>errors.push({page:page.url(),phase:checks.length,message:error.message,stack:error.stack}));
   });
   return ctx;
 }
@@ -100,6 +100,18 @@ async function remoteReset(page,id) {
     await new Promise(resolve=>setTimeout(resolve,20));
   }
   throw Error('Remote clear did not reset '+id);
+}
+async function showSaved(offer) {
+  // Follow the reader's actual path: open its tab, then its native disclosure.
+  // innerText on a collapsed details descendant differs across browser engines.
+  assert.equal(await offer.evaluate(element=>element.open),false,'saved answer starts collapsed');
+  await offer.evaluate(element=>CTMNav.reveal(element.parentElement));
+  assert.equal(await offer.evaluate(element=>element.open),false,'navigation does not reveal the old answer automatically');
+  await offer.locator(':scope > summary').click();
+  assert.equal(await offer.evaluate(element=>element.open),true,'the real saved-answer summary opens its disclosure');
+  await offer.locator('pre').waitFor({state:'visible'});
+  assert.equal(await offer.locator('input,textarea,[contenteditable="true"]').count(),0,'old answers stay read-only');
+  return offer.locator('pre').innerText();
 }
 async function assertRecordMissing(page,id){
   assert.equal(await page.evaluate(id=>localStorage.getItem(CTMStore.key(id)),id),null);
@@ -183,10 +195,12 @@ try {
     roots.course=path.join(root,'after','_site');
     await goto(page);
     assert.equal(await cell(page,'store-scalar').locator('input.math-input').inputValue(),'');
-    assert.match(await cell(page,'store-scalar').locator('.math-saved-answer pre').innerText(),/2/);
+    assert.match(await showSaved(cell(page,'store-scalar').locator('.math-saved-answer details')),/2/);
+    assert.equal(await cell(page,'store-scalar').locator('input.math-input').inputValue(),'');
     assert.equal(await cell(page,'store-pool').locator('input.math-input').inputValue(),'');
-    assert.match(await cell(page,'store-pool').locator('.math-saved-answer pre').innerText(),/0/);
-    assert.match(await page.locator('.py-exercise-saved-outdated pre').innerText(),/stored learner code/);
+    assert.match(await showSaved(cell(page,'store-pool').locator('.math-saved-answer details')),/0/);
+    assert.equal(await cell(page,'store-pool').locator('input.math-input').inputValue(),'');
+    assert.match(await showSaved(page.locator('.py-exercise-saved-outdated')),/stored learner code/);
     assert.equal(await page.evaluate(()=>monaco.editor.getModels().find(m=>m.getValue().includes('def stored_add')).getValue()),await page.evaluate(()=>__pyExercises.find(e=>e.label==='store-python').starter));
     assert.equal(await quiz(page).locator('.ctm-progress-outdated').count(),3);
     await noRestorePython(page);

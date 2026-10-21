@@ -75,3 +75,13 @@ test('pending-flush spy observes an actual adapter read without replacing it',()
   assert.equal(options.read(),inputs);
   assert.equal(world.__storeAudit.readCalls.length,1);
 });
+
+test('both native clipboard write paths capture plaintext without OS writes',async()=>{
+  const world=fixture();
+  await world.navigator.clipboard.writeText('plain answer');
+  const types=[];
+  await world.navigator.clipboard.write([{types:['text/plain'],async getType(type){types.push(type);return {async text(){return 'Monaco answer';}};}}]);
+  assert.equal(world.__storeAudit.copies[0],'plain answer');
+  assert.equal(world.__storeAudit.copies[1],'Monaco answer');
+  assert.equal(types[0],'text/plain');
+});

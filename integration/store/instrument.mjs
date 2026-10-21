@@ -3,7 +3,15 @@ export function instrument() {
   window.__storeEntries = [];
   Math.random = () => 0.1;
   // The OS clipboard is the only external write boundary replaced by the test.
-  Object.defineProperty(navigator, 'clipboard', {configurable:true,value:{writeText:async text => audit.copies.push(String(text))}});
+  Object.defineProperty(navigator, 'clipboard', {configurable:true,value:{
+    writeText:async text => {audit.copies.push(String(text));},
+    write:async items => {
+      // Monaco uses ClipboardItem on WebKit; capture its plaintext too.
+      for(const item of items) {
+        if(item.types.includes('text/plain'))audit.copies.push(await (await item.getType('text/plain')).text());
+      }
+    }
+  }});
   function intercept(name, decorate) {
     let value;
     Object.defineProperty(window,name,{configurable:true,get:()=>value,set:incoming=>{value=incoming;decorate(incoming);}});
