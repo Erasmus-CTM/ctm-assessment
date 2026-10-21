@@ -6,7 +6,7 @@ The last set before the ingmat3a migration: **links into collapsed callouts
 work**, the comparison of old and new renderings **flags a migration that
 drops a construct**, and ctm-checkers is **0.6.0** (STACK).
 
-Components: ctm-libs at aa4b529 (ctm-libs#30, on top of a4777b1), ctm-checkers
+Components: ctm-libs at a3df529 (ctm-libs#30, on top of a4777b1), ctm-checkers
 0.6.0 at 9e042dc (before: 0.2.0 at 8c3db5e); math-exercise, py-exercise,
 pyodide-interaktiv and JSXGraph unchanged, at the commits recorded in
 `_extensions/ctm-assessment/resolved-repos.json`.
@@ -44,7 +44,7 @@ pyodide-interaktiv and JSXGraph unchanged, at the commits recorded in
   `tools/compare-rendered/expect/step4-migration.yml`: the ctm-nav fix makes
   the callout-target pages equal. The course comparison of the migration now
   has one known failure (`jsxgraph-resize-loop`).
-- `integration/feedback/repos.json`: ctm-libs aa4b529 and ctm-checkers 9e042dc.
+- `integration/feedback/repos.json`: ctm-libs a3df529 and ctm-checkers 9e042dc.
 
 ## 0.11.0
 
