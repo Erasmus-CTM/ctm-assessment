@@ -22,6 +22,38 @@
         "pyodide.asm.js",
         "pyodide.asm.wasm"
       ]
+    },
+    "pyodide": {
+      "licence": "MPL-2.0",
+      "file": "integration/assets-licences/pyodide.txt",
+      "source": "https://github.com/pyodide/pyodide/blob/0.28.3/LICENSE",
+      "git_blob_sha1": "a612ad9813b006ce81d1ee438dd784da99a54007",
+      "applies_to": [
+        "pyodide.js",
+        "pyodide.mjs",
+        "pyodide.asm.js",
+        "pyodide.asm.wasm"
+      ]
+    },
+    "libopenblas": {
+      "licence": "BSD-3-Clause",
+      "file": "integration/assets-licences/openblas.txt",
+      "source": "https://github.com/OpenMathLib/OpenBLAS/blob/v0.3.26/LICENSE",
+      "git_blob_sha1": "22745000fc9132da66655b83e0a1659155db4f51",
+      "version_basis": "verified Pyodide0.28.3 pyodide-lock.json package libopenblas0.3.26",
+      "applies_to": [
+        "libopenblas-0.3.26.zip"
+      ]
+    },
+    "libopenssl": {
+      "licence": "OpenSSL",
+      "file": "integration/assets-licences/openssl.txt",
+      "source": "https://github.com/openssl/openssl/blob/OpenSSL_1_1_1w/LICENSE",
+      "git_blob_sha1": "9601ab43575f9719ca6d2731580ec31ca5dfb0e7",
+      "version_basis": "verified Pyodide0.28.3 pyodide-lock.json package libopenssl1.1.1w",
+      "applies_to": [
+        "libopenssl-1.1.1w.zip"
+      ]
     }
   }
 }

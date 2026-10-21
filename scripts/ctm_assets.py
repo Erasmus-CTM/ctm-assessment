@@ -191,7 +191,7 @@ def package_closure(full_lock: dict, requested) -> dict:
     return {"info": dict(full_lock.get("info", {})), "packages": dict(sorted(selected.items()))}
 
 
-def check_python_sources(sources: list[dict], full_lock: dict, subset: dict, *, local_modules=()) -> dict:
+def check_python_sources(sources: list[dict], full_lock: dict, subset: dict, *, local_modules=(), local_dirs=(), strict=True) -> dict:
     """Reuse the one canonical packaged AST scanner; never maintain a copy."""
     scanner = Path(__file__).resolve().parents[1] / "_extensions" / "ctm-assessment" / "author-imports.py"
     if not scanner.is_file():
@@ -200,9 +200,30 @@ def check_python_sources(sources: list[dict], full_lock: dict, subset: dict, *, 
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     try:
-        return module.check_sources(sources, full_lock, subset, local_modules=local_modules)
+        return module.check_sources(sources, full_lock, subset, local_modules=local_modules, local_dirs=local_dirs, strict=strict)
     except module.ImportCheckError as error:
         raise AssetError(str(error)) from None
+
+
+def private_import_index(full_lock: dict, stdlib: dict) -> dict:
+    if stdlib.get("v") != 1 or stdlib.get("python") != full_lock.get("info", {}).get("python"):
+        raise AssetError("Reviewed stdlib facts do not match the Pyodide release Python version")
+    modules = stdlib.get("modules")
+    if not isinstance(modules, list) or not modules or any(not isinstance(name, str) or not name.isidentifier() for name in modules):
+        raise AssetError("Reviewed stdlib facts need canonical module names")
+    return {"v": 1, "python": stdlib["python"], "stdlib_modules": sorted(set(modules)),
+            "source": stdlib.get("source", {}),
+            "packages": {name: {"imports": list(entry.get("imports", []))}
+                         for name, entry in sorted(full_lock.get("packages", {}).items())}}
+
+
+def write_private_import_index(index: dict, destination: Path) -> Path:
+    destination = Path(destination).resolve()
+    if any(part.lower() == "_ctm-assets" for part in destination.parts):
+        raise AssetError("The full import index must stay outside published _ctm-assets")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(json_bytes(index))
+    return destination
 
 
 def allow_licence(name: str, spdx: str | None, accepted=()) -> frozenset[str]:
@@ -214,7 +235,7 @@ def allow_licence(name: str, spdx: str | None, accepted=()) -> frozenset[str]:
     if not spdx:
         raise AssetError(f"{name}: unknown licence; add a reviewed licence record")
     permissive = {"MIT", "MIT-CMU", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0",
-                  "MPL-2.0", "PSF-2.0", "OFL-1.1", "CC-BY-4.0", "GUST-Font-License", "UIUC"}
+                  "MPL-2.0", "PSF-2.0", "OFL-1.1", "CC-BY-4.0", "GUST-Font-License", "UIUC", "OpenSSL"}
     accepted = set(accepted)
     tokens = re.findall(r"[A-Za-z0-9.+-]+|[()]", spdx)
     if re.sub(r"\s+", "", spdx) != "".join(tokens):

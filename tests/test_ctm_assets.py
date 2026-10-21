@@ -120,7 +120,7 @@ class AssetsTests(unittest.TestCase):
                 A.build_from_lock(lock, Path(tmp) / "bundle", Path(tmp) / "cache", accepted_licences=["LGPL-2.1"])
 
     def test_author_ast_scanner_stops_missing_packages_without_running_code(self):
-        full = {"packages": {"numpy": {"imports": ["numpy"]}, "pandas": {"imports": ["pandas"]},
+        full = {"stdlib_modules": ["os", "importlib"], "packages": {"numpy": {"imports": ["numpy"]}, "pandas": {"imports": ["pandas"]},
                              "networkx": {"imports": ["networkx"]}, "sqlite3": {"imports": ["sqlite3"]}}}
         subset = {"packages": {"numpy": {}}}
         report = A.check_python_sources([{"origin": "starter", "source": "import numpy as np\nraise RuntimeError('never executed')\nfrom . import helper\nimport local_helper"}],
@@ -137,8 +137,53 @@ class AssetsTests(unittest.TestCase):
         with self.assertRaisesRegex(A.AssetError, "cannot inspect"):
             A.check_python_sources([{"source": "def invalid("}], full, subset)
         report = A.check_python_sources([{"source": "import os\nimport js\nimport pyodide\n# import pandas"}], full, subset)
-        self.assertEqual(set(report["unmapped"]), {"os"})
+        self.assertEqual(report["unmapped"], {})
         self.assertNotIn("pandas", report["imports"])
+
+    def test_strict_import_scanner_resolves_release_stdlib_local_files_and_dynamic_aliases(self):
+        full = {"stdlib_modules": ["os", "importlib"], "packages": {"pandas": {"imports": ["pandas"]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "helper.py").write_text("raise RuntimeError('never executed')\n")
+            report = A.check_python_sources([{"source": "import os\nimport helper"}], full, {"packages": {}}, local_dirs=[root])
+            self.assertEqual(report["unmapped"], {})
+            for code in ("import totally_unmapped", "from importlib import import_module as load\nload('pandas')",
+                         "import importlib as il\nil.import_module('pandas')",
+                         "name = 'pandas'\n__import__(name)"):
+                with self.subTest(code=code), self.assertRaises(A.AssetError):
+                    A.check_python_sources([{"source": code}], full, {"packages": {}}, local_dirs=[root])
+            report = A.check_python_sources([{"source": "import diagnostic_only"}], full, {"packages": {}}, strict=False)
+            self.assertIn("diagnostic_only", report["unmapped"])
+
+    def test_private_import_index_is_release_matched_and_never_written_under_assets(self):
+        full = {"info": {"python": "3.13.2"}, "packages": {"extra": {"imports": ["extra"], "sha256": "not copied"}}}
+        stdlib = {"v": 1, "python": "3.13.2", "modules": ["os", "sys"]}
+        index = A.private_import_index(full, stdlib)
+        self.assertNotIn("sha256", index["packages"]["extra"])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            file = A.write_private_import_index(index, root / ".private-extensions/assets-imports.json")
+            self.assertEqual(json.loads(file.read_text()), index)
+            with self.assertRaisesRegex(A.AssetError, "outside published"):
+                A.write_private_import_index(index, root / "_ctm-assets/assets-imports.json")
+        with self.assertRaisesRegex(A.AssetError, "do not match"):
+            A.private_import_index(full, {**stdlib, "python": "3.12.0"})
+
+    def test_curated_texts_keep_official_git_bytes_and_stdlib_facts_are_release_scoped(self):
+        root = Path(__file__).resolve().parents[1]
+        provenance = json.loads((root / "integration/assets-licences/provenance.json").read_text())
+        for name, entry in provenance["entries"].items():
+            with self.subTest(component=name):
+                data = (root / entry["file"]).read_bytes()
+                self.assertTrue(data)
+                actual = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+                self.assertEqual(actual, entry["git_blob_sha1"])
+                A.allow_licence(name, entry["licence"])
+        facts = json.loads((root / "integration/assets-stdlib.json").read_text())
+        self.assertEqual(facts["v"], 1)
+        self.assertIn("os", facts["modules"])
+        self.assertIn("sys", facts["modules"])
+        self.assertEqual(len(facts["modules"]), len(set(facts["modules"])))
 
     def test_composite_licences_require_all_and_choose_permissive_or_branch(self):
         self.assertFalse(A.allow_licence("icons", "(CC-BY-4.0 AND OFL-1.1 AND MIT)"))
