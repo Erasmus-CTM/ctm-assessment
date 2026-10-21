@@ -118,11 +118,13 @@ test('caught opaque fetch/XHR attempts are audited even with zero page errors', 
     pages: [{path: 'caught-frame.html', boards: 1}],
     probes: [async page => {
       const frame = page.frames().find(frame => frame.parentFrame());
+      const first = await frame.evaluate(() => window.__ctmFirstScriptAudit);
+      assert.ok(first?.installed && first.wrapped && first.drain === 'function' && first.binding === 'function', JSON.stringify(first));
       await frame.waitForFunction(() => document.body.dataset.caught === 'true');
     }]});
   evidence.contracts.push(result);
   for (const load of result.results) {
-    assert.equal(load.ok, false);
+    assert.equal(load.ok, false, JSON.stringify(load));
     assert.deepEqual(load.evidence.errors, [], 'caught native errors must not be needed for detection');
     for (const name of ['string', 'url', 'request', 'xhr']) {
       const url = 'https://offline.invalid/caught-' + name;
@@ -138,6 +140,8 @@ test('local string/URL/Request and opaque-frame requests succeed; data URLs are 
     probes: [async page => {
       await page.waitForFunction(() => document.body.dataset.parentLocal === 'local request works');
       const frame = page.frames().find(frame => frame.parentFrame());
+      const first = await frame.evaluate(() => window.__ctmFirstScriptAudit);
+      assert.ok(first?.installed && first.wrapped && first.drain === 'function' && first.binding === 'function', JSON.stringify(first));
       await frame.waitForFunction(() => document.body.dataset.local === 'local request works|local request works|inline|local request works');
     }]});
   evidence.contracts.push(result);

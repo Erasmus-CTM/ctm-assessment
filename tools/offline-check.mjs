@@ -30,11 +30,14 @@ export async function offlineContext(browser, baseURL) {
     if (new URL(url).origin !== allowed.origin) external.push(url);
   });
   await context.addInitScript(() => {
+    globalThis.__ctmOfflineAudit = {version: 1, installed: false};
     const pending = new Set(), auditErrors = [];
     const absolute = input => {
       try {
         const value = input && typeof input === 'object' && 'url' in input ? input.url : String(input);
-        const url = new URL(value, document.baseURI);
+        let url;
+        try { url = new URL(value); }
+        catch { url = new URL(value, document.baseURI); }
         return /^(https?:)$/.test(url.protocol) ? url.href : null;
       } catch { return null; } // Native APIs still receive the untouched input.
     };
@@ -59,6 +62,7 @@ export async function offlineContext(browser, baseURL) {
       record(args[0], 'fetch');
       return Reflect.apply(nativeFetch, this, args);
     };
+    if (nativeFetch) globalThis.fetch.__ctmOfflineAuditWrapped = true;
     const xhr = globalThis.XMLHttpRequest?.prototype;
     if (xhr) {
       const urls = new WeakMap(), open = xhr.open, send = xhr.send;
@@ -77,12 +81,21 @@ export async function offlineContext(browser, baseURL) {
       record(url, 'service-worker');
       return Promise.reject(new DOMException('Service workers are blocked by offline checks', 'NotAllowedError'));
     };
+    globalThis.__ctmOfflineAudit.installed = true;
   });
   const drain = async () => {
     for (const page of context.pages()) for (const frame of page.frames()) {
       try {
-        const problems = await frame.evaluate(() => globalThis.__ctmOfflineDrainAttempts?.() || []);
-        failed.push(...problems.map(error => ({url: frame.url(), error: 'request audit: ' + error})));
+        const state = await frame.evaluate(async () => {
+          if (globalThis.__ctmOfflineAudit?.version !== 1 || !globalThis.__ctmOfflineAudit.installed ||
+              typeof globalThis.__ctmOfflineDrainAttempts !== 'function') {
+            return {installed: false, marker: globalThis.__ctmOfflineAudit || null, baseURI: document.baseURI,
+              fetch: typeof globalThis.fetch, binding: typeof globalThis.__ctmOfflineRecordAttempt};
+          }
+          return {installed: true, problems: await globalThis.__ctmOfflineDrainAttempts()};
+        });
+        if (!state.installed) failed.push({url: frame.url(), error: 'request audit not installed: ' + JSON.stringify(state)});
+        else failed.push(...state.problems.map(error => ({url: frame.url(), error: 'request audit: ' + error})));
       } catch (error) { failed.push({url: frame.url(), error: 'request audit drain: ' + String(error.message)}); }
     }
   };

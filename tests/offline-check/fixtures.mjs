@@ -13,9 +13,10 @@ const svg = (w, h, drawn = true) => '<svg xmlns="http://www.w3.org/2000/svg" wid
   (drawn ? '<path d="M10 10 L80 50" stroke="black"/>' : '') + '</svg>';
 const box = (id, w = 240, h = 140, shape = svg(w, h)) => '<div class="jxgbox" id="' + id +
   '" style="width:' + w + 'px;height:' + h + 'px">' + shape + '</div>';
+const firstScript = '<script>window.__ctmFirstScriptAudit={fetch:typeof fetch,drain:typeof __ctmOfflineDrainAttempts,binding:typeof __ctmOfflineRecordAttempt,baseURI:document.baseURI,installed:window.__ctmOfflineAudit?.installed===true,wrapped:fetch.__ctmOfflineAuditWrapped===true};</script>';
 const frame = (id, content) => '<iframe data-ctm-board name="iframeJXG-' + id +
   '" sandbox="allow-scripts" style="width:300px;height:180px;border:0" srcdoc="' +
-  quote('<!doctype html><html><body style="margin:0">' + content + '</body></html>') + '"></iframe>';
+  quote('<!doctype html><html><body style="margin:0">' + firstScript + content + '</body></html>') + '"></iframe>';
 const html = body => '<!doctype html><html><head><link rel="icon" href="data:,"><meta charset="utf-8">' +
   '<style>.tab-pane:not(.active),.collapse:not(.show){display:none}.fade:not(.show){opacity:0}.math-exercise-cell:not(.math-exercise-open) > .math-exercise-body{height:0;overflow:hidden;visibility:hidden;pointer-events:none}' +
   '</style></head><body>' + body + '<script src="toggles.js"></script></body></html>';
@@ -101,12 +102,15 @@ document.addEventListener('click', event => {
   if (!jsxgraphDir) return;
   fs.mkdirSync(path.join(root, '_ctm-assets'), {recursive: true});
   fs.copyFileSync(path.join(jsxgraphDir, 'jsxgraphcore.js'), path.join(root, '_ctm-assets', 'jsxgraphcore.js'));
-  // A deterministic zero-SVG control uses a real board, deliberately initialised at 0x0.
+  // The pinned fork (17de83e lua/jsxgraph.lua) disables native resize and owns
+  // refresh itself. Match that contract in both plain and refresh-model modes;
+  // otherwise core auto-resize can heal the negative before our check.
+  // Only the deterministic control deliberately forces the real board to 0x0.
   for (const mode of ['always-blank-real', 'plain-hidden', 'refresh-model']) {
     const script = String.raw`
 var box = document.querySelector('.jxgbox');
 var b = JXG.JSXGraph.initBoard(box.id, {boundingbox:[-5,5,5,-5], axis:true,
-  showCopyright:false, showNavigation:false, resize:{enabled:MODE !== 'always-blank-real'}});
+  showCopyright:false, showNavigation:false, resize:{enabled:false}});
 b.create('point', [1,2]);
 if (MODE === 'always-blank-real') b.resizeContainer(0,0,true);
 window.addEventListener('message', function(e) {
@@ -116,7 +120,7 @@ window.addEventListener('message', function(e) {
 });
 `;
     // The script URL is supplied as an absolute loopback URL at test time.
-    const content = '<!doctype html><body style="margin:0"><div class="jxgbox" id="real-board" style="width:calc(100vw - 2px);height:calc(100vh - 2px)"></div>' +
+    const content = '<!doctype html><body style="margin:0">' + firstScript + '<div class="jxgbox" id="real-board" style="width:calc(100vw - 2px);height:calc(100vh - 2px)"></div>' +
       '<script src="__BASE___ctm-assets/jsxgraphcore.js"></script><script>const MODE=' + JSON.stringify(mode) + ';' + script + '</script>';
     fs.writeFileSync(path.join(root, mode + '.template'), html(
       '<div id="hidden" style="display:none"><iframe data-ctm-board sandbox="allow-scripts" ' +
