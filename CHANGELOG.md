@@ -278,3 +278,10 @@ pyodide-interaktiv).
   include lines from memory and writes nothing into a course it only reads;
   a console message is put down to an iframe only from the same page load;
   the first visit loads a target of every kind of place on each page.
+- The converter keeps no copy of ctm-libs' rules (AC's decision P1): which
+  lines are Markdown, the raw HTML `markdown-lint` names and the reveals'
+  default titles come from ctm-libs itself (`ctm.source.read()`,
+  `ctm.ui.rawHTML()`, `ctm.ui.defaultTitle()`, ctm-libs #28), run by
+  `tools/markdown-lines.lua` through `quarto pandoc lua`; the tool needs a
+  ctm-libs with them. Its results on ingmat3a (`main`, `linalg-branch`),
+  ctm-demo and the fixture course are unchanged.

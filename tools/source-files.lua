@@ -1,10 +1,13 @@
 -- CTM Assessment: the files a page shows, as ctm-libs reads them (AGPL-3.0-or-later).
 --
 --   quarto pandoc lua tools/source-files.lua CTM_LIBS_EXTENSION PROJECT PAGE...
+--   quarto pandoc lua tools/source-files.lua CTM_LIBS_EXTENSION PROJECT --pages < pages
 --   quarto pandoc lua tools/source-files.lua CTM_LIBS_EXTENSION PROJECT --include < requests
 --
 -- Prints "PAGE<TAB>FILE" for every file each PAGE shows: the page and the
 -- files it includes, nested ones too, in order, FILE relative to PROJECT.
+-- With --pages, the PAGEs are read one per line (Quarto's Pandoc 3.6 crashes
+-- when `pandoc lua` gets more than 82 arguments).
 -- With --include, reads "FOLDER<TAB>LINE" requests, one per line, and prints
 -- for each, in order, the file that LINE (an include shortcode) brings in on
 -- a page in FOLDER, as ctm-libs gives its label (empty: none).
@@ -40,9 +43,17 @@ if arg[3] == "--include" then
     io.write(found[2] and found[2].label or "", "\n")
   end
 else
-  for k = 3, #arg do
-    for _, file in ipairs(files(pandoc.path.join({root, arg[k]}))) do
-      io.write(arg[k], "\t", file.label, "\n")
+  local pages = {table.unpack(arg, 3)}
+  if arg[3] == "--pages" then
+    pages = {}
+    for page in io.lines() do
+      page = page:gsub("\r$", "")
+      if page ~= "" then pages[#pages + 1] = page end
+    end
+  end
+  for _, page in ipairs(pages) do
+    for _, file in ipairs(files(pandoc.path.join({root, page}))) do
+      io.write(page, "\t", file.label, "\n")
     end
   end
 end

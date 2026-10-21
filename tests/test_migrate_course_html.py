@@ -17,8 +17,8 @@ import unittest.mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'tools/migrate-course-html.py'
 QUARTO = shutil.which(os.environ.get('QUARTO_BIN', 'quarto'))
-# ctm-libs' extension folder: the tool reads includes with its rule
-# (tools/source-files.lua); setup-feedback-integration.py --test sets it.
+# ctm-libs' extension folder: the tool reads a course with its rules
+# (tools/source-files.lua, tools/markdown-lines.lua); setup-feedback-integration.py --test sets it.
 LIBS = os.environ.get('CTM_LIBS_EXTENSION')
 STEP4_COURSE = Path(__file__).resolve().parents[1] / 'integration/step4-course'
 
@@ -426,7 +426,8 @@ class Migrate(unittest.TestCase):
         slow = self.dir.parent / (self.dir.name + '-quarto.py')
         self.addCleanup(lambda: slow.unlink(missing_ok=True))
         # A Quarto that answers the first call (the pages' files) and, on the
-        # second (the include lines), notes the course's files and never answers.
+        # second (the files' lines, tools/markdown-lines.lua), notes the
+        # course's files and never answers.
         slow.write_text('#!/usr/bin/env python3\nimport os, sys, time\nfrom pathlib import Path\n'
                         f'root, seen, quarto = Path({str(self.dir)!r}), {str(seen)!r}, {QUARTO!r}\n'
                         "count = Path(seen + '.count')\n"
@@ -564,17 +565,95 @@ class Migrate(unittest.TestCase):
         self.assertEqual(len(annotations), 2, out.getvalue())
         self.assertTrue(annotations[0].startswith('::warning file=_includes/intro.md,line=4,title=Raw HTML in Markdown::'))
 
-    def test_the_default_titles_are_ctm_libs_ones(self):
-        libs = os.environ.get('CTM_LIBS_EXTENSION')
-        catalogue = Path(libs or '') / 'locales' / 'ui.js'
-        if not libs or not catalogue.is_file():
-            self.skipTest('CTM_LIBS_EXTENSION is not set (setup-feedback-integration.py --test sets it)')
-        text = catalogue.read_text(encoding='utf-8')
-        data = json.loads(text[text.index('/*BEGIN-JSON*/') + 14:text.index('/*END-JSON*/')])
-        keys = {'reading-step': 'readingStep', 'solution': 'solution', 'hint': 'hint'}
-        for kind, titles in self.module.DEFAULT_TITLES.items():
-            for lang, title in titles.items():
-                self.assertEqual(data[lang][keys[kind]], title, f'{kind} {lang}')
+    # ---- The tool has no copy of ctm-libs' rules (decision P1): it follows
+    # them. Each test runs it with ctm-libs and with a copy of ctm-libs whose
+    # rule is changed (a mutation), and the tool's result changes with it.
+    def outcome(self, libs):
+        """(baseline keys of uke5.md, its converted text, --check output) with this ctm-libs."""
+        work = Path(tempfile.mkdtemp(prefix='outcome-'))
+        self.addCleanup(shutil.rmtree, work, True)
+        course = work / 'course'
+        shutil.copytree(self.dir, course)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.module.main(['--project', str(course), '--ctm-libs', str(libs), '--write-baseline', str(work / 'b.json')])
+            check = io.StringIO()
+            with contextlib.redirect_stdout(check):
+                self.module.main(['--project', str(course), '--ctm-libs', str(libs), '--check', '--format', 'text'])
+            self.module.main(['--project', str(course), '--ctm-libs', str(libs)])
+        keys = json.loads((work / 'b.json').read_text(encoding='utf-8'))['constructs']['_includes/uke5.md']
+        return keys, (course / '_includes/uke5.md').read_text(encoding='utf-8'), check.getvalue()
+
+    def mutated(self, file, old, new):
+        """A copy of ctm-libs with `old` replaced by `new` in `file`."""
+        libs = Path(tempfile.mkdtemp(prefix='ctm-libs-mutant-')) / 'ctm-libs'
+        self.addCleanup(shutil.rmtree, libs.parent, True)
+        shutil.copytree(LIBS, libs)
+        path = libs / file
+        text = path.read_text(encoding='utf-8')
+        self.assertEqual(text.count(old), 1, f'the mutation of {file} no longer applies: write it for the rule as it is now')
+        path.write_text(text.replace(old, new), encoding='utf-8')
+        return libs
+
+    @staticmethod
+    def line_of(needle):
+        return WEEK[:WEEK.index(needle)].count('\n') + 1
+
+    def test_comments_are_what_ctm_libs_reads_as_comments(self):
+        keys, _, check = self.outcome(LIBS)
+        self.assertNotIn('details.reading-step: I en kommentar', keys)
+        libs = self.mutated('lua/source.lua', 'local start = text:find("<!--", 1, true)', 'local start = nil')
+        keys, converted, check = self.outcome(libs)
+        self.assertIn('details.reading-step: I en kommentar', keys)
+        self.assertIn(f'_includes/uke5.md:{self.line_of("<details class=\"reading-step\">\n<summary>I en kommentar")}:', check)
+
+    def test_code_is_what_ctm_libs_reads_as_code(self):
+        line = self.line_of('    <details>\n    indented code')
+        self.assertNotIn(f'_includes/uke5.md:{line}:', self.outcome(LIBS)[2])
+        libs = self.mutated('lua/source.lua', 'elseif deep and afterBlank and not inList and not blank then', 'elseif false then')
+        self.assertIn(f'_includes/uke5.md:{line}:', self.outcome(libs)[2])
+
+    def test_the_raw_html_is_what_markdown_lint_names(self):
+        keys, _, check = self.outcome(LIBS)
+        self.assertIn('iframe ../assets/vis.html', keys)
+        self.assertNotIn('summary: Hint til oppgave 1', keys)
+        libs = self.mutated('lua/ui.lua', 'find = function(t) return t:match("<iframe[%s>]") end', 'find = function(t) return false end')
+        keys, converted, _ = self.outcome(libs)
+        self.assertNotIn('iframe ../assets/vis.html', keys)
+        self.assertIn('::: {.embed src="../assets/vis.html"', converted, 'the conversion is the tool\'s own')
+        # A <summary> right after its <details> is the same block: ctm-libs' rule, with its state.
+        libs = self.mutated('lua/ui.lua', 'state.summary = not t:match("<summary[%s>]")', 'state.summary = false')
+        self.assertIn('summary: Hint til oppgave 1', self.outcome(libs)[0])
+
+    def test_a_default_title_is_ctm_libs_default_title(self):
+        converted = self.outcome(LIBS)[1]
+        self.assertIn('::: {.solution}\n', converted)
+        self.assertIn('::: {.reading-step}\n\nYtre.', converted)
+        # The kind's catalogue key, the catalogue's text and the page's language are ctm-libs'.
+        for file, old, new in [
+                ('lua/ui.lua', 'solution = "solution"', 'solution = "hint"'),
+                ('locales/ui.js', '"solution": "Løsningsforslag"', '"solution": "Løsningsforslaget"'),
+                ('lua/locale.lua', 'if primary == "no" then return "nb" end', 'if primary == "nb" then return "de" end')]:
+            with self.subTest(file=file):
+                converted = self.outcome(self.mutated(file, old, new))[1]
+                self.assertIn('::: {.solution title="Løsningsforslag"}\n', converted)
+
+    def test_a_ctm_libs_without_the_reading_api_stops_the_tool(self):
+        libs = self.mutated('lua/ui.lua', 'function M.rawHTML(lines)', 'function M.rawHTMLx(lines)')
+        out = io.StringIO()
+        with contextlib.redirect_stderr(out), self.assertRaises(SystemExit) as stopped:
+            self.module.main(['--project', str(self.dir), '--ctm-libs', str(libs), '--check'])
+        self.assertEqual(stopped.exception.code, 2)
+        self.assertIn('has no ctm.source.read, ctm.ui.rawHTML and ctm.ui.defaultTitle', out.getvalue())
+
+    def test_many_pages_and_files(self):
+        # Quarto's Pandoc 3.6 crashes when `pandoc lua` gets more than 82
+        # arguments: the drivers read their lists from standard input.
+        for k in range(90):
+            (self.dir / f'pages/p{k:02d}.qmd').write_text(f'---\ntitle: P{k}\n---\n\n<div id="p{k}"></div>\n', encoding='utf-8')
+        status, out = self.run_tool('--check')
+        self.assertEqual(status, 0, out)
+        self.assertIn('pages/p89.qmd:5:', out)
 
     @unittest.skipUnless(QUARTO, 'Quarto (for its Pandoc) is not installed')
     def test_pandoc_reads_the_converted_blocks_with_their_titles(self):
