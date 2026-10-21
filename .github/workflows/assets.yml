@@ -69,3 +69,23 @@ jobs:
         run: |
           git -C .asset-report-helper add -N -- assets-metadata.json
           python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
+  hook-provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: 17112c0ff280a3e506cc6ebbf7611a825079b65f
+          path: .asset-sources/libs
+          persist-credentials: false
+      - name: Actual assessment hook and shared assets API provenance
+        env:
+          CTM_ASSETS_LIBS_SOURCE: ${{ github.workspace }}/.asset-sources/libs
+        run: node --test tests/assets-hook-render.test.cjs
