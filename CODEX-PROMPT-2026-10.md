@@ -26,7 +26,7 @@ BINDING RULES (summary; the handoff files have the details)
 - Licences: code is AGPL-3.0-or-later. CTM question XML is CC BY-SA 4.0. STACK fixtures are GPL-3.0, with a notice. HELM rows are CC BY-NC (test data only).
 - No HTML in Markdown authoring. ingmat3a must build green and clean.
 - Wording rule (STACK): two upstream STACK security issues were reported privately. In anything public (code, docs, CHANGELOG, PR bodies, commit messages), describe only what OUR engine does. Never describe how STACK handles feedback-variable names or which question-variable names it lets students type.
-- Courses: ingmat3a stays pinned to ctm-assessment 9ed46a4 until its migration PR. Never touch ingmat3a's `linalg-branch`: AC and others work there. ctm-demo follows `ref: main`.
+- Courses: ingmat3a stays pinned to ctm-assessment 9ed46a4 until its migration PR. ingmat3a's `linalg-branch` is merged into main; other people may still work on ingmat3a, so touch only your migration branch. ctm-demo follows `ref: main`.
 
 IMMEDIATE TASKS, in order
 
@@ -48,7 +48,7 @@ A. Review the two finished but unreviewed sets. Report each to AC with a verdict
       - S-11's hyperbolic case is fixed later, with S-12;
       - S-11's LowestTerms case is to be discussed with AC before any change.
 B. jsxgraph-quarto PR #2. An agent may still be finishing it at hand-off: it should require JSXGraph ≥ 1.14.1, remove the workarounds for older versions, keep the fixes to the extension's own bugs, the keep-aspect fit and the unitX/originX handling, and rewrite the PR text. Review it and test it in full Chromium. AC pastes the description himself; you do not comment on upstream.
-C. The ingmat3a migration set, ONLY after AC says `linalg-branch` is merged into ingmat3a main. Use the same method as ctm-demo:
+C. The ingmat3a migration set. ingmat3a is STAGED for migration (21 Oct, 19:50): AC merged `linalg-branch` into ingmat3a main (a0a34ee, PR #15); main builds green on the old pin 9ed46a4. Branch `consolidation/2026-10-step4-migration` (commit 5ad31ab) holds the first commit: `ref: main` in quarto-extensions.yml and `/_extensions/ctm-checkers/` in .gitignore (G1). No PR yet. Do the migration on that branch AFTER AC has merged the step-4 final set (ctm-libs #30, then ctm-assessment #24), which adds the callout fix and the dropped-construct check the migration relies on. Then, the same method as ctm-demo:
    - first commit `ref: main`;
    - run the converter (ctm-assessment `build-course.py --convert`) and review every construct by hand;
    - add `.gitignore` `/_extensions/ctm-checkers/`;
