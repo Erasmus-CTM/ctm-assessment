@@ -1,5 +1,5 @@
 export function instrument() {
-  const audit = window.__storeAudit = {depth:0, duringRestore:[], checkerCalls:0, restores:[], wrapped:[], copies:[], studentRuns:[]};
+  const audit = window.__storeAudit = {depth:0, duringRestore:[], checkerCalls:0, restores:[], wrapped:[], copies:[], studentRuns:[], pythonRequests:[], cellRuns:[]};
   window.__storeEntries = [];
   Math.random = () => 0.1;
   // The OS clipboard is the only external write boundary replaced by the test.
@@ -15,7 +15,11 @@ export function instrument() {
       const original=api[name];
       const wrapped=function(...args) {
         if (name==='callCheckers') audit.checkerCalls++;
-        if (/runPython/.test(name) && args.some(arg=>typeof arg==='string' && /stored_add|store cell starter|stored learner cell/.test(arg))) audit.studentRuns.push(prefix+name);
+        if (name==='runCell') {
+          audit.cellRuns.push({code:args[0],wantPickle:args[1]});
+          audit.studentRuns.push(prefix+name);
+        }
+        if (/runPython/.test(name) && args.some(arg=>typeof arg==='string' && /stored_add|store cell starter|stored learner cell|_ctm_py_exercise.*call/.test(arg))) audit.studentRuns.push(prefix+name);
         if (audit.depth) audit.duringRestore.push(prefix+name);
         return Reflect.apply(original,this,args);
       };
@@ -24,7 +28,23 @@ export function instrument() {
     }
   }
   intercept('MathExerciseRuntime',api=>wrapRuntime(api,['ensurePyodide','ensureCheckers','callCheckers'],'runtime.'));
-  intercept('mainPyodide',api=>wrapRuntime(api,['runPython','runPythonAsync'],'python.'));
+  intercept('mainPyodide',api=>{
+    wrapRuntime(api,['runPython','runPythonAsync','runCell'],'python.');
+    if (typeof api?.globals?.set==='function') {
+      const original=api.globals.set;
+      api.globals.set=function(name,value) {
+        if (name==='_ctm_py_request') {
+          let request;
+          try {request=JSON.parse(value);} catch (_) {request={function:'malformed'};}
+          audit.pythonRequests.push(request);
+          audit.studentRuns.push('python.request.'+request.function);
+          if (audit.depth) audit.duringRestore.push('python.globals.set');
+        }
+        return Reflect.apply(original,this,arguments);
+      };
+      audit.wrapped.push('python.globals.set');
+    }
+  });
   intercept('CTMStore',store=>{
     const register=store.register;
     store.register=function(options) {

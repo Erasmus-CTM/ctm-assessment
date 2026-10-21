@@ -7,7 +7,7 @@ function fixture() {
   const world={navigator:{}};world.window=world;
   vm.runInNewContext(source.replace('export function instrument','function instrument')+'\ninstrument();',world);
   world.MathExerciseRuntime={ensurePyodide(){},ensureCheckers(){},callCheckers(){}};
-  world.mainPyodide={runPythonAsync(){}};
+  world.mainPyodide={globals:{set(name,value){return value;}},runPythonAsync(code){return code;},runCell(code,wantPickle){return {code,wantPickle};}};
   world.CTMStore={register:options=>({restore:()=>{options.effect?.();return {state:'restored'};}})};
   return world;
 }
@@ -31,10 +31,38 @@ test('a restore that starts Python/checking cannot pass the browser assertions',
   assert.equal(world.__storeAudit.checkerCalls,1);
   assert.equal(world.__storeAudit.studentRuns.length,1);
 });
-test('deferred saved-code execution is caught outside the synchronous restore window',()=>{
+test('deferred literal-code execution is caught outside the synchronous restore window',()=>{
   const world=fixture();
   world.CTMStore.register({component:'pyodide-interaktiv',id:'fixture'}).restore();
   world.mainPyodide.runPythonAsync('print("stored learner cell")');
   assert.equal(world.__storeAudit.duringRestore.length,0);
   assert.equal(world.__storeAudit.studentRuns.length,1);
+});
+
+test('deferred actual Python request and constant CALL_PY dispatch are audited',async()=>{
+  const world=fixture();
+  world.CTMStore.register({component:'py-exercise',id:'fixture'}).restore();
+  const request={function:'run',args:['def stored_add(a,b): return a+b','assert stored_add(1,2)==3',{}]};
+  const CALL_PY='__import__("_ctm_py_exercise").call(globals())';
+  await Promise.resolve().then(async()=>{
+    assert.equal(await world.mainPyodide.globals.set('_ctm_py_request',JSON.stringify(request)),JSON.stringify(request));
+    assert.equal(await world.mainPyodide.runPythonAsync(CALL_PY),CALL_PY);
+  });
+  assert.equal(world.__storeAudit.duringRestore.length,0);
+  assert.equal(world.__storeAudit.studentRuns.length,2);
+  assert.equal(world.__storeAudit.pythonRequests.length,1);
+  assert.equal(world.__storeAudit.pythonRequests[0].function,'run');
+  assert.equal(world.__storeAudit.pythonRequests[0].args[0],request.args[0]);
+  assert.ok(world.__storeAudit.wrapped.includes('python.globals.set'));
+});
+test('deferred actual worker-plugin runCell is audited without changing its result',async()=>{
+  const world=fixture();
+  world.CTMStore.register({component:'pyodide-interaktiv',id:'fixture'}).restore();
+  const result=await Promise.resolve().then(()=>world.mainPyodide.runCell('print("arbitrary learner code")',false));
+  assert.equal(result.code,'print("arbitrary learner code")');
+  assert.equal(result.wantPickle,false);
+  assert.equal(world.__storeAudit.duringRestore.length,0);
+  assert.equal(world.__storeAudit.studentRuns.length,1);
+  assert.equal(world.__storeAudit.cellRuns.length,1);
+  assert.ok(world.__storeAudit.wrapped.includes('python.runCell'));
 });

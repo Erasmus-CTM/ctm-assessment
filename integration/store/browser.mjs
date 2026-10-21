@@ -43,12 +43,18 @@ async function ready(page,name='index.html'){
   await page.waitForFunction(()=>window.CTMStore && window.__storeEntries.some(e=>e.options.component==='math-exercise'));
   if(name==='index.html') await page.waitForFunction(()=>
     window.__storeEntries.some(e=>e.options.component==='py-exercise') &&
-    window.qpyodideCellContainer?.cells.find(c=>c.options.label==='store-cell')?.primaryUnit?.editor);
-  await noRestorePython(page);
+    window.qpyodideCellContainer?.cells.find(c=>c.options.label==='store-cell')?.primaryUnit?.editor && window.qpyodideCellsReady && window.qpyodideStartupPhaseDone && window.__storeAudit.wrapped.includes('python.runCell'));
+  await noRestorePython(page,name==='index.html');
 }
-async function noRestorePython(page) {
-  const audit=await page.evaluate(()=>({during:__storeAudit.duringRestore,checks:__storeAudit.checkerCalls,wrapped:__storeAudit.wrapped,studentRuns:__storeAudit.studentRuns,restores:__storeAudit.restores.length}));
+async function noRestorePython(page,mixed=false) {
+  const audit=await page.evaluate(()=>({requests:__storeAudit.pythonRequests,cells:__storeAudit.cellRuns,during:__storeAudit.duringRestore,checks:__storeAudit.checkerCalls,wrapped:__storeAudit.wrapped,studentRuns:__storeAudit.studentRuns,restores:__storeAudit.restores.length}));
   assert.ok(audit.wrapped.includes('runtime.callCheckers'),'spy wraps the actual runtime boundary');
+  if(mixed) {
+    assert.ok(audit.wrapped.includes('python.globals.set'),'spy observes actual structured Python requests');
+    assert.ok(audit.wrapped.includes('python.runCell'),'spy observes actual worker plugin execution');
+  }
+  assert.deepEqual(audit.requests,[],'restoration must not dispatch private Python requests');
+  assert.deepEqual(audit.cells,[],'restoration must not dispatch worker cell runs');
   assert.deepEqual(audit.during,[],'restore may not start Python or checker installation/calls');
   assert.ok(audit.restores>0,'the actual component restore path was observed');
   assert.deepEqual(audit.studentRuns,[],'neither saved code nor starter code is executed on restoration');
