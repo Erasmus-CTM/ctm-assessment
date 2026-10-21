@@ -21,8 +21,8 @@ MIME = {".wasm": "application/wasm", ".mjs": "text/javascript",
 IMMUTABLE = "public, max-age=31536000, immutable"
 
 
-def accepts_gzip(value):
-    """An explicit gzip refusal overrides a wildcard."""
+def encoding_preferences(value):
+    """Parse gzip preference plus explicit identity preference/refusal."""
     encodings = {}
     for item in value.lower().split(","):
         fields = item.strip().split(";")
@@ -36,8 +36,10 @@ def accepts_gzip(value):
                     quality = float(raw)
                 except ValueError:
                     quality = 0.0
-        encodings[fields[0]] = quality
-    return encodings.get("gzip", encodings.get("*", 0)) > 0
+        encodings[fields[0]] = quality if 0 <= quality <= 1 else 0
+    gzip_quality = encodings.get("gzip", encodings.get("*", 0))
+    identity_quality = encodings.get("identity", 0 if encodings.get("*") == 0 else None)
+    return gzip_quality, identity_quality
 
 
 def byte_range(value, size):
@@ -137,7 +139,8 @@ class OfflineHandler(SimpleHTTPRequestHandler):
         content_type = MIME.get(candidate.suffix.lower()) or self.guess_type(str(candidate))
         vary = candidate.suffix.lower() in COMPRESSIBLE
         compressed = False
-        if vary and accepts_gzip(self.headers.get("Accept-Encoding", "")):
+        gzip_quality, identity_quality = encoding_preferences(self.headers.get("Accept-Encoding", ""))
+        if vary and gzip_quality > 0 and (identity_quality is None or gzip_quality >= identity_quality):
             try:
                 gz = Path(str(candidate) + ".gz").resolve()
                 if gz.is_relative_to(root) and gz.is_file():
@@ -145,6 +148,9 @@ class OfflineHandler(SimpleHTTPRequestHandler):
             except (OSError, RuntimeError):
                 self.send_error(HTTPStatus.FORBIDDEN)
                 return
+        if not compressed and identity_quality == 0:
+            self.send_error(HTTPStatus.NOT_ACCEPTABLE)
+            return
         try:
             source = candidate.open("rb")
         except OSError:

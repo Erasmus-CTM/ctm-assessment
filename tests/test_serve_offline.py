@@ -186,6 +186,24 @@ class OfflineHTTPTests(unittest.TestCase):
         status, _, _ = self.request(path, {"Accept-Encoding": "gzip", "If-None-Match": identity["ETag"]})
         self.assertEqual(status, 200)
 
+    def test_encoding_preferences_and_unavailable_representations(self):
+        wasm = "/_ctm-assets/pyodide/1.0/core.wasm"
+        status, headers, body = self.request(wasm, {"Accept-Encoding": "gzip;q=0.1, identity;q=1"})
+        self.assertEqual((status, body), (200, self.wasm))
+        self.assertNotIn("Content-Encoding", headers)
+        status, headers, body = self.request(wasm, {"Accept-Encoding": "gzip;q=1, identity;q=0"})
+        self.assertEqual((status, body), (200, self.compressed))
+        self.assertEqual(headers["Content-Encoding"], "gzip")
+        for path, accept in [(wasm, "gzip;q=0, identity;q=0"),
+                             (wasm, "*;q=0"),
+                             ("/_ctm-assets/pyodide/1.0/module.mjs", "gzip, identity;q=0"),
+                             ("/_ctm-assets/pyodide/1.0/package.whl", "gzip, identity;q=0")]:
+            with self.subTest(path=path, accept=accept):
+                status, headers, _ = self.request(path, {"Accept-Encoding": accept})
+                self.assertEqual(status, 406)
+                self.assertEqual(headers["Cache-Control"], "no-cache")
+                self.check_headers(headers, assets=True)
+
     def test_head_and_empty_files(self):
         status, headers, body = self.request("/_ctm-assets/pyodide/1.0/package.whl",
                                              {"Range": "bytes=0-1"}, method="HEAD")
