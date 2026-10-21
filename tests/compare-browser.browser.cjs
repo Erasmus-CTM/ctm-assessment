@@ -80,3 +80,68 @@ test('a page\'s own console error is not taken for a board\'s error with the sam
   run = compare({old: {'p.html': OLD}, new: {'p.html': page(REVEAL + BOARD)}});
   assert.equal(run.status, 0, run.output);
 });
+
+// A page only new has (a course's test page) is checked on its own (`new-only`).
+// The switch here is a stand-in for ctm-libs' ui/ctm-reveal.js, as small as the
+// harness needs: it opens and closes the reading steps, keeps the mode for the
+// session, and opens them for print.
+const STUB = `<style>@media print { .ctm-modes { display: none; } }</style>
+<div class="ctm-modes" hidden><button type="button" data-mode="lecture" aria-pressed="true">Explore</button>
+<button type="button" data-mode="reading" aria-pressed="false">Go deeper</button><span class="ctm-modes-status">Explore.</span></div>
+<script>
+const box = document.querySelector('.ctm-modes'), steps = () => document.querySelectorAll('details.reading-step');
+const set = mode => {
+  for (const b of box.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  box.querySelector('.ctm-modes-status').textContent = mode === 'reading' ? 'Go deeper.' : 'Explore.';
+  for (const d of steps()) d.open = mode === 'reading';
+  sessionStorage.setItem('mode', mode);
+};
+box.hidden = false;
+box.addEventListener('click', event => { const b = event.target.closest('button'); if (b) set(b.dataset.mode); });
+addEventListener('DOMContentLoaded', () => { if (sessionStorage.getItem('mode') === 'reading') set('reading'); });
+let printed = null;
+addEventListener('beforeprint', () => { printed = [...steps()].map(d => d.open); for (const d of steps()) d.open = true; });
+addEventListener('afterprint', () => { [...steps()].forEach((d, k) => { d.open = printed[k]; }); });
+</script>`;
+const reveal = (kind, title, open = false) => `<details class="ctm-reveal ${kind}"${open ? ' open' : ''}><summary>${title}</summary><div class="ctm-reveal-body"><p>Text.</p></div></details>`;
+const PICTURE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>';
+
+test('a page only new has gets the new-only checks: reveals, switch, keyboard, print, embedded pages', () => {
+  const fine = page(STUB + reveal('reading-step', 'Go deeper') + reveal('hint', 'Hint') + reveal('solution', 'Solution')
+    + reveal('details', 'Details') + '<iframe class="ctm-embed" title="A picture" src="picture.svg" style="height:100px"></iframe>');
+  const only = run => run.results.find(r => r.check === 'new-only' && r.page === 't.html');
+  const sites = news => ({old: {'p.html': OLD}, new: {'p.html': page(REVEAL), 'picture.svg': PICTURE, ...news}});
+  let run = compare(sites({'t.html': fine}), ['--checks', 'new-only']);
+  assert.equal(run.status, 0, run.output);
+  assert.match(only(run).note, /only on new: 1 reading-step, 1 hint, 1 solution, 1 details, all closed at first; the switch opens and closes 1 reading steps, keeps the mode on reload; 4 summaries toggle by Enter and Space; 1 embedded pages load/, only(run).note);
+  // A reveal that starts open, and an embedded page that is not there.
+  run = compare(sites({'t.html': fine.replace(reveal('hint', 'Hint'), reveal('hint', 'Hint', true)).replace('picture.svg', 'gone.svg')}), ['--checks', 'new-only']);
+  assert.equal(run.status, 1, run.output);
+  assert.match(only(run).note, /hint 2 \("Hint"\) starts open.*embedded page gone\.svg does not load/, only(run).note);
+  // A switch that also closes the hints, and one that forgets its mode.
+  run = compare(sites({'t.html': fine.replace("d.open = mode === 'reading';", "d.open = mode === 'reading'; for (const h of document.querySelectorAll('details.hint')) h.open = false;")}), ['--checks', 'new-only']);
+  assert.match(only(run).note, /changed a hint, solution or details block/, only(run).note);
+  run = compare(sites({'t.html': fine.replace("sessionStorage.setItem('mode', mode);", '')}), ['--checks', 'new-only']);
+  assert.match(only(run).note, /reading mode is lost on reload/, only(run).note);
+  // Pages both sides have are not new-only.
+  assert.ok(!run.results.some(r => r.check === 'new-only' && r.page === 'p.html'), run.output);
+});
+
+test('a known failure can be limited to the place of a link\'s target (`place`)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-browser-expect-'));
+  try {
+    const expect = path.join(dir, 'expect.yml');
+    fs.writeFileSync(expect, ['known-failures:', '  - id: callout-target', '    title: a target in a collapsed callout',
+      '    fix: none (test)', '    browsers: [chromium]', '    checks: [link load]', "    place: '^collapsed callout$'", ''].join('\n'));
+    // No ctm-nav.js is served: every link load fails; only the callout's is known.
+    const target = page('<script src="ctm-nav.js"></script>' + REVEAL + '<p id="plain">Plain.</p>'
+      + '<div class="callout-collapse collapse" id="c1"><div id="in-callout">Hidden.</div></div>');
+    const links = page('<p><a href="t.html#plain">a</a> <a href="t.html#in-callout">b</a></p>');
+    const run = compare({old: {'t.html': OLD, 'l.html': links}, new: {'t.html': target, 'l.html': links}}, ['--checks', 'links', '--expect', expect]);
+    const load = id => run.results.find(r => r.check === 'link load' && r.page === 't.html#' + id);
+    assert.equal(load('in-callout').known, 'callout-target', run.output);
+    assert.ok(!load('plain').ok && !load('plain').known, run.output);
+  } finally {
+    fs.rmSync(dir, {recursive: true, force: true});
+  }
+});

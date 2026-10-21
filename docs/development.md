@@ -318,11 +318,22 @@ into other parts' pages are checked, and the screenshots go to part 1. A
 console error names its frame (the page, or an iframe such as a JSXGraph
 board): each frame reports its own errors and `console.error` calls, and a
 message without its frame is an iframe's only when an iframe of the same page
-load reported that very text and the page did not.
+load reported that very text and the page did not. A page that only new has
+(a course's test page, added by its migration) has nothing to compare with
+and is checked on its own (`new-only`): every reveal starts closed with a
+summary and its body; the switch is shown, reading opens and lecture closes
+every reading step without touching the other reveals, `aria-pressed` and the
+status line follow, and the mode survives a reload; Enter and Space toggle
+every summary; print opens the reading steps and hides the switch; each
+embedded page loads; with `--shots`, its switch and the first reveal of each
+kind are kept (not compared). Its links and its console errors are checked
+with the rest. A course's own expected differences go in
+`expect/<course>.yml` (the repository's name), which the workflow adds.
 `tests/compare-browser.browser.cjs` (`npm run test:browser`) runs the tool in
 Chromium on small sites. `known-failures:` in the expect file lists failures that are fixed
 elsewhere and not pinned yet (browsers and checks, both required; optional
-courses, `targets: tab-title`, `frame` and `note` patterns): they count as
+courses, `targets: tab-title`, a `place` pattern for where a link's target
+stands, such as `collapsed callout`, `frame` and `note` patterns): they count as
 expected and are reported.
 
 `compare-rendered.mjs` also checks three invariants on every page, which no
