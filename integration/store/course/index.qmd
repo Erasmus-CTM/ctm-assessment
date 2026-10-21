@@ -1,0 +1,81 @@
+---
+title: Store integration
+lang: en
+---
+
+## Mixed quiz {quiz=mixed}
+
+::: {.panel-tabset}
+### Scalar
+
+```{math-exercise}
+#| label: store-scalar
+#| field-labels: x
+Same scalar task: _[2].
+```
+
+### Nested
+
+:::: {.panel-tabset}
+#### Matrix
+
+::: {.reading-step title="Matrix details"}
+```{math-exercise}
+#| label: store-matrix
+#| mode: custom
+#| checker: |
+#|   def check(response, symbols):
+#|       return {'correct': response['inputs']['A']['matrix'].shape == (2, 2)}
+mat{name=A, rows=auto, cols=auto, initial-rows=1, initial-cols=1, min-rows=1, min-cols=1, max-rows=3, max-cols=3}
+```
+:::
+
+#### Pool
+
+```{math-exercise}
+#| label: store-pool
+#| pool: true
+First pool task: _[10].
+---
+Second pool task: _[20].
+```
+::::
+
+### Code
+
+```{py-exercise}
+#| label: store-python
+#| task: Add two numbers.
+def stored_add(a, b):
+    return a - b
+## TESTS ##
+assert stored_add(1, 2) == 3
+```
+
+```{pyodide-python}
+#| label: store-cell
+#| autorun: false
+print("store cell starter")
+```
+:::
+
+## Outside quizzes
+
+```{math-exercise}
+#| label: store-outside
+Outside task: _[5].
+```
+
+```{math-exercise}
+#| label: store-duplicate
+First duplicate: _[6].
+```
+
+```{math-exercise}
+#| label: store-duplicate
+Second duplicate: _[7].
+```
+
+```{math-exercise}
+Unlabelled task: _[8].
+```

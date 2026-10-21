@@ -231,7 +231,7 @@ const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 // Playwright's routes, so the served files point them at a closed port.
 const HEAVY = /https?:\/\/[\w.-]+(?=[^\s"'`()<>]*?(?:\/pyodide\/v[\d.]+\/|\/monaco-editor@))/g;
 const BLOCKED = 'http://127.0.0.1:9';
-function serve(roots, isolated = true) {
+export function serve(roots, isolated = true) {
   const server = http.createServer((request, response) => {
     const parts = decodeURIComponent(new URL(request.url, 'http://x').pathname).split('/');
     const root = roots[parts[1]];
