@@ -91,4 +91,4 @@ jobs:
       - name: Actual assessment hook and shared assets API provenance
         env:
           CTM_ASSETS_LIBS_SOURCE: ${{ github.workspace }}/.asset-sources/libs
-        run: node --test tests/assets-hook-render.test.cjs tests/author-imports-render.test.cjs
+        run: node --test --test-concurrency=1 tests/assets-hook-render.test.cjs tests/author-imports-render.test.cjs
