@@ -38,7 +38,7 @@ export async function offlineContext(browser, baseURL) {
   return {context, evidence: {external, responses, failed, errors}};
 }
 
-export async function checkOfflinePages({browser, baseURL, pages, loads = 5, probes = [], settleMs = 1200}) {
+export async function checkOfflinePages({browser, baseURL, pages, loads = 5, probes = [], settleMs = 1200, scope = 'course-regression'}) {
   if (!Number.isInteger(loads) || loads < 5) throw new Error('at least five loads per page are required');
   if (!Array.isArray(pages) || !pages.length) throw new Error('manifest needs at least one page');
   const results = [];
@@ -72,7 +72,7 @@ export async function checkOfflinePages({browser, baseURL, pages, loads = 5, pro
       results.push(result);
     }
   }
-  return {scope: 'course-regression', loads, results, ok: results.every(result => result.ok)};
+  return {scope, loads, results, ok: results.every(result => result.ok)};
 }
 
 async function main() {

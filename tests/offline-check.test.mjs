@@ -38,7 +38,7 @@ test('geometry tolerance is 2px and SVG size, visibility and ink are separate re
 });
 
 test('every nested hidden board, inline board and smaller board passes all five independent loads', {timeout: 180000}, async () => {
-  const result = await checkOfflinePages({browser, baseURL: server.baseURL, pages: [{path: 'positive.html', boards: 4}]});
+  const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL, pages: [{path: 'positive.html', boards: 4}]});
   evidence.contracts.push(result);
   assert.ok(result.ok, JSON.stringify(result));
   assert.equal(result.results.length, 5);
@@ -51,7 +51,7 @@ test('every nested hidden board, inline board and smaller board passes all five 
 
 test('zero SVG, wrong-size SVG and empty ink controls fail every load for their own reason', {timeout: 180000}, async () => {
   for (const [name, reason] of [['blank', /SVG width is zero/], ['mismatch', /width differs/], ['empty', /no drawn/]]) {
-    const result = await checkOfflinePages({browser, baseURL: server.baseURL, pages: [{path: name + '.html', boards: 1}]});
+    const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL, pages: [{path: name + '.html', boards: 1}]});
     evidence.contracts.push(result);
     assert.equal(result.results.length, 5);
     for (const load of result.results) {
@@ -73,7 +73,7 @@ test('known board iframe without a board is a failure rather than a vacuous pass
 });
 
 test('external requests in document, worker and opaque frame are recorded and fail the offline run', {timeout: 180000}, async () => {
-  const result = await checkOfflinePages({browser, baseURL: server.baseURL, pages: [{path: 'external.html', boards: 1}]});
+  const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL, pages: [{path: 'external.html', boards: 1}]});
   evidence.contracts.push(result);
   for (const load of result.results) {
     assert.equal(load.ok, false);
@@ -84,7 +84,7 @@ test('external requests in document, worker and opaque frame are recorded and fa
 
 test('HTTP errors and browser exceptions independently fail', {timeout: 180000}, async () => {
   for (const [name, kind] of [['http-error', 'responses'], ['exception', 'errors']]) {
-    const result = await checkOfflinePages({browser, baseURL: server.baseURL, pages: [{path: name + '.html', boards: 0}]});
+    const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL, pages: [{path: name + '.html', boards: 0}]});
     evidence.contracts.push(result);
     assert.ok(result.results.every(load => !load.ok && load.evidence[kind].length > 0), JSON.stringify(result));
   }
