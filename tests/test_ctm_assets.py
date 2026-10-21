@@ -292,6 +292,54 @@ class MetadataTests(unittest.TestCase):
             with self.assertRaises(A.AssetError):
                 A.version_sources(root)
 
+    def pins(self, root):
+        pins = root / "jsxgraph-pins.yml"
+        pins.write_text(
+            "jsxgraph:\n"
+            "  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.2.3/distrib/jsxgraphcore.js\n"
+            "  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.2.3/distrib/jsxgraph.css\n"
+            "  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.0.0/tex-mml-svg.js\n"
+            "  mjx_fonts: https://cdn.jsdelivr.net/npm/@mathjax/mathjax-newcm-font@4.0.0/\n", encoding="utf-8")
+        return pins
+
+    def test_three_canonical_version_homes_must_equal_the_lock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.sources(root)
+            pins = self.pins(root)
+            versions = {"katex": "0.16.47", "pyodide": "0.28.3", "jsxgraph": "1.2.3",
+                        "mathjax4": "4.0.0", "mathjax-newcm-font": "4.0.0"}
+            self.assertEqual(A.validate_version_homes({"versions": versions}, root, pins), versions)
+            for changes in ({"pyodide": "0.28.4"}, {"katex": "0.16.11"}, {"jsxgraph": "1.2.4"}):
+                with self.subTest(changes=changes), self.assertRaises(A.AssetError):
+                    A.validate_version_homes({"versions": {**versions, **changes}}, root, pins)
+            pins.write_text(pins.read_text().replace("jsxgraph@1.2.3", "jsxgraph@1"))
+            with self.assertRaisesRegex(A.AssetError, "exact"):
+                A.board_versions(pins)
+
+    def test_profiles_preserve_authored_files_and_separate_exam_answers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "_quarto-offline.yml").write_text("# Author profile\n", encoding="utf-8")
+            (root / ".gitignore").write_text("existing/\n", encoding="utf-8")
+            created = A.write_profiles(root, course_key="course")
+            self.assertEqual([file.name for file in created], ["_quarto-exam.yml"])
+            self.assertEqual((root / "_quarto-offline.yml").read_text(), "# Author profile\n")
+            exam = (root / "_quarto-exam.yml").read_text()
+            self.assertIn('storage-key: "course-exam"', exam)
+            self.assertIn("save: answers", exam)
+            self.assertIn("export: true", exam)
+            self.assertIn("enabled: false", exam)
+            self.assertIn("output-dir: _site-exam", exam)
+            self.assertEqual(A.write_profiles(root, course_key="ignored"), [])
+            self.assertEqual((root / ".gitignore").read_text(), "existing/\n_ctm-assets/\n")
+            (root / "_quarto-offline.yml").unlink()
+            A.write_profiles(root)
+            offline = (root / "_quarto-offline.yml").read_text()
+            self.assertIn('_ctm-assets/**', offline)
+            self.assertIn('_extensions/ctm-assessment/offline.scss', offline)
+            self.assertIn('assets: local', offline)
+
     def test_release_version_uses_package_json_not_full_lock_dev_version(self):
         self.assertEqual(A.release_version(b'{"version":"0.28.3"}', "0.28.3"), "0.28.3")
         with self.assertRaises(A.AssetError):

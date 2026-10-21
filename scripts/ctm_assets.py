@@ -371,6 +371,72 @@ def version_sources(library: Path) -> dict:
             "runtime_sha256": digest(runtime_path.read_bytes())}
 
 
+def board_versions(pins: Path) -> dict[str, str]:
+    """Read exact board pins from their sole version home, without YAML deps."""
+    values = {}
+    for line in Path(pins).read_text(encoding="utf-8").splitlines():
+        found = re.fullmatch(r"\s*(src_jxg|src_css|src_mjx|mjx_fonts):\s*(.*?)\s*", line)
+        if found:
+            key, value = found.groups()
+            if key in values:
+                raise AssetError(f"Duplicate board pin: {key}")
+            values[key] = value.strip("'\"")
+    packages = {"src_jxg": ("jsxgraph", "jsxgraph"), "src_css": ("jsxgraph", "jsxgraph"),
+                "src_mjx": ("mathjax4", "mathjax"), "mjx_fonts": ("mathjax-newcm-font", "@mathjax/mathjax-newcm-font")}
+    versions = {}
+    for key, (logical, package) in packages.items():
+        url = values.get(key, "")
+        pattern = r"https://cdn\.jsdelivr\.net/npm/" + re.escape(package) + r"@([0-9]+\.[0-9]+\.[0-9]+)(?:/.*)?"
+        found = re.fullmatch(pattern, url)
+        if not found:
+            raise AssetError(f"jsxgraph-pins.yml {key} needs an exact npm version")
+        if logical in versions and versions[logical] != found[1]:
+            raise AssetError("JSXGraph script and CSS pins differ")
+        versions[logical] = found[1]
+    return versions
+
+
+def validate_version_homes(lock: dict, library: Path, pins: Path) -> dict[str, str]:
+    sources = version_sources(library)
+    expected = {name: entry["version"] for name, entry in sources["assets"].items()}
+    expected["pyodide"] = sources["pyodide"]
+    expected.update(board_versions(pins))
+    if lock.get("versions") != expected:
+        raise AssetError("Asset lock versions differ from assets.json, runtime constant or jsxgraph-pins.yml; run --update-assets and review the lock")
+    return expected
+
+
+def write_profiles(project: Path, *, course_key: str | None = None) -> list[Path]:
+    """Create missing profiles only; existing authored profiles are preserved."""
+    project = Path(project)
+    storage_key = (course_key or project.name) + "-exam"
+    profiles = {
+        "_quarto-offline.yml": (
+            "# Local assets: quarto render --profile offline\n"
+            "project:\n  resources: [\"_ctm-assets/**\"]\n"
+            "format:\n  html:\n    theme: [_extensions/ctm-assessment/offline.scss]\n"
+            "ctm-assessment:\n  assets: local\n"),
+        "_quarto-exam.yml": (
+            "# Exam build: quarto render --profile offline,exam\n"
+            "project:\n  output-dir: _site-exam\n"
+            "ctm-assessment:\n  export: true\n  save: answers\n  storage-key: "
+            + json.dumps(storage_key, ensure_ascii=False) + "\n"
+            "ai-feedback:\n  enabled: false\n"),
+    }
+    created = []
+    for name, text in profiles.items():
+        target = project / name
+        if not target.exists():
+            target.write_text(text, encoding="utf-8")
+            created.append(target)
+    ignore = project / ".gitignore"
+    text = ignore.read_text(encoding="utf-8") if ignore.exists() else ""
+    if not any(line.strip() in {"_ctm-assets/", "/_ctm-assets/", "_ctm-assets/**", "/_ctm-assets/**"}
+               for line in text.splitlines()):
+        ignore.write_text(text.rstrip("\n") + ("\n" if text else "") + "_ctm-assets/\n", encoding="utf-8")
+    return created
+
+
 def release_version(package_json: bytes, expected: str) -> str:
     """The release package.json owns its version; lock.info.version does not."""
     actual = json.loads(package_json)["version"]
