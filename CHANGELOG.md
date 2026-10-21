@@ -1,5 +1,12 @@
 # Changes
 
+## Unreleased
+
+- Complete consolidation U3c: ctm-libs no longer ships the ai-feedback
+  extension alias. Keep pyodide-interaktiv's standalone forwarder outside
+  the package, and retain the stale-version check with migration advice.
+  Tests use `CTM_LIBS_EXTENSION` for shared feedback files.
+
 ## 0.12.0
 
 The last set before the ingmat3a migration: **links into collapsed callouts
