@@ -88,6 +88,19 @@ async function runSite(o) {
   try {
     for (let run = 0; run < o.runs; run++) {
       const context = await browser.newContext({serviceWorkers: 'block'});
+      // The end of the startup phase, the same way for 1.8 and 1.9: the
+      // container's runStartupCells (setup, output and autorun cells) has
+      // returned. 1.9 also sets qpyodideStartupPhaseDone.
+      await context.addInitScript(() => {
+        const poll = setInterval(() => {
+          const container = globalThis.qpyodideCellContainer;
+          if (!container || container.__ctmWatched) return;
+          container.__ctmWatched = true;
+          const original = container.runStartupCells.bind(container);
+          container.runStartupCells = async (...args) => { try { return await original(...args); } finally { globalThis.__ctmStartupEnded = true; } };
+          clearInterval(poll);
+        }, 5);
+      });
       const record = {};
       for (const name of pages) {
         const page = await context.newPage();
@@ -98,23 +111,12 @@ async function runSite(o) {
         try {
           await page.goto(base + name, {waitUntil: 'domcontentloaded', timeout: WAIT});
           // The cells may run (1.9: qpyodideCellsReady; 1.8: the proxy) and the
-          // startup phase is over: no output cell waits, no run is in progress
-          // (no Stop button, and not every Run button disabled, as during a
-          // run), for two seconds: 1.8 says "Ready" before its autorun cells.
+          // startup phase is over (runStartupCells has returned; 1.8 says
+          // "Ready" before it), and no run is in progress (no Stop button).
           await page.waitForFunction(() => (globalThis.qpyodideCellsReady === true || (globalThis.qpyodideCellsReady === undefined && globalThis.mainPyodide))
             && globalThis.qpyodideCellContainer?.cells.length > 0, null, {timeout: WAIT});
-          await page.evaluate(async wait => {
-            const buttons = () => [...document.querySelectorAll('.qpyodide-button-run')];
-            const busy = () => document.querySelector('.qpyodide-non-interactive-loading-container')
-              || buttons().some(button => /Stop|Stopp/.test(button.innerText)) || (buttons().length > 0 && buttons().every(button => button.disabled));
-            const t0 = Date.now();
-            let quietSince = Date.now();
-            while (Date.now() - quietSince < 2000) {
-              if (Date.now() - t0 > wait) throw new Error('the startup cells did not finish within ' + wait / 1000 + ' s');
-              if (busy()) quietSince = Date.now();
-              await new Promise(r => setTimeout(r, 100));
-            }
-          }, WAIT);
+          await page.waitForFunction(() => (globalThis.__ctmStartupEnded === true || globalThis.qpyodideStartupPhaseDone === true)
+            && ![...document.querySelectorAll('.qpyodide-button-run')].some(button => /Stop|Stopp/.test(button.innerText)), null, {timeout: WAIT, polling: 50});
           const startup = await page.evaluate(recordCells);
           const runs = [];
           for (const cell of startup) {

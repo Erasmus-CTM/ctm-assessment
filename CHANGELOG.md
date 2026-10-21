@@ -7,12 +7,11 @@ package's library, like the other components: one Python worker, one
 language catalogue, one settings reader and one feedback implementation on
 every page. Authors keep their pages and `filters: [ctm-assessment]`.
 
-Components: ctm-libs at 15e6c82 (step 3, on top of 0.10.0's 8c7e5f6),
+Components: ctm-libs at a35c9f1 (step 3, on top of 0.10.0's 8c7e5f6),
 math-exercise and py-exercise with ctm-libs' new bootstrap copy (no
-behaviour change), pyodide-interaktiv 1.9.0, ctm-checkers 0.3.0 at e84bc8c
-(S-01: a STACK student answer may not name question or feedback variables;
-math-exercise's verdicts are unchanged), JSXGraph unchanged, at the commits
-recorded in `_extensions/ctm-assessment/resolved-repos.json`.
+behaviour change), pyodide-interaktiv 1.9.0; ctm-checkers (0.2.0 at 8c3db5e)
+and JSXGraph unchanged, at the commits recorded in
+`_extensions/ctm-assessment/resolved-repos.json`.
 
 ### Changed for authors and learners
 
@@ -20,7 +19,9 @@ recorded in `_extensions/ctm-assessment/resolved-repos.json`.
   Pyodide cells, math and Python checks run as soon as Python has started;
   matplotlib and the other extra packages load in the background without
   getting in a check's way. Pyodide's own cells and Run buttons wait for
-  them, as before. If they cannot be loaded, the status line says that plots
+  them, as before. A Run clicked while the page's setup and output cells
+  are still running waits for them (its button shows that it is loading),
+  so a cell that uses their names never runs before them. If they cannot be loaded, the status line says that plots
   are not available (naming the package), that other Python code works
   normally, and offers Retry.
 - **pyodide-interaktiv's scripts are cacheable files** (they were inline),

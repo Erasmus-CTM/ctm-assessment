@@ -296,6 +296,11 @@ def main():
         for name, spec in config['repositories'].items():
             if name == 'ctm-assessment' or not spec.get('commit'):
                 continue
+            if spec.get('pin-outside-branch'):
+                # Known to lie outside its branch (JSXGraph: the fork commit of
+                # an upstream pull request); --follow-branches keeps it too.
+                print(f'{name}: {spec["commit"][:12]} is outside {spec["branch"]} by design ({spec["pin-outside-branch"]})', flush=True)
+                continue
             tip = remote_revision(name, spec, follow=True)
             on = tip == spec['commit'] or descends(spec['repository'], spec['commit'], tip)
             print(f'{name}: {spec["commit"][:12]} {"is" if on else "is NOT"} on {spec["branch"]} ({tip[:12]})', flush=True)

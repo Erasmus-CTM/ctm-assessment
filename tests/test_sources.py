@@ -84,10 +84,12 @@ class SourceSelection(unittest.TestCase):
 
     def test_check_pins_names_the_pins_not_on_their_branch(self):
         # A stacked set pins reviewed heads; after its merges each is on its branch.
+        # repos.json marks the JSXGraph pin as outside its branch: never checked.
         def tip(name, spec, review_ref=None, follow=False):
-            return spec['commit'] if name == 'jsxgraph' else 'f' * 40
+            assert name != 'jsxgraph', 'the JSXGraph pin is not checked'
+            return 'f' * 40
         with patch.object(builder, 'remote_revision', side_effect=tip), \
-             patch.object(builder, 'descends', side_effect=lambda repository, ancestor, head: 'math-exercise' not in repository), \
+             patch.object(builder, 'descends', side_effect=lambda repository, ancestor, head: 'math-exercise' not in repository and 'jsxgraph' not in repository), \
              patch.object(builder.Path, 'write_text') as write, \
              patch('sys.argv', ['setup', '--check-pins']):
             with self.assertRaises(SystemExit) as stop:
