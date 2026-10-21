@@ -13,7 +13,7 @@ const svg = (w, h, drawn = true) => '<svg xmlns="http://www.w3.org/2000/svg" wid
   (drawn ? '<path d="M10 10 L80 50" stroke="black"/>' : '') + '</svg>';
 const box = (id, w = 240, h = 140, shape = svg(w, h)) => '<div class="jxgbox" id="' + id +
   '" style="width:' + w + 'px;height:' + h + 'px">' + shape + '</div>';
-const firstScript = '<script>window.__ctmFirstScriptAudit={fetch:typeof fetch,drain:typeof __ctmOfflineDrainAttempts,binding:typeof __ctmOfflineRecordAttempt,baseURI:document.baseURI,installed:window.__ctmOfflineAudit?.installed===true,wrapped:fetch.__ctmOfflineAuditWrapped===true};</script>';
+const firstScript = '<script>window.__ctmFirstScriptAudit={fetch:typeof fetch,drain:typeof __ctmOfflineDrainAttempts,binding:typeof __ctmOfflineRecordAttempt,baseURI:document.baseURI,installed:window.__ctmOfflineAudit?.installed===true,wrapped:fetch.__ctmOfflineAuditWrapped===true,transport:typeof __ctmOfflineRecordAttempt==="function"?"binding":window.parent!==window?"parent-bridge":"none"};</script>';
 const frame = (id, content) => '<iframe data-ctm-board name="iframeJXG-' + id +
   '" sandbox="allow-scripts" style="width:300px;height:180px;border:0" srcdoc="' +
   quote('<!doctype html><html><body style="margin:0">' + firstScript + content + '</body></html>') + '"></iframe>';
@@ -87,6 +87,11 @@ document.addEventListener('click', event => {
     'fetch(new Request("https://offline.invalid/caught-request")).catch(function(){}),' +
     'new Promise(function(resolve){var xhr=new XMLHttpRequest();xhr.open("GET","https://offline.invalid/caught-xhr");xhr.onload=xhr.onerror=resolve;xhr.send();})' +
     ']).then(function(){document.body.dataset.caught="true";});</script>')));
+  const dataDocument = '<!doctype html><html><body>' + firstScript + box('caught-data') +
+    '<script>fetch("https://offline.invalid/caught-data").catch(function(){document.body.dataset.caught="true";});</script></body></html>';
+  fs.writeFileSync(path.join(root, 'caught-data.html'), html(
+    '<iframe data-ctm-board name="iframeJXG-data" sandbox="allow-scripts" style="width:300px;height:180px;border:0" src="data:text/html;base64,' +
+    Buffer.from(dataDocument).toString('base64') + '"></iframe>'));
   fs.writeFileSync(path.join(root, 'same-origin.html'), html('<script>fetch("_ctm-assets/local.txt").then(function(r){return r.text();}).then(function(t){document.body.dataset.parentLocal=t;});</script>' + frame('same-origin', box('same-origin') +
     '<script>Promise.all([fetch(new URL("__BASE___ctm-assets/local.txt")).then(function(r){return r.text();}),' +
     'fetch(new Request("__BASE___ctm-assets/local.txt")).then(function(r){return r.text();}),' +
@@ -113,10 +118,20 @@ var b = JXG.JSXGraph.initBoard(box.id, {boundingbox:[-5,5,5,-5], axis:true,
   showCopyright:false, showNavigation:false, resize:{enabled:false}});
 b.create('point', [1,2]);
 if (MODE === 'always-blank-real') b.resizeContainer(0,0,true);
+window.__ctmModelRefresh = {invocations: 0, samples: [], completed: false};
+function refreshModel() {
+  var width = box.clientWidth, height = box.clientHeight;
+  window.__ctmModelRefresh.invocations++;
+  window.__ctmModelRefresh.samples.push({width: width, height: height});
+  if (!(width > 0 && height > 0)) return;
+  b.resizeContainer(width, height, true);
+  b.fullUpdate();
+  window.__ctmModelRefresh.completed = true;
+}
 window.addEventListener('message', function(e) {
   if (e.data !== 'visible' || MODE !== 'refresh-model') return;
-  b.resizeContainer(box.clientWidth, box.clientHeight, true);
-  b.fullUpdate();
+  refreshModel();
+  requestAnimationFrame(function () { refreshModel(); requestAnimationFrame(refreshModel); });
 });
 `;
     // The script URL is supplied as an absolute loopback URL at test time.

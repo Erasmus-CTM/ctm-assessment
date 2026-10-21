@@ -5,6 +5,8 @@
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
+import {randomUUID} from 'node:crypto';
+import {JSDOM} from 'jsdom';
 import {checkBoards} from './board-check.mjs';
 
 export async function launchOfflineBrowser() {
@@ -16,20 +18,8 @@ export async function launchOfflineBrowser() {
       '--disable-background-networking', '--no-proxy-server']});
 }
 
-export async function offlineContext(browser, baseURL) {
-  const allowed = new URL(baseURL);
-  if (allowed.hostname !== '127.0.0.1') throw new Error('offline harness server must use 127.0.0.1');
-  const context = await browser.newContext({serviceWorkers: 'allow', viewport: {width: 1280, height: 900}});
-  const errors = [], external = [], responses = [], failed = [], attempts = [];
-  // Playwright 1.55's serviceWorkers:'block' script reads navigator.serviceWorker,
-  // whose getter throws in opaque sandboxed frames. Block registration ourselves
-  // through the constructor prototype without reading that getter.
-  await context.exposeBinding('__ctmOfflineRecordAttempt', ({frame}, url, kind) => {
-    const attempt = {url, kind, frame: frame.url()};
-    attempts.push(attempt);
-    if (new URL(url).origin !== allowed.origin) external.push(url);
-  });
-  await context.addInitScript(() => {
+export function installOfflineAudit({channel}) {
+    if (globalThis.__ctmOfflineAudit?.installed) return;
     globalThis.__ctmOfflineAudit = {version: 1, installed: false};
     const pending = new Set(), auditErrors = [];
     const absolute = input => {
@@ -41,11 +31,39 @@ export async function offlineContext(browser, baseURL) {
         return /^(https?:)$/.test(url.protocol) ? url.href : null;
       } catch { return null; } // Native APIs still receive the untouched input.
     };
+    let nextId = 0;
+    const acknowledgements = new Map();
+    const send = (url, kind, documentURL) => {
+      if (typeof globalThis.__ctmOfflineRecordAttempt === 'function')
+        return globalThis.__ctmOfflineRecordAttempt(url, kind, documentURL);
+      if (parent === globalThis) return Promise.reject(new Error('top-level audit binding is absent'));
+      return new Promise((resolve, reject) => {
+        const id = ++nextId;
+        acknowledgements.set(id, {resolve, reject});
+        parent.postMessage({channel, type: 'ctm-audit-request', id, url, kind, documentURL}, '*');
+      });
+    };
+    globalThis.addEventListener('message', event => {
+      const data = event.data;
+      if (!data || data.channel !== channel) return;
+      if (data.type === 'ctm-audit-ack' && event.source === parent) {
+        const acknowledgement = acknowledgements.get(data.id);
+        if (!acknowledgement) return;
+        acknowledgements.delete(data.id);
+        if (data.error) acknowledgement.reject(new Error(data.error));
+        else acknowledgement.resolve();
+      } else if (data.type === 'ctm-audit-request' &&
+          [...document.querySelectorAll('iframe')].some(frame => frame.contentWindow === event.source)) {
+        Promise.resolve(send(data.url, data.kind, data.documentURL)).then(
+          () => event.source.postMessage({channel, type: 'ctm-audit-ack', id: data.id}, '*'),
+          error => event.source.postMessage({channel, type: 'ctm-audit-ack', id: data.id, error: String(error)}, '*'));
+      }
+    });
     const record = (input, kind) => {
       const url = absolute(input);
       if (!url) return;
       let promise;
-      try { promise = globalThis.__ctmOfflineRecordAttempt(url, kind); }
+      try { promise = send(url, kind, document.URL); }
       catch (error) { auditErrors.push(String(error)); return; }
       pending.add(promise);
       promise.then(() => pending.delete(promise), error => {
@@ -54,7 +72,11 @@ export async function offlineContext(browser, baseURL) {
       });
     };
     globalThis.__ctmOfflineDrainAttempts = async () => {
-      while (pending.size) await Promise.allSettled([...pending]);
+      while (pending.size) {
+        const completed = await Promise.race([Promise.allSettled([...pending]).then(() => true),
+          new Promise(resolve => setTimeout(() => resolve(false), 10000))]);
+        if (!completed) return [...auditErrors, 'request audit acknowledgement timeout'];
+      }
       return auditErrors.slice();
     };
     const nativeFetch = globalThis.fetch;
@@ -82,7 +104,62 @@ export async function offlineContext(browser, baseURL) {
       return Promise.reject(new DOMException('Service workers are blocked by offline checks', 'NotAllowedError'));
     };
     globalThis.__ctmOfflineAudit.installed = true;
+}
+
+// Preserve all author bytes except the added audit script and iframe attributes.
+// JSDOM parses locations only; it never executes scripts or fetches resources.
+export function instrumentOfflineHTML(source, script) {
+  const dom = new JSDOM(source, {includeNodeLocations: true});
+  try {
+    const edits = [];
+    const quote = value => '"' + value.replaceAll('&', '&amp;').replaceAll('"', '&quot;') + '"';
+    for (const frame of dom.window.document.querySelectorAll('iframe')) {
+      const locations = dom.nodeLocation(frame)?.attrs;
+      if (frame.hasAttribute('srcdoc') && locations?.srcdoc) {
+        const loc = locations.srcdoc;
+        edits.push({start: loc.startOffset, end: loc.endOffset,
+          text: 'srcdoc=' + quote(instrumentOfflineHTML(frame.getAttribute('srcdoc'), script))});
+      } else {
+        const src = frame.getAttribute('src') || '';
+        if (!/^data:text\/html(?:[;,])/i.test(src) || !locations?.src) continue;
+        const comma = src.indexOf(','), header = src.slice(0, comma), data = src.slice(comma + 1);
+        const decoded = /;base64$/i.test(header) ? Buffer.from(data, 'base64').toString('utf8') : decodeURIComponent(data);
+        const loc = locations.src;
+        edits.push({start: loc.startOffset, end: loc.endOffset,
+          text: 'src=' + quote('data:text/html;base64,' + Buffer.from(instrumentOfflineHTML(decoded, script)).toString('base64'))});
+      }
+    }
+    const head = dom.nodeLocation(dom.window.document.head);
+    const body = dom.nodeLocation(dom.window.document.body);
+    const firstNode = dom.window.document.querySelector('script');
+    const first = firstNode && dom.nodeLocation(firstNode);
+    const doctype = dom.window.document.doctype && dom.nodeLocation(dom.window.document.doctype);
+    const start = head?.startTag?.endOffset ?? Math.min(body?.startTag?.endOffset ?? Infinity,
+      first?.startOffset ?? Infinity);
+    edits.push({start: Number.isFinite(start) ? start : doctype?.endOffset || 0,
+      end: Number.isFinite(start) ? start : doctype?.endOffset || 0, text: script});
+    for (const edit of edits.sort((a, b) => b.start - a.start))
+      source = source.slice(0, edit.start) + edit.text + source.slice(edit.end);
+    return source;
+  } finally { dom.window.close(); }
+}
+
+export async function offlineContext(browser, baseURL) {
+  const allowed = new URL(baseURL);
+  if (allowed.hostname !== '127.0.0.1') throw new Error('offline harness server must use 127.0.0.1');
+  const context = await browser.newContext({serviceWorkers: 'allow', viewport: {width: 1280, height: 900}});
+  const channel = 'ctm-offline-' + randomUUID();
+  const script = '<script data-ctm-offline-audit>(' + installOfflineAudit.toString() + ')(' + JSON.stringify({channel}) + ');</script>';
+  const errors = [], external = [], responses = [], failed = [], attempts = [];
+  // Playwright 1.55's serviceWorkers:'block' script reads navigator.serviceWorker,
+  // whose getter throws in opaque sandboxed frames. Block registration ourselves
+  // through the constructor prototype without reading that getter.
+  await context.exposeBinding('__ctmOfflineRecordAttempt', ({frame}, url, kind, documentURL) => {
+    const attempt = {url, kind, frame: documentURL || frame.url()};
+    attempts.push(attempt);
+    if (new URL(url).origin !== allowed.origin) external.push(url);
   });
+  await context.addInitScript(installOfflineAudit, {channel});
   const drain = async () => {
     for (const page of context.pages()) for (const frame of page.frames()) {
       try {
@@ -99,11 +176,22 @@ export async function offlineContext(browser, baseURL) {
       } catch (error) { failed.push({url: frame.url(), error: 'request audit drain: ' + String(error.message)}); }
     }
   };
-  await context.route('**/*', route => {
+  await context.route('**/*', async route => {
     const url = route.request().url();
     if (new URL(url).origin !== allowed.origin) {
       external.push(url);
       return route.abort('blockedbyclient');
+    }
+    if (route.request().resourceType() === 'document') {
+      const response = await route.fetch({maxRedirects: 0, headers: {...route.request().headers(), 'accept-encoding': 'identity'}});
+      if (/text\/html/i.test(response.headers()['content-type'] || '') && response.status() < 300) {
+        const body = instrumentOfflineHTML(await response.text(), script);
+        const headers = {...response.headers()};
+        delete headers['content-length'];
+        delete headers['content-encoding'];
+        return route.fulfill({response, headers, body});
+      }
+      return route.fulfill({response});
     }
     return route.continue();
   });

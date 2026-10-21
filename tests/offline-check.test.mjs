@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {launchOfflineBrowser, offlineContext, checkOfflinePages} from '../tools/offline-check.mjs';
+import {launchOfflineBrowser, offlineContext, checkOfflinePages, instrumentOfflineHTML} from '../tools/offline-check.mjs';
 import {checkBoards, geometryProblems} from '../tools/board-check.mjs';
 import {writeFixtures, finishMechanismFixtures} from './offline-check/fixtures.mjs';
+import {JSDOM} from 'jsdom';
 import {serveFixtures} from './offline-check/harness.mjs';
 
 let root, browser, server;
@@ -26,6 +27,24 @@ after(async () => {
   if (server) await server.close();
   if (root) fs.rmSync(root, {recursive: true, force: true});
   if (process.env.CTM_OFFLINE_REPORT) fs.writeFileSync(process.env.CTM_OFFLINE_REPORT, JSON.stringify(evidence, null, 2) + '\n');
+});
+
+test('HTML instrumentation preserves author bytes, doctype, sandbox and decoded embedded documents', () => {
+  const audit = '<script data-ctm-offline-audit>window.audit=true;</script>';
+  const plain = '<!doctype html>\n<html><head><title>Fixture</title></head><body><!--keep--><pre>raw &amp; "quoted"</pre></body></html>';
+  assert.equal(instrumentOfflineHTML(plain, audit).replace(audit, ''), plain);
+  const child = '<!doctype html><html><body><script>window.author=true;</script><p>Board</p></body></html>';
+  const encode = text => text.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
+  const source = '<!doctype html><html><head></head><body><iframe sandbox="allow-scripts" srcdoc="' + encode(child) + '"></iframe>' +
+    '<iframe sandbox="allow-scripts" src="data:text/html;base64,' + Buffer.from(child).toString('base64') + '"></iframe></body></html>';
+  const dom = new JSDOM(instrumentOfflineHTML(source, audit));
+  try {
+    assert.equal(dom.window.document.compatMode, 'CSS1Compat');
+    const frames = [...dom.window.document.querySelectorAll('iframe')];
+    assert.ok(frames.every(frame => frame.getAttribute('sandbox') === 'allow-scripts'));
+    assert.equal(frames[0].getAttribute('srcdoc').replace(audit, ''), child);
+    assert.equal(Buffer.from(frames[1].getAttribute('src').split(',')[1], 'base64').toString('utf8').replace(audit, ''), child);
+  } finally { dom.window.close(); }
 });
 
 test('geometry tolerance is 2px and SVG size, visibility and ink are separate requirements', () => {
@@ -127,7 +146,7 @@ test('caught opaque fetch/XHR attempts are audited even with zero page errors', 
     probes: [async page => {
       const frame = page.frames().find(frame => frame.parentFrame());
       const first = await frame.evaluate(() => window.__ctmFirstScriptAudit);
-      assert.ok(first?.installed && first.wrapped && first.drain === 'function' && first.binding === 'function', JSON.stringify(first));
+      assert.ok(first?.installed && first.wrapped && first.drain === 'function' && ['binding', 'parent-bridge'].includes(first.transport), JSON.stringify(first));
       await frame.waitForFunction(() => document.body.dataset.caught === 'true');
     }]});
   evidence.contracts.push(result);
@@ -142,6 +161,23 @@ test('caught opaque fetch/XHR attempts are audited even with zero page errors', 
   }
 });
 
+test('caught data-frame requests are audited before the first author script without changing the sandbox', {timeout: 60000}, async () => {
+  const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL,
+    pages: [{path: 'caught-data.html', boards: 1}], probes: [async page => {
+      assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts');
+      const frame = page.frames().find(frame => frame.parentFrame());
+      const first = await frame.evaluate(() => window.__ctmFirstScriptAudit);
+      assert.ok(first?.installed && first.wrapped && first.transport !== 'none', JSON.stringify(first));
+      await frame.waitForFunction(() => document.body.dataset.caught === 'true');
+    }]});
+  evidence.contracts.push(result);
+  for (const load of result.results) {
+    assert.equal(load.ok, false, JSON.stringify(load));
+    assert.deepEqual(load.evidence.errors, []);
+    assert.ok(load.evidence.external.includes('https://offline.invalid/caught-data'), JSON.stringify(load.evidence));
+  }
+});
+
 test('local string/URL/Request and opaque-frame requests succeed; data URLs are not external attempts', {timeout: 60000}, async () => {
   const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL,
     pages: [{path: 'same-origin.html', boards: 1}],
@@ -149,7 +185,7 @@ test('local string/URL/Request and opaque-frame requests succeed; data URLs are 
       await page.waitForFunction(() => document.body.dataset.parentLocal === 'local request works');
       const frame = page.frames().find(frame => frame.parentFrame());
       const first = await frame.evaluate(() => window.__ctmFirstScriptAudit);
-      assert.ok(first?.installed && first.wrapped && first.drain === 'function' && first.binding === 'function', JSON.stringify(first));
+      assert.ok(first?.installed && first.wrapped && first.drain === 'function' && ['binding', 'parent-bridge'].includes(first.transport), JSON.stringify(first));
       await frame.waitForFunction(() => document.body.dataset.local === 'local request works|local request works|inline|local request works');
     }]});
   evidence.contracts.push(result);
@@ -208,8 +244,12 @@ test('real JSXGraph hidden-frame mechanism: blank negative every time; >=20 plai
         await page.waitForTimeout(150);
         await page.evaluate(() => {
           document.getElementById('hidden').style.display = 'block';
-          document.querySelector('iframe').contentWindow.postMessage('visible', '*');
         });
+        await frame.waitForFunction(() => document.querySelector('.jxgbox').clientWidth > 0 && document.querySelector('.jxgbox').clientHeight > 0);
+        if (mode === 'refresh-model') {
+          await page.evaluate(() => document.querySelector('iframe').contentWindow.postMessage('visible', '*'));
+          await frame.waitForFunction(() => window.__ctmModelRefresh?.completed === true);
+        }
         const boards = await checkBoards(page);
         const blank = boards.some(board => board.errors.some(error => /SVG (width|height)/.test(error)));
         assert.equal(boards.length, 1);
@@ -218,7 +258,7 @@ test('real JSXGraph hidden-frame mechanism: blank negative every time; >=20 plai
         assert.deepEqual(network.responses, []);
         assert.deepEqual(network.failed, []);
         assert.deepEqual(network.errors, []);
-        outcomes.push({load: i + 1, blank, boards});
+        outcomes.push({load: i + 1, blank, boards, refresh: await frame.evaluate(() => window.__ctmModelRefresh || null)});
       } finally {
         await drain();
         await context.close();
