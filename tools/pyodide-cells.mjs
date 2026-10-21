@@ -15,7 +15,8 @@
 // (each in a fresh browser context, so in a fresh interpreter); one browser
 // cache per run. A record per cell: its terminal text (stdout, stderr and
 // results), the text of HTML results, and the numbers of images and of
-// animations; memory addresses and timings are normalised.
+// animations, once no interactive figure is still being drawn; memory
+// addresses and timings are normalised.
 //
 // compare: a cell whose output differs between the old file's runs (random
 // numbers, times) is compared only for errors (a traceback or not); every
@@ -117,6 +118,10 @@ async function runSite(o) {
             && globalThis.qpyodideCellContainer?.cells.length > 0, null, {timeout: WAIT});
           await page.waitForFunction(() => (globalThis.__ctmStartupEnded === true || globalThis.qpyodideStartupPhaseDone === true)
             && ![...document.querySelectorAll('.qpyodide-button-run')].some(button => /Stop|Stopp/.test(button.innerText)), null, {timeout: WAIT, polling: 50});
+          // Interactive figures are drawn in the background, by a second
+          // Pyodide (the PNG first, then canvases): wait until none is pending.
+          const settle = () => page.waitForFunction(() => !document.querySelector('.qpyodide-canvas-hint .fa-spin'), null, {timeout: CELL, polling: 100}).catch(() => {});
+          await settle();
           const startup = await page.evaluate(recordCells);
           const runs = [];
           for (const cell of startup) {
@@ -137,6 +142,7 @@ async function runSite(o) {
               if (how === 'timeout') { unit.runButton.click(); await done; }
               return how;
             }, {index: cell.index, limit: CELL});
+            await settle();
             runs.push({index: cell.index, outcome});
           }
           const after = await page.evaluate(recordCells);
