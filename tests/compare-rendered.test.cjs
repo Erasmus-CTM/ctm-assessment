@@ -139,3 +139,10 @@ test('an id that the new page has twice is unexplained', () => {
     + reveal('<p>En.</p><p>To.</p><p>Tre.</p>') + '<p>Etter.</p><div id="a"></div></section>'));
   assert.deepEqual(invariants(items), ['duplicate id']);
 });
+
+test('a migrated course on both sides: the new switch where it stood is no difference, one moved down is', () => {
+  const body = '<section id="a" class="level2"><h2>A</h2>' + reveal('<p>En.</p><p>To.</p><p>Tre.</p>') + '<p>Etter.</p></section>';
+  const before = page(`<p>Innledning.</p>${NEW_SWITCH}${body}`);
+  assert.deepEqual(invariants(compare(before, before)), []);
+  assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${body}${NEW_SWITCH}`), before)), ['switch moved']);
+});
