@@ -153,12 +153,16 @@ known-failures:
     note: 'ResizeObserver loop'
   # A link to an id inside a collapsed callout: ctm-nav.js opens tabs and
   # <details> around a target, not a collapsed callout (design §2.3 names
-  # tabs and <details> only), so the target stays hidden. No course had such
-  # a target; ctm-demo's step-4 UI test page has one on purpose
-  # (#ui-target-callout).
+  # tabs and <details> only), so the target stays hidden. No course has such
+  # a target; ctm-demo's step-4 UI test page has exactly one on purpose. The
+  # entry names that course, that place and that target only: a failure
+  # anywhere else (an expanded callout, a callout in a tab, another target)
+  # still fails.
   - id: collapsed-callout-target
-    title: A link's target inside a collapsed callout stays hidden (ctm-nav.js does not open callouts)
+    title: The test page's target in a collapsed callout stays hidden (ctm-nav.js does not open callouts)
     fix: ctm-libs ui/ctm-nav.js, open an enclosing collapsed callout as it opens <details> (follow-up, not filed yet); then pin it
+    courses: [ctm-demo]
     browsers: [chromium, firefox, webkit]
     checks: [link load, link click]
-    place: 'collapsed callout'
+    place: '^collapsed callout$'
+    target: '^pages/step4-ui\.html#ui-target-callout$'

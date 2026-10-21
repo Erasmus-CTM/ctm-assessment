@@ -127,21 +127,41 @@ test('a page only new has gets the new-only checks: reveals, switch, keyboard, p
   assert.ok(!run.results.some(r => r.check === 'new-only' && r.page === 'p.html'), run.output);
 });
 
-test('a known failure can be limited to the place of a link\'s target (`place`)', () => {
+test('a known failure can be limited to the place and the target of a link (`place`, `target`)', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-browser-expect-'));
   try {
     const expect = path.join(dir, 'expect.yml');
     fs.writeFileSync(expect, ['known-failures:', '  - id: callout-target', '    title: a target in a collapsed callout',
-      '    fix: none (test)', '    browsers: [chromium]', '    checks: [link load]', "    place: '^collapsed callout$'", ''].join('\n'));
-    // No ctm-nav.js is served: every link load fails; only the callout's is known.
+      '    fix: none (test)', '    courses: [demo]', '    browsers: [chromium]', '    checks: [link load]', "    place: '^collapsed callout$'",
+      "    target: '^t\\.html#in-callout$'", ''].join('\n'));
+    // No ctm-nav.js is served: every link load fails. Only the one target in a
+    // collapsed callout that the entry names is known; an expanded callout
+    // (collapse show), a callout in a tab pane and another collapsed target are not.
     const target = page('<script src="ctm-nav.js"></script>' + REVEAL + '<p id="plain">Plain.</p>'
-      + '<div class="callout-collapse collapse" id="c1"><div id="in-callout">Hidden.</div></div>');
-    const links = page('<p><a href="t.html#plain">a</a> <a href="t.html#in-callout">b</a></p>');
-    const run = compare({old: {'t.html': OLD, 'l.html': links}, new: {'t.html': target, 'l.html': links}}, ['--checks', 'links', '--expect', expect]);
+      + '<div class="callout-collapse collapse" id="c1"><div id="in-callout">Hidden.</div><div id="other-in-callout">Hidden too.</div></div>'
+      + '<div class="callout-collapse collapse show" id="c2"><div id="in-open-callout">Shown.</div></div>'
+      + '<div class="tab-content"><div class="tab-pane" id="p1"><div class="callout-collapse collapse" id="c3"><div id="pane-callout">Pane.</div></div></div></div>');
+    const ids = ['plain', 'in-callout', 'other-in-callout', 'in-open-callout', 'pane-callout'];
+    const links = page('<p>' + ids.map(id => `<a href="t.html#${id}">${id}</a>`).join(' ') + '</p>');
+    const sites = {old: {'t.html': OLD, 'l.html': links}, new: {'t.html': target, 'l.html': links}};
+    const run = compare(sites, ['--checks', 'links', '--expect', expect, '--course', 'demo']);
     const load = id => run.results.find(r => r.check === 'link load' && r.page === 't.html#' + id);
     assert.equal(load('in-callout').known, 'callout-target', run.output);
-    assert.ok(!load('plain').ok && !load('plain').known, run.output);
+    for (const id of ['plain', 'other-in-callout', 'in-open-callout', 'pane-callout']) assert.ok(!load(id).ok && !load(id).known, id + ': ' + run.output);
+    assert.equal(load('in-open-callout').place, 'plain', run.output);
+    // Another course: not known.
+    const other = compare(sites, ['--checks', 'links', '--expect', expect, '--course', 'else']);
+    assert.ok(!other.results.find(r => r.check === 'link load' && r.page === 't.html#in-callout').known, other.output);
   } finally {
     fs.rmSync(dir, {recursive: true, force: true});
   }
+});
+
+test('new-only: a switch whose script did not run fails once, and the other pages are still checked', () => {
+  const broken = page(STUB.replace('box.hidden = false;', '') + reveal('reading-step', 'Go deeper'));
+  const fine = page(reveal('hint', 'Hint'));
+  const run = compare({old: {'p.html': OLD}, new: {'p.html': page(REVEAL), 'a.html': broken, 'b.html': fine}}, ['--checks', 'new-only']);
+  const only = name => run.results.find(r => r.check === 'new-only' && r.page === name);
+  assert.match(only('a.html').note, /^the switch is not shown$/, run.output);
+  assert.ok(only('b.html').ok, run.output);
 });

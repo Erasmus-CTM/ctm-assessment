@@ -82,8 +82,8 @@
 // `known-failures` in the expect file lists failures of new that are known
 // and fixed elsewhere (the browsers and the checks, both required; the
 // courses, `targets: tab-title`, a `place` pattern (where a link's target
-// stands: "collapsed callout", "pane + details", ...), a `frame` and a
-// `note` pattern, optional;
+// stands: "collapsed callout", "pane + details", ...), a `target` pattern
+// (the target as page#id), a `frame` and a `note` pattern, optional;
 // and the fix): such a failure counts as expected and is reported, until the
 // fix is pinned and the entry removed.
 // Exit status: 0 when every check passes, 1 otherwise, 2 on errors.
@@ -190,7 +190,8 @@ function placeOf(el) {
   for (let node = el.parentElement; node; node = node.parentElement) {
     if (node.classList.contains('tab-pane')) panes++;
     if (node.tagName === 'DETAILS') details = true;
-    if (node.classList.contains('collapse')) collapse = true;
+    // A callout Quarto renders collapsed (an expanded one, `collapse show`, hides nothing).
+    if (node.classList.contains('collapse') && !node.classList.contains('show')) collapse = true;
   }
   if (el.classList.contains('ctm-tab-target')) return panes ? 'nested tab title' : 'tab title';
   const parts = [];
@@ -369,6 +370,7 @@ class Run {
     const known = ok ? null : (this.known || []).find(k => k.browsers.includes(this.browserName)
       && k.checks.includes(check) && (!k.courses || k.courses.includes(this.o.course))
       && (!k.targets || k.targets !== 'tab-title' || detail.tabTitle) && (!k.place || new RegExp(k.place).test(detail.place || ''))
+      && (!k.target || new RegExp(k.target).test(detail.target || ''))
       && (!k.frame || new RegExp(k.frame).test(detail.frame || '')) && (!k.note || new RegExp(k.note).test(detail.note || '')));
     if (known) {
       ok = true;
@@ -808,7 +810,7 @@ class Run {
       const visit = this.o.firstVisit ? `; first visit: ${state.isolation}` : '';
       this.record('link load', name, !problems.length, {note: (problems.join('; ') || `shown, focus ${n.focus}; ${was}`) + visit, expected: dead('old')(link) || undefined,
         previouslyDead: dead('old')(link) || undefined, tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined,
-        place: this.inventories[link.target]?.new?.places.get(link.id)});
+        place: this.inventories[link.target]?.new?.places.get(link.id), target: link.target + '#' + link.id});
     }
     // On click, from the page with the link; Back and Forward for the first
     // link of each page. Not on a first visit: a click comes from a page the
@@ -889,7 +891,8 @@ class Run {
       const was = !state.old ? 'dead on old' : works(state.old) ? 'shown on old' : 'not shown on old';
       if (problems.length) problems.push('trace: ' + n.trace);
       this.record('link click', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}${history.new ? ', Back and Forward' : ''}; ${was}`,
-        tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined, place: this.inventories[link.target]?.new?.places.get(link.id)});
+        tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined, place: this.inventories[link.target]?.new?.places.get(link.id),
+        target: link.target + '#' + link.id});
     }
     const previously = this.results.filter(r => r.previouslyDead && r.ok).map(r => r.page);
     const part = this.o.shard ? ` (part ${this.o.shard.index}/${this.o.shard.count} of them)` : '';
@@ -1146,13 +1149,16 @@ class Run {
         if (!r.body) problems.push(`${r.kind} ${k + 1} has no div.ctm-reveal-body`);
       });
       let modes = 'no switch';
-      if (inv.switch) {
+      if (inv.switch && !initial.switch?.visible) {
+        // Its script did not run: nothing to click (the other checks go on).
+        problems.push('the switch is not shown');
+        modes = 'the switch is not shown';
+      } else if (inv.switch) {
+        if (initial.switch.pressed !== 'lecture=true reading=false') problems.push('aria-pressed at the start: ' + initial.switch.pressed);
         const others = () => tab.evaluate(() => [...document.querySelectorAll('main details.ctm-reveal:not(.reading-step)')].map(d => d.open));
         // A hint (solution, details) opened by the reader stays open, the others closed, whatever the mode.
         await tab.evaluate(() => { const d = document.querySelector('main details.ctm-reveal:not(.reading-step)'); if (d) d.open = true; });
         const before = await others();
-        if (!initial.switch.visible) problems.push('the switch is not shown');
-        if (initial.switch.pressed !== 'lecture=true reading=false') problems.push('aria-pressed at the start: ' + initial.switch.pressed);
         await tab.click('.ctm-modes button[data-mode="reading"]');
         await tab.waitForTimeout(250);
         const reading = await read();
