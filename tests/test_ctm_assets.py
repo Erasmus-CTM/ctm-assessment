@@ -267,6 +267,56 @@ class AssetsTests(unittest.TestCase):
             with self.assertRaisesRegex(A.AssetError, "licence text"):
                 A.build_from_lock(lock, target, cache)
 
+    def test_carried_directory_and_tar_are_verified_before_replacing_previous_assets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            bundle = root / "verified"
+            with patch.object(A, "download", side_effect=downloaded):
+                A.build_from_lock(lock, bundle, root / "cache")
+            target = root / "project/_ctm-assets"
+            target.mkdir(parents=True)
+            (target / "previous").write_bytes(b"old assets")
+            A.install_carried_bundle(lock, bundle, target)
+            A.verify_bundle(target, lock)
+            packed = root / "carried.tar.gz"
+            with tarfile.open(packed, "w:gz") as out:
+                out.add(bundle, arcname="_ctm-assets")
+            A.install_carried_bundle(lock, packed, target)
+            A.verify_bundle(target, lock)
+            (bundle / "npm/demo@1.0.0/dist/app.js").write_bytes(b"tampered")
+            with self.assertRaises(A.AssetError):
+                A.install_carried_bundle(lock, bundle, target)
+            A.verify_bundle(target, lock)
+
+    def test_carried_tar_rejects_extra_entries_and_failed_publish_restores_previous(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            bundle = root / "verified"
+            with patch.object(A, "download", side_effect=downloaded):
+                A.build_from_lock(lock, bundle, root / "cache")
+            target = root / "project/_ctm-assets"
+            target.mkdir(parents=True)
+            (target / "previous").write_bytes(b"old assets")
+            packed = root / "carried.tar.gz"
+            with tarfile.open(packed, "w:gz") as out:
+                out.add(bundle, arcname="_ctm-assets")
+                extra = tarfile.TarInfo("_ctm-assets/unreviewed")
+                extra.size = 1
+                out.addfile(extra, io.BytesIO(b"x"))
+            with self.assertRaises(A.AssetError):
+                A.install_carried_bundle(lock, packed, target)
+            self.assertEqual((target / "previous").read_bytes(), b"old assets")
+            rename = Path.rename
+            def fail_publish(source, destination):
+                if source.name == "bundle":
+                    raise OSError("simulated publication failure")
+                return rename(source, destination)
+            with patch.object(Path, "rename", fail_publish), self.assertRaises(OSError):
+                A.install_carried_bundle(lock, bundle, target)
+            self.assertEqual((target / "previous").read_bytes(), b"old assets")
+
     @unittest.skipUnless(hasattr(os, "mkfifo"), "POSIX special-entry fixture")
     def test_carried_bundle_rejects_fifo_without_reading_it(self):
         with tempfile.TemporaryDirectory() as tmp:

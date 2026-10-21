@@ -15,6 +15,7 @@ import io
 import json
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import tarfile
 import tempfile
 import urllib.parse
@@ -261,6 +262,8 @@ def allow_licence(name: str, spdx: str | None, accepted=()) -> frozenset[str]:
 
 def inventory(root: Path) -> dict[str, str]:
     root = Path(root)
+    if root.is_symlink() or not root.is_dir():
+        raise AssetError("Bundle root must be a regular directory")
     out = {}
     for file in sorted(root.rglob("*")):
         if file.is_symlink():
@@ -308,12 +311,7 @@ def cache_key(lock: dict) -> str:
     return digest(json_bytes(lock))
 
 
-def build_from_lock(lock: dict, destination: Path, cache: Path, *, accepted_licences=()) -> Path:
-    """Construct into a private stage, verify, then publish to an empty target."""
-    if lock.get("v") != 1 or not lock.get("archives"):
-        raise AssetError("Unsupported or empty asset lock")
-    destination, cache = Path(destination), Path(cache)
-    # Reusing a verified bundle must not bypass the caller's licence policy.
+def validate_licence_policy(lock: dict, accepted_licences=()) -> None:
     accepted_licences = tuple(accepted_licences)
     for archive in lock["archives"]:
         obligations = allow_licence(archive["id"], archive.get("licence"), accepted_licences)
@@ -321,6 +319,14 @@ def build_from_lock(lock: dict, destination: Path, cache: Path, *, accepted_lice
             raise AssetError(f'{archive["id"]}: accepted copyleft licence needs a source offer')
         if not archive.get("licence_files"):
             raise AssetError(f'{archive["id"]}: licence text is required')
+
+
+def build_from_lock(lock: dict, destination: Path, cache: Path, *, accepted_licences=()) -> Path:
+    """Construct into a private stage, verify, then publish to an empty target."""
+    if lock.get("v") != 1 or not lock.get("archives"):
+        raise AssetError("Unsupported or empty asset lock")
+    destination, cache = Path(destination), Path(cache)
+    validate_licence_policy(lock, accepted_licences)
     if destination.exists():
         verify_bundle(destination, lock)
         return destination
@@ -360,6 +366,63 @@ def build_from_lock(lock: dict, destination: Path, cache: Path, *, accepted_lice
         destination.parent.mkdir(parents=True, exist_ok=True)
         stage.rename(destination)
     return destination
+
+def install_carried_bundle(lock: dict, source: Path, destination: Path, *, accepted_licences=()) -> Path:
+    """Verify a directory or _ctm-assets-rooted tar before replacing the target."""
+    validate_licence_policy(lock, accepted_licences)
+    source, destination = Path(source), Path(destination)
+    if source.is_symlink() or destination.is_symlink():
+        raise AssetError("Carried bundle and destination must not be symlinks")
+    if not source.exists():
+        raise AssetError(f"Carried bundle not found: {source}")
+    if not source.is_dir() and not source.is_file():
+        raise AssetError("Carried bundle must be a regular directory or tar file")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".ctm-assets-", dir=destination.parent) as temporary:
+        stage = Path(temporary) / "bundle"
+        if source.is_dir():
+            verify_bundle(source, lock)
+            if source.resolve() == destination.resolve():
+                return destination
+            shutil.copytree(source, stage)
+        else:
+            stage.mkdir()
+            wanted, seen = lock.get("files", {}), set()
+            with tarfile.open(source, "r|*") as archive:
+                for member in archive:
+                    name = member.name.rstrip("/")
+                    if name == "_ctm-assets" and member.isdir():
+                        continue
+                    if not name.startswith("_ctm-assets/"):
+                        raise AssetError("Carried tar must contain only the _ctm-assets/ bundle")
+                    relative = name[len("_ctm-assets/"):]
+                    path = relative_path(relative)
+                    if member.isdir():
+                        continue
+                    if not member.isfile() or relative in seen or relative not in wanted:
+                        raise AssetError(f"Unexpected carried bundle member: {name}")
+                    seen.add(relative)
+                    stream = archive.extractfile(member)
+                    if stream is None:
+                        raise AssetError(f"Unreadable carried bundle member: {name}")
+                    data = stream.read()
+                    if digest(data) != wanted[relative]:
+                        raise AssetError(f"Carried bundle sha256 mismatch: {relative}")
+                    target = stage.joinpath(*path.parts)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(data)
+        verify_bundle(stage, lock)
+        backup = Path(temporary) / "previous"
+        if destination.exists():
+            destination.rename(backup)
+        try:
+            stage.rename(destination)
+        except OSError:
+            if backup.exists():
+                backup.rename(destination)
+            raise
+    return destination
+
 
 def version_sources(library: Path) -> dict:
     """Read the two canonical library sources; never duplicate Pyodide's pin."""
