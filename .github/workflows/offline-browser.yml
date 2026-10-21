@@ -1,0 +1,76 @@
+name: Offline browser checker and mechanism controls
+on:
+  pull_request:
+    paths:
+      - tools/board-check.mjs
+      - tools/offline-check.mjs
+      - tests/offline-check.test.mjs
+      - tests/offline-check/**
+      - .github/workflows/offline-browser.yml
+  push:
+    branches-ignore: [main]
+    paths:
+      - tools/board-check.mjs
+      - tools/offline-check.mjs
+      - tests/offline-check.test.mjs
+      - tests/offline-check/**
+      - .github/workflows/offline-browser.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          # Canonical server PR27; replace this checkout after AC merges it.
+          ref: c1f509c301e786f7573b8a5c35745570a4d853d1
+          path: server-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - name: Install full Chromium (headless shell is not mechanism evidence)
+        run: npx playwright install --with-deps chromium
+      - name: Prepare local real JSXGraph fixture
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/offline-jxg"
+          npm view jsxgraph@1.14.1 dist.integrity --registry=https://registry.npmjs.org > "$RUNNER_TEMP/offline-jxg/integrity.txt"
+          npm pack jsxgraph@1.14.1 --registry=https://registry.npmjs.org --pack-destination "$RUNNER_TEMP/offline-jxg" --json > "$RUNNER_TEMP/offline-jxg/package.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import path from 'node:path';
+          const dir = path.join(process.env.RUNNER_TEMP, 'offline-jxg');
+          const metadata = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))[0];
+          const expected = fs.readFileSync(path.join(dir, 'integrity.txt'), 'utf8').trim();
+          const actual = 'sha512-' + crypto.createHash('sha512').update(fs.readFileSync(path.join(dir, metadata.filename))).digest('base64');
+          if (metadata.version !== '1.14.1' || actual !== expected || metadata.integrity !== expected) throw new Error('fixture package integrity mismatch');
+          console.log(JSON.stringify({version: metadata.version, integrity: actual}));
+          JS
+          tar -xzf "$RUNNER_TEMP/offline-jxg/jsxgraph-1.14.1.tgz" -C "$RUNNER_TEMP/offline-jxg"
+      - name: Run positive, negative and real hidden-frame controls
+        env:
+          CTM_OFFLINE_SERVER: server-source/scripts/serve-offline.py
+          JXG_FIXTURE_DIR: ${{ runner.temp }}/offline-jxg/package/distrib
+          CTM_OFFLINE_REPORT: offline-browser-report.json
+        run: node --test tests/offline-check.test.mjs
+      - name: Upload exact evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-browser-controls-${{ github.sha }}
+          path: offline-browser-report.json
+          if-no-files-found: warn
