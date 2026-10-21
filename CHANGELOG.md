@@ -25,7 +25,13 @@ pyodide-interaktiv and JSXGraph unchanged, at the commits recorded in
   rules and messages (S-13), the inverse trigonometric functions, and the
   other STACK changes of ctm-checkers' CHANGELOG. Only STACK verdicts change.
   math-exercise's tables, and so the math exercises' verdicts, do not
-  change.
+  change. The pyodide parity job shows it on the re-pin: Pyodide 0.27.2
+  against 0.28.3 has 0 differences (L2 = 0), and the build with ctm-checkers
+  8c3db5e (0.2.0) against the build with 9e042dc (0.6.0) has 0 differences
+  in status, score, details and feedback over 10541 graded responses, 720
+  variant fixtures, 34 authored question tests and 28 Python programs of
+  the example site, math-exercise, ctm-demo and ingmat3a (and 2827
+  responses of `linalg-branch`), so the math goldens are identical.
 
 ### For maintainers
 
