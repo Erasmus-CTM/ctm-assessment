@@ -276,3 +276,108 @@ def build_from_lock(lock: dict, destination: Path, cache: Path, *, accepted_lice
         destination.parent.mkdir(parents=True, exist_ok=True)
         stage.rename(destination)
     return destination
+
+def version_sources(library: Path) -> dict:
+    """Read the two canonical library sources; never duplicate Pyodide's pin."""
+    library = Path(library)
+    table_path = library / "assets.json"
+    runtime_path = library / "runtime" / "pyodide-runtime.js"
+    table = json.loads(table_path.read_text(encoding="utf-8"))
+    if table.get("v") != 1 or not isinstance(table.get("assets"), dict):
+        raise AssetError("Unsupported canonical asset table")
+    assets = {}
+    exact = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?")
+    for name, entry in table["assets"].items():
+        if not exact.fullmatch(str(entry.get("version", ""))):
+            raise AssetError(f"{name}: the asset table needs an exact version")
+        if name == "pyodide" or entry.get("npm") in {"jsxgraph", "@mathjax/mathjax-newcm-font"}:
+            raise AssetError(f"{name}: version belongs to runtime/jsxgraph-pins, not assets.json")
+        relative_path(entry["local"].replace("{version}", entry["version"]).rstrip("/"))
+        assets[name] = dict(entry)
+    runtime = runtime_path.read_text(encoding="utf-8")
+    found = re.findall(r"var indexURL = 'https://cdn\.jsdelivr\.net/pyodide/v([0-9]+\.[0-9]+\.[0-9]+)/full/';", runtime)
+    if len(found) != 1:
+        raise AssetError("The canonical Pyodide runtime constant could not be read")
+    return {"assets": assets, "pyodide": found[0], "table_sha256": digest(table_path.read_bytes()),
+            "runtime_sha256": digest(runtime_path.read_bytes())}
+
+
+def release_version(package_json: bytes, expected: str) -> str:
+    """The release package.json owns its version; lock.info.version does not."""
+    actual = json.loads(package_json)["version"]
+    if actual != expected:
+        raise AssetError(f"Pyodide package.json is {actual}, expected {expected}")
+    return actual
+
+
+def fetch_json(url: str) -> dict:
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != "https" or parsed.hostname not in {"registry.npmjs.org", "api.github.com"} or parsed.username or parsed.password:
+        raise AssetError("Metadata must come from the official registry or GitHub API")
+    request = urllib.request.Request(url, headers={"User-Agent": "CTM-Assets/1", "Accept": "application/json"})
+    with urllib.request.build_opener(SafeRedirect()).open(request, timeout=120) as response:
+        final = urllib.parse.urlsplit(response.geturl())
+        if final.scheme != "https" or final.hostname not in {"registry.npmjs.org", "api.github.com"}:
+            raise AssetError("Metadata redirect left the official sources")
+        return json.load(response)
+
+
+def collect_metadata(library: Path, *, source_refs=None) -> dict:
+    """Collect official archive digests for review; this is not a trusted lock."""
+    sources = version_sources(library)
+    archives = []
+    for name, entry in sorted(sources["assets"].items()):
+        package, version = entry["npm"], entry["version"]
+        url = "https://registry.npmjs.org/" + urllib.parse.quote(package, safe="@") + "/" + version
+        metadata = fetch_json(url)
+        if metadata.get("name") != package or metadata.get("version") != version:
+            raise AssetError(f"{name}: registry metadata does not match the requested version")
+        dist = metadata.get("dist", {})
+        integrity = dist.get("integrity", "")
+        if not re.fullmatch(r"sha512-[A-Za-z0-9+/]+={0,2}", integrity):
+            raise AssetError(f"{name}: official npm sha512 integrity is missing")
+        if len(base64.b64decode(integrity[7:], validate=True)) != 64:
+            raise AssetError(f"{name}: malformed npm sha512 integrity")
+        archives.append({"id": name, "npm": package, "version": version,
+                         "url": checked_url(dist["tarball"]), "integrity": integrity,
+                         "reported_licence": metadata.get("license"), "metadata_url": url})
+    version = sources["pyodide"]
+    release_url = "https://api.github.com/repos/pyodide/pyodide/releases/tags/" + version
+    release = fetch_json(release_url)
+    wanted = "pyodide-" + version + ".tar.bz2"
+    matching = [asset for asset in release.get("assets", []) if asset.get("name") == wanted]
+    if len(matching) != 1:
+        raise AssetError(f"The official Pyodide release lacks {wanted}")
+    asset = matching[0]
+    checksum = asset.get("digest", "")
+    if not re.fullmatch(r"sha256:[a-f0-9]{64}", checksum or ""):
+        raise AssetError("The official Pyodide release has no SHA-256 digest; verify its published checksum before locking")
+    archives.append({"id": "pyodide", "version": version, "url": checked_url(asset["browser_download_url"]),
+                     "sha256": checksum.split(":", 1)[1], "metadata_url": release_url})
+    return {"v": 1, "kind": "official-asset-metadata", "sources": sources, "source_refs": dict(source_refs or {}),
+            "archives": archives, "status": "archive bytes, licence texts and bundle file hashes still require verification"}
+
+
+def main(argv=None):
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    metadata = sub.add_parser("metadata", help="Collect official npm/release digests for review")
+    metadata.add_argument("--libs", type=Path, required=True, help="ctm-libs extension folder")
+    metadata.add_argument("--output", type=Path, required=True)
+    metadata.add_argument("--source-ref", action="append", default=[], metavar="NAME=SHA")
+    verify = sub.add_parser("verify", help="Verify a carried bundle against the reviewed external lock")
+    verify.add_argument("--lock", type=Path, required=True)
+    verify.add_argument("--bundle", type=Path, required=True)
+    args = parser.parse_args(argv)
+    if args.command == "metadata":
+        refs = dict(value.split("=", 1) for value in args.source_ref)
+        result = collect_metadata(args.libs, source_refs=refs)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_bytes(json_bytes(result))
+    else:
+        verify_bundle(args.bundle, json.loads(args.lock.read_text(encoding="utf-8")))
+
+
+if __name__ == "__main__":
+    main()

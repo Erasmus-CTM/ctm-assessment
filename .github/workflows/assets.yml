@@ -14,3 +14,30 @@ jobs:
         run: python -m py_compile scripts/ctm_assets.py
       - name: Integrity, extraction, licence and carried-bundle contracts
         run: python -m unittest discover -s tests -p 'test_ctm_assets.py' -v
+  official-metadata:
+    needs: fixture-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: 2ed1a3381bb6b606e3a913905095eadd8aee0988
+          path: .asset-sources/libs
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 4edd42835a8923ebeac1a44b158add3c2698b75c
+          path: .asset-report-helper
+          persist-credentials: false
+      - name: Collect official registry and release digests
+        run: |
+          python scripts/ctm_assets.py metadata --libs .asset-sources/libs/_extensions/ctm-libs --source-ref ctm-libs=2ed1a3381bb6b606e3a913905095eadd8aee0988 --output .asset-report-helper/assets-metadata.json
+      - name: Emit one checksummed report without runner commits
+        run: |
+          git -C .asset-report-helper add -N -- assets-metadata.json
+          python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
