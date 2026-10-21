@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Move a course's raw HTML in Markdown to CTM Assessment's Markdown forms (step 4), or report it.
 
-    python migrate-course-html.py [--project DIR] [--config] [--switch auto|marker|remove] [--dry-run] [FILE ...]
-    python migrate-course-html.py [--project DIR] --check [--baseline FILE] [--strict] [FILE ...]
-    python migrate-course-html.py [--project DIR] --write-baseline FILE [FILE ...]
+    python migrate-course-html.py [--project DIR] [--ctm-libs DIR] [--config] [--switch auto|marker|remove] [--dry-run] [FILE ...]
+    python migrate-course-html.py [--project DIR] [--ctm-libs DIR] --check [--baseline FILE] [--strict] [FILE ...]
+    python migrate-course-html.py [--project DIR] [--ctm-libs DIR] --write-baseline FILE [FILE ...]
+    python migrate-course-html.py [--project DIR] [--ctm-libs DIR] --reveal-ends FILE
 
 A maintainer tool of ctm-assessment (not part of the package; Python 3.9+,
-standard library only). It reads the project's pages (project: render:, or
-every .qmd and .md outside folders that start with _ or .) and the files they
-include, or the FILEs given, outside code blocks, HTML comments and front
-matter, rewrites in place, and reports what it did and what it left:
+standard library only, and Quarto). It reads the project's pages (project:
+render:, or every .qmd and .md outside folders that start with _ or .) and
+the files they include, or the FILEs given, outside code blocks, HTML
+comments and front matter, rewrites in place, and reports what it did and
+what it left:
 
   <details class="reading-step">     ->  ::: {.reading-step title="…"}   (the <summary> is the title)
   <details class="learning-hint">    ->  ::: {.hint title="…"}
@@ -17,6 +19,9 @@ matter, rewrites in place, and reports what it did and what it left:
   <details>                          ->  ::: {.details title="…"}
   </details>                         ->  :::
   <div id="x"></div>                 ->  ::: {#x} and :::
+                                         (removed when it is the first thing in a tab whose
+                                         heading has the same id: tab-ids.lua puts that id first
+                                         in the tab, and the page would have it twice)
   <iframe src="…" title="…" style="…height:920px…"></iframe>
                                      ->  ::: {.embed src="…" title="…" height="920px"} and :::
   the hand-written lecture/reading switch (<div … data-learning-mode …> … </div>)
@@ -35,11 +40,29 @@ browser and the new block is no longer part of that list). What cannot be
 converted (other attributes, a <summary> elsewhere, raw HTML inside
 ```{=html} blocks) stays as it is and is reported.
 
+Which files a page includes (nested includes too) is ctm-libs' rule, the
+one its markdown-lint reads: tools/source-files.lua runs ctm-libs' own
+ctm.source.files() with `quarto pandoc lua`. --ctm-libs DIR names ctm-libs'
+extension folder (default: $CTM_LIBS_EXTENSION), the one the umbrella pins
+(scripts/build-course.py --convert passes the copy it has just installed).
+
 --config also edits _quarto.yml: the tab-ids.lua line first in `filters:`,
 `ctm-assessment: markdown-lint: true`, and no include-after-body entries for
 the courses' _includes/site/learning-mode.html and tab-links.html (deleted
 when nothing else names them). The course's own CSS for the old classes is
 left to the author.
+
+--reveal-ends FILE records, for the course before its migration, how each
+<details> of each page ends: true when a heading's section closes it before
+its own </details> (a raw <details> with a heading inside, at the fenced-div
+depth where it opened: the browser ends it there, and the migrated reveal
+holds that heading; a heading inside a ::: div, such as a callout's title,
+is that div's and closes nothing), else false; one list
+per rendered page, in the page's order, includes put in. The rendered
+comparison (tools/compare-rendered.mjs, tools/compare-browser.mjs
+--reveal-ends) allows a reveal to hold the heading after it only where this
+says so: the rendered HTML cannot tell, since Quarto writes it out again
+without the stray </details>. It changes no file.
 
 --check reports the raw HTML that the conversion handles, as warning
 annotations in GitHub Actions (file:line lines otherwise), with the Markdown
@@ -54,6 +77,8 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -70,6 +95,7 @@ KINDS = {'reading-step': 'reading-step', 'learning-hint': 'hint', 'solution-bloc
 SKIPPED_DIRS = {'_site', '_freeze', '_extensions', 'node_modules', 'site_libs', 'renv', 'venv'}
 SITE_SCRIPTS = ('_includes/site/learning-mode.html', '_includes/site/tab-links.html')
 TAB_IDS = '_extensions/ctm-assessment/tab-ids.lua'
+SOURCE_FILES = Path(__file__).resolve().parent / 'source-files.lua'
 
 ADVICE = {
     'details': 'raw HTML <details>/<summary>: CTM Assessment\'s Markdown form is ::: {.reading-step title="…"}, '
@@ -89,6 +115,72 @@ IFRAME = re.compile(r'^(\s*)<iframe((?:\s+[\w:-]+(?:\s*=\s*"[^"]*")?)*)\s*>\s*</
 SWITCH = re.compile(r'^(\s*)<div\b[^>]*\bdata-learning-mode\b[^>]*>\s*$', re.I)
 ATTRIBUTE = re.compile(r'([\w:-]+)(?:\s*=\s*"([^"]*)")?')
 LENGTH = re.compile(r'^\d+(?:\.\d+)?(?:px|r?em|vh|%)$')
+# A shortcode alone on its line: where an include puts its file (ctm-libs
+# decides whether it is one, and which file).
+SHORTCODE = re.compile(r'\{\{<.*>\}\}')
+DETAILS_TAG = re.compile(r'<(/?)details(?=[\s>])', re.I)
+ATX = re.compile(r'^ {0,3}(#{1,6})(?:\s|$)')
+# A fenced div's line: group 1 is what follows an opening fence (empty: a closing one).
+DIV_FENCE = re.compile(r'^\s*:{3,}\s*(\S.*?)?\s*$')
+
+
+class ToolError(Exception):
+    """A failure reported as one line, without a traceback."""
+
+
+def ctm_libs_extension(given=None):
+    """ctm-libs' extension folder: `given` (--ctm-libs), else $CTM_LIBS_EXTENSION."""
+    folder = given or os.environ.get('CTM_LIBS_EXTENSION')
+    if not folder:
+        raise ToolError("which files a page includes is ctm-libs' rule: give ctm-libs' extension folder, at the "
+                        "commit the umbrella pins, as --ctm-libs DIR or $CTM_LIBS_EXTENSION")
+    folder = Path(folder).resolve()
+    if not (folder / 'lua' / 'source.lua').is_file():
+        raise ToolError(f'{folder} is not ctm-libs\' extension folder (no lua/source.lua)')
+    return folder
+
+
+def run_source_files(libs, root, args, given=None):
+    """tools/source-files.lua's output lines (it reads, never writes)."""
+    quarto = shutil.which(os.environ.get('QUARTO_BIN', 'quarto'))
+    if not quarto:
+        raise ToolError('Quarto is not installed: its Pandoc runs ctm-libs\' include rule (tools/source-files.lua)')
+    done = subprocess.run([quarto, 'pandoc', 'lua', str(SOURCE_FILES), str(libs), str(root), *args],
+                          input=given, capture_output=True, text=True, encoding='utf-8')
+    if done.returncode:
+        raise ToolError(f'tools/source-files.lua failed (exit status {done.returncode}): {done.stderr.strip()}')
+    return done.stdout.splitlines()
+
+
+def inside(file):
+    """A label of ctm-libs for a file in the project (not ../… or absolute)."""
+    return file and not file.startswith('../') and not os.path.isabs(file)
+
+
+def source_files(libs, root, pages):
+    """{page: [file, …]}: the files each page shows, as ctm-libs'
+    ctm.source.files() gives them (tools/source-files.lua): the page and its
+    includes, nested ones too, in order, relative to the project."""
+    found = {page: [] for page in pages}
+    for line in run_source_files(libs, root, pages) if pages else []:
+        page, _, file = line.partition('\t')
+        if page in found and inside(file):
+            found[page].append(file)
+    return found
+
+
+def include_files(libs, root, requests):
+    """{(page folder, line): file or None}: the file each include line
+    brings in on a page in that folder, as ctm-libs' ctm.source.files()
+    resolves it (tools/source-files.lua --include serves a page of that one
+    line from memory: nothing is written into the project)."""
+    if not requests:
+        return {}
+    given = ''.join(f'{folder}\t{line}\n' for folder, line in requests)
+    files = run_source_files(libs, root, ['--include'], given)
+    if len(files) != len(requests):
+        raise ToolError(f'tools/source-files.lua --include answered {len(files)} of {len(requests)} include lines')
+    return {request: (file if inside(file) else None) for request, file in zip(requests, files)}
 
 
 # ---------------------------------------------------------------- reading
@@ -177,28 +269,56 @@ def normalized(lang):
     return {'no': 'nb', 'nob': 'nb', 'nno': 'nn'}.get(lang, lang)
 
 
+def heading_id(text):
+    """A heading's id: its {#id}, else Pandoc's automatic one (auto_identifiers)."""
+    attrs = re.search(r'\s*\{([^{}]*)\}\s*$', text)
+    if attrs:
+        written = re.search(r'(?:^|\s)#([^\s}]+)', attrs.group(1))
+        if written:
+            return written.group(1)
+        text = text[:attrs.start()]
+    text = re.sub(r'!?\[([^\]]*)\]\([^)]*\)', r'\1', text)  # links and images: their text
+    text = re.sub(r'[*`$]|(?<!\w)_|_(?!\w)', '', text)       # emphasis, code and maths marks
+    text = re.sub(r'<[^>]+>', '', text)
+    kept = ''.join(c for c in text if c.isalnum() or c in '_-.' or c.isspace())
+    identifier = '-'.join(kept.lower().split())
+    first = next((k for k, c in enumerate(identifier) if c.isalpha()), None)
+    return identifier[first:] if first is not None else 'section'
+
+
 class Project:
     """The project's pages, the Markdown files they show (includes,
     transitively; posix paths relative to the project) and their languages."""
 
-    def __init__(self, root):
+    def __init__(self, root, libs):
         self.root = root
         top = root / '_quarto.yml'
         self.config = top.read_text(encoding='utf-8') if top.is_file() else ''
         found = re.search(r'^lang:\s*["\']?([\w-]+)', self.config, re.M)
         self.lang = found.group(1) if found else None
         self.languages = {}
-        for page in self.pages():
+        self.shown = {}  # file -> the pages that show it
+        pages = self.pages()
+        for page, files in source_files(libs, root, pages).items():
             lang = self.page_lang(page)
-            todo, seen = [page], set()
-            while todo:
-                current = todo.pop()
-                if current in seen or not (root / current).is_file():
-                    continue
-                seen.add(current)
+            for current in files:
                 self.languages.setdefault(current, set()).add(lang)
-                todo.extend(self.includes(current))
+                self.shown.setdefault(current, set()).add(page)
         self.files = sorted(self.languages)
+        self.included = self.resolve(libs)
+
+    def resolve(self, libs):
+        """{(page folder, line): file or None}: the file that each shortcode
+        line of the shown files puts in, on the pages of that folder, as
+        ctm-libs resolves it (include_files())."""
+        wanted = set()
+        for file in self.files:
+            lines = (self.root / file).read_text(encoding='utf-8').split('\n')
+            for text, raw in scan(lines):
+                if text is not None and not raw and SHORTCODE.fullmatch(text.strip()):
+                    for page in self.shown[file]:
+                        wanted.add((Path(page).parent.as_posix(), text.strip()))
+        return include_files(libs, self.root, sorted(wanted))
 
     def markdown(self):
         for folder, dirs, files in os.walk(self.root):
@@ -222,21 +342,124 @@ class Project:
             chosen = chosen - matched if remove else chosen | {m for m in matched if m.endswith(('.md', '.qmd'))}
         return sorted(chosen)
 
-    def includes(self, relative):
-        path = self.root / relative
-        try:
-            text = path.read_text(encoding='utf-8')
-        except OSError:
-            return []
-        found = []
-        for target in re.findall(r'\{\{<\s*include\s+(.+?)\s*>\}\}', text):
-            target = target.strip().strip('"\'')
-            full = (self.root / target.lstrip('/')) if target.startswith('/') else (path.parent / target)
+    def expanded(self, page):
+        """The page's Markdown with its includes put in, nested ones too, as
+        (file, index, text) for each line: `text` as scan() gives it (None for
+        code, front matter and ```{=html} blocks)."""
+        return [(file, index, None if raw else text) for file, index, text, raw in self.lines(page)]
+
+    def lines(self, page):
+        """As expanded(), as (file, index, text, raw): `raw` for ```{=html} blocks, whose text is kept."""
+        folder = Path(page).parent.as_posix()
+        out = []
+
+        def walk(relative, trail):
+            path = self.root / relative
             try:
-                found.append(Path(os.path.normpath(full)).relative_to(self.root).as_posix())
-            except ValueError:
-                continue
+                lines = path.read_text(encoding='utf-8').split('\n')
+            except OSError:
+                return
+            for index, (line, (text, raw)) in enumerate(zip(lines, scan(lines))):
+                inner = self.included.get((folder, text.strip())) if text is not None and not raw else None
+                if inner:
+                    if inner not in trail:
+                        walk(inner, trail | {inner})
+                    continue
+                out.append((relative, index, text, raw))
+        walk(page, {page})
+        return out
+
+    def reveal_ends(self):
+        """--reveal-ends: {rendered page: [closed by a heading's section, …]},
+        one entry per <details> start tag of the page (Markdown and
+        ```{=html} blocks, includes put in), in order. A heading of the level
+        of the section the <details> opened in, or a higher one, ends that
+        section before the <details>' own </details>: the browser closes the
+        <details> there (the end tag is stray). Only a heading at the
+        fenced-div depth where the <details> opened counts: Pandoc makes a
+        section of a heading inside a ::: div within that div (and Quarto a
+        callout's first heading its title), so it closes neither the outer
+        section nor the <details> (review A2c S1)."""
+        found = {}
+        for page in self.pages():
+            flags, open_, sections, depth = [], [], [], 0
+            for _, _, text, raw in self.lines(page):
+                if text is None:
+                    continue
+                fence = None if raw else DIV_FENCE.match(text)
+                if fence:
+                    depth = depth + 1 if fence.group(1) else max(0, depth - 1)
+                    continue
+                heading = None if raw else ATX.match(text)
+                if heading:
+                    level = len(heading.group(1))
+                    for k, opened, at in open_:
+                        if opened and level <= opened and at == depth:
+                            flags[k] = True
+                    while sections and sections[-1] >= level:
+                        sections.pop()
+                    sections.append(level)
+                    continue
+                for tag in DETAILS_TAG.finditer(text):
+                    if tag.group(1):
+                        if open_:
+                            open_.pop()
+                    else:
+                        flags.append(False)
+                        open_.append((len(flags) - 1, sections[-1] if sections else 0, depth))
+            found[re.sub(r'\.(q?md)$', '.html', page)] = flags
         return found
+
+    def tab_anchor_duplicates(self):
+        """The hand-written anchors that repeat the id of the tab heading they
+        follow (<div id="x"></div>, or ::: {#x} and :::, first in the tab):
+        with tab-ids.lua the tab's pane starts with that id, so the page
+        would have it twice. {file: {line index: id}} for anchors that do so
+        on every page that shows their file."""
+        hits = {}  # (file, index) -> (id, pages)
+        for page in self.pages():
+            entries = self.expanded(page)
+            stack = []  # open divs: [is a tabset, its tab level]
+            for k, (file, index, text) in enumerate(entries):
+                if text is None:
+                    continue
+                fence = re.match(r'^\s*(:{3,})\s*(.*?)\s*$', text)
+                if fence:
+                    if fence.group(2):
+                        stack.append([bool(re.search(r'(^|[\s{.])panel-tabset\b', fence.group(2))), None])
+                    elif stack:
+                        stack.pop()
+                    continue
+                heading = re.match(r'^(#{1,6})\s+(.*?)\s*$', text)
+                if not heading or not stack or not stack[-1][0]:
+                    continue
+                level = len(heading.group(1))
+                if stack[-1][1] is None:
+                    stack[-1][1] = level
+                if level != stack[-1][1]:
+                    continue
+                identifier = heading_id(heading.group(2))
+                # The first content of the tab: blank lines and comments do not count.
+                for j in range(k + 1, len(entries)):
+                    later = entries[j][2]
+                    if later is not None and not later.strip():
+                        continue
+                    if later is None:
+                        break
+                    anchor = ANCHOR.match(later)
+                    marker = re.match(r'^\s*:::+\s*\{#([^\s}]+)\}\s*$', later)
+                    if marker and not (j + 1 < len(entries) and re.match(r'^\s*:::+\s*$', entries[j + 1][2] or '')):
+                        marker = None
+                    found = (anchor.group(2) if anchor else marker.group(1) if marker else None)
+                    if found and found == identifier:
+                        key = (entries[j][0], entries[j][1])
+                        hits.setdefault(key, (found, set()))[1].add(page)
+                    break
+        result = {}
+        for (file, index), (identifier, pages) in hits.items():
+            if pages >= self.shown.get(file, set()):
+                result.setdefault(file, {})[index] = identifier
+        return result
 
     def page_lang(self, relative):
         lang = front_matter_lang((self.root / relative).read_text(encoding='utf-8'))
@@ -320,9 +543,11 @@ def front_matter_end(lines):
     return 0
 
 
-def convert_file(path, lines, scanned, languages, switch, report):
-    """(converted lines, indexes of the converted constructs' first lines, why others were left)."""
+def convert_file(path, lines, scanned, languages, switch, report, drop=None):
+    """(converted lines, indexes of the converted constructs' first lines, why others were left).
+    `drop`: the indexes of anchors that repeat their tab heading's id (removed)."""
     out, done, why = [], set(), {}
+    drop = drop or {}
     closes = {}  # index of a </details> line -> the indent of its fence
     # Markdown lines (outside code, comments and front matter); `usable`: also
     # without inline code or a comment on the line. A <summary> line may hold
@@ -397,7 +622,19 @@ def convert_file(path, lines, scanned, languages, switch, report):
                 continue
             why[index] = converted
 
-        match = ANCHOR.match(line) if usable[index] else None
+        marker = index in drop and re.match(r'^\s*:::+\s*\{#[^\s}]+\}\s*$', line) and index + 1 < len(lines)
+        match = ANCHOR.match(line) if usable[index] or marker else None
+        if (match or marker) and index in drop:
+            # The tab heading carries this id (tab-ids.lua puts it first in the
+            # pane), so the anchor would repeat it: removed, links still work.
+            report.counts['anchor removed: its tab heading has the same id (tab-ids.lua)'] += 1
+            report.note(path, index + 1, f'removed the anchor #{drop[index]}: the tab heading it follows has that id, '
+                                         'which tab-ids.lua puts first in the tab (the page would have it twice)')
+            done.add(index)
+            index += 1 if match else 2
+            if (not out or not out[-1].strip()) and index < len(lines) and not lines[index].strip():
+                index += 1
+            continue
         if match:
             fence_after_blank(index)
             out += [f'{match.group(1)}::: {{#{match.group(2)}}}', match.group(1) + ':::']
@@ -550,6 +787,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('files', nargs='*', type=Path, help='Markdown files (default: the pages and the files they include)')
     parser.add_argument('--project', type=Path, default=Path('.'), help='The project folder (default: the current folder)')
+    parser.add_argument('--ctm-libs', type=Path, metavar='DIR',
+                        help="ctm-libs' extension folder, as the umbrella pins it (default: $CTM_LIBS_EXTENSION)")
     parser.add_argument('--switch', choices=('auto', 'marker', 'remove'), default='auto',
                         help='The hand-written switch: removed when it starts its file, else a ::: {.modes} marker (auto)')
     parser.add_argument('--config', action='store_true', help='Also edit _quarto.yml (see above)')
@@ -558,6 +797,7 @@ def main(argv=None):
     parser.add_argument('--baseline', type=Path, help='With --check: report only what this baseline does not list')
     parser.add_argument('--write-baseline', type=Path, metavar='FILE', help='Record the raw HTML of the project in FILE')
     parser.add_argument('--strict', action='store_true', help='With --check: exit 1 when something is reported')
+    parser.add_argument('--reveal-ends', type=Path, metavar='FILE', help='Record how each page\'s <details> end (see above)')
     parser.add_argument('--format', choices=('github', 'text'),
                         default='github' if os.environ.get('GITHUB_ACTIONS') == 'true' else 'text',
                         help='--check output: GitHub annotations (default in GitHub Actions) or file:line lines')
@@ -567,7 +807,17 @@ def main(argv=None):
         parser.error(f'no project folder {root}')
     if args.baseline and not args.check:
         parser.error('--baseline belongs to --check')
-    project = Project(root)
+    try:
+        project = Project(root, ctm_libs_extension(args.ctm_libs))
+    except ToolError as error:
+        parser.exit(2, f'{parser.prog}: error: {error}\n')
+    if args.reveal_ends:
+        record = {'tool': 'ctm-assessment tools/migrate-course-html.py --reveal-ends', 'version': 1, 'pages': project.reveal_ends()}
+        args.reveal_ends.write_text(json.dumps(record, indent=1) + '\n', encoding='utf-8')
+        closed = sum(sum(flags) for flags in record['pages'].values())
+        print(f'{args.reveal_ends}: {sum(len(flags) for flags in record["pages"].values())} <details> in '
+              f'{len(record["pages"])} pages, {closed} closed by a heading\'s section')
+        return 0
     files = project.files
     if args.files:
         files = []
@@ -578,6 +828,10 @@ def main(argv=None):
             files.append(full.relative_to(root).as_posix())
     records = {}
     report = Report()
+    # Anchors that repeat their tab heading's id: removed when the project
+    # has (or --config adds) the tab-ids.lua line, else reported.
+    duplicates = project.tab_anchor_duplicates()
+    tab_ids = args.config or TAB_IDS in project.config
     for key in files:
         path = root / key
         lines = path.read_text(encoding='utf-8').split('\n')
@@ -585,10 +839,15 @@ def main(argv=None):
         found = constructs(lines, scanned)
         if found:
             records[key] = found
-        if args.write_baseline or not found:
+        if args.write_baseline or not (found or (tab_ids and not args.check and duplicates.get(key))):
             continue
+        drop = duplicates.get(key, {}) if tab_ids else {}
+        if not tab_ids and not args.check:
+            for index, identifier in sorted(duplicates.get(key, {}).items()):
+                report.note(key, index + 1, f'the anchor #{identifier} repeats the id of the tab heading it follows: '
+                                            'remove it once _quarto.yml has the tab-ids.lua line (--config adds it)')
         converted, done, why = convert_file(key, lines, scanned, project.languages, args.switch,
-                                            Report() if args.check else report)
+                                            Report() if args.check else report, drop)
         if args.check:
             for construct in found:
                 if construct.line - 1 not in done:

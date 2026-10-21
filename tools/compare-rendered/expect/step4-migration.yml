@@ -9,7 +9,11 @@
 # Rules: see step1.yml and step4.yml. Element lines name the element; an end
 # tag carries its class and id (`</div class="ctm-reveal-body">`), so a
 # wrapper is told apart from what it holds; "moved" is an element removed and
-# added unchanged elsewhere.
+# added unchanged elsewhere. Three invariants are checked on every page and
+# no category can explain a breach: each reveal keeps its words (field
+# `reveal`: same, heading, grown; never shrunk, changed or swallowed), the switch keeps
+# its place or goes to the top, and no id occurs more often than before
+# (hand anchors that repeat a tab heading's id, review A2 S3).
 categories:
   # <details class="reading-step|learning-hint|solution-block"> and plain
   # <details> become ctm-libs reveals: the class changes and the content gets
@@ -29,21 +33,31 @@ categories:
   # the <details> early, so the heading and what followed escaped it (design
   # §1.4 item 5; ingmat3a's linalg-branch, uke4). In a reveal they stay inside
   # its div.ctm-reveal-body. Only where the end tags of the <details> and of
-  # the sections fall changes; the content is the same.
+  # the sections fall changes; the content is the same. `reveal: heading`:
+  # the reveal holds the old <details>' words followed by exactly the words
+  # that followed it on the old page, starting with a heading, and old's
+  # <details> had no </details> of its own before that heading's section in
+  # the course's Markdown (--reveal-ends; compare-rendered.mjs; a reveal with
+  # fewer or other words than before, or
+  # one that took in a heading old's <details> had ended before, "swallowed",
+  # is always unexplained, reviews A2 S1 and A2b S1).
   - id: reveal-heading
     title: A heading inside a reveal stays inside it (a raw <details> was closed early by the heading's section)
     match:
-      - {area: dom, change: removed, line: '^</details( class="(reading-step|learning-hint|solution-block)")?>$', content: '^summary( |$)'}
-      - {area: dom, change: added, line: '^</details class="ctm-reveal (reading-step|hint|solution|details)">$', content: '^summary div$'}
-      - {area: dom, change: removed, line: '^</section( [\w-]+="[^"]*")*>$', content: '(^| )details$'}
-      - {area: dom, change: added, line: '^</section( [\w-]+="[^"]*")*>$', ancestors: 'details\.ctm-reveal\.[\w-]+ > div\.ctm-reveal-body$'}
+      - {area: dom, change: removed, line: '^</details( class="(reading-step|learning-hint|solution-block)")?>$', content: '^summary( |$)', reveal: '^heading$'}
+      - {area: dom, change: added, line: '^</details class="ctm-reveal (reading-step|hint|solution|details)">$', content: '^summary div$', reveal: '^heading$'}
+      - {area: dom, change: removed, line: '^</section( [\w-]+="[^"]*")*>$', content: '(^| )details$', reveal: '^heading$'}
+      - {area: dom, change: added, line: '^</section( [\w-]+="[^"]*")*>$', ancestors: 'details\.ctm-reveal\.[\w-]+ > div\.ctm-reveal-body$', reveal: '^heading$'}
 
   # The hand-written switch (<div class="learning-mode" data-learning-mode>,
   # its buttons in a <p>) becomes ctm-libs' (div.ctm-modes, hidden until its
   # script runs), at the top of the page or where ::: {.modes} puts it. Its
   # labels are raw HTML now, so the AI context of an exercise next to it
   # loses just the two button labels; what sat above the old switch can move
-  # below the new one.
+  # below the new one (`switchOrder: above-to-below`, when the switch went to
+  # the top of the page). The new switch must stand where the old one stood
+  # (the same words before it) or at the top of the page; anywhere else is
+  # always unexplained (compare-rendered.mjs, review A2 S1).
   - id: modes-switch
     title: The lecture/reading switch from ctm-libs (div.ctm-modes); AI contexts lose only its two button labels
     match:
@@ -51,7 +65,7 @@ categories:
       - {area: dom, change: '^(added|removed|moved)$', ancestors: 'div\.(learning-mode|ctm-modes)( > p)?$'}
       - {area: dom, tag: '^div$', attribute: '^(class|data-learning-mode|data-reading-label|data-lecture-label|hidden)$', where: {class: '^ctm-modes$'}}
       - {area: dom, tag: '^span$', attribute: '^(class|role|aria-live|data-lecture|data-reading)$', where: {class: '^ctm-modes-status$'}}
-      - {area: dom, change: moved, ancestors: 'main#quarto-document-content\.content$', to: 'main#quarto-document-content\.content$', modes: '^1$'}
+      - {area: dom, change: moved, ancestors: 'main#quarto-document-content\.content$', to: 'main#quarto-document-content\.content$', modes: '^1$', switchOrder: '^above-to-below$'}
       - {area: config, path: '(/context|/feedbackContext/text)$', lost: '^(Forelesning Gå i dybden|Førelesing Gå i djupna|Explore Go deeper|Vortrag Vertiefung)$', gained: '^$'}
       - {area: dom, attribute: '^(data-context|data-ai-feedback-context)$', lost: '^(Forelesning Gå i dybden|Førelesing Gå i djupna|Explore Go deeper|Vortrag Vertiefung)$', gained: '^$'}
 
@@ -114,3 +128,26 @@ look:
     height: any
     pixels: any
     styles: any
+
+# Failures of new that are known and fixed elsewhere (tools/compare-browser.mjs):
+# they count as expected, and are reported, until the fix is pinned; then the
+# entry goes. Fields: id, title, fix, browsers and checks (both required),
+# and optionally courses, `targets: tab-title` (only links to an id that
+# tab-ids.lua put on div.ctm-tab-target), `frame` and `note` (patterns for
+# the frame a console error comes from, and the failure's note).
+# WebKit's tab-title links (review A2 S5) work since ctm-libs e415cee
+# (Erasmus-CTM/ctm-libs#25), and keep the focus after WebKit's late jump to
+# the fragment since 8c7e5f6 (ctm-libs#29); CTM Assessment pins both.
+known-failures:
+  # A JSXGraph board in a tab that a link opens (on old the link was dead, so
+  # the board was never shown): jsxgraph-quarto's ResizeObserver callbacks
+  # resize the board's container at once (scheduleBoardRefresh ->
+  # refreshBoards, graph-editor.js resizeToVisibleContainer), and the browser
+  # reports a loop, in the board's iframe, at random (review A2b S3).
+  - id: jsxgraph-resize-loop
+    title: A ResizeObserver loop in a JSXGraph board's iframe
+    fix: jsxgraph-quarto (follow-up, not filed yet), defer the refresh in observer callbacks to requestAnimationFrame; then re-pin jsxgraph
+    browsers: [chromium, firefox, webkit]
+    checks: [console]
+    frame: '^iframe: JSXGraph board \(jsxgraph-quarto\)$'
+    note: 'ResizeObserver loop'

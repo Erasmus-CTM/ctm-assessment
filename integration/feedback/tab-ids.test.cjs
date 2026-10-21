@@ -4,7 +4,8 @@
 // automatic) and attributes move onto an empty div.ctm-tab-target, the first
 // element of its tab pane; classes (.active) stay with the heading; nested
 // tabsets and tabsets in callouts too; an id with a cross-reference prefix is
-// not moved (one warning each, no figure or theorem in the page); the
+// not moved (one warning each, no figure or theorem in the page), nor is an
+// id of the form of Quarto's pane ids (tabset-N-M, review A2 M4); the
 // metadata flag ctm-tab-ids is set. With the package: markdown-lint is quiet
 // with the line and names the page without it; a package without the file
 // stops the render.
@@ -88,6 +89,13 @@ function checkTargets(doc, stderr) {
   }
   assert.equal(doc.querySelectorAll('figure, .quarto-float, .theorem, .proof, .quarto-xref').length, 0, 'no float or theorem');
   assert.doesNotMatch(doc.body.textContent, /Figure\s*1|Theorem\s*1|Video\s*1/);
+  // An id of the form tabset-N-M is not moved: the page has it once, on Quarto's pane.
+  assert.equal(doc.querySelectorAll('[id="tabset-1-2"]').length, 1);
+  assert.ok(doc.getElementById('tabset-1-2').classList.contains('tab-pane'));
+  assert.equal(stderr.split('\n').filter(line => line.includes("tab-ids.lua: the tab heading id #tabset-1-2 has the form of Quarto's own")).length, 1, stderr);
+  // No id twice.
+  const ids = [...doc.querySelectorAll('[id]')].map(el => el.id);
+  assert.deepEqual(ids.filter((id, k) => ids.indexOf(id) !== k), [], 'duplicate ids');
   // The flag for markdown-lint.
   assert.equal(doc.getElementById('ctm-tab-ids-flag')?.textContent, 'true');
 }

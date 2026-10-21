@@ -6,17 +6,27 @@
 //
 //   node tools/compare-browser.mjs --old DIR --new DIR [--browser chromium] [--browser firefox] ...
 //     [--expect tools/compare-rendered/expect/step4-migration.yml] [--course NAME] [--pages a.html,b.html]
-//     [--offline] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
+//     [--offline] [--first-visit] [--shard I/N] [--reveal-ends FILE] [--max-links N] [--checks reveals,switch,...] [--shots DIR] [--report OUT.json] [--summary OUT.md]
 //
 // Checks, on the pages with reveals, the switch or links into tabs:
-//  1. reveals: count per kind, summary texts and initial state equal;
+//  1. reveals: count per kind, summary texts and initial state equal; each
+//     reveal holds the words it held on old, never fewer or others; more
+//     only as old's words followed by exactly what came after it there,
+//     and when that starts with a heading, only if old's <details> was
+//     closed by that heading's section (a raw <details> closed early; not
+//     one that had its own </details> before the heading): --reveal-ends
+//     FILE, from tools/migrate-course-html.py --reveal-ends on the old course;
 //  2. the switch: reading opens and lecture closes every reading step, per
 //     block; aria-pressed and the status text equal; the mode survives a
-//     reload and another page; a new tab starts in lecture;
-//  3. keyboard: Tab reaches both buttons; each summary takes focus and Enter
-//     and Space toggle it, as on old; axe-core finds no new violation;
-//  4. links: every link to an id on a page of the site, on load and on click:
-//     the right (nested) tab and every <details> around the target open, the
+//     reload and another page; a new tab starts in lecture; it stands where
+//     the old one stood (the same words before it in main, outside the
+//     title block) or at the top of the page;
+//  3. keyboard: Tab reaches both buttons, in no more presses than on old;
+//     each summary takes focus and Enter and Space toggle it, as on old;
+//     axe-core finds no new violation;
+//  4. links: every link to an id on a page of the site, on load and on click
+//     (a link in a closed tab, <details> or collapsed callout is opened
+//     first, as a reader would): the right (nested) tab and every <details> around the target open, the
 //     target below the header and still there 2 s later (pinned while the
 //     layout settles), focus inside the viewport; the script's path is
 //     asserted (its data-ctm-nav mark, a pushState for a link in the page),
@@ -33,12 +43,43 @@
 //  7. computed styles of every summary equal (component <details> included);
 //  8. embedded content (not --offline): JSXGraph boards in reveals have a
 //     finite size once opened; a Python cell in a reveal runs;
-//  9. no console error on new that old did not have.
+//  9. no console error on new that old did not have; each error names the
+//     frame it comes from (the page, or an iframe such as a JSXGraph board):
+//     every frame reports its uncaught errors and console.error calls, and a
+//     message that does not say its frame is an iframe's only when an iframe
+//     of the same page load reported exactly that text and the page did not.
+//
+// --shard I/N runs the I-th of N parts of the checks (a course too large for
+// one job): the pages' checks and the links are dealt out in turn, the
+// screenshots go to part 1. Every part reads every page's inventory, so a
+// link into another part's page is still checked.
+//
+// --first-visit serves both sides without the cross-origin isolation headers
+// and lets service workers run, so a page with Python cells isolates itself
+// with coi-serviceworker on a first visit (it registers the worker and
+// reloads), as on GitHub Pages; the links are then followed on that visit.
+// Only the link loads are checked then (a click comes from a page already
+// visited), and console errors are not compared: the reload aborts loads at
+// random. The loads are sampled, stratified: on each page with links into
+// it, one target of each kind (a tab title, or in a tab pane, a nested pane,
+// a <details>, a collapsed callout, as they combine, or none of them; linked
+// from its own page or another), and every tab title a link names; the
+// summary lists the kinds loaded, in every run. Playwright's routes do not see the requests that
+// coi-serviceworker makes for the page, so Pyodide and Monaco are blocked in
+// the served files instead (their CDN addresses point at a closed port).
+//
+// `known-failures` in the expect file lists failures of new that are known
+// and fixed elsewhere (the browsers and the checks, both required; the
+// courses, `targets: tab-title`, a `frame` and a `note` pattern, optional;
+// and the fix): such a failure counts as expected and is reported, until the
+// fix is pinned and the entry removed.
 // Exit status: 0 when every check passes, 1 otherwise, 2 on errors.
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+import {COMPONENTS, closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 const require = createRequire(import.meta.url);
 const {JSDOM} = require('jsdom');
 const yaml = require('js-yaml');
@@ -46,15 +87,22 @@ const playwright = require('playwright');
 
 // ---------------------------------------------------------------- options
 function options(argv) {
-  const o = {browsers: [], pages: null, checks: null, offline: false, maxLinks: 0, expect: null, course: '', shots: null, report: null, summary: null};
+  const o = {browsers: [], pages: null, checks: null, offline: false, firstVisit: false, shard: null, maxLinks: 0, expect: null, course: '', shots: null, report: null, summary: null};
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i], value = argv[i + 1];
     if (flag === '--offline') { o.offline = true; continue; }
+    if (flag === '--first-visit') { o.firstVisit = true; continue; }
     i++;
     if (flag === '--browser') o.browsers.push(value);
     else if (flag === '--pages') o.pages = value.split(',').filter(Boolean);
     else if (flag === '--checks') o.checks = value.split(',').filter(Boolean);
     else if (flag === '--max-links') o.maxLinks = Number(value);
+    else if (flag === '--shard') {
+      const [index, count] = String(value).split('/').map(Number);
+      if (!(Number.isInteger(index) && Number.isInteger(count) && index >= 1 && index <= count)) throw new Error('--shard I/N: 1 <= I <= N');
+      o.shard = {index, count};
+    }
+    else if (flag === '--reveal-ends') o.revealEnds = value;
     else if (['--old', '--new', '--expect', '--course', '--shots', '--report', '--summary'].includes(flag)) o[flag.slice(2)] = value;
     else throw new Error('Unknown option ' + flag);
   }
@@ -67,8 +115,6 @@ function options(argv) {
 
 // ---------------------------------------------------------------- the sites
 const OLD_REVEALS = {'reading-step': 'reading-step', 'learning-hint': 'hint', 'solution-block': 'solution'};
-// Elements that components make: their <details> are not the course's reveals.
-const COMPONENTS = '.math-exercise-cell, .py-exercise-cell, .ai-feedback-activity, [id^="qpyodide-insertion-location-"], .qpyodide-cell';
 const norm = text => String(text || '').replace(/\s+/g, ' ').trim();
 
 function htmlPages(root) {
@@ -79,16 +125,19 @@ function htmlPages(root) {
 
 // What a page holds, from its HTML: reveals (old: the courses' <details>; new:
 // ctm-libs' reveals), the switch, ids, tabsets and the links to ids.
-function inventory(root, page, side) {
+export function inventory(root, page, side, ends) {
   const doc = new JSDOM(fs.readFileSync(path.join(root, page), 'utf8')).window.document;
   const reveals = [];
+  // How each old <details> ended (--reveal-ends; unknown: not by a section).
+  const all = [...doc.body.querySelectorAll('details')], closed = closedBySection(side === 'old' ? ends : null, page, all);
+  const bySection = details => closed[all.indexOf(details)];
   for (const details of doc.querySelectorAll('main details')) {
     if (details.closest(COMPONENTS)) continue;
     let kind = null;
     if (side === 'new') kind = details.classList.contains('ctm-reveal') ? details.classList[1] : null;
     else if (!details.className.trim()) kind = 'details';
     else kind = Object.keys(OLD_REVEALS).find(c => details.classList.contains(c)) ? OLD_REVEALS[Object.keys(OLD_REVEALS).find(c => details.classList.contains(c))] : null;
-    if (kind) reveals.push({kind, summary: norm(details.querySelector(':scope > summary')?.textContent)});
+    if (kind) reveals.push({kind, summary: norm(details.querySelector(':scope > summary')?.textContent), bySection: bySection(details)});
   }
   const links = [];
   const main = doc.querySelector('main') || doc.body;
@@ -105,19 +154,69 @@ function inventory(root, page, side) {
     if (id) links.push({href, page, target, id, text: norm(a.textContent).slice(0, 60)});
   }
   const groups = [...doc.querySelectorAll('.panel-tabset[data-group]')].map(set => set.getAttribute('data-group'));
+  // Where each id stands, as a kind of place (a link's target: sampled by it on a first visit).
+  const places = new Map();
+  for (const el of doc.querySelectorAll('[id]')) if (!places.has(el.id)) places.set(el.id, placeOf(el));
   return {reveals, links, groups, switch: !!doc.querySelector(side === 'new' ? '.ctm-modes' : '[data-learning-mode]'),
     nav: !!doc.querySelector('script[src*="ctm-nav"]'), toggle: !!doc.querySelector('.quarto-color-scheme-toggle'),
-    tabsets: doc.querySelectorAll('.panel-tabset').length, ids: new Set([...doc.querySelectorAll('[id]')].map(el => el.id)),
+    tabsets: doc.querySelectorAll('.panel-tabset').length, ids: new Set(places.keys()), places,
+    tabTitles: new Set([...doc.querySelectorAll('.ctm-tab-target[id]')].map(el => el.id)),
+    coi: !!doc.querySelector('script[src*="coi-serviceworker"]'),
     inTabs: new Set([...doc.querySelectorAll('.tab-pane [id], details [id]')].map(el => el.id)),
     boards: doc.querySelectorAll('main details iframe[name^="iframeJXG"]').length,
     cells: doc.querySelectorAll('main details [id^="qpyodide-insertion-location-"]').length};
+}
+
+// The kind of place an element stands in: a tab title (of a nested tabset:
+// one inside another's pane), else in a tab pane (nested: in a pane of a
+// pane), inside a <details> and inside a collapsed callout, each that holds;
+// "plain" when none does.
+function placeOf(el) {
+  let panes = 0, details = false, collapse = false;
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    if (node.classList.contains('tab-pane')) panes++;
+    if (node.tagName === 'DETAILS') details = true;
+    if (node.classList.contains('collapse')) collapse = true;
+  }
+  if (el.classList.contains('ctm-tab-target')) return panes ? 'nested tab title' : 'tab title';
+  const parts = [];
+  if (panes) parts.push(panes > 1 ? 'nested pane' : 'pane');
+  if (details) parts.push('details');
+  if (collapse) parts.push('collapsed callout');
+  return parts.join(' + ') || 'plain';
+}
+
+// The targets that the link loads visit: all of them, or on a first visit a
+// stratified sample, one target of each kind on each page (kind: where it
+// stands on new, placeOf(), and whether its link is on that page or
+// another) and every tab title, so that each kind the full run has is
+// loaded. Also the kinds loaded ("kind n"), those of all targets, and the
+// kinds left out (none).
+export function sampleTargets(all, inventories, firstVisit) {
+  const kind = link => (inventories[link.target]?.new?.places.get(link.id) || 'dead')
+    + (link.page === link.target ? ', same page' : ', other page');
+  const kinds = list => Object.entries(list.reduce((n, link) => ({...n, [kind(link)]: (n[kind(link)] || 0) + 1}), {}))
+    .sort(([a], [b]) => a.localeCompare(b)).map(([k, n]) => `${k} ${n}`);
+  let targets = all;
+  if (firstVisit) {
+    const first = new Map();
+    all.forEach((link, k) => { const key = link.target + ' ' + kind(link); if (!first.has(key)) first.set(key, k); });
+    targets = all.filter((link, k) => inventories[link.target]?.new?.tabTitles.has(link.id) || first.get(link.target + ' ' + kind(link)) === k);
+  }
+  const every = kinds(all), covered = kinds(targets), name = k => k.replace(/ \d+$/, '');
+  return {targets, every, covered, missing: every.map(name).filter(k => !covered.map(name).includes(k))};
 }
 
 // One origin for both sides; a folder serves its index.html, x serves x.html.
 const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff': 'font/woff',
   '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.ttf': 'font/ttf', '.gif': 'image/gif', '.ico': 'image/x-icon'};
-function serve(roots) {
+// Pyodide and Monaco from a CDN (the address part that context() routes
+// away): on a first visit coi-serviceworker fetches them for the page, past
+// Playwright's routes, so the served files point them at a closed port.
+const HEAVY = /https?:\/\/[\w.-]+(?=[^\s"'`()<>]*?(?:\/pyodide\/v[\d.]+\/|\/monaco-editor@))/g;
+const BLOCKED = 'http://127.0.0.1:9';
+function serve(roots, isolated = true) {
   const server = http.createServer((request, response) => {
     const parts = decodeURIComponent(new URL(request.url, 'http://x').pathname).split('/');
     const root = roots[parts[1]];
@@ -125,9 +224,12 @@ function serve(roots) {
     if (root && fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
     else if (root && !fs.existsSync(file) && fs.existsSync(file + '.html')) file += '.html';
     if (!root || !file.startsWith(root) || !fs.existsSync(file)) { response.writeHead(404); response.end(); return; }
+    // Without the isolation headers (--first-visit), as GitHub Pages serves a course.
     response.writeHead(200, {'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
-      'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'credentialless'});
-    response.end(fs.readFileSync(file));
+      ...(isolated ? {'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'credentialless'} : {})});
+    let body = fs.readFileSync(file);
+    if (!isolated && ['.html', '.js', '.mjs'].includes(path.extname(file))) body = body.toString('utf8').replace(HEAVY, BLOCKED);
+    response.end(body);
   });
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
@@ -148,7 +250,20 @@ const TRACE = `(() => {
   HTMLElement.prototype.focus = function () { log('focus ' + this.tagName + (this.id ? '#' + this.id : '')); return focus.apply(this, arguments); };
   const set = Element.prototype.setAttribute;
   Element.prototype.setAttribute = function (name, value) { if (name === 'data-ctm-nav') log('mark ' + value); return set.apply(this, arguments); };
+  // Errors of this frame (the page's or an iframe's) to the harness, which
+  // knows the frame: uncaught errors and console.error calls.
+  const report = text => { try { window.__ctmCompareError?.(text); } catch (_) { /* none */ } };
+  addEventListener('error', event => { if (event instanceof ErrorEvent) report(String(event.message || event.error?.message || '')); }, true);
+  const consoleError = console.error;
+  console.error = function (...args) {
+    report(args.map(a => a instanceof Error ? a.message : typeof a === 'string' ? a : String(a)).join(' '));
+    return consoleError.apply(this, args);
+  };
 })();`;
+// An error's text as the harness compares it: its first line, without
+// "Uncaught" and the error's type (an error event says "Uncaught Error: x"
+// where the page error says "x").
+const errorText = text => norm(String(text || '').split('\n')[0]).replace(/^(Uncaught\s+)?(\w*Error:\s+)?/, '');
 
 // The target's state: visible, its panes and <details>, below the header, the
 // focused element and whether it is in view, the script's mark.
@@ -180,6 +295,33 @@ function stateOf(id) {
     focusInView: !!rect && (rect.height > 0 ? rect.bottom > Math.max(0, headerBottom - 2) : rect.top >= headerBottom - 2) && rect.top < innerHeight,
   };
 }
+// In the page: the words of an element (outside script and style), and the
+// words in main before the switch (outside the title block).
+function wordsIn(el) {
+  const out = [];
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.parentElement?.closest('script, style, template, noscript')) continue;
+    out.push(...node.textContent.split(/\s+/).filter(Boolean));
+  }
+  return out;
+}
+const WORDS_IN = wordsIn.toString();
+function switchPlace([selector, wordsInSource]) {
+  const wordsIn = new Function('return ' + wordsInSource)();
+  const box = document.querySelector(selector);
+  if (!box) return null;
+  const main = box.closest('main') || document.body, title = main.querySelector('#title-block-header');
+  const range = document.createRange();
+  range.setStart(main, 0);
+  range.setEndBefore(box);
+  const holder = document.createElement('div');
+  holder.append(range.cloneContents());
+  holder.querySelector('#title-block-header')?.remove();
+  holder.querySelectorAll('script, style, template, noscript').forEach(el => el.remove());
+  return wordsIn(holder).join(' ');
+}
+
 const works = s => s.exists && s.visible && s.panes.every(Boolean) && s.details.every(Boolean)
   && s.top >= s.headerBottom - 2 && s.top < s.innerHeight;
 const describeState = s => s.exists ? `visible ${s.visible}, panes ${JSON.stringify(s.panes)}, details ${JSON.stringify(s.details)}, top ${s.top} (header ${s.headerBottom}), focus ${s.focus}${s.focusInView ? ' in view' : ' not in view'}, mark ${s.mark}` : 'no such id';
@@ -189,10 +331,35 @@ class Run {
   constructor(o, browserName, base, inventories, look) {
     Object.assign(this, {o, browserName, base, inventories, look});
     this.results = [];
-    this.errors = {old: new Map(), new: new Map()};
+    // Console errors as seen ({text, page, frame, load}; `frame` null for a
+    // console message or page error, which do not say their frame), and
+    // what each frame reported itself, per page load (load -> [{text,
+    // frame}]), to tell where such an error comes from.
+    this.errors = {old: [], new: []};
+    this.reports = {old: new Map(), new: new Map()};
+    this.tabs = new WeakMap();
+    this.tabCount = 0;
+    this.order = Object.keys(inventories).sort();
+  }
+
+  // --shard I/N: the I-th part; the k-th page or link belongs to part k mod N.
+  mine(k) {
+    return !this.o.shard || k % this.o.shard.count === this.o.shard.index - 1;
+  }
+  minePage(page) {
+    return this.mine(this.order.indexOf(page));
   }
 
   record(check, page, ok, detail = {}) {
+    // A known failure (expect file `known-failures`) is expected until its fix is pinned.
+    const known = ok ? null : (this.known || []).find(k => k.browsers.includes(this.browserName)
+      && k.checks.includes(check) && (!k.courses || k.courses.includes(this.o.course))
+      && (!k.targets || k.targets !== 'tab-title' || detail.tabTitle)
+      && (!k.frame || new RegExp(k.frame).test(detail.frame || '')) && (!k.note || new RegExp(k.note).test(detail.note || '')));
+    if (known) {
+      ok = true;
+      detail = {...detail, expected: true, known: known.id, note: `known failure (${known.id}: ${known.title}): ${detail.note || ''}`};
+    }
     this.results.push({browser: this.browserName, check, page, ok, ...detail});
     if (!ok) console.log(`  ${this.browserName} ${check} ${page}: FAILED ${detail.note || ''}`);
   }
@@ -201,7 +368,15 @@ class Run {
   // load only for the embedded-content check (`python`): elsewhere they
   // would only cost time, on both sides alike.
   async context(side, contextOptions = {}, python = false) {
-    const context = await this.browser.newContext({viewport: {width: 1280, height: 900}, serviceWorkers: 'block', ...contextOptions});
+    const context = await this.browser.newContext({viewport: {width: 1280, height: 900}, serviceWorkers: this.o.firstVisit ? 'allow' : 'block', ...contextOptions});
+    await context.exposeBinding('__ctmCompareError', async ({frame}, text) => {
+      if (!frame || !text) return;
+      const load = this.loadKey(frame.page());
+      const label = frame.parentFrame() ? await this.frameLabel(frame) : 'page';
+      if (!this.reports[side].has(load)) this.reports[side].set(load, []);
+      this.reports[side].get(load).push({text: errorText(text), frame: label});
+      this.errors[side].push({text, page: frame.page().url(), frame: label, load});
+    });
     await context.addInitScript(TRACE);
     if (this.o.offline) await context.route(/^https?:\/\/(?!127\.0\.0\.1)/, route => route.abort());
     else if (!python) await context.route(/\/pyodide\/v[\d.]+\/|\/monaco-editor@/, route => route.abort());
@@ -209,23 +384,77 @@ class Run {
     return context;
   }
 
+  // An iframe as an error names it: a JSXGraph board (jsxgraph-quarto's
+  // iframe[name^=iframeJXG]), else its name, title or address.
+  async frameLabel(frame) {
+    const element = await frame.frameElement().catch(() => null);
+    const seen = element ? await element.evaluate(el => ({name: el.getAttribute('name') || '', title: el.getAttribute('title') || '',
+      src: el.getAttribute('src') || (el.hasAttribute('srcdoc') ? 'srcdoc' : '')})).catch(() => null) : null;
+    if (seen?.name.startsWith('iframeJXG')) return 'iframe: JSXGraph board (jsxgraph-quarto)';
+    const what = seen ? seen.name || seen.title || seen.src : frame.url();
+    return 'iframe: ' + norm(what).replace(/\d+/g, 'N').slice(0, 80);
+  }
+
+  // A page load: the tab (a Page) and the address it shows, without the hash.
+  loadKey(tab) {
+    if (!this.tabs.has(tab)) this.tabs.set(tab, ++this.tabCount);
+    return this.tabs.get(tab) + ' ' + tab.url().replace(/#.*$/, '');
+  }
+
+  // The console errors of a side, keyed: the frame, and the text without
+  // ports, sides and random ids (the URLs coi-serviceworker's fetches name).
+  // A message without its frame is an iframe's only when an iframe of the
+  // same page load reported that very text and the page itself did not
+  // (review A2c S3): a board's error elsewhere hides nothing.
+  consoleErrors(side) {
+    const found = new Map();
+    for (const {text, page, frame, load} of this.errors[side]) {
+      const n = errorText(text), reports = this.reports[side].get(load) || [];
+      const known = frame || (reports.some(r => r.frame === 'page' && r.text === n) ? 'page'
+        : reports.find(r => r.frame !== 'page' && r.text === n)?.frame || 'page');
+      const key = (known !== 'page' ? `[${known}] ` : '') + n.replace(/https?:\/\/127\.0\.0\.1:\d+\/((old|new)\/)?/g, '/')
+        .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<id>').replace(/:\d+:\d+/g, '').slice(0, 200);
+      if (!found.has(key)) found.set(key, {page: page.replace(this.base + side + '/', ''), frame: known});
+    }
+    return found;
+  }
+
   watch(page, side) {
-    const add = message => {
-      const key = norm(message).replace(/https?:\/\/127\.0\.0\.1:\d+\/(old|new)\//g, '/').replace(/:\d+:\d+/g, '').slice(0, 200);
-      const errors = this.errors[side];
-      if (!errors.has(key)) errors.set(key, page.url().replace(this.base + side + '/', ''));
-    };
+    const add = message => this.errors[side].push({text: message, page: page.url(), frame: null, load: this.loadKey(page)});
     page.on('pageerror', error => add(error.message));
     page.on('console', message => {
       if (message.type() !== 'error') return;
       const text = message.text();
-      // Resources (fonts, CDNs while offline, favicons) are not the page's errors.
-      if (/Failed to load resource|ERR_FAILED|net::|NS_ERROR|blocked|status of 404/i.test(text)) return;
+      // Resources (fonts, CDNs while offline or blocked, favicons) are not the
+      // page's errors; WebKit reports a blocked fetch as "access control checks".
+      if (/Failed to load resource|ERR_FAILED|net::|NS_ERROR|blocked|status of 404|downloadable font|cannot load .* due to access control checks/i.test(text)) return;
       add(text);
     });
   }
 
   url(side, page, hash = '') { return this.base + side + '/' + page + (hash ? '#' + encodeURIComponent(hash) : ''); }
+
+  // --first-visit: on a page with coi-serviceworker, wait for the worker's
+  // reload (crossOriginIsolated), as long as a reader would see it happen
+  // (5 s); "none" on a page without it. WebKit is not isolated by it: once
+  // the worker controls the page and the same page has stayed loaded for
+  // 1.2 s (no reload pending), "controlled, not isolated".
+  async isolation(page) {
+    // The worker's reload may destroy the page's context while we ask: ask again.
+    let calm = 0, last = null;
+    for (let k = 0; k < 17; k++) {
+      const seen = await page.evaluate(() => ({coi: !!document.querySelector('script[src*="coi-serviceworker"]'),
+        isolated: window.crossOriginIsolated, ready: document.readyState === 'complete',
+        controlled: !!navigator.serviceWorker?.controller, origin: performance.timeOrigin})).catch(() => null);
+      if (seen?.isolated && seen.ready) return 'isolated';
+      if (seen && seen.ready && !seen.coi) return 'none';
+      calm = seen?.ready && seen.controlled && seen.origin === last ? calm + 1 : 0;
+      last = seen?.origin ?? null;
+      if (calm >= 4) return 'controlled, not isolated';
+      await page.waitForTimeout(300);
+    }
+    return 'not isolated';
+  }
 
   async settle(page, ms = 700) {
     await page.waitForTimeout(ms);
@@ -236,6 +465,7 @@ class Run {
     // A page may still be navigating (Firefox interrupts one about:blank by another).
     await page.goto('about:blank').catch(() => page.waitForTimeout(300));
     await page.goto(url, {waitUntil: 'load', timeout: 60000}).catch(() => {});
+    if (this.o.firstVisit) page.ctmIsolated = await this.isolation(page);
     if (id && side === 'new') {
       await page.waitForFunction(id => document.getElementById(id)?.getAttribute('data-ctm-nav') === 'load', id, {timeout: 10000}).catch(() => {});
     }
@@ -261,18 +491,27 @@ class Run {
           this.record(name, '-', false, {note: 'the check stopped: ' + (error.stack || error.message).split('\n').slice(0, 3).join(' ')});
         }
       }
-      for (const [key, page] of this.errors.new) {
-        if (!this.errors.old.has(key)) this.record('console', page, false, {note: 'a console error new has and old had not: ' + key});
+      // On a first visit the worker's reload aborts whatever is loading, at
+      // a moment that differs from load to load: the console is compared in
+      // the run without --first-visit.
+      const [before, after] = [this.consoleErrors('old'), this.consoleErrors('new')];
+      if (this.o.firstVisit) {
+        this.record('console', '-', true, {note: `not compared on a first visit (${after.size} distinct console errors on new, ${before.size} on old)`});
+      } else {
+        for (const [key, {page, frame}] of after) {
+          if (!before.has(key)) this.record('console', page, false, {frame, note: `a console error new has and old had not (${frame}): ${key}`});
+        }
+        this.record('console', '-', true, {note: `${after.size} distinct console errors on new, ${before.size} on old`});
       }
-      this.record('console', '-', true, {note: `${this.errors.new.size} distinct console errors on new, ${this.errors.old.size} on old`});
     } finally {
       await this.browser.close();
     }
   }
 
-  // Pages with reveals or a switch on either side.
-  revealPages() {
-    return Object.entries(this.inventories).filter(([, v]) => v.old && v.new && (v.old.reveals.length || v.new.reveals.length || v.old.switch || v.new.switch)).map(([page]) => page);
+  // Pages with reveals or a switch on either side (of this part, unless `all`).
+  revealPages(all = false) {
+    return Object.entries(this.inventories).filter(([page, v]) => (all || this.minePage(page))
+      && v.old && v.new && (v.old.reveals.length || v.new.reveals.length || v.old.switch || v.new.switch)).map(([page]) => page);
   }
 
   // 1. Reveals: kinds, summaries, initial state.
@@ -283,25 +522,79 @@ class Run {
         const context = await this.context(side);
         const tab = await context.newPage();
         await this.load(tab, side, this.url(side, page));
-        seen[side] = await tab.evaluate(([side, components, kinds]) => [...document.querySelectorAll('main details')]
-          .filter(d => !d.closest(components))
-          .map(d => {
+        // Old: also the words that follow each reveal in main. New: whether
+        // the word after old's words (counts) is in a heading inside the reveal.
+        const counts = side === 'new' ? (seen.old || []).map(r => r.words.length) : [];
+        seen[side] = await tab.evaluate(([side, components, kinds, wordsSource, counts]) => {
+          const wordsIn = new Function('return ' + wordsSource)();
+          const textNodes = root => {
+            const out = [], walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            for (let node = walker.nextNode(); node; node = walker.nextNode())
+              if (!node.parentElement?.closest('script, style, template, noscript')) out.push(node);
+            return out;
+          };
+          const main = document.querySelector('main') || document.body, mainText = textNodes(main);
+          return [...document.querySelectorAll('main details')].filter(d => !d.closest(components)).map(d => {
             let kind = null;
             if (side === 'new') kind = d.classList.contains('ctm-reveal') ? d.classList[1] : null;
             else if (!d.className.trim()) kind = 'details';
             else for (const [c, k] of Object.entries(kinds)) if (d.classList.contains(c)) kind = k;
-            return kind && {kind, summary: (d.querySelector(':scope > summary')?.textContent || '').replace(/\s+/g, ' ').trim(), open: d.open};
-          }).filter(Boolean), [side, COMPONENTS, OLD_REVEALS]);
+            return kind && {d, kind};
+          }).filter(Boolean).map(({d, kind}, k) => {
+            const found = {kind, summary: (d.querySelector(':scope > summary')?.textContent || '').replace(/\s+/g, ' ').trim(), open: d.open, words: wordsIn(d)};
+            if (side === 'old') {
+              const after = [];
+              for (const node of mainText) {
+                if (after.length >= 3000) break;
+                if (!d.contains(node) && d.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) after.push(...node.textContent.split(/\s+/).filter(Boolean));
+              }
+              found.after = after;
+            } else if (counts[k] !== undefined && counts[k] < found.words.length) {
+              let seen = 0;
+              for (const node of textNodes(d)) {
+                seen += node.textContent.split(/\s+/).filter(Boolean).length;
+                if (seen <= counts[k]) continue;
+                const heading = node.parentElement?.closest('h1, h2, h3, h4, h5, h6');
+                found.headingFirst = !!heading && d.contains(heading);
+                break;
+              }
+            }
+            return found;
+          });
+        }, [side, COMPONENTS, OLD_REVEALS, WORDS_IN, counts]);
         await context.close();
       }
-      const same = JSON.stringify(seen.old) === JSON.stringify(seen.new);
+      const head = r => r && {kind: r.kind, summary: r.summary, open: r.open};
+      const same = JSON.stringify(seen.old.map(head)) === JSON.stringify(seen.new.map(head));
       const counts = side => Object.entries(seen[side].reduce((c, r) => ({...c, [r.kind]: (c[r.kind] || 0) + 1}), {})).map(([k, n]) => `${n} ${k}`).join(', ');
       let note = same ? counts('new') : '';
       if (!same) {
-        const k = seen.old.findIndex((r, i) => JSON.stringify(r) !== JSON.stringify(seen.new[i]));
-        note = `old ${counts('old')} / new ${counts('new')}; first difference at ${k}: ${JSON.stringify(seen.old[k])} -> ${JSON.stringify(seen.new[k])}`;
+        const k = seen.old.findIndex((r, i) => JSON.stringify(head(r)) !== JSON.stringify(head(seen.new[i])));
+        note = `old ${counts('old')} / new ${counts('new')}; first difference at ${k}: ${JSON.stringify(head(seen.old[k]))} -> ${JSON.stringify(head(seen.new[k]))}`;
       }
-      this.record('reveals', page, same, {note});
+      // Each reveal keeps its words, never fewer or others. More only as old's
+      // words followed by exactly what followed it on old; when that starts
+      // with a heading, only where old's <details> was closed by the
+      // heading's section (as compare-rendered.mjs: "heading", else
+      // "swallowed"); otherwise "grown" (what a list item cut short).
+      const problems = [];
+      const grown = {heading: 0, grown: 0};
+      const old = this.inventories[page].old.reveals;
+      if (same) seen.old.forEach((o, k) => {
+        const n = seen.new[k], ow = o.words.join(' '), nw = n.words.join(' ');
+        if (ow === nw) return;
+        const where = `"${o.summary}" (${k + 1}) holds ${n.words.length} words, on old ${o.words.length}`;
+        if (!nw.startsWith(ow + ' ')) { problems.push(where + (ow.startsWith(nw) ? ': it ends early' : ': other words')); return; }
+        const extra = n.words.slice(o.words.length);
+        if (o.after.slice(0, extra.length).join(' ') !== extra.join(' ')) problems.push(where + ': more than what followed it on old');
+        else if (n.headingFirst && !(old.length === seen.old.length && old[k].bySection))
+          problems.push(where + ': it took in the heading after it, which old\'s <details> had ended before (its own </details>)');
+        else grown[n.headingFirst ? 'heading' : 'grown']++;
+      });
+      if (problems.length) note = problems.join('; ');
+      else if (grown.heading || grown.grown) note += `; ${grown.heading + grown.grown} hold more than on old, exactly what followed them there`
+        + ` (${grown.heading} a heading that closed a raw <details> early, ${grown.grown} other)`;
+      this.record('reveals', page, same && !problems.length, {note});
     }
   }
 
@@ -330,7 +623,7 @@ class Run {
             status: (status?.textContent || '').trim(),
             steps: [...document.querySelectorAll('main details.reading-step')].map(d => d.open)};
         }, [sw]);
-        const result = {initial: await read()};
+        const result = {initial: await read(), place: await tab.evaluate(switchPlace, [sw, WORDS_IN]).catch(() => null)};
         await tab.click(sw + ' button[data-mode="reading"]');
         await tab.waitForTimeout(250);
         result.reading = await read();
@@ -374,6 +667,8 @@ class Run {
         if (key !== 'initial' && n[key].status !== o[key].status) problems.push(`status text after ${key}: old "${o[key].status}" new "${n[key].status}"`);
       }
       if (JSON.stringify(n.initial.labels) !== JSON.stringify(o.initial.labels)) problems.push(`labels: old ${o.initial.labels} new ${n.initial.labels}`);
+      // Where the old one stood, or at the top of the page.
+      if (n.place && n.place !== o.place) problems.push(`the switch moved: on old after "${(o.place || '').slice(-80)}", on new after "${n.place.slice(-80)}"`);
       this.record('switch', page, !problems.length, {note: problems.join('; ') || `${n.reading.steps.length} reading steps follow the switch; mode kept on reload${n.other ? ' and another page' : ''}`});
     }
   }
@@ -438,6 +733,8 @@ class Run {
       if (seen.old.buttons && seen.new.buttons) {
         if (seen.old.buttons.reached && !seen.new.buttons.reached) problems.push('Tab does not reach the switch');
         if (seen.old.buttons.second && !seen.new.buttons.second) problems.push('Tab does not go on to the second button');
+        if (seen.old.buttons.reached && seen.new.buttons.reached && seen.new.buttons.presses > seen.old.buttons.presses)
+          problems.push(`Tab reaches the switch later than on old (${seen.new.buttons.presses} presses, old ${seen.old.buttons.presses}): it moved down`);
       }
       if (JSON.stringify(seen.old.summaries) !== JSON.stringify(seen.new.summaries)) {
         problems.push(`summaries [focus, Enter toggles, Space toggles]: old ${JSON.stringify(seen.old.summaries)} new ${JSON.stringify(seen.new.summaries)}`);
@@ -461,10 +758,12 @@ class Run {
       }
     }
     const chosen = this.o.maxLinks > 0 ? links.slice(0, this.o.maxLinks) : links;
-    const targets = [...new Map(chosen.map(link => [link.target + '#' + link.id, link])).values()];
+    let targets = [...new Map(chosen.map(link => [link.target + '#' + link.id, link])).values()];
+    const sampled = sampleTargets(targets, this.inventories, this.o.firstVisit);
+    targets = sampled.targets;
     const dead = side => link => !this.inventories[link.target]?.[side]?.ids.has(link.id);
-    // On load.
-    for (const link of targets) {
+    // On load (this part's share of the targets).
+    for (const link of targets.filter((_, k) => this.mine(k))) {
       const name = link.target + '#' + link.id;
       if (dead('new')(link)) {
         const before = dead('old')(link);
@@ -478,6 +777,7 @@ class Run {
         await this.load(tab, side, this.url(side, link.target, link.id), link.id);
         state[side] = await tab.evaluate(stateOf, link.id);
         if (side === 'new') {
+          state.isolation = tab.ctmIsolated;
           await tab.waitForTimeout(2200);
           state.later = await tab.evaluate(stateOf, link.id);
         }
@@ -490,12 +790,15 @@ class Run {
       if (!works(state.later)) problems.push('not kept in place: 2 s later ' + describeState(state.later));
       const was = dead('old')(link) ? 'dead on old' : works(state.old) ? 'shown on old' : 'not shown on old (' + describeState(state.old) + ')';
       if (problems.length) problems.push('trace: ' + state.later.trace);
-      this.record('link load', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}; ${was}`, expected: dead('old')(link) || undefined,
-        previouslyDead: dead('old')(link) || undefined});
+      const visit = this.o.firstVisit ? `; first visit: ${state.isolation}` : '';
+      this.record('link load', name, !problems.length, {note: (problems.join('; ') || `shown, focus ${n.focus}; ${was}`) + visit, expected: dead('old')(link) || undefined,
+        previouslyDead: dead('old')(link) || undefined, tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined});
     }
-    // On click, from the page with the link; Back and Forward for the first link of each page.
+    // On click, from the page with the link; Back and Forward for the first
+    // link of each page. Not on a first visit: a click comes from a page the
+    // reader has seen, whose worker already runs.
     const backTried = new Set();
-    for (const link of chosen) {
+    for (const link of this.o.firstVisit ? [] : chosen.filter((_, k) => this.mine(k))) {
       if (dead('new')(link)) continue;
       const name = link.page + ' -> ' + link.href;
       const state = {}, history = {};
@@ -505,7 +808,7 @@ class Run {
         const tab = await context.newPage();
         await this.load(tab, side, this.url(side, link.page));
         // The link, by its address (Quarto's scripts rewrite hrefs), may sit in a
-        // closed tab or <details>: open them as a reader would.
+        // closed tab, <details> or collapsed callout: open them as a reader would.
         const found = await tab.evaluate(href => {
           const page = url => { const u = new URL(url, location.href); return u.origin + u.pathname.replace(/\/index\.html$/, '/').replace(/\.html$/, '') + u.hash; };
           const wanted = page(href);
@@ -513,6 +816,12 @@ class Run {
           if (!anchor) return false;
           for (let node = anchor; node; node = node.parentElement) {
             if (node.tagName === 'DETAILS') node.open = true;
+            // A collapsed callout (Quarto: .callout-collapse.collapse, opened by its header).
+            if (node.classList?.contains('collapse') && !node.classList.contains('show')) {
+              node.classList.add('show');
+              const toggle = node.id && document.querySelector(`[data-bs-target="#${CSS.escape(node.id)}"]`);
+              if (toggle) { toggle.classList.remove('collapsed'); toggle.setAttribute('aria-expanded', 'true'); }
+            }
             if (node.classList?.contains('tab-pane') && !node.classList.contains('active') && node.id) {
               const tab = document.querySelector(`[data-bs-target="#${CSS.escape(node.id)}"], [href="#${CSS.escape(node.id)}"]`);
               if (tab && window.bootstrap?.Tab) window.bootstrap.Tab.getOrCreateInstance(tab).show(); else tab?.click();
@@ -531,6 +840,7 @@ class Run {
           samePage ? Promise.resolve() : tab.waitForEvent('load', {timeout: 30000}).catch(() => {}),
           tab.click('[data-ctm-compare-link]', {timeout: 10000}).catch(() => {}),
         ]);
+        if (this.o.firstVisit && !samePage) await this.isolation(tab);
         if (side === 'new') {
           await tab.waitForFunction(([id, how]) => document.getElementById(id)?.getAttribute('data-ctm-nav') === how,
             [link.id, samePage ? 'link' : 'load'], {timeout: 10000}).catch(() => {});
@@ -562,16 +872,22 @@ class Run {
       }
       const was = !state.old ? 'dead on old' : works(state.old) ? 'shown on old' : 'not shown on old';
       if (problems.length) problems.push('trace: ' + n.trace);
-      this.record('link click', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}${history.new ? ', Back and Forward' : ''}; ${was}`});
+      this.record('link click', name, !problems.length, {note: problems.join('; ') || `shown, focus ${n.focus}${history.new ? ', Back and Forward' : ''}; ${was}`,
+        tabTitle: this.inventories[link.target]?.new?.tabTitles.has(link.id) || undefined});
     }
     const previously = this.results.filter(r => r.previouslyDead && r.ok).map(r => r.page);
-    this.record('links', '-', true, {note: `${chosen.length} links to ${targets.length} targets; previously dead, now working: ${previously.join(', ') || 'none'}`});
+    const part = this.o.shard ? ` (part ${this.o.shard.index}/${this.o.shard.count} of them)` : '';
+    const {covered, missing, every} = sampled;
+    this.record('links', '-', !missing.length, {note: `${chosen.length} links to ${targets.length} targets`
+      + `${this.o.firstVisit ? ' (sampled: one of each kind per page, and every tab title)' : ''}${part}; kinds of target loaded: ${covered.join(', ') || 'none'}`
+      + `${missing.length ? '; NOT loaded: ' + missing.join(', ') : this.o.firstVisit ? ` (every one of the ${every.length} kinds the links have)` : ''}`
+      + `; previously dead, now working: ${previously.join(', ') || 'none'}`});
   }
 
   // A link into a grouped tabset wins over the stored choice and leaves it.
   async groups() {
     for (const [page, v] of Object.entries(this.inventories)) {
-      if (!v.new?.groups.length) continue;
+      if (!v.new?.groups.length || !this.minePage(page)) continue;
       const context = await this.context('new');
       const tab = await context.newPage();
       await this.load(tab, 'new', this.url('new', page));
@@ -637,13 +953,14 @@ class Run {
   }
 
   async looks() {
+    if (this.o.shard && this.o.shard.index !== 1) return;
     const kinds = {'reading-step': ['details.reading-step', 'details.ctm-reveal.reading-step'], hint: ['details.learning-hint', 'details.ctm-reveal.hint'],
       solution: ['details.solution-block', 'details.ctm-reveal.solution'], details: ['main details:not([class])', 'details.ctm-reveal.details']};
     const wanted = [['switch', '[data-learning-mode]', '.ctm-modes', null]];
     for (const [kind, [oldSelector, newSelector]] of Object.entries(kinds)) {
       wanted.push([kind + '-closed', oldSelector, newSelector, false], [kind + '-open', oldSelector, newSelector, true]);
     }
-    const pageFor = shot => this.revealPages().find(page => {
+    const pageFor = shot => this.revealPages(true).find(page => {
       const v = this.inventories[page];
       return shot === 'switch' ? v.old.switch && v.new.switch : v.new.reveals.some(r => r.kind === shot.replace(/-(open|closed)$/, '')) && v.old.reveals.some(r => r.kind === shot.replace(/-(open|closed)$/, ''));
     });
@@ -787,6 +1104,7 @@ class Run {
   // 8. Boards and Python cells inside reveals (needs the network).
   async embedded() {
     if (this.o.offline) return;
+    if (this.o.firstVisit) { this.record('embedded', '-', true, {note: 'not on a first visit (Pyodide and Monaco are blocked in the served files)'}); return; }
     for (const page of this.revealPages()) {
       const inv = this.inventories[page];
       if (!inv.new.boards && !inv.new.cells) continue;
@@ -821,10 +1139,17 @@ class Run {
         seen[side] = result;
         await context.close();
       }
+      // A board without a finite size on old too, at the same place, is the
+      // course's as it was (not the migration's): expected, and reported.
       const problems = [];
-      if (seen.new.boards.some(ok => !ok)) problems.push(`boards ${JSON.stringify(seen.new.boards)} (old ${JSON.stringify(seen.old.boards)})`);
+      const asOld = JSON.stringify(seen.new.boards) === JSON.stringify(seen.old.boards);
+      if (seen.new.boards.some(ok => !ok) && !asOld) problems.push(`boards ${JSON.stringify(seen.new.boards)} (old ${JSON.stringify(seen.old.boards)})`);
       if (seen.new.python === false && seen.old.python !== false) problems.push('the Python cell in a reveal does not run');
-      this.record('embedded', page, !problems.length, {note: problems.join('; ') || `${seen.new.boards.length} boards with a finite size${seen.new.python === null ? '' : seen.new.python ? '; a Python cell ran' : '; the Python cell ran on neither'}`});
+      const failing = seen.new.boards.filter(ok => !ok).length;
+      this.record('embedded', page, !problems.length, {expected: (failing && asOld) || undefined,
+        note: problems.join('; ') || `${seen.new.boards.length - failing} boards with a finite size`
+          + (failing ? `, ${failing} without one, as on old (${JSON.stringify(seen.old.boards)})` : '')
+          + `${seen.new.python === null ? '' : seen.new.python ? '; a Python cell ran' : '; the Python cell ran on neither'}`});
     }
   }
 }
@@ -832,22 +1157,29 @@ class Run {
 // ---------------------------------------------------------------- main
 async function main() {
   const o = options(process.argv.slice(2));
-  const look = o.expect ? (yaml.load(fs.readFileSync(o.expect, 'utf8')) || {}).look || [] : [];
+  const expect = o.expect ? yaml.load(fs.readFileSync(o.expect, 'utf8')) || {} : {};
+  const look = expect.look || [], known = expect['known-failures'] || [];
+  // An entry must name its browsers and checks: without them it would match every failure.
+  for (const entry of known) {
+    if (!Array.isArray(entry.browsers) || !entry.browsers.length || !Array.isArray(entry.checks) || !entry.checks.length)
+      throw new Error(`known-failures ${entry.id || JSON.stringify(entry)}: name its browsers and checks (lists)`);
+  }
   const pages = o.pages || [...new Set([...htmlPages(o.old), ...htmlPages(o.new)])];
-  const inventories = {};
+  const inventories = {}, ends = loadRevealEnds(o.revealEnds);
   for (const page of pages) {
     inventories[page] = {};
     for (const side of ['old', 'new']) {
       const root = side === 'old' ? o.old : o.new;
-      if (fs.existsSync(path.join(root, page))) inventories[page][side] = inventory(root, page, side);
+      if (fs.existsSync(path.join(root, page))) inventories[page][side] = inventory(root, page, side, ends);
     }
   }
-  const server = await serve({old: o.old, new: o.new});
+  const server = await serve({old: o.old, new: o.new}, !o.firstVisit);
   const base = `http://127.0.0.1:${server.address().port}/`;
   const results = [];
   try {
     for (const browserName of o.browsers) {
       const run = new Run(o, browserName, base, inventories, look);
+      run.known = known;
       await run.run();
       results.push(...run.results);
     }
@@ -855,7 +1187,8 @@ async function main() {
     server.close();
   }
   const failed = results.filter(r => !r.ok);
-  const lines = [`### Browser comparison${o.course ? ' of ' + o.course : ''}, old against new (${o.browsers.join(', ')}): ${results.length} checks, ${failed.length} failed`, ''];
+  const knownFailures = results.filter(r => r.known).length;
+  const lines = [`### Browser comparison${o.course ? ' of ' + o.course : ''}, old against new (${o.browsers.join(', ')}${o.firstVisit ? ', first visit without isolation headers' : ''}${o.shard ? `, part ${o.shard.index}/${o.shard.count}` : ''}): ${results.length} checks, ${failed.length} failed${knownFailures ? `, ${knownFailures} known failures` : ''}`, ''];
   const byCheck = {};
   for (const r of results) {
     const key = r.browser + ' ' + r.check;
@@ -864,14 +1197,15 @@ async function main() {
     if (r.ok && r.expected) byCheck[key].expected++;
   }
   for (const [key, v] of Object.entries(byCheck)) lines.push(`- **${key}**: ${v.ok} passed${v.expected ? ` (${v.expected} with an expected difference)` : ''}${v.failed ? `, **${v.failed} failed**` : ''}`);
+  // Failures first: an annotation keeps only its first 4 KB.
+  if (failed.length) {
+    lines.push('', '**Failed:**');
+    for (const r of failed.slice(0, 80)) lines.push(`- ${r.browser} ${r.check} \`${r.page}\`: ${String(r.note || "").slice(0, 600)}`);
+  }
   const notes = results.filter(r => r.ok && (r.expected || r.page === '-'));
   if (notes.length) {
     lines.push('', '**Expected differences and notes:**');
     for (const r of notes.slice(0, 60)) lines.push(`- ${r.browser} ${r.check} \`${r.page}\`: ${r.note}`);
-  }
-  if (failed.length) {
-    lines.push('', '**Failed:**');
-    for (const r of failed.slice(0, 80)) lines.push(`- ${r.browser} ${r.check} \`${r.page}\`: ${r.note}`);
   }
   const md = lines.join('\n') + '\n';
   if (o.report) fs.writeFileSync(o.report, JSON.stringify({old: o.old, new: o.new, browsers: o.browsers, results}, null, 1));
@@ -881,4 +1215,5 @@ async function main() {
   process.exit(failed.length ? 1 : 0);
 }
 
-main().catch(error => { console.error(error); process.exit(2); });
+// Run as a program (tests import sampleTargets and inventory).
+if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))) main().catch(error => { console.error(error); process.exit(2); });

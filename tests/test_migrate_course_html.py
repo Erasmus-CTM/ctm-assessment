@@ -7,12 +7,20 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
+import unittest.mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'tools/migrate-course-html.py'
 QUARTO = shutil.which(os.environ.get('QUARTO_BIN', 'quarto'))
+# ctm-libs' extension folder: the tool reads includes with its rule
+# (tools/source-files.lua); setup-feedback-integration.py --test sets it.
+LIBS = os.environ.get('CTM_LIBS_EXTENSION')
+STEP4_COURSE = Path(__file__).resolve().parents[1] / 'integration/step4-course'
 
 
 def load():
@@ -156,6 +164,7 @@ On an English page the title stays.
 '''
 
 
+@unittest.skipUnless(QUARTO and LIBS, 'Quarto and CTM_LIBS_EXTENSION (setup-feedback-integration.py --test sets it) are needed')
 class Migrate(unittest.TestCase):
     def setUp(self):
         self.module = load()
@@ -290,6 +299,261 @@ class Migrate(unittest.TestCase):
         self.assertEqual(week.read_text(encoding='utf-8').split('\n')[number - 1], '<details class="reading-step">')
         self.assertIn('Not in the baseline', reported[0])
         self.assertIn('Found: details.reading-step: Gå i dybden: ny', reported[0])
+
+    def test_nested_includes_resolve_against_the_page(self):
+        # Quarto resolves an include inside an included file against the page's
+        # folder (review A2 S2): ../_includes/… from pages/, not from _includes/.
+        week = self.dir / '_includes/uke5.md'
+        week.write_text(week.read_text(encoding='utf-8') + '\n{{< include ../_includes/oppgaver/uke5_ex.md >}}\n', encoding='utf-8')
+        nested = self.dir / '_includes/oppgaver/uke5_ex.md'
+        nested.parent.mkdir(parents=True)
+        nested.write_text('## Oppgaver\n\n<div id="uke5-oppg"></div>\n\n'
+                          '{{< include ../_includes/oppgaver/deeper.md >}}\n', encoding='utf-8')
+        (self.dir / '_includes/oppgaver/deeper.md').write_text(
+            '<details class="learning-hint">\n<summary>Hint til 5.1</summary>\n\nDypt.\n</details>\n', encoding='utf-8')
+        # The rule of ctm-libs' ctm.source.files(): `/` is the project's root,
+        # quotes are dropped, and an include written relative to the including
+        # file is not found (no fallback; Quarto stops on it).
+        nested.write_text(nested.read_text(encoding='utf-8') + '\n{{< include "/_includes/oppgaver/root.md" >}}\n'
+                          '\n{{< include rel.md >}}\n', encoding='utf-8')
+        for name in ('root.md', 'rel.md'):
+            (self.dir / '_includes/oppgaver' / name).write_text('<div id="x-' + name[:-3] + '"></div>\n', encoding='utf-8')
+        files = self.module.Project(self.dir, LIBS).files
+        self.assertIn('_includes/oppgaver/root.md', files)
+        self.assertNotIn('_includes/oppgaver/rel.md', files)
+        status, out = self.run_tool('--check')
+        self.assertIn('_includes/oppgaver/uke5_ex.md:3: ', out)
+        self.assertIn('_includes/oppgaver/deeper.md:1: ', out)
+        self.assertEqual(self.module.Project(self.dir, LIBS).languages['_includes/oppgaver/deeper.md'], {'nb'})
+        # The lint: a construct added to a nested file is new to the baseline.
+        baseline = self.dir / 'ctm-html-baseline.json'
+        self.run_tool('--write-baseline', str(baseline))
+        self.assertIn('anchor #uke5-oppg', json.loads(baseline.read_text(encoding='utf-8'))['constructs']['_includes/oppgaver/uke5_ex.md'])
+        nested.write_text(nested.read_text(encoding='utf-8') + '\n<details>\n<summary>Ny</summary>\n\nNy.\n</details>\n', encoding='utf-8')
+        status, out = self.run_tool('--check', '--baseline', str(baseline), '--strict')
+        self.assertEqual(status, 1)
+        self.assertIn('_includes/oppgaver/uke5_ex.md:11: Not in the baseline', out)
+        # The conversion reaches them too.
+        self.run_tool()
+        self.assertIn('::: {#uke5-oppg}\n:::\n', nested.read_text(encoding='utf-8'))
+        self.assertEqual(self.read('_includes/oppgaver/deeper.md'), '::: {.hint title="Hint til 5.1"}\n\nDypt.\n:::\n')
+
+    def test_includes_resolve_with_ctm_libs_own_rule(self):
+        # The tool has no include rule of its own: ctm-libs' ctm.source.files()
+        # (tools/source-files.lua) decides, for the pages' lists and for each
+        # include line. This fails if that stops running, if the two disagree,
+        # or if ctm-libs' rule moves away from the one the courses are written
+        # for (relative to the page, `/` the project's root, quotes dropped,
+        # no fallback).
+        files = {
+            'index.qmd': '# Hjem\n\n{{< include _includes/hjem.md >}}\n\n{{< pagebreak >}}\n',
+            '_includes/hjem.md': 'Hjem.\n\n{{< include _includes/felles/a.md >}}\n',
+            'pages/uke7.qmd': '---\ntitle: Uke 7\n---\n\n{{< include \'../_includes/uke7.md\' >}}\n\n'
+                              '{{< include ../_includes/felles/a.md >}}\n',
+            '_includes/uke7.md': '## 7.1\n\n{{< include ../_includes/felles/a.md >}}\n\n'
+                                 '{{< include "/_includes/felles/b.md" >}}\n\n{{< include c.md >}}\n',
+            '_includes/felles/a.md': 'A.\n',
+            '_includes/felles/b.md': 'B.\n\n```\n{{< include ../_includes/felles/kode.md >}}\n```\n',
+            '_includes/felles/c.md': 'C.\n',
+            '_includes/felles/kode.md': 'Kode.\n',
+        }
+        for name, text in files.items():
+            (self.dir / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.dir / name).write_text(text, encoding='utf-8')
+        project = self.module.Project(self.dir, LIBS)
+        listed = self.module.source_files(Path(LIBS).resolve(), self.dir, project.pages())
+        self.assertEqual(listed['index.qmd'], ['index.qmd', '_includes/hjem.md', '_includes/felles/a.md'])
+        self.assertEqual(listed['pages/uke7.qmd'], ['pages/uke7.qmd', '_includes/uke7.md', '_includes/felles/a.md',
+                                                    '_includes/felles/b.md', '_includes/felles/kode.md'])
+        self.assertEqual(project.shown['_includes/felles/a.md'], {'index.qmd', 'pages/uke7.qmd'})
+        self.assertNotIn('_includes/felles/c.md', project.files)
+        for page in project.pages():
+            # Each page's Markdown, its include lines filled in, reaches exactly
+            # the files ctm-libs lists (a file in a code block is listed, not put in).
+            reached = {file for file, _, _ in project.expanded(page)}
+            self.assertEqual(reached, set(listed[page]) - {'_includes/felles/kode.md'}, page)
+        expanded = [text for _, _, text in project.expanded('pages/uke7.qmd') if text and text.strip()]
+        self.assertEqual(expanded[:5], ['## 7.1', 'A.', 'B.', '{{< include c.md >}}', 'A.'])
+        self.assertIn('{{< pagebreak >}}', [text for _, _, text in project.expanded('index.qmd')])
+
+    def tree(self):
+        return sorted((path.relative_to(self.dir).as_posix(), path.stat().st_mtime_ns) for path in self.dir.rglob('*'))
+
+    def test_an_include_outside_the_project_puts_nothing_in(self):
+        # A line that includes a file outside the project brings in nothing
+        # the tool reads, also when that file includes one inside (review A2c
+        # S2: the probes' "second file listed" was then the nested file).
+        shared = Path(tempfile.mkdtemp(prefix='shared-', dir=self.dir.parent))
+        self.addCleanup(shutil.rmtree, shared, True)
+        # (Its include resolves against the page's folder, as every include.)
+        (shared / 's.md').write_text('{{< include ../_includes/x.md >}}\n', encoding='utf-8')
+        (self.dir / '_includes/x.md').write_text('X.\n', encoding='utf-8')
+        line = '{{< include ../../' + shared.name + '/s.md >}}'
+        (self.dir / 'pages/x.qmd').write_text('---\ntitle: X\n---\n\n' + line + '\n', encoding='utf-8')
+        project = self.module.Project(self.dir, LIBS)
+        self.assertIsNone(project.included[('pages', line)])
+        self.assertEqual(project.included[('pages', '{{< include ../_includes/uke5.md >}}')], '_includes/uke5.md')
+
+    def test_the_tool_writes_nothing_into_a_read_only_course(self):
+        # --check (the courses' lint), --dry-run and --reveal-ends read the
+        # course and write nothing into it: they work on a read-only checkout
+        # (review A2c S2; as root, which may write anyway, the tree is compared).
+        before = self.tree()
+        modes = {path: path.stat().st_mode for path in [self.dir, *self.dir.rglob('*')]}
+        for path in modes:
+            path.chmod(0o555 if path.is_dir() else 0o444)
+        try:
+            status, out = self.run_tool('--check')
+            self.assertEqual(status, 0, out)
+            self.assertIn('Raw HTML in Markdown: ', out)
+            status, out = self.run_tool('--dry-run')
+            self.assertIn('Dry run: no file was changed.', out)
+            record = Path(tempfile.mkdtemp(prefix='ends-')) / 'ends.json'
+            self.addCleanup(shutil.rmtree, record.parent, True)
+            self.assertEqual(self.run_tool('--reveal-ends', str(record))[0], 0)
+        finally:
+            for path, mode in modes.items():
+                path.chmod(mode)
+        self.assertEqual(self.tree(), before)
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX signals')
+    def test_an_interrupted_run_leaves_nothing_behind(self):
+        # Killed while ctm-libs reads the includes (SIGTERM, as a CI timeout):
+        # the course is as it was, since nothing was written into it.
+        before = self.tree()
+        seen = self.dir.parent / (self.dir.name + '-seen.txt')
+        self.addCleanup(lambda: seen.unlink(missing_ok=True))
+        slow = self.dir.parent / (self.dir.name + '-quarto.py')
+        self.addCleanup(lambda: slow.unlink(missing_ok=True))
+        # A Quarto that answers the first call (the pages' files) and, on the
+        # second (the include lines), notes the course's files and never answers.
+        slow.write_text('#!/usr/bin/env python3\nimport os, sys, time\nfrom pathlib import Path\n'
+                        f'root, seen, quarto = Path({str(self.dir)!r}), {str(seen)!r}, {QUARTO!r}\n'
+                        "count = Path(seen + '.count')\n"
+                        "if not count.exists():\n    count.write_text('1')\n    os.execv(quarto, [quarto, *sys.argv[1:]])\n"
+                        "Path(seen + '.new').write_text('\\n'.join(sorted(p.relative_to(root).as_posix() for p in root.rglob('*'))))\n"
+                        "os.replace(seen + '.new', seen)\n"
+                        'time.sleep(60)\n', encoding='utf-8')
+        self.addCleanup(lambda: Path(str(seen) + '.count').unlink(missing_ok=True))
+        slow.chmod(0o755)
+        tool = subprocess.Popen([sys.executable, str(SCRIPT), '--project', str(self.dir), '--ctm-libs', LIBS, '--check'],
+                                env=dict(os.environ, QUARTO_BIN=str(slow)), start_new_session=True,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            for _ in range(200):
+                if seen.exists() or tool.poll() is not None:
+                    break
+                time.sleep(0.05)
+            self.assertTrue(seen.exists(), 'the tool ran Quarto')
+            os.killpg(tool.pid, signal.SIGTERM)
+            tool.wait(10)
+        finally:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(tool.pid, signal.SIGKILL)
+        self.assertEqual(seen.read_text(encoding='utf-8').split('\n'), [name for name, _ in before], 'nothing added while it ran')
+        self.assertEqual(self.tree(), before)
+
+    def test_the_fixture_course_reads_as_ctm_libs_reads_it(self):
+        course = self.dir / 'course'
+        shutil.copytree(STEP4_COURSE, course, ignore=shutil.ignore_patterns('_site', '.quarto', '_extensions', 'migrated'))
+        project = self.module.Project(course, LIBS)
+        listed = self.module.source_files(Path(LIBS).resolve(), course, project.pages())
+        self.assertIn('_includes/uke3.md', listed['pages/uke3.qmd'])
+        for page in project.pages():
+            self.assertEqual({file for file, _, _ in project.expanded(page)}, set(listed[page]), page)
+
+    def test_reveal_ends_records_which_details_a_heading_closed(self):
+        # For the rendered comparison (review A2b S1): a raw <details> with a
+        # heading of its section's level (or higher) inside is closed by the
+        # browser at that heading; one closed before the heading, or with a
+        # deeper heading inside (a section within it), is not.
+        (self.dir / 'pages/uke7.qmd').write_text(
+            '---\ntitle: Uke 7\n---\n\n## 7.1 A\n\n<details class="reading-step">\n<summary>Gå i dybden</summary>\n\nEn.\n\n'
+            '## 7.2 B\n\nTo.\n</details>\n\n<details>\n<summary>Lukket</summary>\n\nTre.\n</details>\n\n## 7.3 C\n\n'
+            '<details>\n<summary>Ytre</summary>\n\n### 7.3.1 Dypere\n\n<details><summary>Indre</summary>\n\n## 7.4 D\n\n'
+            '</details>\n</details>\n\n```{=html}\n<details><summary>Rå</summary></details>\n```\n\n'
+            '```python\n# <details> in code\n```\n\n{{< include ../_includes/uke7.md >}}\n', encoding='utf-8')
+        (self.dir / '_includes/uke7.md').write_text('<details>\n<summary>Inkludert</summary>\n\n# Øverst\n\n</details>\n', encoding='utf-8')
+        record = self.dir / 'ends.json'
+        status, out = self.run_tool('--ctm-libs', LIBS, '--reveal-ends', str(record))
+        self.assertEqual(status, 0)
+        pages = json.loads(record.read_text(encoding='utf-8'))['pages']
+        self.assertEqual(pages['pages/uke7.html'], [True, False, True, True, False, True])
+        self.assertIn('pages/uke5.html', pages)
+        self.assertEqual(self.read('pages/uke7.qmd').count('<details'), 6, 'nothing changed')
+
+    def test_reveal_ends_counts_only_headings_at_the_depth_of_the_details(self):
+        # A heading inside a ::: div (a callout's title) is sectioned inside
+        # that div: it closes neither the section nor the raw <details> around
+        # the div (review A2c S1: linalg-branch's m1_3.md and m2_4.md). A
+        # heading at the depth where the <details> opened, in a tab too, does.
+        (self.dir / 'pages/uke8.qmd').write_text(
+            '---\ntitle: Uke 8\n---\n\n## 8.1 A\n\n<details class="reading-step">\n<summary>Gå i dybden</summary>\n\n'
+            '::: {.callout-important}\n## Viktig\n\nEn.\n:::\n\nTo.\n</details>\n\n'
+            '<details>\n<summary>Kilde</summary>\n\n:::: {.callout-note collapse="true"}\n#### Kilde for formatene\n\n'
+            '::: {.inner}\n## Dypt\n:::\n::::\n\n</details>\n\n'
+            '::: {.panel-tabset}\n\n### Fane 1\n\n<details>\n<summary>I fanen</summary>\n\n'
+            '::: {.callout-tip}\n### Tips\n:::\n\nTre.\n\n### Fane 2\n\n</details>\n\n:::\n\n'
+            '<details>\n<summary>Etter</summary>\n\n::: {.callout-note}\n## Merk\n:::\n\n## 8.2 B\n\n</details>\n', encoding='utf-8')
+        # The reviewer's page: a callout in a reading step, the next heading
+        # after its </details>. Its converted reveal moved past that heading
+        # (new.qmd) fails both comparisons (tests/compare-rendered.test.cjs,
+        # tests/compare-browser.browser.cjs, which use this record).
+        shutil.copy(Path(__file__).resolve().parent / 'swallowed-heading/old.qmd', self.dir / 'pages/zz.qmd')
+        record = self.dir / 'ends.json'
+        status, out = self.run_tool('--ctm-libs', LIBS, '--reveal-ends', str(record))
+        self.assertEqual(status, 0, out)
+        pages = json.loads(record.read_text(encoding='utf-8'))['pages']
+        self.assertEqual(pages['pages/uke8.html'], [False, False, True, True])
+        self.assertEqual(pages['pages/zz.html'], [False])
+
+    def test_without_ctm_libs_the_tool_stops(self):
+        out = io.StringIO()
+        with contextlib.redirect_stderr(out), unittest.mock.patch.dict(os.environ, {'CTM_LIBS_EXTENSION': ''}):
+            with self.assertRaises(SystemExit) as stopped:
+                self.module.main(['--project', str(self.dir), '--check'])
+        self.assertEqual(stopped.exception.code, 2)
+        self.assertIn("ctm-libs' rule", out.getvalue())
+
+    def test_an_anchor_that_repeats_its_tab_heading_id_is_removed_with_the_tab_ids_line(self):
+        # A hand anchor first in a tab whose heading has the same id (written or
+        # automatic, also across an include): with tab-ids.lua the page would
+        # have the id twice (review A2 S3), so --config removes it.
+        (self.dir / 'pages/uke6.qmd').write_text(
+            '---\ntitle: "Uke 6"\n---\n\n::: {.panel-tabset}\n\n'
+            '## 6.1 Del {#uke6-del1}\n\n<div id="uke6-del1"></div>\n\nTekst.\n\n'
+            '## 6.2 Fikspunkt og konvergens\n{{< include ../_includes/m6.md >}}\n\n'
+            '## 6.3 Annet {#uke6-annet}\n\n<div id="uke6-annet-start"></div>\n\n'
+            '## 6.4 Delt\n{{< include ../_includes/shared.md >}}\n\n:::\n\n'
+            '<div id="uke6-slutt"></div>\n', encoding='utf-8')
+        (self.dir / '_includes/m6.md').write_text('<div id="fikspunkt-og-konvergens"></div>\n\nInnhold.\n', encoding='utf-8')
+        # A file that another page shows without that tab heading keeps its anchor.
+        (self.dir / '_includes/shared.md').write_text('<div id="delt"></div>\n\nDelt.\n', encoding='utf-8')
+        (self.dir / 'pages/delt.qmd').write_text('---\ntitle: Delt\n---\n\n{{< include ../_includes/shared.md >}}\n', encoding='utf-8')
+        self.assertEqual(self.module.Project(self.dir, LIBS).tab_anchor_duplicates(),
+                         {'pages/uke6.qmd': {8: 'uke6-del1'}, '_includes/m6.md': {0: 'fikspunkt-og-konvergens'}})
+        # Without the tab-ids.lua line: converted as any anchor, and named.
+        status, out = self.run_tool()
+        self.assertIn('\n::: {#uke6-del1}\n:::\n', self.read('pages/uke6.qmd'))
+        self.assertIn('pages/uke6.qmd:9: the anchor #uke6-del1 repeats the id of the tab heading it follows', out)
+        # With it (--config): removed, also in the ::: {#…} form; the others stay.
+        status, out = self.run_tool('--config')
+        page = self.read('pages/uke6.qmd')
+        self.assertIn('## 6.1 Del {#uke6-del1}\n\nTekst.\n', page)
+        self.assertNotIn('{#uke6-del1}\n:::', page)
+        self.assertIn('::: {#uke6-annet-start}\n:::\n', page)
+        self.assertIn('::: {#uke6-slutt}\n:::\n', page)
+        self.assertEqual(self.read('_includes/m6.md'), 'Innhold.\n')
+        self.assertTrue(self.read('_includes/shared.md').startswith('::: {#delt}\n:::\n'))
+        self.assertIn('2  anchor removed: its tab heading has the same id (tab-ids.lua)', out)
+        self.assertIn('_includes/m6.md:1: removed the anchor #fikspunkt-og-konvergens', out)
+
+    def test_heading_ids(self):
+        heading_id = self.module.heading_id
+        self.assertEqual(heading_id('3.3 Beskriv bilder {#uke3-del2 .unnumbered}'), 'uke3-del2')
+        self.assertEqual(heading_id('2.4 Feil, residual og toleranse'), 'feil-residual-og-toleranse')
+        self.assertEqual(heading_id('Støtte: *Æ* og `ø`'), 'støtte-æ-og-ø')
+        self.assertEqual(heading_id('1.2 {.unnumbered}'), 'section')
 
     def test_github_annotations(self):
         out = io.StringIO()

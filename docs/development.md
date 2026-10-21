@@ -272,7 +272,9 @@ lists the comparisons):
 - on demand for any course: `course-ref` (after) and `course-base-ref`
   (before), the package per side (`base`, `head`; `pin` is the one the
   course pins at that side's ref), `convert` (a migration preview of an
-  unmigrated branch), `expect` (more expect files) and `browser`.
+  unmigrated branch), `expect` (more expect files), `browser` and
+  `review-refs` (component commits for the after side, `NAME=SHA`: a preview
+  of an unmerged component fix, never a pin).
 
 A course's migration PR is checked with `course` = the course,
 `course-ref` = the migration branch, `course-base-ref` = `main`,
@@ -283,9 +285,11 @@ A course's migration PR is checked with `course` = the course,
 
 `tools/compare-browser.mjs --old DIR --new DIR --browser chromium|firefox|webkit`
 serves two rendered sites from one origin and compares them with Playwright
-(design §6.3): reveals (kinds, titles, initial state), the switch (per
-block, `aria-pressed`, status texts, kept on reload and on another page, a
-new tab in lecture), the keyboard (Tab to the switch; Enter and Space on
+(design §6.3): reveals (kinds, titles, initial state, and the words each
+holds: never fewer than on old), the switch (per block, `aria-pressed`,
+status texts, kept on reload and on another page, a new tab in lecture,
+where old's stood or at the top of the page), the keyboard (Tab to the
+switch, in no more presses than on old; Enter and Space on
 every summary, as on old; axe-core finds no new violation), every link into
 a page with tabs or reveals on load and on click (the tab and reveal opened,
 the target below the header and still there 2 s later, focus in view, the
@@ -297,7 +301,45 @@ screenshots of the switch and of each kind of reveal at 1280 and 390 px
 JSXGraph boards and a Python cell inside reveals (not with `--offline`), and
 console errors that only new has. `--shots DIR` keeps the screenshots for the
 pull request's look review. Locally, `CHROMIUM_EXECUTABLE` names a Chromium
-and `--offline` blocks the CDNs.
+and `--offline` blocks the CDNs. `--first-visit` serves both sides as GitHub
+Pages does, without the cross-origin isolation headers and with service
+workers allowed, so a page with Python cells isolates itself with
+coi-serviceworker (a reload) before the links are loaded; the workflow runs
+the link loads a second time this way (no clicks, no console comparison),
+sampled by kind: on each page, one target of each kind of place (a tab title,
+or in a tab pane, a nested pane, a `<details>`, a collapsed callout, linked
+from its own page or another) and every tab title; the summary names the
+kinds loaded, and a kind left out fails the run. On a first visit Pyodide and
+Monaco are blocked in the served files, since Playwright's routes do not see
+the fetches coi-serviceworker makes. `--shard I/N` runs the I-th of N parts
+(the workflow's `shards`; by default 4 jobs per browser for ingmat3a's
+`linalg-branch`, 2 for its other refs): every part reads every page, so links
+into other parts' pages are checked, and the screenshots go to part 1. A
+console error names its frame (the page, or an iframe such as a JSXGraph
+board): each frame reports its own errors and `console.error` calls, and a
+message without its frame is an iframe's only when an iframe of the same page
+load reported that very text and the page did not.
+`tests/compare-browser.browser.cjs` (`npm run test:browser`) runs the tool in
+Chromium on small sites. `known-failures:` in the expect file lists failures that are fixed
+elsewhere and not pinned yet (browsers and checks, both required; optional
+courses, `targets: tab-title`, `frame` and `note` patterns): they count as
+expected and are reported.
+
+`compare-rendered.mjs` also checks three invariants on every page, which no
+expected category can explain: each `<details>` keeps its words (more only as
+its old words followed by what followed it on old: `reveal: heading` when
+that starts with a heading and old's `<details>` was closed by that heading's
+section, that is, had no `</details>` of its own before it in the old
+course's Markdown (a heading at the fenced-div depth where the `<details>`
+opened: a callout's title, inside its `:::` div, closes nothing); `swallowed`, never explained, when it had one; `grown`
+otherwise), the new switch stands where
+the old one stood or at the top of the page, and no id occurs more often than
+on old. Quarto writes a page's HTML out again, without the stray
+`</details>`, so only the Markdown tells how a `<details>` ended:
+`tools/migrate-course-html.py --reveal-ends FILE`, run on the old course,
+records it per page, and both tools take the record as `--reveal-ends FILE`
+(the workflow writes it for every course; without it no reveal may take in
+a heading).
 
 ### Migrating a course to step 4's Markdown
 
@@ -307,12 +349,29 @@ switch) in its pages and the files they include, adds the `tab-ids.lua` line
 and `markdown-lint: true` to `_quarto.yml` and drops the courses'
 `learning-mode.html` and `tab-links.html`; it reports what it changed, the
 places where it put a blank line before a fence, and what it left (`--dry-run`
-changes nothing). The course's own CSS for the old classes is the migration
+changes nothing). An anchor that is the first thing in a tab and repeats the
+id of its tab heading (written or automatic, also across an include, on every
+page that shows its file) is removed when the project has the `tab-ids.lua`
+line, since that line puts the id first in the tab; without it, it is
+reported. The course's own CSS for the old classes is the migration
 PR's to remove. Until a course migrates, its CI can run the same tool as a
 lint: `--write-baseline ctm-html-baseline.json` records the raw HTML it has,
 and `--check --baseline ctm-html-baseline.json` gives a warning annotation for
 every construct the baseline does not list (constructs are keyed by file,
 kind and title, id or address, so moved lines are not reported).
+
+Which files a page includes (nested includes too) is ctm-libs' rule, not the
+tool's: `tools/source-files.lua` runs ctm-libs' own `ctm.source.files()`, the
+one `markdown-lint` reads, with `quarto pandoc lua`, and the tool asks it for
+each page and each include line (a page of that one line, served from
+memory: the tool writes nothing into the course unless it converts it, so
+`--check` works on a read-only checkout). The tool therefore needs Quarto and ctm-libs'
+extension folder at the commit the umbrella pins: `--ctm-libs DIR`, or
+`CTM_LIBS_EXTENSION` (`scripts/build-course.py --convert` passes the copy it
+has just installed; a course's CI that runs the lint passes the ctm-libs of
+the ctm-assessment ref it fetches the tool from). `tests/test_migrate_course_html.py`
+fails if the files a page's expanded Markdown reaches stop being exactly the
+ones ctm-libs lists.
 
 ### Releases
 
@@ -347,8 +406,9 @@ its branch does not contain stays, with a log line: the JSXGraph pin is the
 fork commit of upstream pull request #2, which upstream `main` lacks.
 The **Quarto versions** workflow (weekly, on demand, and when it or
 `tab-ids.lua` changes) builds and tests with Quarto 1.8.27 and with the
-current release; its first step is the canary for `tab-ids.lua`
-(`integration/feedback/tab-ids.test.cjs` with Quarto alone): the filter keeps
+current release (the release job may fail without failing the run); its
+canary job for `tab-ids.lua` (`integration/feedback/tab-ids.test.cjs` with
+Quarto alone, with both versions) fails the run: the filter keeps
 tab-heading ids only while Quarto parses tabsets after pre-ast filters.
 
 One repository setting is required: **Settings → Pages → Build and deployment →

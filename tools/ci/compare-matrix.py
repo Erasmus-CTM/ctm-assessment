@@ -11,6 +11,10 @@ quarto-extensions.yml names at that side's ref, empty for the pull request's
 base and head), `convert` (a preview of the step-4 migration on the after
 side), extra expect files (`expect`), `browser`, `informational` and a `key`
 for artifact names; `engines` lists the browsers (all three, or BROWSERS).
+A browser entry is split into `shard` parts ("I/N", compare-browser.mjs
+--shard), each a job of its own per browser: SHARDS parts, or by default
+4 for ingmat3a's linalg-branch, 2 for its other refs and 1 otherwise (a
+browser job has 150 minutes; review A2b S4).
 
 On a pull request: the example site; every course of the one course list
 (integration/pyodide-parity/build-corpora.py --course-matrix) on its own
@@ -19,7 +23,7 @@ migration), after = the head; and the step-4 fixture course, before = as it
 is with its pinned package, after = converted with the head, compared with
 expect/step4-migration.yml and in the browser. On workflow_dispatch: the one
 comparison its inputs describe (COURSE, COURSE_REF, COURSE_BASE_REF, PROFILE,
-BASE, HEAD, CONVERT, EXPECT, BROWSER, BROWSERS).
+BASE, HEAD, CONVERT, EXPECT, BROWSER, BROWSERS, SHARDS).
 """
 import json
 import os
@@ -31,6 +35,18 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = {'course': 'step4-course', 'path': 'integration/step4-course'}
 ENGINES = ('chromium', 'firefox', 'webkit')
+
+
+def shards(entry, wanted=''):
+    """The parts of an entry's browser comparison."""
+    if wanted.strip():
+        count = int(wanted)
+        if not 1 <= count <= 12:
+            raise SystemExit(f'shards {wanted}: 1 to 12')
+        return count
+    if entry['course'] == 'aacchhee/ingmat3a_ntnu':
+        return 4 if entry.get('ref') == 'linalg-branch' else 2
+    return 1
 
 
 def key(entry):
@@ -80,11 +96,18 @@ def entries(event, inputs):
 
 def main():
     inputs = {name: os.environ.get(name, '') for name in ('COURSE', 'COURSE_REF', 'COURSE_BASE_REF', 'PROFILE', 'BASE', 'HEAD',
-                                                          'CONVERT', 'EXPECT', 'BROWSER', 'BROWSERS')}
+                                                          'CONVERT', 'EXPECT', 'BROWSER', 'BROWSERS', 'SHARDS')}
     matrix = entries(os.environ.get('EVENT', 'pull_request'), inputs)
     for entry in matrix:
         entry['key'] = key(entry)
-    browsers = [entry for entry in matrix if entry.get('browser')]
+    browsers = []
+    for entry in matrix:
+        if not entry.get('browser'):
+            continue
+        count = shards(entry, inputs['SHARDS'])
+        for index in range(1, count + 1):
+            part = f'{index}/{count}' if count > 1 else ''
+            browsers.append({**entry, 'shard': part, 'part': f'-part{index}of{count}' if part else ''})
     engines = [name for name in (inputs['BROWSERS'] or ' '.join(ENGINES)).split() if name in ENGINES] or list(ENGINES)
     lines = ['matrix=' + json.dumps(matrix), 'browsers=' + json.dumps(browsers), 'engines=' + json.dumps(engines)]
     if os.environ.get('GITHUB_OUTPUT'):

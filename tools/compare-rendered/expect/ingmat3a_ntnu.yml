@@ -9,4 +9,6 @@ categories:
   - id: week7-details-after-a-list
     title: project_week7 B2's optional <details> no longer cut short by its list item
     match:
-      - {area: dom, page: '^pages/project_week7\.html$', change: '^(added|removed)$', line: '^</(details|li|ol)( class="ctm-reveal details")?>$', ancestors: 'section#b2\.-del-feilen-i-tapt-signal-og-forsterket-støy\.level3( > ol( > li)?)?$'}
+      - {area: dom, page: '^pages/project_week7\.html$', change: '^(added|removed)$', line: '^</(li|ol)>$', ancestors: 'section#b2\.-del-feilen-i-tapt-signal-og-forsterket-støy\.level3( > ol)?$'}
+      # The reveal holds its old words and exactly what followed it (`grown`).
+      - {area: dom, page: '^pages/project_week7\.html$', change: '^(added|removed)$', line: '^</details( class="ctm-reveal details")?>$', ancestors: 'section#b2\.-del-feilen-i-tapt-signal-og-forsterket-støy\.level3( > ol > li)?$', reveal: '^grown$'}

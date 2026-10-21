@@ -53,6 +53,10 @@ A section prefix.
 
 A custom cross-reference category.
 
+## Pane form {#tabset-1-2}
+
+An id of the form of Quarto's own pane ids.
+
 :::
 
 ::: {.callout-note}
