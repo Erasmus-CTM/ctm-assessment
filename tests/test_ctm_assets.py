@@ -366,6 +366,18 @@ class MetadataTests(unittest.TestCase):
         with self.assertRaises(A.AssetError):
             A.release_version(b'{"version":"0.28.0.dev0"}', "0.28.3")
 
+    def test_single_file_profile_uses_system_font_variant(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            A.write_profiles(root, website=False)
+            self.assertIn("offline-system.scss", (root / "_quarto-offline.yml").read_text())
+        extension = Path(__file__).resolve().parents[1] / "_extensions/ctm-assessment"
+        website = (extension / "offline.scss").read_text()
+        single = (extension / "offline-system.scss").read_text()
+        self.assertIn('../../_ctm-assets/fonts/source-sans-pro.css', website)
+        self.assertIn('$web-font-path: false;', single)
+        self.assertNotIn('https://', website + single)
+
     def test_metadata_redirects_use_their_own_official_hosts_and_https_ports(self):
         original = A.urllib.request.Request("https://api.github.com/repos/pyodide/pyodide/releases")
         moved = "https://api.github.com/repos/pyodide/pyodide/releases/tags/0.28.3"

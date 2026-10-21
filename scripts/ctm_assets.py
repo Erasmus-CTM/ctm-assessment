@@ -421,15 +421,16 @@ def validate_version_homes(lock: dict, library: Path, pins: Path) -> dict[str, s
     return expected
 
 
-def write_profiles(project: Path, *, course_key: str | None = None) -> list[Path]:
+def write_profiles(project: Path, *, course_key: str | None = None, website: bool = True) -> list[Path]:
     """Create missing profiles only; existing authored profiles are preserved."""
     project = Path(project)
     storage_key = (course_key or project.name) + "-exam"
+    theme = "offline.scss" if website else "offline-system.scss"
     profiles = {
         "_quarto-offline.yml": (
             "# Local assets: quarto render --profile offline\n"
             "project:\n  resources: [\"_ctm-assets/**\"]\n"
-            "format:\n  html:\n    theme: [_extensions/ctm-assessment/offline.scss]\n"
+            "format:\n  html:\n    theme: [_extensions/ctm-assessment/" + theme + "]\n"
             "ctm-assessment:\n  assets: local\n"),
         "_quarto-exam.yml": (
             "# Exam build: quarto render --profile offline,exam\n"
