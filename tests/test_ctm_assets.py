@@ -8,6 +8,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location("ctm_assets", Path(__file__).resolve().parents[1] / "scripts" / "ctm_assets.py")
 A = importlib.util.module_from_spec(SPEC)
@@ -164,6 +165,66 @@ class AssetsTests(unittest.TestCase):
     def test_cache_key_changes_with_any_reviewed_lock_change(self):
         self.assertEqual(A.cache_key({"v": 1, "a": 2}), A.cache_key({"a": 2, "v": 1}))
         self.assertNotEqual(A.cache_key({"v": 1, "a": 2}), A.cache_key({"v": 1, "a": 3}))
+
+
+
+class MetadataTests(unittest.TestCase):
+    def sources(self, root):
+        table = {"v": 1, "assets": {"katex": {"npm": "katex", "version": "0.16.47",
+                  "cdn": "https://cdn.jsdelivr.net/npm/katex@{version}/", "local": "npm/katex@{version}/"}}}
+        (root / "assets.json").write_bytes(A.json_bytes(table))
+        (root / "runtime").mkdir()
+        (root / "runtime/pyodide-runtime.js").write_text("var indexURL = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';\n", encoding="utf-8")
+        return table
+
+    def test_version_sources_keep_runtime_as_the_only_pyodide_home(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = self.sources(root)
+            found = A.version_sources(root)
+            self.assertEqual(found["pyodide"], "0.28.3")
+            self.assertEqual(found["assets"]["katex"]["version"], "0.16.47")
+            table["assets"]["pyodide"] = dict(table["assets"]["katex"])
+            (root / "assets.json").write_bytes(A.json_bytes(table))
+            with self.assertRaises(A.AssetError):
+                A.version_sources(root)
+
+    def test_release_version_uses_package_json_not_full_lock_dev_version(self):
+        self.assertEqual(A.release_version(b'{"version":"0.28.3"}', "0.28.3"), "0.28.3")
+        with self.assertRaises(A.AssetError):
+            A.release_version(b'{"version":"0.28.0.dev0"}', "0.28.3")
+
+    def test_official_metadata_is_exact_and_is_not_claimed_as_a_verified_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.sources(root)
+            integrity = "sha512-" + base64.b64encode(hashlib.sha512(b"archive").digest()).decode()
+            def metadata(url):
+                if "api.github.com" in url:
+                    return {"assets": [{"name": "pyodide-0.28.3.tar.bz2", "digest": "sha256:" + "a" * 64,
+                            "browser_download_url": "https://github.com/pyodide/pyodide/releases/download/0.28.3/pyodide-0.28.3.tar.bz2"}]}
+                return {"name": "katex", "version": "0.16.47", "license": "MIT",
+                        "dist": {"integrity": integrity, "tarball": "https://registry.npmjs.org/katex/-/katex-0.16.47.tgz"}}
+            with patch.object(A, "fetch_json", side_effect=metadata):
+                report = A.collect_metadata(root, source_refs={"ctm-libs": "b" * 40})
+            self.assertEqual(len(report["archives"]), 2)
+            self.assertEqual(report["archives"][0]["integrity"], integrity)
+            self.assertEqual(report["archives"][1]["sha256"], "a" * 64)
+            self.assertEqual(report["source_refs"]["ctm-libs"], "b" * 40)
+            self.assertIn("still require verification", report["status"])
+
+    def test_missing_official_digest_never_becomes_a_guessed_lock_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.sources(root)
+            integrity = "sha512-" + base64.b64encode(hashlib.sha512(b"archive").digest()).decode()
+            def metadata(url):
+                if "api.github.com" in url:
+                    return {"assets": [{"name": "pyodide-0.28.3.tar.bz2", "digest": None}]}
+                return {"name": "katex", "version": "0.16.47",
+                        "dist": {"integrity": integrity, "tarball": "https://registry.npmjs.org/katex/-/katex-0.16.47.tgz"}}
+            with patch.object(A, "fetch_json", side_effect=metadata), self.assertRaisesRegex(A.AssetError, "no SHA-256"):
+                A.collect_metadata(root)
 
 
 if __name__ == "__main__":
