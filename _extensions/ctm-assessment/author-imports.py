@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Inspect author Python imports against a private release index and subset lock.
+
+This is the single packaged scanner used by the builder and render hook. It
+parses Python syntax and never executes authored code. The full import index
+stays outside published resources; the public subset lock lists shipped files.
+"""
+from __future__ import annotations
+
+import argparse
+import ast
+import json
+from pathlib import Path
+import re
+
+
+class ImportCheckError(ValueError):
+    """Author code needs an unavailable package or cannot be inspected."""
+
+
+def _normalise(name: str) -> str:
+    if not isinstance(name, str) or not name.strip():
+        raise ImportCheckError("Python package names must be nonempty strings")
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def check_sources(sources: list[dict], full_lock: dict, subset: dict, *, local_modules=()) -> dict:
+    """AST-scan author fragments against the release import map and shipped set.
+
+    Known imports outside the subset stop the build/render. Unmapped names are
+    reported separately: they may be local helpers or built-ins, not packages.
+    Dynamic imports with a literal name are included; arbitrary execution is
+    never used to discover imports.
+    """
+    packages = full_lock.get("packages", {})
+    by_import = {}
+    by_name = {_normalise(name): name for name in packages}
+    shipped = {_normalise(name) for name in subset.get("packages", {})}
+    local = set(local_modules) | {"js", "pyodide", "_pyodide", "pyodide_js", "ctm_checkers"}
+    for name, entry in packages.items():
+        for module in entry.get("imports", []):
+            by_import.setdefault(module.split(".", 1)[0], set()).add(name)
+    missing, unknown, found = {}, {}, set()
+    def require_package(name, origin):
+        normalised = _normalise(name)
+        if normalised not in by_name:
+            raise ImportCheckError(f"{origin}: Pyodide distribution has no package {name}")
+        if normalised not in shipped:
+            missing.setdefault(by_name[normalised], set()).add(origin)
+    for index, fragment in enumerate(sources):
+        origin = fragment.get("origin", f"author fragment {index + 1}")
+        for package in fragment.get("packages", []):
+            require_package(package, origin)
+        try:
+            tree = ast.parse(fragment.get("source", ""), filename=origin)
+        except SyntaxError as error:
+            raise ImportCheckError(f"{origin}: cannot inspect author Python ({error.msg}, line {error.lineno})") from None
+        modules = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                modules.update(alias.name.split(".", 1)[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                modules.add(node.module.split(".", 1)[0])
+            elif isinstance(node, ast.Call):
+                function = node.func
+                dynamic = (isinstance(function, ast.Name) and function.id == "__import__") or (
+                    isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name)
+                    and function.value.id == "importlib" and function.attr == "import_module")
+                if dynamic and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+                    module = node.args[0].value
+                    if not module.startswith("."):
+                        modules.add(module.split(".", 1)[0])
+                if isinstance(function, ast.Name) and function.id == "graph_from_response":
+                    require_package("networkx", origin)
+        for module in modules:
+            found.add(module)
+            if module in local:
+                continue
+            candidates = by_import.get(module)
+            if candidates:
+                if not any(_normalise(name) in shipped for name in candidates):
+                    for name in candidates:
+                        missing.setdefault(name, set()).add(origin)
+            else:
+                unknown.setdefault(module, set()).add(origin)
+    if missing:
+        details = "; ".join(name + " (" + ", ".join(sorted(origins)) + ")" for name, origins in sorted(missing.items()))
+        command = ",".join(sorted(missing))
+        raise ImportCheckError(f"Author Python needs packages absent from the local bundle: {details}. "
+                         f"Install with --assets local --python-packages {command}")
+    return {"imports": sorted(found), "unmapped": {name: sorted(origins) for name, origins in sorted(unknown.items())}}
+
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--sources", type=Path, required=True, help="JSON array of actual authored fragments")
+    parser.add_argument("--index", type=Path, required=True, help="Private release import index, never published")
+    parser.add_argument("--subset", type=Path, required=True, help="Published subset pyodide-lock.json")
+    parser.add_argument("--local-module", action="append", default=[])
+    args = parser.parse_args(argv)
+    try:
+        result = check_sources(json.loads(args.sources.read_text(encoding="utf-8")),
+                               json.loads(args.index.read_text(encoding="utf-8")),
+                               json.loads(args.subset.read_text(encoding="utf-8")),
+                               local_modules=args.local_module)
+    except (ImportCheckError, OSError, json.JSONDecodeError) as error:
+        parser.exit(1, str(error) + "\n")
+    print(json.dumps(result, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

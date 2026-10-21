@@ -6,6 +6,7 @@ installing never trust a manifest without the reviewed lock's file hashes.
 """
 from __future__ import annotations
 
+import importlib.util
 import base64
 import gzip
 import hashlib
@@ -187,6 +188,20 @@ def package_closure(full_lock: dict, requested) -> dict:
     for name in requested:
         visit(name)
     return {"info": dict(full_lock.get("info", {})), "packages": dict(sorted(selected.items()))}
+
+
+def check_python_sources(sources: list[dict], full_lock: dict, subset: dict, *, local_modules=()) -> dict:
+    """Reuse the one canonical packaged AST scanner; never maintain a copy."""
+    scanner = Path(__file__).resolve().parents[1] / "_extensions" / "ctm-assessment" / "author-imports.py"
+    if not scanner.is_file():
+        raise AssetError(f"The canonical packaged author-imports.py is missing: {scanner}")
+    spec = importlib.util.spec_from_file_location("ctm_author_imports", scanner)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        return module.check_sources(sources, full_lock, subset, local_modules=local_modules)
+    except module.ImportCheckError as error:
+        raise AssetError(str(error)) from None
 
 
 def allow_licence(name: str, spdx: str | None, accepted=()) -> frozenset[str]:

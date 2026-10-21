@@ -119,6 +119,27 @@ class AssetsTests(unittest.TestCase):
             with self.assertRaisesRegex(A.AssetError, "source offer"):
                 A.build_from_lock(lock, Path(tmp) / "bundle", Path(tmp) / "cache", accepted_licences=["LGPL-2.1"])
 
+    def test_author_ast_scanner_stops_missing_packages_without_running_code(self):
+        full = {"packages": {"numpy": {"imports": ["numpy"]}, "pandas": {"imports": ["pandas"]},
+                             "networkx": {"imports": ["networkx"]}, "sqlite3": {"imports": ["sqlite3"]}}}
+        subset = {"packages": {"numpy": {}}}
+        report = A.check_python_sources([{"origin": "starter", "source": "import numpy as np\nraise RuntimeError('never executed')\nfrom . import helper\nimport local_helper"}],
+                                        full, subset, local_modules=["local_helper"])
+        self.assertEqual(report["imports"], ["local_helper", "numpy"])
+        self.assertEqual(report["unmapped"], {})
+        for code in ("import pandas", "from pandas.core import frame",
+                     "__import__('pandas')", "importlib.import_module('pandas')",
+                     "graph_from_response(answer)", "import sqlite3"):
+            with self.subTest(code=code), self.assertRaisesRegex(A.AssetError, "absent from the local bundle"):
+                A.check_python_sources([{"source": code, "origin": "exercise:solution"}], full, subset)
+        with self.assertRaisesRegex(A.AssetError, "pandas"):
+            A.check_python_sources([{"source": "", "packages": ["pandas"]}], full, subset)
+        with self.assertRaisesRegex(A.AssetError, "cannot inspect"):
+            A.check_python_sources([{"source": "def invalid("}], full, subset)
+        report = A.check_python_sources([{"source": "import os\nimport js\nimport pyodide\n# import pandas"}], full, subset)
+        self.assertEqual(set(report["unmapped"]), {"os"})
+        self.assertNotIn("pandas", report["imports"])
+
     def test_composite_licences_require_all_and_choose_permissive_or_branch(self):
         self.assertFalse(A.allow_licence("icons", "(CC-BY-4.0 AND OFL-1.1 AND MIT)"))
         self.assertFalse(A.allow_licence("board", "(MIT OR LGPL-3.0)", ["LGPL-3.0"]))
