@@ -47,7 +47,7 @@ A. Review the two finished but unreviewed sets. Report each to AC with a verdict
       - S-10's nested-list message is fine;
       - S-11's hyperbolic case is fixed later, with S-12;
       - S-11's LowestTerms case is to be discussed with AC before any change.
-B. jsxgraph-quarto PR #2. An agent may still be finishing it at hand-off: it should require JSXGraph ≥ 1.14.1, remove the workarounds for older versions, keep the fixes to the extension's own bugs, the keep-aspect fit and the unitX/originX handling, and rewrite the PR text. Review it and test it in full Chromium. AC pastes the description himself; you do not comment on upstream.
+B. jsxgraph-quarto PR #2 is NOT yours: AC and Claude handle its review and the contact with the maintainer. It now requires JSXGraph >= 1.14.1 (head 21c5f9c). Your only JSXGraph task is in D: re-pin the courses from the fork to upstream after AC tells you PR #2 is merged.
 C. The ingmat3a migration set. ingmat3a is STAGED for migration (21 Oct, 19:50): AC merged `linalg-branch` into ingmat3a main (a0a34ee, PR #15); main builds green on the old pin 9ed46a4. Branch `consolidation/2026-10-step4-migration` (commit 5ad31ab) holds the first commit: `ref: main` in quarto-extensions.yml and `/_extensions/ctm-checkers/` in .gitignore (G1). No PR yet. Do the migration on that branch AFTER AC has merged the step-4 final set (ctm-libs #30, then ctm-assessment #24), which adds the callout fix and the dropped-construct check the migration relies on. Then, the same method as ctm-demo:
    - first commit `ref: main`;
    - run the converter (ctm-assessment `build-course.py --convert`) and review every construct by hand;
