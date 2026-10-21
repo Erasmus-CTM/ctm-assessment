@@ -152,18 +152,32 @@ def extract_selected(archive: Path, destination: Path, files: list[dict], *, pre
     return found
 
 
+def normalise_package(name: str) -> str:
+    if not isinstance(name, str) or not name.strip():
+        raise AssetError("Python package names must be nonempty strings")
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
 def package_closure(full_lock: dict, requested) -> dict:
     packages = full_lock.get("packages", {})
+    aliases = {}
+    for key in packages:
+        normalised = normalise_package(key)
+        if normalised in aliases:
+            raise AssetError(f"Ambiguous package names in Pyodide lock: {key}")
+        aliases[normalised] = key
     selected, visiting = {}, set()
-    def visit(name):
-        if name == "all":
+    def visit(request):
+        normalised = normalise_package(request)
+        if normalised == "all":
             raise AssetError("Name Python extras explicitly; 'all' is not supported")
+        if normalised not in aliases:
+            raise AssetError(f"Pyodide distribution has no package {request}")
+        name = aliases[normalised]
         if name in selected:
             return
         if name in visiting:
             raise AssetError(f"Dependency cycle in Pyodide lock: {name}")
-        if name not in packages:
-            raise AssetError(f"Pyodide distribution has no package {name}")
         visiting.add(name)
         entry = packages[name]
         for dependency in entry.get("depends", []):
@@ -175,13 +189,59 @@ def package_closure(full_lock: dict, requested) -> dict:
     return {"info": dict(full_lock.get("info", {})), "packages": dict(sorted(selected.items()))}
 
 
-def allow_licence(name: str, spdx: str | None, accepted=()) -> None:
+def allow_licence(name: str, spdx: str | None, accepted=()) -> frozenset[str]:
+    """Validate SPDX AND/OR policy; return explicitly accepted obligations.
+
+    OR chooses an available branch, preferring one with no extra consent.
+    AND requires each branch. Unsupported syntax is refused, never guessed.
+    """
     if not spdx:
         raise AssetError(f"{name}: unknown licence; add a reviewed licence record")
     permissive = {"MIT", "MIT-CMU", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0",
                   "MPL-2.0", "PSF-2.0", "OFL-1.1", "CC-BY-4.0", "GUST-Font-License", "UIUC"}
-    if spdx not in permissive and spdx not in set(accepted):
-        raise AssetError(f"{name}: {spdx} needs --accept-licence {spdx} and a source offer")
+    accepted = set(accepted)
+    tokens = re.findall(r"[A-Za-z0-9.+-]+|[()]", spdx)
+    if re.sub(r"\s+", "", spdx) != "".join(tokens):
+        raise AssetError(f"{name}: unsupported licence expression: {spdx}")
+    position = 0
+    def atom():
+        nonlocal position
+        if position >= len(tokens):
+            raise AssetError(f"{name}: incomplete licence expression")
+        token = tokens[position]
+        position += 1
+        if token == "(":
+            value = either()
+            if position >= len(tokens) or tokens[position] != ")":
+                raise AssetError(f"{name}: unclosed licence expression")
+            position += 1
+            return value
+        if token in {"AND", "OR", ")"}:
+            raise AssetError(f"{name}: invalid licence expression")
+        return frozenset() if token in permissive else frozenset({token}) if token in accepted else None
+    def both():
+        nonlocal position
+        value = atom()
+        while position < len(tokens) and tokens[position] == "AND":
+            position += 1
+            other = atom()
+            value = value | other if value is not None and other is not None else None
+        return value
+    def either():
+        nonlocal position
+        value = both()
+        while position < len(tokens) and tokens[position] == "OR":
+            position += 1
+            other = both()
+            if value is None or (other is not None and len(other) < len(value)):
+                value = other
+        return value
+    obligations = either()
+    if position != len(tokens):
+        raise AssetError(f"{name}: unsupported licence expression: {spdx}")
+    if obligations is None:
+        raise AssetError(f"{name}: {spdx} needs explicit --accept-licence and a source offer")
+    return obligations
 
 
 def inventory(root: Path) -> dict[str, str]:
@@ -241,8 +301,8 @@ def build_from_lock(lock: dict, destination: Path, cache: Path, *, accepted_lice
     # Reusing a verified bundle must not bypass the caller's licence policy.
     accepted_licences = tuple(accepted_licences)
     for archive in lock["archives"]:
-        allow_licence(archive["id"], archive.get("licence"), accepted_licences)
-        if archive.get("licence") in set(accepted_licences) and not archive.get("source_offer"):
+        obligations = allow_licence(archive["id"], archive.get("licence"), accepted_licences)
+        if obligations and not archive.get("source_offer"):
             raise AssetError(f'{archive["id"]}: accepted copyleft licence needs a source offer')
         if not archive.get("licence_files"):
             raise AssetError(f'{archive["id"]}: licence text is required')

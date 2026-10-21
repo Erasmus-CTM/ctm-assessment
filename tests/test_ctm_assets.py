@@ -119,6 +119,26 @@ class AssetsTests(unittest.TestCase):
             with self.assertRaisesRegex(A.AssetError, "source offer"):
                 A.build_from_lock(lock, Path(tmp) / "bundle", Path(tmp) / "cache", accepted_licences=["LGPL-2.1"])
 
+    def test_composite_licences_require_all_and_choose_permissive_or_branch(self):
+        self.assertFalse(A.allow_licence("icons", "(CC-BY-4.0 AND OFL-1.1 AND MIT)"))
+        self.assertFalse(A.allow_licence("board", "(MIT OR LGPL-3.0)", ["LGPL-3.0"]))
+        self.assertEqual(A.allow_licence("extra", "MIT AND LGPL-2.1", ["LGPL-2.1"]), {"LGPL-2.1"})
+        for expression in ("MIT AND LGPL-2.1", "MIT OR", "(MIT", "MIT WITH exception", "MIT ; BSD-3-Clause"):
+            with self.subTest(expression=expression), self.assertRaises(A.AssetError):
+                A.allow_licence("bad", expression)
+        with tempfile.TemporaryDirectory() as tmp:
+            lock = {"v": 1, "archives": [{"id": "extra", "licence": "MIT AND LGPL-2.1"}]}
+            with self.assertRaisesRegex(A.AssetError, "source offer"):
+                A.build_from_lock(lock, Path(tmp) / "bundle", Path(tmp) / "cache", accepted_licences=["LGPL-2.1"])
+
+    def test_python_package_aliases_use_release_keys_and_reject_ambiguous_lock(self):
+        full = {"packages": {"pyodide-http": {"depends": ["Some_Dep"]}, "some-dep": {"depends": []}}}
+        self.assertEqual(set(A.package_closure(full, ["pyodide_http"])["packages"]), {"pyodide-http", "some-dep"})
+        with self.assertRaisesRegex(A.AssetError, "Ambiguous"):
+            A.package_closure({"packages": {"a_b": {}, "a-b": {}}}, ["a_b"])
+        with self.assertRaises(A.AssetError):
+            A.package_closure(full, ["ALL"])
+
     def test_compression_is_deterministic_and_preserves_range_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
