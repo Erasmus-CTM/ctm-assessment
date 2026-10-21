@@ -4,9 +4,11 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "8c7e5f607b21136e71a510c8fe8385de26493712",
+      "commit": "a35c9f156cf256953dd947fb5441da91fcabb2fb",
       "extensions": [
-        "ctm-libs",
+        "ctm-libs"
+      ],
+      "ships-copies": [
         "ai-feedback"
       ],
       "review-ref-aliases": [
@@ -16,12 +18,12 @@
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "main",
-      "commit": "2b24df65deacfe405f07c17409b2d70eb3d7622b"
+      "commit": "ad56804fd511bf89d909bf5e495ad515bb0c0c37"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "df8fff5eb49fbcb44a1c59c57ad61679ccf54947"
+      "commit": "e092b8dece85f420f25ce774e5e85779cc078309"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
@@ -31,7 +33,7 @@
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "feature/shared-feedback-integration",
-      "commit": "8a16aa73bc1eea241ee1407525d8657c4c8b287b",
+      "commit": "d12d80cebf478ca88ed0a773c090e038b59bac63",
       "ships-copies": [
         "ai-feedback",
         "ctm-libs"
@@ -41,7 +43,8 @@
       "repository": "jsxgraph/jsxgraph-quarto",
       "branch": "main",
       "commit": "17de83e006cf8907a146cc6a2366f42a35463c6e",
-      "extension": "jsxgraph"
+      "extension": "jsxgraph",
+      "pin-outside-branch": "the fork commit of upstream pull request #2, not on upstream main"
     },
     "ctm-assessment": {
       "repository": "Erasmus-CTM/ctm-assessment",

@@ -19,13 +19,14 @@ In VS Code, **Terminal → Run Task…** offers the same commands (`.vscode/task
 
 The builder renders one `example.html` from `example.qmd` and topic includes,
 using the components pinned in `integration/feedback/repos.json`: ctm-libs (the
-library, with its `ai-feedback` alias), math-exercise, ctm-checkers (the Python
+library; its `ai-feedback` alias is a declared copy, no longer packaged), math-exercise, ctm-checkers (the Python
 checker library math-exercise grades with from 0.11 on: the generated
 `_extensions/ctm-checkers` folder with its wheel and page script),
 py-exercise, pyodide-interaktiv and JSXGraph (the upstream
 jsxgraph/jsxgraph-quarto extension). It records revisions and hashes, rejects
 any vendored copy of another component, checks that every `ctm-bootstrap.lua`
-equals ctm-libs' own (with `--follow-branches`, a copy may also equal the
+(math-exercise's, py-exercise's and, from 1.9, pyodide-interaktiv's; a component
+may pass options, `standalone` and `api`, but never edits its copy) equals ctm-libs' own (with `--follow-branches`, a copy may also equal the
 pinned ctm-libs' file), keeps checker Python in one home (no packaged folder but
 ctm-checkers defines `_math_check` or `assess_basis` in any file or ships a
 wheel, and math-exercise's only Python files are `variants.py` and the
@@ -33,8 +34,8 @@ wheel, and math-exercise's only Python files are `variants.py` and the
 shared loading, filter order, context reuse and browser behavior. The components' tests run against the
 pinned ctm-libs and ctm-checkers: `CTM_LIBS_EXTENSION` names its
 `_extensions/ctm-libs` folder and `AI_FEEDBACK_EXTENSION` its `feedback`
-folder (pyodide-interaktiv 1.8's tests load the three feedback files from
-there), `CTM_CHECKERS_EXTENSION` the packaged `_extensions/ctm-checkers`
+folder (the umbrella's own tests load the three feedback files from there;
+it goes with step 3's U3c), `CTM_CHECKERS_EXTENSION` the packaged `_extensions/ctm-checkers`
 folder and `CTM_CHECKERS_SOURCE` the ctm-checkers checkout (ctm-libs' tests
 install it from there); they get a temporary folder outside this checkout.
 `--test` also runs ctm-checkers' `tools/build.py --check`: the packaged folder
@@ -237,7 +238,9 @@ two renders page by page: the files a page loads, its configuration objects
 belong to a category of the expectation files in
 `tools/compare-rendered/expect/` (`step1.yml` for the changes of CTM
 Assessment 0.9, `step2.yml` for 0.10's (ctm-checkers' page script on math
-pages), `step4.yml` for step 4 on pages without its Markdown,
+pages), `step3.yml` for pyodide-interaktiv 1.9 on ctm-libs (its scripts as
+files, the new `uiLanguage`, Bokmål named `nb`; pyodide-interaktiv's settings
+script is compared by its values, as `qpyodideSettings`), `step4.yml` for step 4 on pages without its Markdown,
 `step4-migration.yml` for a course's step-4 migration; one file per course or
 site where needed). A rule matches an item's fields: besides the difference
 (`area`, `change`, `tag`, `attribute`, `before`, `after`, `line`, …), where a
@@ -398,6 +401,35 @@ files a page's expanded Markdown reaches stop being exactly the ones ctm-libs
 lists, and runs the tool with copies of ctm-libs whose rules are changed (a
 comment, indented code, a lint rule and its state, a kind's title, the
 catalogue, a language): the tool's result must change with each.
+
+### Pyodide cells, old against new
+
+`tools/pyodide-cells.mjs run --site DIR --out FILE [--runs N] [--browser
+chromium|firefox|webkit]` runs every Pyodide cell of a rendered site in a
+browser: it waits for the startup phase (setup, output and autorun cells),
+records each cell's output, then runs every interactive cell in page order
+(a cell that calls `input()` is skipped) and records it again; `compare --old
+FILE --new FILE` fails on any difference, except that a cell whose output
+differs between the old file's runs is compared for errors only. The workflow
+*Pyodide cells, old against new* (`pyodide-cells-parity.yml`) runs it for
+ctm-demo and ingmat3a (old = a pull request's base, new = its head; ingmat3a's
+`linalg-branch` informational) on pull requests that change the pins, and on
+demand for any course and refs; it also runs the example site's cells in
+Firefox and WebKit against Chromium. `integration/feedback/pyodide-browser.cjs`
+(`npm run test:browser`) checks pyodide-interaktiv's cells in Chromium: the COI
+service worker as GitHub Pages serves a site, no isolation, Stop, `input()`,
+plots and `embed-resources`. `integration/feedback/loading-timing.cjs` with
+`CTM_TIMING_D2_LIMIT_S` fails when the first check on the combined page waits
+longer than that for pyodide-interaktiv's background packages.
+
+### Merging a set of pull requests
+
+Cross-repository work goes to AC as a stacked set (consolidation step-1 design
+§12.1): every pull request pins the reviewed heads of the others, with no
+review trailer, every branch is up to date with its base, and the umbrella pull
+request's CI is the combined run. AC merges the set in one sitting, in order,
+with merge commits. Afterwards `python scripts/setup-feedback-integration.py
+--check-pins` checks that every pin of `repos.json` is a commit of its branch.
 
 ### Releases
 

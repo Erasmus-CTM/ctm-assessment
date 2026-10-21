@@ -60,8 +60,4 @@ function atLeast(extensionsDir, name, major, minor) {
   const [a, b] = extensionVersion(extensionsDir, name);
   return a > major || (a === major && b >= minor);
 }
-// pyodide-interaktiv 1.9 (consolidation step 3) or later; the tests' 1.8
-// branches go once the package pins 1.9 (U3b).
-const pyodideAtLeast19 = extensionsDir => atLeast(extensionsDir, 'pyodide-interaktiv', 1, 9);
-
-module.exports = {FEEDBACK, LIBRARY, MATH, CONFIG, dependency, scriptsOf, run, extensionVersion, atLeast, pyodideAtLeast19};
+module.exports = {FEEDBACK, LIBRARY, MATH, CONFIG, dependency, scriptsOf, run, extensionVersion, atLeast};

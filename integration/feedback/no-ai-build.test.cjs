@@ -52,10 +52,10 @@ function messages(stderr) {
 function output(dir) {
   return fs.readdirSync(path.join(dir, '_site'), {recursive: true}).map(String).map(name => name.split(path.sep).join('/'));
 }
-// pyodide-interaktiv 1.9 (consolidation step 3) writes none of the AI-only
-// cell options without AI feedback, not even empty (E3): no task,
+// pyodide-interaktiv (1.9 and later, consolidation step 3) writes none of the
+// AI-only cell options without AI feedback, not even empty (E3): no task,
 // feedback-policy or feedback-context key, so no hidden #| task: text; and no
-// Pyodide feedback script. 1.8 kept them.
+// Pyodide feedback script.
 const AI_ONLY = ['task', 'feedback-policy', 'feedback-context'];
 // The Pyodide cells of a page (its settings script, evaluated), or [].
 function pyodideCells(html) {
@@ -68,17 +68,15 @@ function pyodideCells(html) {
 }
 function checkWithout(dir, pages, reason, stderr) {
   assert.deepEqual(output(dir).filter(name => FILES.test(name)), [], 'feedback files in the site');
-  const page19 = page.pyodideAtLeast19(path.join(dir, '_extensions'));
+  assert.ok(page.atLeast(path.join(dir, '_extensions'), 'pyodide-interaktiv', 1, 9), 'the package ships pyodide-interaktiv 1.9 or later');
   for (const name of pages) {
     const html = fs.readFileSync(path.join(dir, '_site', name.replace(/\.qmd$/, '.html')), 'utf8');
     assert.doesNotMatch(html, ABSENT, name);
     assert.doesNotMatch(html, MARKERS, name);
-    if (page19) {
-      assert.doesNotMatch(html, /Print two\.|qpyodide-feedback\.js|"policySelection"|"feedbackContext"/, name);
-      for (const cell of pyodideCells(html)) assert.deepEqual(AI_ONLY.filter(key => key in cell.options), [], name + ': AI-only keys of cell ' + cell.id);
-    }
+    assert.doesNotMatch(html, /Print two\.|qpyodide-feedback\.js|"policySelection"|"feedbackContext"/, name);
+    for (const cell of pyodideCells(html)) assert.deepEqual(AI_ONLY.filter(key => key in cell.options), [], name + ': AI-only keys of cell ' + cell.id);
   }
-  if (page19) assert.ok(pyodideCells(fs.readFileSync(path.join(dir, '_site', 'all.html'), 'utf8')).length > 0, 'all.html has Pyodide cells');
+  assert.ok(pyodideCells(fs.readFileSync(path.join(dir, '_site', 'all.html'), 'utf8')).length > 0, 'all.html has Pyodide cells');
   const html = fs.readFileSync(path.join(dir, '_site', 'all.html'), 'utf8');
   const doc = new JSDOM(html).window.document;
   const task = doc.querySelector('#essay');
@@ -148,5 +146,27 @@ test('the example site builds without AI feedback: no policy panels, criteria or
     assert.ok(texts.length >= 10, 'criteria and starters found: ' + texts.length);
     const visible = doc.body.innerHTML;
     for (const text of texts) assert.ok(!visible.includes(text) && !html.includes(text), 'still on the page: ' + text);
+  } finally { fs.rmSync(dir, {recursive: true, force: true}); }
+});
+
+test('E3: a page with only Pyodide cells with #| task: builds without AI feedback, without-ai unset; the cells stay runnable', {skip: !site}, () => {
+  // Such cells are runnable code, not exercises only AI can assess (ctm-libs'
+  // without-ai rule counts none of them): the build neither stops nor names
+  // Pyodide unless the project asked for its feedback.
+  const dir = fs.mkdtempSync(path.join(path.dirname(path.dirname(site)), 'no-ai-pyodide-'));
+  try {
+    fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true});
+    fs.writeFileSync(path.join(dir, '_quarto.yml'), 'project:\n  type: website\n  render: [cells.qmd]\nfilters: [ctm-assessment]\n');
+    fs.writeFileSync(path.join(dir, '_quarto-no-ai.yml'), 'ai-feedback:\n  enabled: false\n');
+    fs.writeFileSync(path.join(dir, 'cells.qmd'), '---\ntitle: Cells\n---\n\n```{pyodide-python}\n#| task: Print two.\nprint(0)\n```\n');
+    const stderr = render(dir, ['--profile', 'no-ai']);
+    // Nothing asked for feedback, so there is no build message at all.
+    assert.doesNotMatch(stderr, /AI feedback is off|pyodide/i, stderr);
+    const html = fs.readFileSync(path.join(dir, '_site', 'cells.html'), 'utf8');
+    assert.doesNotMatch(html, /Print two\./);
+    const cells = pyodideCells(html);
+    assert.equal(cells.length, 1);
+    assert.deepEqual(AI_ONLY.filter(key => key in cells[0].options), []);
+    assert.deepEqual(output(dir).filter(name => FILES.test(name)), []);
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
 });

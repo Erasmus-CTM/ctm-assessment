@@ -1,7 +1,10 @@
 name: Measure loading times
 
 # Time to the first graded exercise (cold/warm cache, fast/slow network) and
-# Pyodide runtime/package costs. On demand, and when the measurement changes.
+# Pyodide runtime/package costs. On demand, and when the measurement or the
+# pins change. D2 (consolidation step 3, T8): the combined page's first check
+# comes within 2 s of the same page with pyodide-interaktiv's stage 2
+# switched off, on the fast and the slow profile, or the job fails.
 on:
   workflow_dispatch:
   push:
@@ -12,6 +15,7 @@ on:
       - .github/workflows/measure-loading.yml
   pull_request:
     paths:
+      - integration/feedback/repos.json
       - integration/feedback/loading-timing.cjs
       - integration/feedback/timing/**
       - .github/workflows/measure-loading.yml
@@ -56,6 +60,7 @@ jobs:
         timeout-minutes: 45
         env:
           CTM_INTEGRATION_SITE: ${{ github.workspace }}/.feedback-workspace/site/_site
+          CTM_TIMING_D2_LIMIT_S: '2'
         run: node integration/feedback/loading-timing.cjs "$RUNNER_TEMP/loading-timing.json"
       - uses: actions/upload-artifact@v7
         if: always()

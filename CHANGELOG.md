@@ -1,5 +1,66 @@
 # Changes
 
+## 0.11.0
+
+Consolidation step 3: **pyodide-interaktiv 1.9 runs on ctm-libs**, the
+package's library, like the other components: one Python worker, one
+language catalogue, one settings reader and one feedback implementation on
+every page. Authors keep their pages and `filters: [ctm-assessment]`.
+
+Components: ctm-libs at a35c9f1 (step 3, on top of 0.10.0's 8c7e5f6),
+math-exercise and py-exercise with ctm-libs' new bootstrap copy (no
+behaviour change), pyodide-interaktiv 1.9.0; ctm-checkers (0.2.0 at 8c3db5e)
+and JSXGraph unchanged, at the commits recorded in
+`_extensions/ctm-assessment/resolved-repos.json`.
+
+### Changed for authors and learners
+
+- **Pyodide cells no longer hold up the other exercises.** On a page with
+  Pyodide cells, math and Python checks run as soon as Python has started;
+  matplotlib and the other extra packages load in the background without
+  getting in a check's way. Pyodide's own cells and Run buttons wait for
+  them, as before. A Run clicked while the page's setup and output cells
+  are still running waits for them (its button shows that it is loading),
+  so a cell that uses their names never runs before them. If they cannot be loaded, the status line says that plots
+  are not available (naming the package), that other Python code works
+  normally, and offers Retry.
+- **A page that cannot be isolated is reloaded once, not again and again.**
+  Where a host sends no COOP/COEP headers (GitHub Pages) the page reloads once
+  so that the service worker can isolate it. WebKit cannot be isolated this
+  way and reports that reload as a plain navigation; the page then reloaded
+  every two seconds. It now reloads once and `input()` stays unavailable
+  there, as in other browsers that cannot isolate. A hard reload (which
+  bypasses the worker) is not taken for the failed check, and the failure is
+  remembered for 24 hours, not for good.
+- **pyodide-interaktiv's scripts are cacheable files** (they were inline),
+  and pages with `embed-resources: true` work with Pyodide cells.
+- **`pyodide:` settings combine key by key** across `_quarto.yml`, profiles,
+  `_metadata.yml` and the page, as every other CTM section; `ctm-assessment:
+  lang` reaches Pyodide's interface; `nn` pages get its Bokmål texts.
+- **Builds without AI feedback** leave out Pyodide's Feedback buttons and
+  every AI-only cell option (`#| task:` text included), in any filter order.
+- After **Stop** without cross-origin isolation (a restart), Run waits until
+  the new start is ready, and the setup cells run again first.
+- **The `ai-feedback` folder is no longer installed** with the package (it
+  was a thin alias of ctm-libs since 0.9). `filters: [ctm-assessment]` is
+  unchanged; a page listing `ai-feedback` with the package's components uses
+  `filters: [ctm-assessment]` instead. An old copy left in a course is inert.
+
+### For maintainers
+
+- `repos.json`: ctm-libs packages its library only (its alias is a declared
+  copy until ctm-libs deletes it); pyodide-interaktiv is compared like the
+  other components for its `ctm-bootstrap.lua`, and no component keeps a
+  retired copy.
+- New checks: `integration/feedback/pyodide-browser.cjs` (in `npm run
+  test:browser`), the D2 comparison in `loading-timing.cjs`
+  (`CTM_TIMING_D2_LIMIT_S`, `measure-loading.yml`), `tools/pyodide-cells.mjs`
+  and the workflow *Pyodide cells, old against new*, and
+  `tools/compare-rendered/expect/step3.yml` (`compare-rendered.mjs` reads
+  Pyodide's settings script by its values).
+- `setup-feedback-integration.py --check-pins`, and the stacked-set merge
+  protocol (consolidation step-1 design §12.1).
+
 ## 0.10.0
 
 Consolidation step 2: math-exercise grades with **ctm-checkers**, the

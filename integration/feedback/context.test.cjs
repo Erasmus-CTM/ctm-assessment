@@ -1,10 +1,10 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {spawnSync}=require('node:child_process'),{JSDOM}=require('jsdom');
 const site=process.env.CTM_INTEGRATION_SITE;
-// ctm-libs (with its ai-feedback alias) and the components; the package's own folder
-// (ctm-assessment) is installed unqualified, as `quarto add <archive>` does.
-// ctm-checkers: math-exercise 0.11 and later grade with it (the folder is unused with 0.10).
-const names=['ctm-libs','ai-feedback','math-exercise','ctm-checkers','py-exercise','pyodide-interaktiv'];
+// ctm-libs and the components (no ai-feedback alias since step 3); the package's own
+// folder (ctm-assessment) is installed unqualified, as `quarto add <archive>` does.
+// ctm-checkers: math-exercise grades with it.
+const names=['ctm-libs','math-exercise','ctm-checkers','py-exercise','pyodide-interaktiv'];
 function fixture(filters){
  let q=`---\nformat: html\n${filters.length ? 'filters: ['+filters.join(', ')+']\n' : ''}py-exercise:\n  feedback: true\npyodide:\n  feedback: true\n---\n`;
  for(const mode of ['auto','none','shared']){
@@ -27,7 +27,7 @@ test('one shared installation supplies identical context across integrations, or
   for(const name of names)fs.cpSync(path.join(path.dirname(site),'_extensions',name),path.join(dir,'_extensions',...(qualified?['Erasmus-CTM']:[]),name),{recursive:true});
   fs.cpSync(path.join(path.dirname(site),'_extensions','ctm-assessment'),path.join(dir,'_extensions','ctm-assessment'),{recursive:true});
   fs.mkdirSync(path.join(dir,'chapter'));
-  const filters=qualified?['ai-feedback','py-exercise','pyodide-interaktiv','math-exercise']:['math-exercise','pyodide-interaktiv','py-exercise'];
+  const filters=qualified?['py-exercise','pyodide-interaktiv','math-exercise']:['math-exercise','pyodide-interaktiv','py-exercise'];
   fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\n  render: [chapter/context.qmd]\nfilters: ['+filters.join(', ')+']\n');
   fs.writeFileSync(path.join(dir,'chapter','context.qmd'),fixture([]));
   const result=spawnSync(process.env.QUARTO_BIN||'quarto',['render'],{cwd:dir,encoding:'utf8',timeout:120000});

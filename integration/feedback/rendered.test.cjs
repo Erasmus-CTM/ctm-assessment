@@ -89,9 +89,14 @@ test('common page renders the active extensions and keeps local dependencies res
   for (const file of ['feedback-core.js','feedback-dom.js','ai-feedback.js','ai-feedback.css']) {
     assert.equal(record.extension_sha256['pyodide-interaktiv']['ai-feedback/'+file],undefined);
   }
-  // ctm-libs ships its library and the thin ai-feedback alias (0.9.x): no feedback files in the alias.
-  assert.deepEqual(record.repositories['ctm-libs'].extensions, ['ctm-libs', 'ai-feedback']);
-  assert.deepEqual(Object.keys(record.extension_sha256['ai-feedback']).sort(), ['_extension.yml', 'ai-feedback.lua', 'feedback-quarto.lua']);
+  // ctm-libs packages its library only: the ai-feedback alias of 0.9 and 0.10
+  // is no longer packaged (step 3, U3b), and no folder of that name is built.
+  assert.deepEqual(record.repositories['ctm-libs'].extensions, ['ctm-libs']);
+  assert.equal(record.extension_sha256['ai-feedback'], undefined);
+  assert.ok(!fs.existsSync(path.join(path.dirname(site), '_extensions', 'ai-feedback')), 'no ai-feedback folder in the build');
+  // pyodide-interaktiv 1.9 loads ctm-libs through the shared bootstrap; its loader is gone.
+  assert.ok(record.extension_sha256['pyodide-interaktiv']['ctm-bootstrap.lua']);
+  assert.equal(record.extension_sha256['pyodide-interaktiv']['feedback-loader.lua'], undefined);
   for (const file of ['feedback/feedback-core.js', 'lua/ctm.lua', 'runtime/pyodide-runtime.js', 'locales/ctm-locale.js', 'ctm-libs-end.lua'])
     assert.ok(record.extension_sha256['ctm-libs'][file], file);
   for (const [name, source] of Object.entries(record.repositories)) {
@@ -237,19 +242,21 @@ test('Python practice keeps five incomplete starters and their tasks separate fr
   dom.window.close();
 });
 
-test('individually listed math-exercise and both shared-filter orders load one usable runtime; an old ai-feedback stops', async () => {
-  // The package is installed (ctm-assessment, ctm-libs with its ai-feedback
-  // alias, math-exercise) and the page lists filters itself, as documented
-  // for pages that do not use filters: [ctm-assessment].
+test('individually listed math-exercise loads one usable runtime; an old ai-feedback listed next to it stops', async () => {
+  // The package is installed (ctm-assessment, ctm-libs, math-exercise) and
+  // the page lists filters itself, as documented for pages that do not use
+  // filters: [ctm-assessment]. The package has no ai-feedback alias any more
+  // (step 3, U3b); an old ai-feedback 0.8.1 listed next to the components
+  // stops with the migration message (L3, §18.4).
   const {spawnSync} = require('node:child_process');
   const dir = fs.mkdtempSync(path.join(path.dirname(site), 'filter-order-'));
   try {
     const source = path.join(path.dirname(site), '_extensions');
     // ctm-checkers: math-exercise 0.11 and later grade with it (unused with 0.10).
-    for (const name of ['ctm-assessment', 'ctm-libs', 'ai-feedback', 'math-exercise', 'ctm-checkers'])
+    for (const name of ['ctm-assessment', 'ctm-libs', 'math-exercise', 'ctm-checkers'])
       fs.cpSync(path.join(source, name), path.join(dir, '_extensions', name), {recursive: true});
     if (legacy) fs.cpSync(legacy, path.join(dir, '_extensions/Erasmus-CTM/ai-feedback'), {recursive: true});
-    const orders = [['math-exercise'], ['ai-feedback', 'math-exercise'], ['math-exercise', 'ai-feedback']];
+    const orders = [['math-exercise']];
     if (legacy) orders.push(['Erasmus-CTM/ai-feedback', 'math-exercise'], ['math-exercise', 'Erasmus-CTM/ai-feedback']);
     for (const [i, filters] of orders.entries()) {
       fs.writeFileSync(path.join(dir, `order-${i}.qmd`), `---\nformat: html\nfilters: [${filters.join(', ')}]\n---\n\n::: {#context .ai-context}\nUse $x^2$.\n:::\n\n\x60\x60\x60{math-exercise}\n#| label: order\n#| context: context\nCompute $2+2$: _[SECRET_ANSWER]\n\x60\x60\x60\n`);
@@ -258,10 +265,10 @@ test('individually listed math-exercise and both shared-filter orders load one u
         // ai-feedback 0.8.1 listed next to the package's components: a page uses one version.
         assert.notEqual(render.status, 0, filters.join(', '));
         assert.match(render.stderr, /combines filters that use different ai-feedback versions/);
+        assert.match(render.stderr, /remove ai-feedback from filters: and delete the old folder/);
         continue;
       }
       assert.equal(render.status, 0, render.stderr);
-      if (filters.includes('ai-feedback')) assert.match(render.stderr, /filters: \[ai-feedback\] is deprecated/);
       const file = path.join(dir, `order-${i}.html`);
       const dom = new JSDOM(fs.readFileSync(file, 'utf8'), {url: 'https://order.invalid/', runScripts: 'outside-only'});
       const w = dom.window;
@@ -285,34 +292,39 @@ test('individually listed math-exercise and both shared-filter orders load one u
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
 });
 
-test('standalone Pyodide, both filter orders and disabled feedback render correctly', () => {
+test('Pyodide through ctm-libs without the alias: [pyodide-interaktiv], [ctm-assessment] and feedback off render correctly', () => {
+  // pyodide-interaktiv 1.9 runs on ctm-libs through the shared bootstrap: no
+  // ai-feedback folder is installed (step 3, U3b), in either layout.
   const {spawnSync} = require('node:child_process');
   const dir = fs.mkdtempSync(path.join(path.dirname(site), 'pyodide-order-'));
   try {
-    // pyodide-interaktiv 1.8 loads ai-feedback through its own loader: the alias hands it ctm-libs' feedback.
-    for(const extension of ['pyodide-interaktiv','ctm-libs','ai-feedback']) fs.cpSync(path.join(path.dirname(site),'_extensions',extension),path.join(dir,'_extensions',extension),{recursive:true});
-    for(const [i,filters] of [['pyodide-interaktiv'],['ai-feedback','pyodide-interaktiv'],['pyodide-interaktiv','ai-feedback'],['pyodide-interaktiv']].entries()) {
-      const blocks=['interactive','setup','output'].map(context=>'```{pyodide-python}\n#| context: '+context+'\n#| task: Print the value.\nprint(1)\n```').join('\n\n');
-      fs.writeFileSync(path.join(dir,`order-${i}.qmd`),`---\nformat: html\nfilters: [${filters.join(', ')}]\npyodide:\n  feedback: ${i!==3}\n---\n\n${blocks}\n`);
-      const render=spawnSync(process.env.QUARTO_BIN||'quarto',['render',`order-${i}.qmd`],{cwd:dir,encoding:'utf8',timeout:120000});
-      assert.equal(render.status,0,render.stderr);
-      const dom=new JSDOM(fs.readFileSync(path.join(dir,`order-${i}.html`),'utf8'),{url:'https://order.invalid/',runScripts:'outside-only'});
-      const w=dom.window;
-      for(const file of ['feedback-core.js','feedback-dom.js','ai-feedback.js']) {
-        const scripts=[...w.document.scripts].filter(s=>s.src.endsWith('/'+file));
-        assert.equal(scripts.length,i===3?0:1);
-        if(i!==3)w.eval(fs.readFileSync(path.join(dir,scripts[0].getAttribute('src')),'utf8'));
+    fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true});
+    assert.ok(!fs.existsSync(path.join(dir, '_extensions', 'ai-feedback')));
+    for (const [i, [filters, feedback]] of [[['pyodide-interaktiv'], true], [['ctm-assessment'], true], [['pyodide-interaktiv'], false]].entries()) {
+      const blocks = ['interactive', 'setup', 'output'].map(context => '```{pyodide-python}\n#| context: ' + context + '\n#| task: Print the value.\nprint(1)\n```').join('\n\n');
+      fs.writeFileSync(path.join(dir, `order-${i}.qmd`), `---\nformat: html\nfilters: [${filters.join(', ')}]\npyodide:\n  feedback: ${feedback}\n---\n\n${blocks}\n`);
+      const render = spawnSync(process.env.QUARTO_BIN || 'quarto', ['render', `order-${i}.qmd`], {cwd: dir, encoding: 'utf8', timeout: 120000});
+      assert.equal(render.status, 0, render.stderr);
+      assert.doesNotMatch(render.stderr, /ai-feedback\] is deprecated/);
+      const file = path.join(dir, `order-${i}.html`);
+      const w = new JSDOM(fs.readFileSync(file, 'utf8'), {url: 'https://order.invalid/', runScripts: 'outside-only'}).window;
+      for (const name of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) {
+        const scripts = [...w.document.scripts].filter(s => s.src.endsWith('/' + name));
+        assert.equal(scripts.length, feedback ? 1 : 0, `${filters}: ${name}`);
+        if (feedback) w.eval(fs.readFileSync(path.join(dir, scripts[0].getAttribute('src')), 'utf8'));
       }
-      if(i!==3){assert.equal(w.AIFeedback.version,sharedVersion);w.AIFeedback.openSettings();assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length,1);}
-      assert.equal(w.document.querySelectorAll('[id^="qpyodide-insertion-location-"]').length,3);
-      const dataScript = [...w.document.scripts].find(s=>s.textContent.includes('globalThis.qpyodideCellDetails ='));
+      if (feedback) { assert.equal(w.AIFeedback.version, sharedVersion); w.AIFeedback.openSettings(); assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length, 1); }
+      // The worker and the cells' scripts are ctm-libs' and pyodide-interaktiv's files, each once (D1).
+      for (const [name, script] of [['ctm-worker', 'pyodide-worker.js'], ['pyodide-interaktiv', 'qpyodide-cell-classes.js']])
+        assert.equal(page.scriptsOf(w.document, name, script).length, 1, `${filters}: ${name}/${script}`);
+      assert.equal(w.document.querySelectorAll('[id^="qpyodide-insertion-location-"]').length, 3);
+      const dataScript = [...w.document.scripts].find(s => s.textContent.includes('globalThis.qpyodideCellDetails ='));
       assert.ok(dataScript); w.eval(dataScript.textContent);
-      assert.equal(w.qpyodideCellDetails.length,3);
-      assert.ok(w.qpyodideCellDetails.every(c=>c.options.task==='Print the value.'));
-      assert.deepEqual(Array.from(w.qpyodideCellDetails,c=>c.options.context),['interactive','setup','output']);
+      assert.deepEqual(Array.from(w.qpyodideCellDetails, c => c.options.context), ['interactive', 'setup', 'output']);
+      if (feedback) assert.ok(w.qpyodideCellDetails.every(c => c.options.task === 'Print the value.'), String(filters));
       w.close();
     }
-  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+  } finally { fs.rmSync(dir, {recursive: true, force: true}); }
 });
 
 test('explicit file selection and inherited overrides preserve effective policy', () => {

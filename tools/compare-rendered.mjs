@@ -70,8 +70,23 @@ function noiseFree(name, value) {
 // Inline scripts: configuration objects as JSON, everything else by kind.
 // pyodide-interaktiv writes its cells' data into its settings script.
 const CELL_DETAILS = /^globalThis\.qpyodideCellDetails = (\[.*\]);$/m;
+// pyodide-interaktiv's settings script (qpyodide-document-settings.js) only
+// assigns globals: its values are compared as one configuration object,
+// qpyodideSettings (the cells as qpyodideCellDetails), and its comments and
+// layout not at all (step 3: 1.9 writes it as a classic script).
+function pyodideSettings(t) {
+  if (!t.startsWith('// qpyodide-document-settings.js')) return null;
+  const scope = {};
+  try { vm.runInNewContext(t, scope, {timeout: 1000}); } catch (_) { return null; }
+  const json = JSON.parse(JSON.stringify(scope));
+  const cells = json.qpyodideCellDetails || null;
+  delete json.qpyodideCellDetails;
+  return {kind: 'qpyodideSettings', json, cells};
+}
 function inlineScript(text) {
   let t = text.trim(), cells = null;
+  const settings = pyodideSettings(t);
+  if (settings) return settings;
   const details = CELL_DETAILS.exec(t);
   if (details && !t.startsWith('globalThis.qpyodideCellDetails')) {
     try { cells = JSON.parse(details[1]); t = t.replace(CELL_DETAILS, 'globalThis.qpyodideCellDetails = <cells>;'); } catch (_) { cells = null; }
@@ -578,8 +593,10 @@ function revealOf(item, status) {
 
 // The lecture/reading switch: the new one stands where the old one stood
 // (the same words before it in main, outside the title block) or at the top
-// of the page (no words before it). Anything else is a difference that no
-// expectation explains.
+// of the page (no words before it). Where the old side already has the new
+// switch (a migrated course compared with an earlier build), it is the same
+// switch: it must stand in the same place. Anything else is a difference that
+// no expectation explains.
 const OLD_SWITCH = '[data-learning-mode]', NEW_SWITCH = '.ctm-modes';
 function wordsBefore(doc, el) {
   const w = words(doc), main = el.closest('main') || doc.body, title = main.querySelector('#title-block-header');
@@ -587,7 +604,7 @@ function wordsBefore(doc, el) {
   return w.list.slice(ms, es).filter((_, k) => k + ms < ts || k + ms >= te).join(' ');
 }
 function switchCheck(page, A, B) {
-  const [o, n] = [A.doc.querySelector(OLD_SWITCH), B.doc.querySelector(NEW_SWITCH)];
+  const [o, n] = [A.doc.querySelector(OLD_SWITCH) || A.doc.querySelector(NEW_SWITCH), B.doc.querySelector(NEW_SWITCH)];
   if (!n) return [];
   const now = wordsBefore(B.doc, n), was = o ? wordsBefore(A.doc, o) : null;
   if (now === '' || now === was) return [];
@@ -598,7 +615,7 @@ function switchCheck(page, A, B) {
 // page): the words between the new switch and it are those that stood
 // before it on old, so nothing else came in between.
 function switchOrder(A, B, before, after) {
-  const [o, n] = [A.doc.querySelector(OLD_SWITCH), B.doc.querySelector(NEW_SWITCH)];
+  const [o, n] = [A.doc.querySelector(OLD_SWITCH) || A.doc.querySelector(NEW_SWITCH), B.doc.querySelector(NEW_SWITCH)];
   if (!o || !n || !before || !after) return 'other';
   if (!(before.compareDocumentPosition(o) & 4) || !(n.compareDocumentPosition(after) & 4)) return 'other';
   const w = words(B.doc), [, end] = w.range(n), [start] = w.range(after);

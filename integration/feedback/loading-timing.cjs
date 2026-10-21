@@ -10,6 +10,15 @@
 // offline mode and response accounting do not reach requests made by a
 // service worker (pyodide-interaktiv's COI worker). One separate scenario
 // measures a first visit with the service worker allowed (it reloads the page).
+//
+// D2 (consolidation step 3, T8): on the combined page, the first graded
+// mathematics check with pyodide-interaktiv's stage 2 (matplotlib and the
+// other extra packages, in the background) against the same page with stage
+// 2 switched off (the test-only globalThis.__ctmWorkerNoBackground), on the
+// fast and the slow profile; also when Python is ready (stage 1) and when
+// Pyodide's cells are (stage 2). With CTM_TIMING_D2_LIMIT_S set, the job
+// fails when the first check comes later than that many seconds after the
+// page without stage 2 (design §18.5: 2 s on both profiles).
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
@@ -24,6 +33,7 @@ const VERSIONS = (process.env.CTM_PYODIDE_VERSIONS || '0.27.2,0.28.3').split(','
 // The slow profile is expensive; by default it covers one page and one runtime.
 const SLOW_PAGES = (process.env.CTM_TIMING_SLOW_PAGES || 'math-exercise alone').split(',');
 const WAIT_MS = Number(process.env.CTM_TIMING_WAIT_MS || 180000);
+const D2_LIMIT_S = process.env.CTM_TIMING_D2_LIMIT_S ? Number(process.env.CTM_TIMING_D2_LIMIT_S) : null;
 const types = {'.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.png': 'image/png'};
 
 const server = http.createServer((req, res) => {
@@ -139,11 +149,23 @@ async function firstGradeable(page, kind, wait = WAIT_MS) {
   }
 }
 
-async function pageScenario(browser, name, url, kind, profile, {serviceWorkers = 'block', warm = true, offline = profile === 'fast'} = {}) {
+// Pyodide's two stages on a page, in epoch milliseconds: the proxy is
+// published (stage 1; checks may run) and the cells are ready (stage 2).
+function watchStages() {
+  window.__ctmStages = {};
+  const poll = setInterval(() => {
+    if (!window.__ctmStages.python && globalThis.mainPyodide) window.__ctmStages.python = Date.now();
+    if (!window.__ctmStages.cells && globalThis.qpyodideCellsReady === true) { window.__ctmStages.cells = Date.now(); clearInterval(poll); }
+  }, 25);
+}
+
+async function pageScenario(browser, name, url, kind, profile, {serviceWorkers = 'block', warm = true, offline = profile === 'fast', noBackground = false, stages = false} = {}) {
   const runs = [];
   const caches = warm ? ['cold', 'warm'] : ['cold'];
   for (let i = 0; i < (profile === 'slow' ? SLOW_RUNS : RUNS); i++) {
     const ctx = await newContext(browser, serviceWorkers);
+    if (noBackground) await ctx.addInitScript(() => { globalThis.__ctmWorkerNoBackground = true; });
+    if (stages) await ctx.addInitScript(watchStages);
     const record = {};
     try {
       for (const cache of caches) {
@@ -158,7 +180,13 @@ async function pageScenario(browser, name, url, kind, profile, {serviceWorkers =
           await page.goto(url, {waitUntil: 'domcontentloaded', timeout: WAIT_MS});
           const t = await firstGradeable(page, kind);
           await page.waitForTimeout(3000); // let iframes (JSXGraph boards) finish loading
-          record[cache] = {controls_s: round((t.controls - start) / 1000), graded_s: round((t.graded - start) / 1000), status: t.status,
+          let stage = {};
+          if (stages) {
+            await page.waitForFunction(() => window.__ctmStages?.cells, null, {timeout: WAIT_MS}).catch(() => {});
+            const at = await page.evaluate(() => window.__ctmStages);
+            stage = {python_s: at.python ? round((at.python - start) / 1000) : null, cells_s: at.cells ? round((at.cells - start) / 1000) : null};
+          }
+          record[cache] = {controls_s: round((t.controls - start) / 1000), graded_s: round((t.graded - start) / 1000), ...stage, status: t.status,
             reloads: Math.max(0, navigations - 1),
             megabytes: serviceWorkers === 'allow' ? null : round((ctx.__bytes.total - before) / 1048576),
             families: familyMegabytes(ctx.__bytes.families, serviceWorkers)};
@@ -189,6 +217,7 @@ async function pageScenario(browser, name, url, kind, profile, {serviceWorkers =
     summary[cache] = {
       controls_s: median(runs.map(r => r[cache]?.controls_s)),
       graded_s: median(runs.map(r => r[cache]?.graded_s)),
+      ...(stages ? {python_s: median(runs.map(r => r[cache]?.python_s)), cells_s: median(runs.map(r => r[cache]?.cells_s))} : {}),
       megabytes: median(runs.map(r => r[cache]?.megabytes)),
       reloads: median(runs.map(r => r[cache]?.reloads)),
       families: runs.find(r => r[cache]?.families)?.[cache].families || null,
@@ -276,14 +305,35 @@ async function runtimeScenario(browser, version, profile, base) {
     for (const [file, name, kind] of [['timing-math.html', 'math-exercise alone', 'math'], ['timing-python.html', 'py-exercise alone', 'python'], ['timing-graphs.html', 'Four JSXGraph boards + one math exercise', 'math']]) {
       if (fs.existsSync(path.join(site, file))) pages.push([name, '/' + file, kind]);
     }
+    const d2 = [];
     for (const profile of ['fast', 'slow']) {
       for (const [name, url, kind] of pages) {
         if (profile === 'slow' && !SLOW_PAGES.includes(name)) continue;
         record(await pageScenario(browser, name, base + url, kind, profile));
       }
+      // D2: the combined page's first check with and without stage 2.
+      const name = 'Combined example page (all components), mathematics';
+      const withStage2 = await pageScenario(browser, name + ', with stage 2', base + '/example.html', 'math', profile, {offline: false, stages: true});
+      record(withStage2);
+      const without = await pageScenario(browser, name + ', stage 2 switched off', base + '/example.html', 'math', profile, {offline: false, noBackground: true, stages: true});
+      record(without);
+      for (const cache of ['cold', 'warm']) {
+        const a = withStage2.summary[cache], b = without.summary[cache];
+        const delay = a.graded_s !== null && b.graded_s !== null ? round(a.graded_s - b.graded_s) : null;
+        d2.push({profile, cache, graded_with_s: a.graded_s, graded_without_s: b.graded_s, delay_s: delay,
+          python_s: a.python_s, cells_s: a.cells_s, errors: [...a.errors, ...b.errors]});
+      }
       for (const version of profile === 'slow' ? VERSIONS.slice(0, 1) : VERSIONS) {
         record(await runtimeScenario(browser, version, profile, base));
       }
+    }
+    results.d2 = {limit_s: D2_LIMIT_S, comparisons: d2};
+    fs.writeFileSync(out, JSON.stringify(results, null, 2) + '\n');
+    const d2Text = d2.map(c => `${c.profile}/${c.cache}: first check ${c.graded_with_s} s with stage 2, ${c.graded_without_s} s without (${c.delay_s} s); Python ${c.python_s} s, cells ${c.cells_s} s`).join('; ');
+    console.log(process.env.GITHUB_ACTIONS ? '::notice title=D2 (step 3)::' + d2Text : 'D2: ' + d2Text);
+    if (D2_LIMIT_S !== null) {
+      const late = d2.filter(c => c.errors.length || c.delay_s === null || c.delay_s > D2_LIMIT_S);
+      if (late.length) throw new Error(`D2: the first check waits more than ${D2_LIMIT_S} s for stage 2, or failed: ` + JSON.stringify(late));
     }
     // A learner's real first visit to a page with Pyodide cells: the COI
     // service worker registers and reloads the page once.
