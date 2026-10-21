@@ -5,6 +5,8 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tarfile
 import tempfile
@@ -168,6 +170,25 @@ class AssetsTests(unittest.TestCase):
                 A.write_private_import_index(index, root / "_ctm-assets/assets-imports.json")
         with self.assertRaisesRegex(A.AssetError, "do not match"):
             A.private_import_index(full, {**stdlib, "python": "3.12.0"})
+
+    def test_packaged_scanner_cli_uses_stdin_and_paths_with_spaces(self):
+        scanner = Path(__file__).resolve().parents[1] / "_extensions/ctm-assessment/author-imports.py"
+        with tempfile.TemporaryDirectory(prefix="ctm imports ") as tmp:
+            root = Path(tmp)
+            index, subset = root / "private index.json", root / "subset lock.json"
+            index.write_bytes(A.json_bytes({"v": 1, "python": "fixture", "stdlib_modules": ["os"],
+                                           "packages": {"pandas": {"imports": ["pandas"]}}}))
+            subset.write_bytes(A.json_bytes({"info": {"python": "fixture"}, "packages": {}}))
+            args = [sys.executable, str(scanner), "--stdin", "--index", str(index), "--subset", str(subset)]
+            result = subprocess.run(args, input=json.dumps([{"source": "import os\nraise RuntimeError('never run')", "origin": "starter"}]),
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["imports"], ["os"])
+            result = subprocess.run(args, input=json.dumps([{"source": "import pandas", "origin": "solution"}]),
+                                    text=True, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("solution", result.stderr)
+            self.assertIn("absent from the local bundle", result.stderr)
 
     def test_curated_texts_keep_official_git_bytes_and_stdlib_facts_are_release_scoped(self):
         root = Path(__file__).resolve().parents[1]

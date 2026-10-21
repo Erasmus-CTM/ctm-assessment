@@ -20,6 +20,7 @@ function project(front = '') {
   const assessment = C.installPackage(dir);
   // Production hook verbatim; unrelated component filters are omitted.
   fs.copyFileSync(path.join(root, 'ctm-assessment.lua'), path.join(assessment, 'ctm-assessment.lua'));
+  fs.copyFileSync(path.join(root, 'author-imports.lua'), path.join(assessment, 'author-imports.lua'));
   fs.writeFileSync(path.join(assessment, 'jsxgraph-pins.yml'),
     'jsxgraph:\n' + Object.entries(board).map(([k,v]) => '  ' + k + ': ' + v + '\n').join(''));
   const table = JSON.parse(fs.readFileSync(path.join(C.library, 'assets.json'), 'utf8'));

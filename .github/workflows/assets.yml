@@ -73,6 +73,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -88,4 +91,4 @@ jobs:
       - name: Actual assessment hook and shared assets API provenance
         env:
           CTM_ASSETS_LIBS_SOURCE: ${{ github.workspace }}/.asset-sources/libs
-        run: node --test tests/assets-hook-render.test.cjs
+        run: node --test tests/assets-hook-render.test.cjs tests/author-imports-render.test.cjs

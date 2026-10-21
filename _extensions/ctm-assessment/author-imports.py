@@ -33,6 +33,8 @@ def check_sources(sources: list[dict], full_lock: dict, subset: dict, *, local_m
     Dynamic imports with a literal name are included; arbitrary execution is
     never used to discover imports.
     """
+    if full_lock.get("v") == 1 and full_lock.get("python") != subset.get("info", {}).get("python"):
+        raise ImportCheckError("Private import index and published subset use different Python releases; reinstall local assets")
     packages = full_lock.get("packages", {})
     by_import = {}
     by_name = {_normalise(name): name for name in packages}
@@ -82,6 +84,8 @@ def check_sources(sources: list[dict], full_lock: dict, subset: dict, *, local_m
                     if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
                         module = node.args[0].value
                         if not module.startswith("."):
+                            if not module or not all(part.isidentifier() for part in module.split(".")):
+                                raise ImportCheckError(f"{origin}: invalid literal dynamic module name")
                             modules.add(module.split(".", 1)[0])
                     else:
                         dynamic_unknown.append(f"{origin}:{node.lineno}")

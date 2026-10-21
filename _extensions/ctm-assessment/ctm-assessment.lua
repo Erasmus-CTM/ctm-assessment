@@ -24,6 +24,7 @@ local function warnNestedJsxgraph()
 end
 
 function Meta(meta)
+  _G.__ctmAuthorImports = dofile(quarto.utils.resolve_path("author-imports.lua"))
   warnNestedJsxgraph()
   -- Recomputed from the keys this invocation actually fills. Never accept an
   -- author-supplied marker as evidence that a CDN URL came from this hook.
