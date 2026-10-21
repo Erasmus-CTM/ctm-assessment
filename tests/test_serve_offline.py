@@ -7,6 +7,7 @@ from http.server import ThreadingHTTPServer
 import importlib.util
 from pathlib import Path
 import tempfile
+import socket
 import threading
 import unittest
 
@@ -203,6 +204,17 @@ class OfflineHTTPTests(unittest.TestCase):
         status, after, body = self.request("/replace.txt", {"If-None-Match": before["ETag"]})
         self.assertEqual((status, body), (200, b"other"))
         self.assertNotEqual(before["ETag"], after["ETag"])
+
+    def test_protocol_error_has_headers_before_a_path_is_parsed(self):
+        with socket.create_connection(("127.0.0.1", self.server.server_port), timeout=5) as connection:
+            connection.sendall(b"GET / HTTP/2.0\r\n\r\n")
+            parts = []
+            while part := connection.recv(8192):
+                parts.append(part)
+        raw = b"".join(parts)
+        self.assertIn(b"505", raw)
+        self.assertIn(b"Cross-Origin-Embedder-Policy: require-corp", raw)
+        self.assertIn(b"Cache-Control: no-cache", raw)
 
     def test_encoded_traversal_and_symlink_escape(self):
         status, _, _ = self.request("/%2e%2e/secret")

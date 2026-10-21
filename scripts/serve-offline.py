@@ -75,7 +75,7 @@ class OfflineHandler(SimpleHTTPRequestHandler):
 
     def is_asset(self):
         # Also applies to encoded paths and errors below the asset directory.
-        return unquote(urlsplit(self.path).path).startswith("/_ctm-assets/")
+        return unquote(urlsplit(getattr(self, "path", "")).path).startswith("/_ctm-assets/")
 
     def do_GET(self):
         self.serve_file(head=False)

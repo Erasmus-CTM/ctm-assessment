@@ -75,7 +75,7 @@ location because location headers replace inherited ones. Outside assets set
 and ETags. Apache needs equivalent `mod_headers`, MIME types, strong ETags,
 and static gzip rewrites preserving original MIME, plus `Vary`; disable dynamic
 compression. The approved design contains the reviewed nginx/Apache examples:
-[Step 5 design](consolidation/2026-10-step5-offline-exam.md).
+[Step 5 design](https://github.com/Erasmus-CTM/ctm-assessment/blob/handoff/2026-10/docs/consolidation/2026-10-step5-offline-exam.md).
 
 ## Exam-office checklist
 
