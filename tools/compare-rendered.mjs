@@ -555,7 +555,7 @@ function words(doc) {
   const list = [], spans = new Map();
   const walker = doc.createTreeWalker(doc.body, 4);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    if (node.parentElement?.closest('script, style, template, noscript')) continue;
+    if (node.parentElement?.closest('script, style, template, noscript') || doc.ctmValidatedStoreBar?.contains(node)) continue;
     const found = node.textContent.split(/\s+/).filter(Boolean);
     if (!found.length) continue;
     spans.set(node, [list.length, list.length + found.length]);
@@ -723,6 +723,10 @@ function duplicateIds(page, A, B) {
 
 function comparePage(page, before, after, ends, linked) {
   const A = extract(before), B = extract(after), items = [];
+  // Additive generated chrome has no authored position. Only a complete,
+  // catalogue-verified store bar may leave the invariant's prose accounting.
+  markStoreAdditions(A, []);
+  markStoreAdditions(B, []);
   for (const [change, list, other] of [['removed', A.files, B.files], ['added', B.files, A.files]])
     for (const what of list) if (!other.includes(what)) items.push({page, area: 'file', change, what});
   const kinds = side => side.inline.map(x => x.kind);
