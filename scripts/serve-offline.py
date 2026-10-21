@@ -63,6 +63,14 @@ def byte_range(value, size):
 class OfflineHandler(SimpleHTTPRequestHandler):
     """Serve contained regular files only, with headers also on error paths."""
 
+    def send_error(self, code, message=None, explain=None):
+        # parse_request can reject a malformed version before assigning it.
+        # The stdlib then retains HTTP/0.9, which suppresses all headers.
+        # This server requires an HTTP response with isolation even on errors.
+        if self.request_version == "HTTP/0.9":
+            self.request_version = "HTTP/1.0"
+        super().send_error(code, message, explain)
+
     def end_headers(self):
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
@@ -85,6 +93,9 @@ class OfflineHandler(SimpleHTTPRequestHandler):
 
     def serve_file(self, *, head):
         self._cache_sent = False
+        if self.request_version == "HTTP/0.9":
+            self.send_error(HTTPStatus.HTTP_VERSION_NOT_SUPPORTED)
+            return
         root = Path(self.directory).resolve()
         request_path = unquote(urlsplit(self.path).path)
         # Reject traversal instead of normalizing it into a different resource.
