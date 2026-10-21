@@ -685,6 +685,13 @@ function constructChecks(page, A, B, linked) {
   const [was, now] = [switches(A.doc), switches(B.doc)];
   if (was > 0 && now === 0 && count(A.doc, 'details.reading-step') > 0) add('switch dropped', 'switch', was, now);
   else if (now > Math.max(was, 1)) add('switch duplicated', 'switch', was, now);
+  // A retained wrapper must still offer both modes; migration expectations
+  // may explain its descendants changing, but cannot explain lost controls.
+  for (const control of B.doc.querySelectorAll(`${OLD_SWITCH}, ${NEW_SWITCH}`)) {
+    const missing = ['lecture', 'reading'].filter(mode =>
+      ![...control.querySelectorAll(`button[data-mode="${mode}"]`)].some(button => button.textContent.trim()));
+    if (missing.length) add('switch controls missing', 'switch', ['lecture', 'reading'], missing, control.outerHTML.slice(0, 160));
+  }
   for (const [name, selector] of COUNTED) {
     const [before, after] = [count(A.doc, selector), count(B.doc, selector)];
     if (after < before) add(name + ' dropped', name, before, after);
@@ -826,3 +833,4 @@ function main() {
 }
 
 try { main(); } catch (error) { console.error(error); process.exit(2); }
+

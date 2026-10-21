@@ -235,3 +235,28 @@ test('a long page: only what the migration changed differs, and a real change in
   assert.ok(unexplained.length > 0 && unexplained.length <= 4, 'the changed paragraph: ' + unexplained.length);
   assert.ok(JSON.stringify(unexplained).includes('andre ord'));
 });
+
+
+test('a retained switch needs both real mode buttons with nonempty labels (HTML mutations)', () => {
+  const after = controls => page(`<p>Innledning.</p>${controls}${BODY}`);
+  const before = after(NEW_SWITCH);
+  assert.deepEqual(invariants(compare(before)), []);
+  for (const controls of [
+    '<div class="ctm-modes"></div>',
+    '<div class="ctm-modes"><button data-mode="lecture">Lecture</button></div>',
+    '<div class="ctm-modes"><button data-mode="lecture">Lecture</button><button data-mode="other">Reading</button></div>',
+    '<div class="ctm-modes"><span data-mode="lecture">Lecture</span><span data-mode="reading">Reading</span></div>',
+    '<div class="ctm-modes"><button data-mode="lecture"> </button><button data-mode="reading">Reading</button></div>',
+    '<div class="ctm-modes"><button data-mode="lecture">Lecture</button><button data-mode="reading"> </button></div>',
+  ]) {
+    // Check both the original-to-migrated and already-migrated comparisons.
+    for (const baseline of [OLD, before]) {
+      const items = compare(after(controls), baseline);
+      assert.deepEqual(invariants(items), ['switch controls missing'], controls);
+      assert.equal(items.find(item => item.change === 'switch controls missing').category, null);
+    }
+  }
+  // Labels are localized; require content without freezing their wording.
+  const localized = NEW_SWITCH.replace('Forelesning', '<span>Lecture</span>');
+  assert.deepEqual(invariants(compare(after(localized), after(localized))), []);
+});
