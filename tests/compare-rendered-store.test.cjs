@@ -49,21 +49,21 @@ const MESSAGE_KEYS = ["clearFailed","confirmClearCourse","confirmNewVariant","co
 const A = '0123456789abcdef', B = 'fedcba9876543210';
 const files = ['ctm-locale-ui/ui.js', 'ctm-copy/ctm-copy.js', 'ctm-store/ctm-store.js',
   'ctm-export/ctm-export.js', 'math-exercise/math-store.js'];
-function fixture({save = true, exportEnabled = true, locale = 'en'} = {}) {
+function fixture({save = true, exportEnabled = true, locale = 'en', cellLabel = '', cellStoreId = cellLabel || 'cell:' + A} = {}) {
   const messages = Object.fromEntries(MESSAGE_KEYS.map(k => [k, UI[k]])); messages.locale = locale;
   const manifest = {v: 1, save, export: exportEnabled, progress: false, quizzes: [], messages, exercises: [
     {component: 'py-exercise', id: 'py', runtimeId: 'ctm-block-1', source: A, save, order: 1},
     {component: 'math-exercise', id: 'math', runtimeId: 'ctm-block-2', source: B, save, order: 2},
-    {component: 'pyodide-interaktiv', id: 'cell:' + A, runtimeId: 'ctm-runtime-3', source: A, save, order: 3},
-    {component: 'pyodide-interaktiv', id: 'extra:cell:' + A, runtimeId: 'ctm-runtime-4', source: B, save, order: 4}
+    {component: 'pyodide-interaktiv', id: cellStoreId, runtimeId: 'ctm-runtime-3', source: A, save, order: 3},
+    {component: 'pyodide-interaktiv', id: 'extra:' + cellStoreId, runtimeId: 'ctm-runtime-4', source: B, save, order: 4}
   ]};
   const attributes = (component, id, source, runtime) => ` data-ctm-component="${component}" data-ctm-id="${id}" data-ctm-source="${source}" data-ctm-runtime-id="${runtime}" data-ctm-save="${save}"`;
-  const py = {id: 1, label: 'py', code: 'answer = 2', tests: 'assert answer == 2'};
-  const cell = {id: 1, code: 'print(2)', options: {label: ''}};
+  const py = {id: 1, label: 'py', starter: 'answer = 2', tests: 'assert answer == 2'};
+  const cell = {id: 1, code: 'print(2)', options: {label: cellLabel}};
   const page = (after) => {
     const p = {...py, ...(after ? {storeId: 'py', source: A, save} : {})};
     const c = {...cell, options: {...cell.options, ...(after ? {
-      'ctm-store-id': 'cell:' + A, 'ctm-store-source': A, 'ctm-store-save': save,
+      'ctm-store-id': cellStoreId, 'ctm-store-source': A, 'ctm-store-save': save,
       'ctm-extra-source': B, 'ctm-extra-save': save, save: ''} : {})}};
     const bar = (save || exportEnabled) ? `<div class="ctm-save-bar" role="region" aria-label="${save ? UI.savingLabel : UI.exportTitle}" hidden><p class="ctm-save-notice">${save ? UI.savingNotice : UI.savingDisabled}</p><div class="ctm-save-actions">${save ? `<button type="button" data-ctm-clear-page>${UI.clearPage}</button><button type="button" data-ctm-clear-course>${UI.clearCourse}</button><button type="button" data-ctm-save-toggle>${UI.saveOff}</button>` : ''}${exportEnabled ? `<button type="button" data-ctm-export>${UI.exportTitle}</button>` : ''}</div><span class="ctm-save-status" role="status" aria-live="polite"></span></div>` : '';
     return '<!doctype html><html><head><title>Example</title><link rel="stylesheet" href="ctm-ui/ctm-ui.css">'
@@ -71,7 +71,7 @@ function fixture({save = true, exportEnabled = true, locale = 'en'} = {}) {
       + '</head><body><main id="quarto-document-content"><h1>Author heading</h1>'
       + (after ? bar : '') + '<p id="prose">Keep this explanation.</p>'
       + `<div id="py-exercise-1" class="py-exercise-cell"${after ? attributes('py-exercise', 'py', A, 'ctm-block-1') : ''}><noscript>Enable JavaScript.</noscript></div>`
-      + `<div id="math-exercise-1" class="math-exercise-cell" data-variants='[{"answer":"2","checker":"NumRelative"}]'${after ? attributes('math-exercise', 'math', B, 'ctm-block-2') : ''}></div>`
+      + `<div id="math-exercise-1" class="math-exercise-cell" data-label="math" data-variants='[{"answer":"2","checker":"NumRelative"}]'${after ? attributes('math-exercise', 'math', B, 'ctm-block-2') : ''}></div>`
       + '<div id="qpyodide-insertion-location-1"></div>'
       + `<script>(window.__pyExercises = window.__pyExercises || []).push(${JSON.stringify(p)});</script>`
       + `<script>globalThis.qpyodideCellDetails = ${JSON.stringify([c])};</script>`
@@ -196,4 +196,53 @@ test('setup-only cells may gain only the empty save option, without a store regi
   assert.equal(compare(page(after), page(before)).summary.unexpected, 0);
   rejects(page({...after, code: ''}), page(before), 'setup code disappeared');
   rejects(page({...after, options: {...after.options, save: true}}), page(before), 'nonempty setup option');
+});
+
+test('new Python metadata cannot bind one unchanged exercise to another root', () => {
+  const f = fixture(), second = {id: 2, label: 'other', starter: 'answer = 3', tests: 'assert answer == 3'};
+  const add = (html, after) => mutate(html, d => {
+    const root = d.createElement('div'); root.id = 'py-exercise-2'; root.className = 'py-exercise-cell';
+    if (after) for (const [key, value] of Object.entries({
+      component: 'py-exercise', id: 'other', source: B, 'runtime-id': 'ctm-block-5', save: 'true'}))
+      root.setAttribute('data-ctm-' + key, value);
+    d.querySelector('main').append(root);
+    const script = d.createElement('script');
+    script.textContent = '(window.__pyExercises = window.__pyExercises || []).push(' +
+      JSON.stringify({...second, ...(after ? {storeId: 'other', source: B, save: true} : {})}) + ');';
+    d.querySelector('main').append(script);
+    if (after) {
+      const node = d.querySelector('#ctm-store-manifest'), m = JSON.parse(node.textContent);
+      m.exercises.push({component: 'py-exercise', id: 'other', runtimeId: 'ctm-block-5', source: B, save: true, order: 5});
+      node.textContent = JSON.stringify(m);
+    }
+  });
+  const before = add(f.before, false), after = add(f.after, true);
+  assert.equal(compare(after, before).summary.unexpected, 0);
+  const swapped = mutate(after, d => {
+    const scripts = [...d.querySelectorAll('script')].filter(s => s.textContent.startsWith('(window.__pyExercises'));
+    const data = scripts.map(s => JSON.parse(s.textContent.slice(s.textContent.indexOf('.push(') + 6, s.textContent.lastIndexOf(');'))));
+    for (const key of ['storeId', 'source', 'save']) [data[0][key], data[1][key]] = [data[1][key], data[0][key]];
+    scripts.forEach((s, i) => { s.textContent = '(window.__pyExercises = window.__pyExercises || []).push(' + JSON.stringify(data[i]) + ');'; });
+  });
+  rejects(swapped, before, 'new metadata swapped while original ids/labels/code/tests stay fixed');
+});
+
+test('cell identities follow original labels, source hashes and actual insertion roots', () => {
+  const labelled = fixture({cellLabel: 'named'});
+  assert.equal(compare(labelled.after, labelled.before).summary.unexpected, 0);
+  for (const f of [fixture({cellLabel: 'named', cellStoreId: 'another'}),
+                   fixture({cellStoreId: 'another'})])
+    rejects(f.after, f.before, 'new cell identity contradicts unchanged original label/hash');
+  const f = fixture();
+  const removeInsertion = d => d.querySelector('#qpyodide-insertion-location-1').remove();
+  rejects(mutate(f.after, removeInsertion), mutate(f.before, removeInsertion), 'registration with no actual insertion root on either side');
+  rejects(mutate(f.after, d => {
+    const node = d.querySelector('#ctm-store-manifest'), m = JSON.parse(node.textContent);
+    m.exercises.find(e => e.component === 'math-exercise').id = 'another';
+    node.textContent = JSON.stringify(m);
+    d.querySelector('.math-exercise-cell').setAttribute('data-ctm-id', 'another');
+  }), f.before, 'new maths metadata contradicts the unchanged authored data-label');
+  rejects(mutate(f.after, d => {
+    d.querySelector('.math-exercise-cell').setAttribute('data-label', 'another');
+  }), f.before, 'changed original maths label');
 });

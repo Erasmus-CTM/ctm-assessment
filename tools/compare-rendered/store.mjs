@@ -1,6 +1,7 @@
 // Expected store additions, validated against the rendered manifest and catalogue.
 // This never removes DOM or configuration from the ordinary comparison.
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 
 const HASH = /^[0-9a-f]{16}$/;
 const COMPONENTS = new Set(['math-exercise', 'py-exercise', 'pyodide-interaktiv']);
@@ -80,6 +81,7 @@ function inspect(B) {
     const o = cell.options || {};
     return o.context !== 'setup' && !matchingEntry(m, 'pyodide-interaktiv', o['ctm-store-id'], o['ctm-store-source'], o['ctm-store-save']);
   })) return null;
+  if ((B.configs.__pyExercises || []).some(e => !pyBinding(B, m, e)) || !cellBindings(B, m)) return null;
   const bars = [...B.doc.querySelectorAll('.ctm-save-bar')];
   let bar = null;
   if (m.save || m.export) {
@@ -118,12 +120,49 @@ function matchingEntry(m, component, id, source, save) {
 function rootMetadata(node, m) {
   if (!node?.matches('.math-exercise-cell, .py-exercise-cell')) return false;
   const component = node.classList.contains('math-exercise-cell') ? 'math-exercise' : 'py-exercise';
+  const authored = node.getAttribute('data-label');
+  if (component === 'math-exercise') {
+    const id = node.getAttribute('data-ctm-id');
+    if (id ? authored !== id : authored !== '' && authored !== node.id) return false;
+  }
   return m.exercises.some(e => e.component === component &&
     node.getAttribute('data-ctm-component') === component &&
     node.getAttribute('data-ctm-id') === e.id &&
     node.getAttribute('data-ctm-runtime-id') === e.runtimeId &&
     node.getAttribute('data-ctm-source') === e.source &&
     node.getAttribute('data-ctm-save') === String(e.save));
+}
+function pyBinding(B, m, e) {
+  if (!Number.isSafeInteger(e.id) || e.id < 1) return false;
+  const root = B.doc.getElementById('py-exercise-' + e.id);
+  if (!rootMetadata(root, m) || root.getAttribute('data-ctm-component') !== 'py-exercise') return false;
+  const id = e.storeId ?? '';
+  return root.getAttribute('data-ctm-id') === id &&
+    root.getAttribute('data-ctm-source') === e.source && root.getAttribute('data-ctm-save') === String(e.save) &&
+    (id ? e.label === id : e.label === '' || e.label === root.id);
+}
+function cellBindings(B, m) {
+  const counts = new Map(), ids = new Set();
+  const epoch = B.configs.qpyodideSettings?.[0]?.qpyodideLocalStorageOptions?.epoch ?? '';
+  if (!str(epoch)) return false;
+  for (const cell of B.configs.qpyodideCellDetails || []) {
+    if (!Number.isSafeInteger(cell.id) || cell.id < 1 || ids.has(cell.id)) return false;
+    ids.add(cell.id);
+    const o = cell.options || {};
+    if (o.context === 'setup') continue;
+    const root = B.doc.getElementById('qpyodide-insertion-location-' + cell.id);
+    if (!root || root.tagName !== 'DIV') return false;
+    const source = o['ctm-store-source'], label = String(o.label || '').trim();
+    if (!str(source) || !HASH.test(source)) return false;
+    let id = label;
+    if (!id) {
+      const n = (counts.get(source) || 0) + 1; counts.set(source, n);
+      id = 'cell:' + source + (n > 1 ? ':' + n : '');
+    }
+    if (epoch) id += ':epoch:' + createHash('sha1').update(epoch).digest('hex').slice(0, 16);
+    if (o['ctm-store-id'] !== id || !matchingEntry(m, 'pyodide-interaktiv', id, source, o['ctm-store-save'])) return false;
+  }
+  return true;
 }
 export function markStoreAdditions(B, items) {
   // Setup cells have no saved-answer registration. The new author option's
@@ -156,7 +195,7 @@ export function markStoreAdditions(B, items) {
     let match = /^\/(\d+)\/(save|source|storeId)$/.exec(item.path);
     if (item.object === '__pyExercises' && match) {
       const e = B.configs.__pyExercises?.[Number(match[1])];
-      if (e && matchingEntry(m, 'py-exercise', e.storeId, e.source, e.save)) item.store = 'py-metadata';
+      if (e && pyBinding(B, m, e)) item.store = 'py-metadata';
     }
     match = /^\/(\d+)\/options\/(ctm-store-id|ctm-store-source|ctm-store-save|ctm-extra-source|ctm-extra-save|save)$/.exec(item.path);
     if (item.object === 'qpyodideCellDetails' && match) {
