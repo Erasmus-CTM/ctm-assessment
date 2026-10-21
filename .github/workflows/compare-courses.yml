@@ -23,8 +23,12 @@ name: Compare rendered courses
 #   with its pinned package; after = its migration (migrate-course-html.py
 #   --config and its migrated/ edits) with the head; compared with
 #   expect/step4-migration.yml, then old against new in Chromium, Firefox and
-#   WebKit (tools/compare-browser.mjs, design §6.3), and the links once more
+#   WebKit (tools/compare-browser.mjs, design section 6.3), and the links once more
 #   on a first visit without isolation headers (coi-serviceworker).
+# Reusable calls use explicit package refs and tooling-ref, checked out from
+# this repository even when the caller is a course PR. The caller's course
+# PR base/head are never package refs. Pin uses: and tooling-ref to the same
+# reviewed ctm-assessment commit; head can name a different package commit.
 # On demand, any course and refs: `course-base-ref` builds another course ref
 # as before (a migration branch against main), `base` and `head` choose the
 # package per side (`pin`: the one the course pins at that side's ref; the
@@ -33,6 +37,53 @@ name: Compare rendered courses
 # adds the browser comparison, `review-refs` builds the after side with
 # unmerged component commits (a preview of a fix, never a pin).
 on:
+  workflow_call:
+    inputs:
+      tooling-ref:
+        description: 'Exact ctm-assessment commit providing this workflow and its comparison tools'
+        type: string
+        required: true
+      course:
+        description: 'Course repository (owner/name), examples or step4-course'
+        type: string
+        required: true
+      course-ref:
+        description: 'Actual course commit built as after (use the course PR head SHA)'
+        type: string
+        required: true
+      course-base-ref:
+        description: 'Course ref built as before (empty: course-ref)'
+        type: string
+        default: ''
+      profile:
+        type: string
+        default: ''
+      base:
+        description: 'Before PACKAGE ref, or pin; never the course PR base SHA'
+        type: string
+        required: true
+      head:
+        description: 'After PACKAGE ref, or pin; independent of tooling-ref'
+        type: string
+        required: true
+      convert:
+        type: boolean
+        default: false
+      expect:
+        type: string
+        default: ''
+      browser:
+        type: boolean
+        default: false
+      browsers:
+        type: string
+        default: 'chromium firefox webkit'
+      shards:
+        type: string
+        default: ''
+      review-refs:
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       course:
@@ -95,6 +146,9 @@ on:
 permissions:
   contents: read
 
+env:
+  UMBRELLA_REPOSITORY: Erasmus-CTM/ctm-assessment
+
 concurrency:
   # One run per course and ref: a second request for another branch of the same course is not cancelled.
   group: compare-courses-${{ github.ref }}-${{ inputs.course || 'pr' }}-${{ inputs['course-ref'] }}-${{ inputs['course-base-ref'] }}
@@ -110,9 +164,13 @@ jobs:
       engines: ${{ steps.list.outputs.engines }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: ${{ inputs['tooling-ref'] }}
+          persist-credentials: false
       - id: list
         env:
-          EVENT: ${{ github.event_name }}
+          EVENT: ${{ inputs['tooling-ref'] && 'workflow_call' || github.event_name }}
           COURSE: ${{ inputs.course }}
           COURSE_REF: ${{ inputs['course-ref'] }}
           COURSE_BASE_REF: ${{ inputs['course-base-ref'] }}
@@ -141,13 +199,17 @@ jobs:
       COURSE_REF: ${{ matrix.ref }}
       COURSE_BASE_REF: ${{ matrix.base_ref || matrix.ref }}
       PROFILE: ${{ matrix.profile }}
-      BASE: ${{ matrix.base || (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || 'main' }}
-      HEAD: ${{ matrix.head || (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
-      PR_BASE: ${{ github.event.pull_request.base.sha }}
+      BASE: ${{ matrix.base || (!inputs['tooling-ref'] && github.event_name == 'pull_request' && github.event.pull_request.base.sha) || 'main' }}
+      HEAD: ${{ matrix.head || (!inputs['tooling-ref'] && github.event_name == 'pull_request' && github.event.pull_request.head.sha) || inputs['tooling-ref'] || github.sha }}
+      PR_BASE: ${{ !inputs['tooling-ref'] && github.event.pull_request.base.sha || '' }}
       CONVERT: ${{ matrix.convert }}
       EXPECT: ${{ matrix.expect }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: ${{ inputs['tooling-ref'] }}
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -178,7 +240,7 @@ jobs:
           for side in before after; do
             ref=$BEFORE; [ "$side" = after ] && ref=$AFTER
             git init -q "$RUNNER_TEMP/$side"
-            git -C "$RUNNER_TEMP/$side" fetch -q --depth 1 "https://github.com/${{ github.repository }}.git" "$ref"
+            git -C "$RUNNER_TEMP/$side" fetch -q --depth 1 "https://github.com/$UMBRELLA_REPOSITORY.git" "$ref"
             git -C "$RUNNER_TEMP/$side" checkout -q --detach FETCH_HEAD
             echo "$side: $ref = $(git -C "$RUNNER_TEMP/$side" rev-parse HEAD), CTM Assessment $(sed -n 's/^version: *//p' "$RUNNER_TEMP/$side/_extensions/ctm-assessment/_extension.yml")"
           done
@@ -280,6 +342,10 @@ jobs:
         browser: ${{ fromJSON(needs.courses.outputs.engines) }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: ${{ inputs['tooling-ref'] }}
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -328,3 +394,4 @@ jobs:
         with:
           name: browser-${{ matrix.entry.key }}${{ matrix.entry.part }}-${{ matrix.browser }}
           path: ${{ runner.temp }}/browser
+
