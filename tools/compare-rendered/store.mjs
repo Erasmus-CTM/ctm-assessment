@@ -19,6 +19,11 @@ function signature(node) {
   return [node.tagName.toLowerCase(), [...node.attributes].map(a => [a.name, a.value]).sort(),
     [...node.childNodes].map(signature).filter(x => x !== null)];
 }
+const keyOrder = (a, b) => {
+  const x = Array.from(a, c => c.codePointAt(0)), y = Array.from(b, c => c.codePointAt(0));
+  for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return x[i] - y[i];
+  return x.length - y.length;
+};
 function catalogue(B, locale) {
   const name = B.sources['ctm-locale-ui/ui.js'];
   if (!name || !fs.existsSync(name)) return null;
@@ -82,6 +87,7 @@ function inspect(B) {
     return o.context !== 'setup' && !matchingEntry(m, 'pyodide-interaktiv', o['ctm-store-id'], o['ctm-store-source'], o['ctm-store-save']);
   })) return null;
   if ((B.configs.__pyExercises || []).some(e => !pyBinding(B, m, e)) || !cellBindings(B, m)) return null;
+  if ([...B.doc.querySelectorAll('.math-exercise-cell[data-pool]')].some(node => !storageVariants(node))) return null;
   const bars = [...B.doc.querySelectorAll('.ctm-save-bar')];
   let bar = null;
   if (m.save || m.export) {
@@ -132,6 +138,54 @@ function rootMetadata(node, m) {
     node.getAttribute('data-ctm-source') === e.source &&
     node.getAttribute('data-ctm-save') === String(e.save));
 }
+// The component's storageContent profile binds revision descriptors to the
+// unchanged pool questions and grading attributes, including generated ids.
+function storageContent(value) {
+  if (!plain(value) && !Array.isArray(value)) return quartoJSON(value);
+  const entries = Array.isArray(value) ? value.map((v, i) => ['number:' + (i + 1), v]) :
+    Object.entries(value).map(([k, v]) => ['string:' + k, v]);
+  entries.sort((a, b) => keyOrder(a[0], b[0]));
+  return '[' + entries.map(([k, v]) => '[' + JSON.stringify(k) + ',' + storageContent(v) + ']').join(',') + ']';
+}
+function storageVariants(node) {
+  try {
+    const tasks = JSON.parse(node.getAttribute('data-pool'));
+    const descriptors = JSON.parse(node.getAttribute('data-storage-variants'));
+    const variantData = node.hasAttribute('data-variants') ? JSON.parse(node.getAttribute('data-variants')) : null;
+    const records = variantData?.variants || null;
+    if (!Array.isArray(tasks) || !tasks.length || !tasks.every(str) || !Array.isArray(descriptors) ||
+        descriptors.length !== tasks.length || (variantData && (!Array.isArray(records) || records.length !== tasks.length))) return false;
+    const attrs = ['mode', 'reject', 'tolerance', 'decplaces', 'sigfigs', 'form', 'vars', 'response', 'form-credit', 'vecdir'];
+    if (attrs.some(name => node.getAttribute('data-' + name) === null)) return false;
+    const grading = Object.fromEntries(attrs.map(name => [name === 'form-credit' ? 'formCredit' : name, node.getAttribute('data-' + name)]));
+    grading.checker = JSON.parse(node.getAttribute('data-checker'));
+    grading.packages = JSON.parse(node.getAttribute('data-packages'));
+    grading.fieldLabels = JSON.parse(node.getAttribute('data-field-labels'));
+    if (!Array.isArray(grading.packages) || !grading.packages.every(str) ||
+        !Array.isArray(grading.fieldLabels) || !grading.fieldLabels.every(str) ||
+        !['true', 'false'].includes(node.getAttribute('data-partial-credit'))) return false;
+    grading.partialCredit = node.getAttribute('data-partial-credit') === 'true';
+    const ids = new Set();
+    for (let i = 0; i < tasks.length; i++) {
+      const descriptor = descriptors[i], record = records?.[i];
+      if (!keys(descriptor, ['id', 'hash'], ['n']) || !str(descriptor.hash) || !HASH.test(descriptor.hash)) return false;
+      if (record && (!str(record.id) || !record.id || record.question !== tasks[i])) return false;
+      const content = {
+        question: record ? record.question : tasks[i], solution: record?.solution ?? '',
+        context: record?.['variant-context'] ?? '', parameters: record?.parameters ?? false,
+        derived: record?.derived ?? false, variantId: record ? record.id : false,
+        grading: {...grading, checker: record?.checker ?? grading.checker}
+      };
+      const hash = createHash('sha1').update(storageContent(content)).digest('hex').slice(0, 16);
+      const id = record ? record.id : 'pool:' + hash;
+      const n = record ? record.n : i + 1;
+      if (descriptor.hash !== hash || descriptor.id !== id || descriptor.n !== n || ids.has(id)) return false;
+      if (n !== undefined && (!Number.isSafeInteger(n) || n < 1)) return false;
+      ids.add(id);
+    }
+    return true;
+  } catch (_) { return false; }
+}
 function pyBinding(B, m, e) {
   if (!Number.isSafeInteger(e.id) || e.id < 1) return false;
   const root = B.doc.getElementById('py-exercise-' + e.id);
@@ -141,6 +195,29 @@ function pyBinding(B, m, e) {
     root.getAttribute('data-ctm-source') === e.source && root.getAttribute('data-ctm-save') === String(e.save) &&
     (id ? e.label === id : e.label === '' || e.label === root.id);
 }
+// Quarto 1.8's quarto.json.encode sorts object keys, emits empty tables as
+// [], and formats numbers with %.14g (_json.lua). Reconstruct the original
+// options before the component added its five storage metadata fields.
+function quartoJSON(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return '[' + value.map(quartoJSON).join(',') + ']';
+  if (plain(value)) {
+    const names = Object.keys(value).sort(keyOrder);
+    return names.length ? '{' + names.map(k => JSON.stringify(k) + ':' + quartoJSON(value[k])).join(',') + '}' : '[]';
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new TypeError('nonfinite option');
+    if (Object.is(value, -0)) return '-0';
+    if (!value) return '0';
+    const [mantissa, exponentText] = value.toExponential(13).split('e');
+    const exponent = Number(exponentText);
+    if (exponent < -4 || exponent >= 14)
+      return mantissa.replace(/\.?0+$/, '') + 'e' + (exponent < 0 ? '-' : '+') + String(Math.abs(exponent)).padStart(2, '0');
+    return value.toFixed(Math.max(0, 13 - exponent)).replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+  }
+  if (typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
+  throw new TypeError('unsupported option');
+}
 function cellBindings(B, m) {
   const counts = new Map(), ids = new Set();
   const epoch = B.configs.qpyodideSettings?.[0]?.qpyodideLocalStorageOptions?.epoch ?? '';
@@ -149,11 +226,20 @@ function cellBindings(B, m) {
     if (!Number.isSafeInteger(cell.id) || cell.id < 1 || ids.has(cell.id)) return false;
     ids.add(cell.id);
     const o = cell.options || {};
-    if (o.context === 'setup') continue;
+    if (o.context === 'setup') {
+      if (['ctm-store-id', 'ctm-store-source', 'ctm-store-save', 'ctm-extra-source', 'ctm-extra-save'].some(k => o[k] !== undefined)) return false;
+      continue;
+    }
     const root = B.doc.getElementById('qpyodide-insertion-location-' + cell.id);
     if (!root || root.tagName !== 'DIV') return false;
     const source = o['ctm-store-source'], label = String(o.label || '').trim();
-    if (!str(source) || !HASH.test(source)) return false;
+    if (!str(source) || !HASH.test(source) || !str(cell.code)) return false;
+    const original = Object.fromEntries(Object.entries(o).filter(([key]) =>
+      !['ctm-store-id', 'ctm-store-source', 'ctm-store-save', 'ctm-extra-source', 'ctm-extra-save'].includes(key)));
+    let encoded;
+    try { encoded = quartoJSON(original); } catch (_) { return false; }
+    const expectedSource = createHash('sha1').update(cell.code + '\n' + encoded + '\n' + epoch).digest('hex').slice(0, 16);
+    if (source !== expectedSource) return false;
     let id = label;
     if (!id) {
       const n = (counts.get(source) || 0) + 1; counts.set(source, n);
@@ -161,6 +247,15 @@ function cellBindings(B, m) {
     }
     if (epoch) id += ':epoch:' + createHash('sha1').update(epoch).digest('hex').slice(0, 16);
     if (o['ctm-store-id'] !== id || !matchingEntry(m, 'pyodide-interaktiv', id, source, o['ctm-store-save'])) return false;
+    if ((o.context === 'output' || o['read-only'] === 'true') && o['ctm-store-save'] !== false) return false;
+    if (o.context === 'output') {
+      if (o['ctm-extra-source'] !== undefined || o['ctm-extra-save'] !== undefined ||
+          m.exercises.some(e => e.component === 'pyodide-interaktiv' && e.id === 'extra:' + id)) return false;
+    } else {
+      const extraSource = createHash('sha1').update(source + ':extra').digest('hex').slice(0, 16);
+      if (o['ctm-extra-source'] !== extraSource ||
+          !matchingEntry(m, 'pyodide-interaktiv', 'extra:' + id, extraSource, o['ctm-extra-save'])) return false;
+    }
   }
   return true;
 }
@@ -173,8 +268,10 @@ export function markStoreAdditions(B, items) {
         item.before === undefined && item.after === '' && match &&
         B.configs.qpyodideCellDetails?.[Number(match[1])]?.options?.context === 'setup') item.store = 'cell-metadata';
   }
+  B.doc.ctmValidatedStoreBar = null;
   const found = inspect(B);
   if (!found) return;
+  B.doc.ctmValidatedStoreBar = found.bar;
   const m = found.manifest;
   const dependencies = new Set(['script ctm-locale-ui/ui.js', 'script ctm-copy/ctm-copy.js',
     'script ctm-store/ctm-store.js', 'css ctm-ui/ctm-ui.css']);
@@ -191,6 +288,9 @@ export function markStoreAdditions(B, items) {
         (item.node === found.bar || found.bar.contains(item.node))) item.store = 'bar';
     if (item.area === 'dom' && item.change === 'attribute added' && item.before === null &&
         /^data-ctm-(?:component|id|runtime-id|source|save)$/.test(item.attribute) && rootMetadata(item.node, m)) item.store = 'attribute';
+    if (item.area === 'dom' && item.change === 'attribute added' && item.before === null &&
+        item.attribute === 'data-storage-variants' && item.node?.matches('.math-exercise-cell') &&
+        rootMetadata(item.node, m) && storageVariants(item.node)) item.store = 'attribute';
     if (item.area !== 'config' || item.change !== 'changed' || item.before !== undefined) continue;
     let match = /^\/(\d+)\/(save|source|storeId)$/.exec(item.path);
     if (item.object === '__pyExercises' && match) {

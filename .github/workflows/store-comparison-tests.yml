@@ -16,3 +16,32 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: node --test tests/compare-rendered.test.cjs tests/compare-rendered-store.test.cjs
+
+  calibration:
+    needs: compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 3d9ebd94565ca302724dc619092ad9d043c1497f
+          path: _ci/before
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6' jupyter nbformat
+      - run: npm ci --ignore-scripts
+      - name: Render exact canonical before and b045 pins after
+        run: |
+          python _ci/before/scripts/setup-feedback-integration.py --workspace "$RUNNER_TEMP/store-before"
+          python scripts/setup-feedback-integration.py --workspace "$RUNNER_TEMP/store-after"
+      - name: Real Quarto replay and metadata-only mutation
+        run: node tests/compare-rendered-store-calibration.cjs "$RUNNER_TEMP/store-before/site/_site" "$RUNNER_TEMP/store-after/site/_site"
