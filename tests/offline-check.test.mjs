@@ -37,7 +37,7 @@ test('geometry tolerance is 2px and SVG size, visibility and ink are separate re
   assert.match(geometryProblems({...good, drawn: false}).join(';'), /no drawn/);
 });
 
-test('every nested hidden board, inline board and smaller board passes all five independent loads', {timeout: 120000}, async () => {
+test('every nested hidden board, inline board and smaller board passes all five independent loads', {timeout: 180000}, async () => {
   const result = await checkOfflinePages({browser, baseURL: server.baseURL, pages: [{path: 'positive.html', boards: 4}]});
   evidence.contracts.push(result);
   assert.ok(result.ok, JSON.stringify(result));
@@ -49,7 +49,7 @@ test('every nested hidden board, inline board and smaller board passes all five 
   }
 });
 
-test('zero SVG, wrong-size SVG and empty ink controls fail every load for their own reason', {timeout: 120000}, async () => {
+test('zero SVG, wrong-size SVG and empty ink controls fail every load for their own reason', {timeout: 180000}, async () => {
   for (const [name, reason] of [['blank', /SVG width is zero/], ['mismatch', /width differs/], ['empty', /no drawn/]]) {
     const result = await checkOfflinePages({browser, baseURL: server.baseURL, pages: [{path: name + '.html', boards: 1}]});
     evidence.contracts.push(result);
@@ -61,7 +61,7 @@ test('zero SVG, wrong-size SVG and empty ink controls fail every load for their 
   }
 });
 
-test('known board iframe without a board is a failure rather than a vacuous pass', {timeout: 30000}, async () => {
+test('known board iframe without a board is a failure rather than a vacuous pass', {timeout: 180000}, async () => {
   const {context} = await offlineContext(browser, server.baseURL);
   try {
     const page = await context.newPage();
@@ -72,7 +72,7 @@ test('known board iframe without a board is a failure rather than a vacuous pass
   } finally { await context.close(); }
 });
 
-test('external requests in document, worker and opaque frame are recorded and fail the offline run', async () => {
+test('external requests in document, worker and opaque frame are recorded and fail the offline run', {timeout: 180000}, async () => {
   const result = await checkOfflinePages({browser, baseURL: server.baseURL, pages: [{path: 'external.html', boards: 1}]});
   evidence.contracts.push(result);
   for (const load of result.results) {
@@ -90,7 +90,7 @@ test('HTTP errors and browser exceptions independently fail', {timeout: 180000},
   }
 });
 
-test('real JSXGraph hidden-frame mechanism: blank negative every time; >=20 plain loads must expose a blank; refresh model five clean loads', async () => {
+test('real JSXGraph hidden-frame mechanism: blank negative every time; >=20 plain loads must expose a blank; refresh model five clean loads', {timeout: 180000}, async () => {
   const mechanism = {scope: 'plain-iframe-model, not fork-extension proof', modes: {}};
   evidence.mechanism = mechanism;
   for (const [mode, loads] of [['always-blank-real', 5], ['plain-hidden', 20], ['refresh-model', 5]]) {

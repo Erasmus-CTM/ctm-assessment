@@ -49,10 +49,12 @@ export async function checkOfflinePages({browser, baseURL, pages, loads = 5, pro
       const {context, evidence} = await offlineContext(browser, baseURL);
       const page = await context.newPage();
       page.setDefaultTimeout(30000);
-      const result = {path: entry.path, load, boards: [], evidence, problems: [], probes: []};
+      const result = {path: entry.path, load, boards: [], evidence, problems: [], probes: [], externalLinks: []};
       try {
         await page.goto(new URL(entry.path, baseURL).href, {waitUntil: 'load'});
         if (!await page.evaluate(() => crossOriginIsolated)) result.problems.push('page is not cross-origin isolated');
+        result.externalLinks = await page.locator('a[href]').evaluateAll(links => [...new Set(links.map(a => a.href)
+          .filter(href => /^https?:/.test(href) && new URL(href).origin !== location.origin))].sort());
         result.boards = await checkBoards(page, {settleMs});
         if (entry.boards !== undefined && result.boards.length !== entry.boards)
           result.problems.push('expected ' + entry.boards + ' boards, found ' + result.boards.length);
