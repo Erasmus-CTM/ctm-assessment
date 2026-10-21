@@ -277,6 +277,19 @@ class MetadataTests(unittest.TestCase):
         with self.assertRaises(A.AssetError):
             A.release_version(b'{"version":"0.28.0.dev0"}', "0.28.3")
 
+    def test_metadata_redirects_use_their_own_official_hosts_and_https_ports(self):
+        original = A.urllib.request.Request("https://api.github.com/repos/pyodide/pyodide/releases")
+        moved = "https://api.github.com/repos/pyodide/pyodide/releases/tags/0.28.3"
+        request = A.SafeMetadataRedirect().redirect_request(original, None, 302, "", {}, moved)
+        self.assertEqual(request.full_url, moved)
+        for url in ("https://github.com/a", "https://evil.test/a", "http://api.github.com/a",
+                    "https://api.github.com:444/a", "https://registry.npmjs.org:444/a",
+                    "https://user:secret@api.github.com/a"):
+            with self.subTest(url=url), self.assertRaises(A.AssetError):
+                A.checked_metadata_url(url)
+            with self.subTest(redirect=url), self.assertRaises(A.AssetError):
+                A.SafeMetadataRedirect().redirect_request(original, None, 302, "", {}, url)
+
     def test_official_metadata_is_exact_and_is_not_claimed_as_a_verified_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

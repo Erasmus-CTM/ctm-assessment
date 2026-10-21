@@ -19,6 +19,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 
+METADATA_HOSTS = frozenset({"registry.npmjs.org", "api.github.com"})
 ARCHIVE_HOSTS = frozenset({"registry.npmjs.org", "github.com",
                            "objects.githubusercontent.com", "release-assets.githubusercontent.com"})
 COMPRESS = frozenset({".wasm", ".js", ".mjs", ".json", ".css"})
@@ -318,15 +319,25 @@ def release_version(package_json: bytes, expected: str) -> str:
     return actual
 
 
-def fetch_json(url: str) -> dict:
+def checked_metadata_url(url: str) -> str:
     parsed = urllib.parse.urlsplit(url)
-    if parsed.scheme != "https" or parsed.hostname not in {"registry.npmjs.org", "api.github.com"} or parsed.username or parsed.password:
-        raise AssetError("Metadata must come from the official registry or GitHub API")
+    if (parsed.scheme != "https" or parsed.hostname not in METADATA_HOSTS
+            or parsed.username or parsed.password or parsed.port not in (None, 443)):
+        raise AssetError("Metadata must come from the official HTTPS registry or GitHub API")
+    return url
+
+
+class SafeMetadataRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        checked_metadata_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def fetch_json(url: str) -> dict:
+    checked_metadata_url(url)
     request = urllib.request.Request(url, headers={"User-Agent": "CTM-Assets/1", "Accept": "application/json"})
-    with urllib.request.build_opener(SafeRedirect()).open(request, timeout=120) as response:
-        final = urllib.parse.urlsplit(response.geturl())
-        if final.scheme != "https" or final.hostname not in {"registry.npmjs.org", "api.github.com"}:
-            raise AssetError("Metadata redirect left the official sources")
+    with urllib.request.build_opener(SafeMetadataRedirect()).open(request, timeout=120) as response:
+        checked_metadata_url(response.geturl())
         return json.load(response)
 
 
