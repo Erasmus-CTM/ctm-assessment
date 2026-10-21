@@ -9,11 +9,15 @@
 # Rules: see step1.yml and step4.yml. Element lines name the element; an end
 # tag carries its class and id (`</div class="ctm-reveal-body">`), so a
 # wrapper is told apart from what it holds; "moved" is an element removed and
-# added unchanged elsewhere. Three invariants are checked on every page and
+# added unchanged elsewhere. Four invariants are checked on every page and
 # no category can explain a breach: each reveal keeps its words (field
 # `reveal`: same, heading, grown; never shrunk, changed or swallowed), the switch keeps
-# its place or goes to the top, and no id occurs more often than before
-# (hand anchors that repeat a tab heading's id, review A2 S3).
+# its place or goes to the top, no id occurs more often than before
+# (hand anchors that repeat a tab heading's id, review A2 S3), and no
+# construct is dropped: a category below may explain that the old switch's
+# markup, an inline site script or an anchor's old div is gone, never that
+# nothing replaces it (a switch, a tabset, an embedded page, a callout, a
+# linked anchor; `switch dropped`, `anchor dropped`, ...).
 categories:
   # <details class="reading-step|learning-hint|solution-block"> and plain
   # <details> become ctm-libs reveals: the class changes and the content gets
@@ -137,7 +141,9 @@ look:
 # the frame a console error comes from, and the failure's note).
 # WebKit's tab-title links (review A2 S5) work since ctm-libs e415cee
 # (Erasmus-CTM/ctm-libs#25), and keep the focus after WebKit's late jump to
-# the fragment since 8c7e5f6 (ctm-libs#29); CTM Assessment pins both.
+# the fragment since 8c7e5f6 (ctm-libs#29); a link to an id inside a collapsed
+# callout opens it since ctm-libs' callout fix (ctm-libs#30; its `collapsed-callout-target`
+# entry, ctm-demo's test page, is gone). CTM Assessment pins all three.
 known-failures:
   # A JSXGraph board in a tab that a link opens (on old the link was dead, so
   # the board was never shown): jsxgraph-quarto's ResizeObserver callbacks
@@ -151,18 +157,3 @@ known-failures:
     checks: [console]
     frame: '^iframe: JSXGraph board \(jsxgraph-quarto\)$'
     note: 'ResizeObserver loop'
-  # A link to an id inside a collapsed callout: ctm-nav.js opens tabs and
-  # <details> around a target, not a collapsed callout (design §2.3 names
-  # tabs and <details> only), so the target stays hidden. No course has such
-  # a target; ctm-demo's step-4 UI test page has exactly one on purpose. The
-  # entry names that course, that place and that target only: a failure
-  # anywhere else (an expanded callout, a callout in a tab, another target)
-  # still fails.
-  - id: collapsed-callout-target
-    title: The test page's target in a collapsed callout stays hidden (ctm-nav.js does not open callouts)
-    fix: ctm-libs ui/ctm-nav.js, open an enclosing collapsed callout as it opens <details> (follow-up, not filed yet); then pin it
-    courses: [ctm-demo]
-    browsers: [chromium, firefox, webkit]
-    checks: [link load, link click]
-    place: '^collapsed callout$'
-    target: '^pages/step4-ui\.html#ui-target-callout$'

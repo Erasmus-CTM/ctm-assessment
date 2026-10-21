@@ -610,6 +610,50 @@ function switchCheck(page, A, B) {
   if (now === '' || now === was) return [];
   return [{page, area: 'dom', change: 'switch moved', line: n.outerHTML.slice(0, 80), before: was, after: now.slice(-300), invariant: true}];
 }
+// Constructs that a migration may replace but never drop. A category can
+// explain that the old markup is gone (the old switch's div, the inline site
+// scripts, an anchor's old div) and says nothing about what replaces it, so
+// the replacement is checked here and no category explains a breach:
+//  - the switch: a page whose old side has one (the hand-written one or
+//    ctm-libs') and reading steps has one on the new side too, of either kind
+//    (a switch on a page without reading steps has nothing to switch; the
+//    browser comparison treats it so too), and the new page has no more than
+//    one;
+//  - tabsets, tab panes, embedded pages (<iframe>) and callouts: not fewer
+//    than before;
+//  - the hand-written anchors (<div id="x"></div>: an empty div that has no
+//    attribute but its id) that a link of the old site points to (the
+//    components' empty placeholders and Quarto's are no anchors in this
+//    sense): the id is still on the page (as div.ctm-tab-target, for example).
+const COUNTED = [['tabset', '.panel-tabset'], ['tab pane', '.tab-pane'], ['embedded page', 'iframe'], ['callout', '.callout']];
+const plainAnchors = (doc, linked) => [...doc.body.querySelectorAll('div[id]')]
+  .filter(el => el.attributes.length === 1 && !el.children.length && !el.textContent.trim() && linked.has(el.id)).map(el => el.id);
+// The ids (fragments) that the links of a site's pages point to, on any page.
+function linkTargets(root, pages) {
+  const ids = new Set();
+  for (const page of pages) {
+    for (const [, fragment] of fs.readFileSync(path.join(root, page), 'utf8').matchAll(/\bhref="[^"#]*#([^"]+)"/g)) {
+      try { ids.add(decodeURIComponent(fragment)); } catch (_) { ids.add(fragment); }
+    }
+  }
+  return ids;
+}
+function constructChecks(page, A, B, linked) {
+  const items = [], count = (doc, selector) => doc.querySelectorAll(selector).length;
+  const add = (change, construct, before, after, line) =>
+    items.push({page, area: 'dom', change, construct, before, after, ...(line ? {line} : {}), invariant: true});
+  const switches = doc => count(doc, `${OLD_SWITCH}, ${NEW_SWITCH}`);
+  const [was, now] = [switches(A.doc), switches(B.doc)];
+  if (was > 0 && now === 0 && count(A.doc, 'details.reading-step') > 0) add('switch dropped', 'switch', was, now);
+  else if (now > Math.max(was, 1)) add('switch duplicated', 'switch', was, now);
+  for (const [name, selector] of COUNTED) {
+    const [before, after] = [count(A.doc, selector), count(B.doc, selector)];
+    if (after < before) add(name + ' dropped', name, before, after);
+  }
+  const ids = new Set([...B.doc.querySelectorAll('[id]')].map(el => el.id));
+  for (const id of plainAnchors(A.doc, linked)) if (!ids.has(id)) add('anchor dropped', 'anchor', 1, 0, `<div id="${id}">`);
+  return items;
+}
 // A moved element: "above-to-below" when it stood above the old switch and
 // stands directly below the new one (the switch went to the top of the
 // page): the words between the new switch and it are those that stood
@@ -629,7 +673,7 @@ function duplicateIds(page, A, B) {
     .map(([id, k]) => ({page, area: 'dom', change: 'duplicate id', line: `id="${id}"`, before: ca.get(id) || 0, after: k, invariant: true}));
 }
 
-function comparePage(page, before, after, ends) {
+function comparePage(page, before, after, ends, linked) {
   const A = extract(before), B = extract(after), items = [];
   for (const [change, list, other] of [['removed', A.files, B.files], ['added', B.files, A.files]])
     for (const what of list) if (!other.includes(what)) items.push({page, area: 'file', change, what});
@@ -653,10 +697,10 @@ function comparePage(page, before, after, ends) {
   const dom = [];
   for (const hunk of diffLines(A.dom, B.dom)) dom.push(...domItems(page, hunk, A.domNodes, B.domNodes));
   items.push(...movedElements(page, dom, A, B));
-  // Invariants (review A2 S1, S3): reveals keep their words, the switch its place, ids stay unique.
+  // Invariants (review A2 S1, S3): reveals keep their words, the switch its place, constructs are not dropped, ids stay unique.
   const reveals = revealChecks(page, A, B, ends);
   for (const item of items) if (item.area === 'dom' && item.node) { const found = revealOf(item, reveals.status); if (found) item.reveal = found; }
-  items.push(...reveals.items, ...switchCheck(page, A, B), ...duplicateIds(page, A, B));
+  items.push(...reveals.items, ...switchCheck(page, A, B), ...constructChecks(page, A, B, linked), ...duplicateIds(page, A, B));
   // What a changed text lost and gained, word by word; what the page has.
   const count = selector => String(B.doc.querySelectorAll(selector).length);
   const features = {tabsets: count('.panel-tabset'), reveals: count('details.ctm-reveal'), embeds: count('iframe.ctm-embed'), modes: count('.ctm-modes')};
@@ -712,12 +756,12 @@ function main() {
   const ends = loadRevealEnds(o.revealEnds);
   const pagesBefore = htmlPages(o.before), pagesAfter = htmlPages(o.after);
   const pages = o.pages || [...new Set([...pagesBefore, ...pagesAfter])].sort();
-  const items = [];
+  const items = [], linked = linkTargets(o.before, pagesBefore);
   let identical = 0;
   for (const page of pages) {
     const [a, b] = [path.join(o.before, page), path.join(o.after, page)];
     if (!fs.existsSync(a) || !fs.existsSync(b)) { items.push({page, area: 'page', change: fs.existsSync(a) ? 'removed' : 'added'}); continue; }
-    const found = comparePage(page, a, b, ends);
+    const found = comparePage(page, a, b, ends, linked);
     if (!found.length) identical++;
     items.push(...found);
   }

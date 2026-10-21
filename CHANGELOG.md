@@ -1,5 +1,51 @@
 # Changes
 
+## 0.12.0
+
+The last set before the ingmat3a migration: **links into collapsed callouts
+work**, the comparison of old and new renderings **flags a migration that
+drops a construct**, and ctm-checkers is **0.6.0** (STACK).
+
+Components: ctm-libs at aa4b529 (ctm-libs#30, on top of a4777b1), ctm-checkers
+0.6.0 at 9e042dc (before: 0.2.0 at 8c3db5e); math-exercise, py-exercise,
+pyodide-interaktiv and JSXGraph unchanged, at the commits recorded in
+`_extensions/ctm-assessment/resolved-repos.json`.
+
+### Changed for authors and learners
+
+- **A link to a collapsed callout opens it.** A link, a typed address or the
+  Back button that lands on a callout that is closed (`collapse: true`), on
+  something inside it, or on a callout inside a tab or a reveal (and a reveal
+  inside a callout) now opens every closed layer around the target, outermost
+  first, and scrolls to it, as it does for tabs and reveals (ctm-libs#30:
+  `ctm-nav` of ctm-libs). A page that has only a collapsible callout, with no
+  tabset and no reveal, still does not load `ctm-nav` (unchanged), so its
+  callout is not opened by a link.
+- **STACK exercises follow STACK's rules** (ctm-checkers 0.3 to 0.6): input
+  rules and messages (S-13), the inverse trigonometric functions, and the
+  other STACK changes of ctm-checkers' CHANGELOG. Only STACK verdicts change.
+  math-exercise's tables, and so the math exercises' verdicts, do not
+  change.
+
+### For maintainers
+
+- **`compare-rendered.mjs` flags a migration that drops a construct** (review
+  of set 3, addendum 3). Besides the three invariants of step 4 (reveal
+  words, the position of the switch, duplicate ids) it now also reports, and
+  no category of `expect` files can explain: a lecture/learning switch that
+  the old page has and the new one lacks (`switch dropped`; a page without
+  reading steps never had one), a second switch (`switch duplicated`), fewer
+  tabsets, tab panes, embedded pages (`iframe`) or callouts on the new page
+  than on the old one, and a plain `<div id>` that another old page links to
+  and the new page no longer has (`anchor dropped`; the id may move to
+  `ctm-tab-target`). Tests: `tests/compare-rendered.test.cjs` (each new
+  check has a mutation that the old tool did not report).
+- **The known failure `collapsed-callout-target` is gone** from
+  `tools/compare-rendered/expect/step4-migration.yml`: the ctm-nav fix makes
+  the callout-target pages equal. The course comparison of the migration now
+  has one known failure (`jsxgraph-resize-loop`).
+- `integration/feedback/repos.json`: ctm-libs aa4b529 and ctm-checkers 9e042dc.
+
 ## 0.11.0
 
 Consolidation step 3: **pyodide-interaktiv 1.9 runs on ctm-libs**, the
