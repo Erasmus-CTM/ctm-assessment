@@ -113,8 +113,63 @@ test('external requests in document, worker and opaque frame are recorded and fa
   }
 });
 
+test('caught opaque fetch/XHR attempts are audited even with zero page errors', {timeout: 60000}, async () => {
+  const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL,
+    pages: [{path: 'caught-frame.html', boards: 1}],
+    probes: [async page => {
+      const frame = page.frames().find(frame => frame.parentFrame());
+      await frame.waitForFunction(() => document.body.dataset.caught === 'true');
+    }]});
+  evidence.contracts.push(result);
+  for (const load of result.results) {
+    assert.equal(load.ok, false);
+    assert.deepEqual(load.evidence.errors, [], 'caught native errors must not be needed for detection');
+    for (const name of ['string', 'url', 'request', 'xhr']) {
+      const url = 'https://offline.invalid/caught-' + name;
+      assert.ok(load.evidence.external.includes(url), url);
+      assert.ok(load.evidence.attempts.some(attempt => attempt.url === url && attempt.frame === 'about:srcdoc'), url);
+    }
+  }
+});
+
+test('local string/URL/Request and opaque-frame requests succeed; data URLs are not external attempts', {timeout: 60000}, async () => {
+  const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL,
+    pages: [{path: 'same-origin.html', boards: 1}],
+    probes: [async page => {
+      await page.waitForFunction(() => document.body.dataset.parentLocal === 'local request works');
+      const frame = page.frames().find(frame => frame.parentFrame());
+      await frame.waitForFunction(() => document.body.dataset.local === 'local request works|local request works|inline|local request works');
+    }]});
+  evidence.contracts.push(result);
+  assert.ok(result.ok, JSON.stringify(result));
+  for (const load of result.results) {
+    assert.deepEqual(load.evidence.external, []);
+    assert.ok(load.evidence.attempts.length >= 4, JSON.stringify(load.evidence));
+    assert.ok(load.evidence.attempts.every(attempt => attempt.url === server.baseURL + '_ctm-assets/local.txt'));
+  }
+});
+
+test('registration is refused without probing an opaque navigator.serviceWorker getter', {timeout: 30000}, async () => {
+  const {context, drain, evidence: observed} = await offlineContext(browser, server.baseURL);
+  try {
+    const page = await context.newPage();
+    await page.goto(server.baseURL + 'positive.html');
+    const result = await page.evaluate(async () => {
+      let refusal;
+      try { await navigator.serviceWorker.register('service-worker.js'); }
+      catch (error) { refusal = {name: error.name, message: error.message}; }
+      return {refusal, registrations: (await navigator.serviceWorker.getRegistrations()).length};
+    });
+    assert.deepEqual(result, {refusal: {name: 'NotAllowedError', message: 'Service workers are blocked by offline checks'}, registrations: 0});
+    assert.equal(context.serviceWorkers().length, 0);
+    await drain();
+    assert.deepEqual(observed.errors, [], 'opaque frames must not receive an instrumentation getter exception');
+    assert.ok(observed.attempts.some(attempt => attempt.kind === 'service-worker' && attempt.url === server.baseURL + 'service-worker.js'));
+  } finally { await context.close(); }
+});
+
 test('HTTP errors and browser exceptions independently fail', {timeout: 180000}, async () => {
-  for (const [name, kind] of [['http-error', 'responses'], ['exception', 'errors']]) {
+  for (const [name, kind] of [['http-error', 'responses'], ['exception', 'errors'], ['opaque-exception', 'errors']]) {
     const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL, pages: [{path: name + '.html', boards: 0}]});
     evidence.contracts.push(result);
     assert.ok(result.results.every(load => !load.ok && load.evidence[kind].length > 0), JSON.stringify(result));

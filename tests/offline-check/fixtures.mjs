@@ -22,6 +22,7 @@ const html = body => '<!doctype html><html><head><link rel="icon" href="data:,">
 
 export function writeFixtures(root, jsxgraphDir) {
   fs.mkdirSync(root, {recursive: true});
+  fs.mkdirSync(path.join(root, '_ctm-assets'), {recursive: true});
   fs.writeFileSync(path.join(root, 'toggles.js'), String.raw`
 // The caption markup, state attributes and toggle below match math-exercise
 // e092b8dece85f420f25ce774e5e85779cc078309 (also unchanged at 1bf1acf).
@@ -77,7 +78,24 @@ document.addEventListener('click', event => {
   fs.writeFileSync(path.join(root, 'external.js'), 'fetch("https://offline.invalid/worker-fetch");');
   fs.writeFileSync(path.join(root, 'external.html'), html('<script>fetch("https://offline.invalid/page-fetch");' +
     'new Worker("external.js");</script>' + frame('external', box('external') +
-      '<script>fetch("https://offline.invalid/frame-fetch");</script>')));
+      '<script>fetch("https://offline.invalid/frame-fetch").catch(function () {});</script>')));
+  fs.writeFileSync(path.join(root, 'caught-frame.html'), html(frame('caught-frame', box('caught-frame') +
+    '<script>Promise.all([' +
+    'fetch("https://offline.invalid/caught-string").catch(function(){}),' +
+    'fetch(new URL("https://offline.invalid/caught-url")).catch(function(){}),' +
+    'fetch(new Request("https://offline.invalid/caught-request")).catch(function(){}),' +
+    'new Promise(function(resolve){var xhr=new XMLHttpRequest();xhr.open("GET","https://offline.invalid/caught-xhr");xhr.onload=xhr.onerror=resolve;xhr.send();})' +
+    ']).then(function(){document.body.dataset.caught="true";});</script>')));
+  fs.writeFileSync(path.join(root, 'same-origin.html'), html('<script>fetch("_ctm-assets/local.txt").then(function(r){return r.text();}).then(function(t){document.body.dataset.parentLocal=t;});</script>' + frame('same-origin', box('same-origin') +
+    '<script>Promise.all([fetch(new URL("__BASE___ctm-assets/local.txt")).then(function(r){return r.text();}),' +
+    'fetch(new Request("__BASE___ctm-assets/local.txt")).then(function(r){return r.text();}),' +
+    'fetch("data:text/plain,inline").then(function(r){return r.text();}),' +
+    'new Promise(function(resolve,reject){var xhr=new XMLHttpRequest();xhr.open("GET","__BASE___ctm-assets/local.txt");xhr.onload=function(){resolve(xhr.responseText);};xhr.onerror=reject;xhr.send();})' +
+    ']).then(function(values){document.body.dataset.local=values.join("|");});</script>')));
+  fs.writeFileSync(path.join(root, '_ctm-assets', 'local.txt'), 'local request works');
+  fs.writeFileSync(path.join(root, 'service-worker.js'), 'self.addEventListener("fetch", function(){});');
+  fs.writeFileSync(path.join(root, 'opaque-exception.html'), html(frame('opaque-exception', box('opaque-exception') +
+    '<script>throw new Error("genuine opaque fixture exception");</script>')));
   fs.writeFileSync(path.join(root, 'http-error.html'), html('<script src="absent.js"></script>'));
   fs.writeFileSync(path.join(root, 'exception.html'), html('<script>throw new Error("fixture intentional error");</script>'));
   if (!jsxgraphDir) return;
@@ -107,6 +125,8 @@ window.addEventListener('message', function(e) {
 }
 
 export function finishMechanismFixtures(root, baseURL) {
+  const local = path.join(root, 'same-origin.html');
+  fs.writeFileSync(local, fs.readFileSync(local, 'utf8').replaceAll('__BASE__', baseURL));
   for (const mode of ['always-blank-real', 'plain-hidden', 'refresh-model']) {
     const source = fs.readFileSync(path.join(root, mode + '.template'), 'utf8').replaceAll('__BASE__', baseURL);
     fs.writeFileSync(path.join(root, mode + '.html'), source);
