@@ -1,5 +1,5 @@
 export function instrument() {
-  const audit = window.__storeAudit = {depth:0, duringRestore:[], checkerCalls:0, restores:[], wrapped:[], copies:[], studentRuns:[], pythonRequests:[], cellRuns:[]};
+  const audit = window.__storeAudit = {depth:0, duringRestore:[], checkerCalls:0, restores:[], wrapped:[], copies:[], studentRuns:[], pythonRequests:[], cellRuns:[], readCalls:[]};
   window.__storeEntries = [];
   Math.random = () => 0.1;
   // The OS clipboard is the only external write boundary replaced by the test.
@@ -48,6 +48,13 @@ export function instrument() {
   intercept('CTMStore',store=>{
     const register=store.register;
     store.register=function(options) {
+      if(typeof options.read==='function') {
+        const read=options.read;
+        options.read=function(...args) {
+          audit.readCalls.push({component:options.component,id:options.id});
+          return Reflect.apply(read,this,args);
+        };
+      }
       const handle=Reflect.apply(register,this,[options]);
       const restore=handle.restore;
       handle.restore=function(...args) {

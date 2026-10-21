@@ -66,3 +66,12 @@ test('deferred actual worker-plugin runCell is audited without changing its resu
   assert.equal(world.__storeAudit.cellRuns.length,1);
   assert.ok(world.__storeAudit.wrapped.includes('python.runCell'));
 });
+
+test('pending-flush spy observes an actual adapter read without replacing it',()=>{
+  const world=fixture(), inputs={fields:{answer:'pending'}};
+  const options={component:'math-exercise',id:'fixture',read(){assert.equal(this,options);return inputs;}};
+  world.CTMStore.register(options);
+  assert.equal(world.__storeAudit.readCalls.length,0);
+  assert.equal(options.read(),inputs);
+  assert.equal(world.__storeAudit.readCalls.length,1);
+});

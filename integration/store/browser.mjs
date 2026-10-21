@@ -93,6 +93,14 @@ async function codeCell(page,code){
     return unit.editor.getValue();
   },code);
 }
+async function remoteReset(page,id) {
+  // The page clock is paused, so poll from Node rather than relying on its rAF.
+  for(let attempt=0;attempt<100;attempt++){
+    if(await cell(page,id).locator('input.math-input').inputValue()==='')return;
+    await new Promise(resolve=>setTimeout(resolve,20));
+  }
+  throw Error('Remote clear did not reset '+id);
+}
 async function assertRecordMissing(page,id){
   assert.equal(await page.evaluate(id=>localStorage.getItem(CTMStore.key(id)),id),null);
 }
@@ -224,10 +232,20 @@ try {
     await reveal(a,'store-scalar');await reveal(b,'store-scalar');
     await cell(a,'store-scalar').locator('input.math-input').fill('before clear');
     await seed(a,'store-scalar','correct',1);
+    await saved(a,'store-scalar',record=>Object.values(record.inputs.fields).includes('before clear'));
+    // Hold the real debounce before typing; a slow runner cannot flush it first.
+    await b.clock.install({time:new Date('2026-10-21T00:00:00Z')});
+    await b.clock.pauseAt(new Date('2026-10-21T00:00:01Z'));
     await cell(b,'store-scalar').locator('input.math-input').fill('pending remote save');
+    assert.equal(await b.evaluate(()=>Object.values(JSON.parse(localStorage.getItem(CTMStore.key('store-scalar'))).inputs.fields).includes('pending remote save')),false);
     await a.locator('[data-ctm-clear-page]').click();
-    await b.waitForFunction(()=>document.querySelector('[data-ctm-id="store-scalar"] input').value==='');
-    await b.waitForTimeout(750);
+    await remoteReset(b,'store-scalar');
+    await assertRecordMissing(b,'store-scalar');
+    const pageReads=await b.evaluate(()=>__storeAudit.readCalls.length);
+    await b.clock.runFor(1000);
+    assert.equal(await b.evaluate(()=>__storeAudit.readCalls.length),pageReads,'remote page clear cancels the pending adapter read/flush');
+    await assertRecordMissing(b,'store-scalar');
+    await b.clock.resume();
     await goto(a);await goto(b);
     await assertRecordMissing(a,'store-scalar');
     assert.equal(await cell(b,'store-scalar').locator('input.math-input').inputValue(),'');
@@ -239,9 +257,18 @@ try {
     await seed(a,'store-scalar','correct',1);
     await a.locator('[data-ctm-clear-page]').click();
     assert.equal(await cell(b,'store-second').locator('input.math-input').inputValue(),'second page');
+    await saved(b,'store-second',record=>Object.values(record.inputs.fields).includes('second page'));
+    await b.clock.pauseAt(await b.evaluate(()=>Date.now()+1000));
+    await cell(b,'store-second').locator('input.math-input').fill('pending course save');
+    assert.equal(await b.evaluate(()=>Object.values(JSON.parse(localStorage.getItem(CTMStore.key('store-second'))).inputs.fields).includes('pending course save')),false);
     await a.locator('[data-ctm-clear-course]').click();
-    await b.waitForFunction(()=>document.querySelector('[data-ctm-id="store-second"] input').value==='');
-    await b.waitForTimeout(750);await goto(b,'second.html');
+    await remoteReset(b,'store-second');
+    await assertRecordMissing(b,'store-second');
+    const courseReads=await b.evaluate(()=>__storeAudit.readCalls.length);
+    await b.clock.runFor(1000);
+    assert.equal(await b.evaluate(()=>__storeAudit.readCalls.length),courseReads,'remote course clear cancels the pending adapter read/flush');
+    await assertRecordMissing(b,'store-second');
+    await b.clock.resume();await goto(b,'second.html');
     await assertRecordMissing(b,'store-second');await assertRecordMissing(a,'store-scalar');
     checks.push('page/course clear across two actual tabs cancels pending writes and preserves the other page until course clear');
     await noRestorePython(a);await noRestorePython(b);
