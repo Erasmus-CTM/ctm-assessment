@@ -2,6 +2,7 @@
 import contextlib
 import importlib.util
 import io
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -11,6 +12,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts/build-course.py'
 FIXTURE = ROOT / 'integration/step4-course'
+QUARTO = shutil.which(os.environ.get('QUARTO_BIN', 'quarto'))
+LIBS = os.environ.get('CTM_LIBS_EXTENSION')
 
 
 def load():
@@ -45,10 +48,13 @@ class BuildCourse(unittest.TestCase):
             sys.argv = argv
         self.assertRegex(out.getvalue().strip(), r'^[0-9a-f]{40}$')
 
+    @unittest.skipUnless(QUARTO and LIBS, 'Quarto and CTM_LIBS_EXTENSION (setup-feedback-integration.py --test sets it) are needed')
     def test_convert_previews_the_migration_with_the_course_hand_edits(self):
         with tempfile.TemporaryDirectory() as temp:
             dest = Path(temp) / 'course'
             shutil.copytree(FIXTURE, dest)
+            # The conversion runs after the install, with the ctm-libs it installed.
+            shutil.copytree(LIBS, dest / '_extensions' / 'ctm-libs')
             with contextlib.redirect_stdout(io.StringIO()):
                 self.module.convert(dest)
             config = (dest / '_quarto.yml').read_text(encoding='utf-8')

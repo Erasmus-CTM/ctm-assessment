@@ -13,8 +13,9 @@ are those pinned in CHECKOUT's integration/feedback/repos.json, and renders
 the project (with --profile, if given). Used by the Pyodide parity job and the
 course comparison workflow, which build a course with two umbrella refs.
 
---convert previews a course's step-4 migration before installing: this
-checkout's tools/migrate-course-html.py --config, then the course's
+--convert previews a course's step-4 migration after installing: this
+checkout's tools/migrate-course-html.py --config, with the ctm-libs just
+installed (CHECKOUT's pin, which reads the includes), then the course's
 migrated/ folder (the hand edits of a migration, if it has one) copied over
 it. --pin prints the CTM Assessment ref the course pins in its
 quarto-extensions.yml (main when it names none) and stops.
@@ -68,7 +69,8 @@ def fetch(args, dest):
 
 def convert(dest):
     """--convert: the step-4 migration of the course, previewed."""
-    run(sys.executable, ROOT / 'tools' / 'migrate-course-html.py', '--project', dest, '--config')
+    run(sys.executable, ROOT / 'tools' / 'migrate-course-html.py', '--project', dest, '--config',
+        '--ctm-libs', dest / '_extensions' / 'ctm-libs')
     migrated = dest / 'migrated'
     if migrated.is_dir():
         shutil.copytree(migrated, dest, dirs_exist_ok=True)
@@ -107,9 +109,7 @@ def main():
         parser.error('--dest is required')
     dest = args.dest.resolve()
     fetch(args, dest)
-    if args.convert:
-        convert(dest)
-    elif (dest / 'migrated').is_dir() and args.path:
+    if (dest / 'migrated').is_dir() and args.path and not args.convert:
         shutil.rmtree(dest / 'migrated')  # a course folder's migration edits: only for --convert
     installer = [sys.executable, args.umbrella.resolve() / 'scripts' / 'install-project.py', '--project', dest]
     if args.workspace:
@@ -118,6 +118,8 @@ def main():
     if args.review_refs.strip() not in ('', '{}'):
         installer += ['--review-refs', args.review_refs]
     run(*installer)
+    if args.convert:
+        convert(dest)
     if not args.no_render:
         run('quarto', 'render', *[option for profile in args.profile for option in ('--profile', profile)], cwd=dest)
 

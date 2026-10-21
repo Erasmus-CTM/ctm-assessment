@@ -3,7 +3,7 @@
 # package, or the pull request's base) against one built with step 4's
 # package, from the same sources (design §6.2, "package PRs").
 #
-# - A2 (ctm-libs 5f1e2a1): links into tabs are on by default (AC), so every
+# - A2 (ctm-libs 4acb7c6; e415cee since the A2 follow-ups): links into tabs are on by default (AC), so every
 #   page with a tabset loads ui/ctm-nav.js and its styles, ui/ctm-ui.css;
 #   `ctm-assessment: tab-links: false` turns them off.
 # - B4 adds the saved answers' categories (store attributes, the page bar and

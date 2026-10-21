@@ -7,12 +7,12 @@ package's library, like the other components: one Python worker, one
 language catalogue, one settings reader and one feedback implementation on
 every page. Authors keep their pages and `filters: [ctm-assessment]`.
 
-Components: ctm-libs at dd6eaa4 (step 3, with the STACK part of
-`ctm.checkers`), math-exercise and py-exercise with ctm-libs' new bootstrap
-copy (no behaviour change), pyodide-interaktiv 1.9.0, ctm-checkers 0.2.0 at
-8c3db5e (the STACK engine as its own part; math pages are unchanged), JSXGraph
-unchanged, at the commits recorded in
-`_extensions/ctm-assessment/resolved-repos.json`.
+Components: ctm-libs at 15e6c82 (step 3, on top of 0.10.0's 8c7e5f6),
+math-exercise and py-exercise with ctm-libs' new bootstrap copy (no
+behaviour change), pyodide-interaktiv 1.9.0, ctm-checkers 0.3.0 at e84bc8c
+(S-01: a STACK student answer may not name question or feedback variables;
+math-exercise's verdicts are unchanged), JSXGraph unchanged, at the commits
+recorded in `_extensions/ctm-assessment/resolved-repos.json`.
 
 ### Changed for authors and learners
 
@@ -67,8 +67,8 @@ Assessment, as before:
 quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz
 ```
 
-Components: ctm-libs 0.9.0 at 40bad7d, math-exercise 0.11.0, ctm-checkers
-0.1.1.dev0 at 4bd916d (new), py-exercise, pyodide-interaktiv and JSXGraph
+Components: ctm-libs 0.9.0 at 8c7e5f6, math-exercise 0.11.0, ctm-checkers
+0.2.0 at 8c3db5e (new), py-exercise, pyodide-interaktiv and JSXGraph
 unchanged, at the commits recorded in
 `_extensions/ctm-assessment/resolved-repos.json`.
 
@@ -108,7 +108,21 @@ unchanged, at the commits recorded in
 ### ctm-libs
 
 ctm-libs moves from 4acb7c6 to 40bad7d: `ctm.checkers` (it finds, installs
-and calls ctm-checkers for components; ctm-libs #23).
+and calls ctm-checkers for components; ctm-libs #23), then to e415cee
+(ctm-libs #25, step 4 follow-ups): in WebKit a deep link to a tab title far
+down a page keeps the tab row in view, and `markdown-lint` resolves nested
+includes against the page, as Quarto does; then to 8c7e5f6, the head of
+step 4's set (ctm-libs #29 on #28, with #26 merged before them): the focus
+stays where a deep link put it when WebKit's late jump to the fragment drops
+it (#29); `markdown-lint`'s reading as an API for maintainer tools,
+`ctm.source.read()`, `ctm.ui.rawHTML()` and `ctm.ui.defaultTitle()` (#28,
+no change to a page); ctm-checkers' STACK engine as a part of its own, one
+install per runtime and payload (#26, step 2). With it ctm-checkers moves
+from 4bd916d (0.1.1.dev0) to 8c3db5e (0.2.0, ctm-checkers #3 and #4), the
+commit ctm-libs' own tests use since #26: its STACK engine is a wheel and
+page script of their own, which math pages do not load, and its install
+code leaves no name behind; math-exercise's verdicts are unchanged (the
+parity check).
 
 ### For maintainers
 
@@ -214,8 +228,9 @@ commits recorded in `_extensions/ctm-assessment/resolved-repos.json`.
   `_extensions/ctm-assessment/tab-ids.lua` (`filters: - path: …, at: pre-ast`
   before `- ctm-assessment` in `_quarto.yml`): a tab heading's id and
   attributes move to the start of its pane, so links to a tab work (and
-  `quiz=` reaches the filters). Ids with a cross-reference prefix are not
-  moved, with a warning. A project with the line stops with an older package.
+  `quiz=` reaches the filters). Ids with a cross-reference prefix, and ids of
+  the form of Quarto's own pane ids (`tabset-1-2`), are not moved, with a
+  warning. A project with the line stops with an older package.
 - **Reveals take over six class names** (backwards-incompatible for a site
   that uses them; none of the CTM courses, this package or its components
   does): in HTML a div with `.reading-step`, `.hint`, `.solution` (Quarto's
@@ -285,6 +300,40 @@ pyodide-interaktiv).
   fixture course `integration/step4-course` against its migration
   (`expect/step4-migration.yml`) and in Chromium, Firefox and WebKit
   (`tools/compare-browser.mjs`); `expect/step4.yml` lists step 4's
-  differences on pages without its Markdown. The Quarto-release canary runs
-  the `tab-ids.lua` test first. The umbrella's own unlabelled exercises got
+  differences on pages without its Markdown. The `tab-ids.lua` canary runs
+  in its own job of **Quarto versions**, which fails the run with the
+  current Quarto release too. The umbrella's own unlabelled exercises got
   labels.
+- Step 4 follow-ups (review of A2): the converter and its lint follow nested
+  includes with ctm-libs' own rule (`ctm.source.files()`, run by
+  `tools/source-files.lua` through `quarto pandoc lua`; the tool now needs
+  Quarto and `--ctm-libs DIR` or `CTM_LIBS_EXTENSION`), and the converter
+  removes a hand-written anchor that repeats the id of the tab heading it
+  follows (with the `tab-ids.lua` line the page would have it twice; links
+  keep working). `compare-rendered.mjs` checks three invariants that no
+  expected category can explain: every reveal keeps its words (more only as
+  the words that followed a raw `<details>` closed early by a heading), the
+  switch stays where it was or goes to the top of the page, and no id occurs
+  more often than before. `compare-browser.mjs` checks the same for reveals
+  and the switch, compares the Tab presses to reach the switch, has a
+  `--first-visit` mode (no isolation headers, coi-serviceworker active) and
+  reads `known-failures` from the expect file; the fixture course has
+  tabsets far down a long page with deep links from another page. After the
+  A2b review: a reveal may take in the heading after it only where the old
+  course's Markdown had that heading inside the raw `<details>`
+  (`migrate-course-html.py --reveal-ends`, read by both tools);
+  `compare-browser.mjs --shard I/N` splits a large course into jobs, the
+  first visit is sampled and keeps Pyodide and Monaco blocked, console
+  errors name their frame, and a link in a collapsed callout is clicked.
+  After the A2c review: a heading inside a `:::` div (a callout's title)
+  closes no raw `<details>` in `--reveal-ends`; the converter resolves
+  include lines from memory and writes nothing into a course it only reads;
+  a console message is put down to an iframe only from the same page load;
+  the first visit loads a target of every kind of place on each page.
+- The converter keeps no copy of ctm-libs' rules (AC's decision P1): which
+  lines are Markdown, the raw HTML `markdown-lint` names and the reveals'
+  default titles come from ctm-libs itself (`ctm.source.read()`,
+  `ctm.ui.rawHTML()`, `ctm.ui.defaultTitle()`, ctm-libs #28), run by
+  `tools/markdown-lines.lua` through `quarto pandoc lua`; the tool needs a
+  ctm-libs with them. Its results on ingmat3a (`main`, `linalg-branch`),
+  ctm-demo and the fixture course are unchanged.

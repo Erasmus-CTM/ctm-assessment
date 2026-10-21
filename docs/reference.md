@@ -79,8 +79,9 @@ loosely before, give a warning that they become errors in 1.0.
   pane, so a link to it opens the tab; classes such as `.active` stay on the
   heading. An id with a cross-reference prefix (`fig-`, `tbl-`, `thm-`,
   `sec-`, `eq-`, … and the keys of `crossref: custom:`) is not moved, with a
-  warning: Quarto would turn the block into an empty figure or theorem. A
-  package older than this file stops the render of a project with the line.
+  warning: Quarto would turn the block into an empty figure or theorem. Nor
+  is an id of the form of Quarto's own pane ids (`tabset-1-2`), with a
+  warning: the page would have it twice. A package older than this file stops the render of a project with the line.
 - **`markdown-lint: true`** warns at render time, naming files and lines,
   about raw `<details>`/`<summary>`, `<div id="…"></div>`, `<iframe>`, a
   hand-written switch (`data-learning-mode`), a page with tabsets in a

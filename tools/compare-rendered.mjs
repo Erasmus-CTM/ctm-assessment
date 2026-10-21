@@ -12,12 +12,17 @@
 // `modes`); an element removed and added unchanged elsewhere is "moved".
 //
 //   node tools/compare-rendered.mjs --before DIR --after DIR [--expect FILE ...] \
-//     [--name LABEL] [--report OUT.json] [--summary OUT.md] [--pages a.html,b.html]
+//     [--name LABEL] [--report OUT.json] [--summary OUT.md] [--pages a.html,b.html] [--reveal-ends FILE]
+//
+// --reveal-ends FILE: how the old course's <details> ended
+// (tools/migrate-course-html.py --reveal-ends on the old course); without
+// it no reveal may take in the heading after it (see revealChecks).
 //
 // Exit status: 0 when every difference is expected, 1 otherwise, 2 on errors.
 import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire} from 'node:module';
+import {closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 const require = createRequire(import.meta.url);
 const vm = require('node:vm');
 const {JSDOM} = require('jsdom');
@@ -25,11 +30,12 @@ const yaml = require('js-yaml');
 
 // ---------------------------------------------------------------- options
 function options(argv) {
-  const o = {expect: [], pages: null, name: '', report: null, summary: null, before: null, after: null};
+  const o = {expect: [], pages: null, name: '', report: null, summary: null, before: null, after: null, revealEnds: null};
   for (let i = 0; i < argv.length; i += 2) {
     const [flag, value] = [argv[i], argv[i + 1]];
     if (flag === '--expect') o.expect.push(value);
     else if (flag === '--pages') o.pages = value.split(',').filter(Boolean);
+    else if (flag === '--reveal-ends') o.revealEnds = value;
     else if (['--before', '--after', '--name', '--report', '--summary'].includes(flag)) o[flag.slice(2)] = value;
     else throw new Error('Unknown option ' + flag);
   }
@@ -433,8 +439,8 @@ function domItems(page, hunk, nodesBefore = [], nodesAfter = []) {
     rt[k].used = at[k].used = true;
     items.push({page, area: 'dom', change: 'text changed', before: rt[k].line.slice(6), after: at[k].line.slice(6), ancestors: ancestorsOf(at[k].node) + ' > ' + describe(at[k].node)});
   }
-  removed.forEach((r, k) => { if (!r.used) items.push({page, area: 'dom', change: 'removed', line: r.line, index: hunk.at + k, ancestors: ancestorsOf(r.node), content: r.line.startsWith('text: ') ? '' : contentOf(r.node)}); });
-  added.forEach((a, k) => { if (!a.used) items.push({page, area: 'dom', change: 'added', line: a.line, index: hunk.addedAt?.[k], ancestors: ancestorsOf(a.node), content: a.line.startsWith('text: ') ? '' : contentOf(a.node)}); });
+  removed.forEach((r, k) => { if (!r.used) items.push({page, area: 'dom', change: 'removed', line: r.line, index: hunk.at + k, ancestors: ancestorsOf(r.node), content: r.line.startsWith('text: ') ? '' : contentOf(r.node), node: r.node}); });
+  added.forEach((a, k) => { if (!a.used) items.push({page, area: 'dom', change: 'added', line: a.line, index: hunk.addedAt?.[k], ancestors: ancestorsOf(a.node), content: a.line.startsWith('text: ') ? '' : contentOf(a.node), node: a.node}); });
   return items;
 }
 // Elements that moved: an element removed whole (its start tag, content and
@@ -477,7 +483,8 @@ function movedElements(page, items, A, B) {
     for (let i = start; i <= last; i++) gone.add(sides.removed.get(i));
     for (let i = place[0]; i <= place[1]; i++) gone.add(sides.added.get(i));
     moved.push({page, area: 'dom', change: 'moved', line: A.dom[start], lines: last - start + 1,
-      ancestors: ancestorsOf(A.domNodes[start]), content: contentOf(A.domNodes[start]), to: ancestorsOf(B.domNodes[place[0]])});
+      ancestors: ancestorsOf(A.domNodes[start]), content: contentOf(A.domNodes[start]), to: ancestorsOf(B.domNodes[place[0]]),
+      switchOrder: switchOrder(A, B, A.domNodes[start], B.domNodes[place[0]])});
   }
   return [...items.filter(item => !gone.has(item)), ...moved];
 }
@@ -499,7 +506,128 @@ function jsonDiff(a, b, at = '') {
 // Key order is not a change: JSON is compared after sorting object keys.
 const sorted = v => Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, sorted(v[k])])) : v;
 
-function comparePage(page, before, after) {
+// ---------------------------------------------------------------- invariants
+// The page's words in document order (outside script, style, template and
+// noscript) and the word range [start, end) of an element.
+function words(doc) {
+  if (doc.ctmWords) return doc.ctmWords;
+  const list = [], spans = new Map();
+  const walker = doc.createTreeWalker(doc.body, 4);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.parentElement?.closest('script, style, template, noscript')) continue;
+    const found = node.textContent.split(/\s+/).filter(Boolean);
+    if (!found.length) continue;
+    spans.set(node, [list.length, list.length + found.length]);
+    list.push(...found);
+  }
+  const range = el => {
+    let start = null, end = null;
+    const inner = doc.createTreeWalker(el, 4);
+    for (let node = inner.nextNode(); node; node = inner.nextNode()) {
+      const span = spans.get(node);
+      if (!span) continue;
+      if (start === null) start = span[0];
+      end = span[1];
+    }
+    if (start !== null) return [start, end];
+    for (const [node, span] of spans) if (el.compareDocumentPosition(node) & 4) return [span[0], span[0]];
+    return [list.length, list.length];
+  };
+  const at = index => { for (const [node, span] of spans) if (span[0] <= index && index < span[1]) return node; return null; };
+  return (doc.ctmWords = {list, range, at});
+}
+const same = (a, b) => a.length === b.length && a.every((w, k) => w === b[k]);
+const startsWith = (a, b) => b.length <= a.length && b.every((w, k) => w === a[k]);
+
+// Reveals: the k-th <details> of the old page against the k-th of the new
+// one. A reveal must hold the same words as before ("same"). It may hold
+// more only as old + what directly followed the old <details>: "heading"
+// when that starts with a heading and the old <details> was closed by that
+// heading's section (a raw <details> closed early, design §1.4 item 5; the
+// course's Markdown tells, --reveal-ends), "swallowed" when it starts with a
+// heading that old's <details> had ended before (a closing fence moved past
+// the next heading, review A2b S1), else "grown" (a course's own accepted
+// case). "Swallowed", fewer or other words ("shrunk",
+// "changed"), or another number of <details>, is a difference that no
+// expectation explains.
+function revealChecks(page, A, B, ends) {
+  const status = new Map(), items = [];
+  const before = [...A.doc.body.querySelectorAll('details')], after = [...B.doc.body.querySelectorAll('details')];
+  const bySection = closedBySection(ends, page, before);
+  const [wa, wb] = [words(A.doc), words(B.doc)];
+  if (before.length !== after.length)
+    items.push({page, area: 'dom', change: 'reveal count changed', before: before.length, after: after.length, invariant: true});
+  for (let k = 0; k < Math.min(before.length, after.length); k++) {
+    const [o, n] = [before[k], after[k]];
+    const [os, oe] = wa.range(o), [ns, ne] = wb.range(n);
+    const ow = wa.list.slice(os, oe), nw = wb.list.slice(ns, ne);
+    let found = 'changed';
+    if (same(ow, nw)) found = 'same';
+    else if (nw.length > ow.length && startsWith(nw, ow) && same(wa.list.slice(oe, oe + nw.length - ow.length), nw.slice(ow.length))) {
+      const first = wb.at(ns + ow.length);
+      const heading = first?.parentElement?.closest('h1, h2, h3, h4, h5, h6');
+      found = !(heading && n.contains(heading)) ? 'grown' : bySection[k] ? 'heading' : 'swallowed';
+    } else if (nw.length < ow.length && startsWith(ow, nw)) found = 'shrunk';
+    status.set(o, found);
+    status.set(n, found);
+    if (found === 'shrunk' || found === 'changed' || found === 'swallowed') {
+      const summary = n.querySelector('summary')?.textContent.replace(/\s+/g, ' ').trim() || '';
+      items.push({page, area: 'dom', change: 'reveal content changed', reveal: found, line: `<details> ${k + 1}: ${summary}`,
+        ancestors: ancestorsOf(n), ...wordChanges(ow.join(' '), nw.join(' ')), invariant: true});
+    }
+  }
+  return {status, items};
+}
+// The reveal an item belongs to: the <details> it is, sits in, or (a removed
+// section that a raw <details> was cut by) holds as its last <details>.
+function revealOf(item, status) {
+  let el = item.node;
+  if (el && el.nodeType !== 1) el = el.parentElement;
+  if (!el) return undefined;
+  if (el.tagName === 'DETAILS') return status.get(el);
+  const around = el.closest('details');
+  if (around) return status.get(around);
+  const inside = [...el.children].filter(child => child.tagName === 'DETAILS').pop();
+  return inside ? status.get(inside) : undefined;
+}
+
+// The lecture/reading switch: the new one stands where the old one stood
+// (the same words before it in main, outside the title block) or at the top
+// of the page (no words before it). Anything else is a difference that no
+// expectation explains.
+const OLD_SWITCH = '[data-learning-mode]', NEW_SWITCH = '.ctm-modes';
+function wordsBefore(doc, el) {
+  const w = words(doc), main = el.closest('main') || doc.body, title = main.querySelector('#title-block-header');
+  const [ms] = w.range(main), [es] = w.range(el), [ts, te] = title ? w.range(title) : [0, 0];
+  return w.list.slice(ms, es).filter((_, k) => k + ms < ts || k + ms >= te).join(' ');
+}
+function switchCheck(page, A, B) {
+  const [o, n] = [A.doc.querySelector(OLD_SWITCH), B.doc.querySelector(NEW_SWITCH)];
+  if (!n) return [];
+  const now = wordsBefore(B.doc, n), was = o ? wordsBefore(A.doc, o) : null;
+  if (now === '' || now === was) return [];
+  return [{page, area: 'dom', change: 'switch moved', line: n.outerHTML.slice(0, 80), before: was, after: now.slice(-300), invariant: true}];
+}
+// A moved element: "above-to-below" when it stood above the old switch and
+// stands directly below the new one (the switch went to the top of the
+// page): the words between the new switch and it are those that stood
+// before it on old, so nothing else came in between.
+function switchOrder(A, B, before, after) {
+  const [o, n] = [A.doc.querySelector(OLD_SWITCH), B.doc.querySelector(NEW_SWITCH)];
+  if (!o || !n || !before || !after) return 'other';
+  if (!(before.compareDocumentPosition(o) & 4) || !(n.compareDocumentPosition(after) & 4)) return 'other';
+  const w = words(B.doc), [, end] = w.range(n), [start] = w.range(after);
+  return w.list.slice(end, start).join(' ') === wordsBefore(A.doc, before) ? 'above-to-below' : 'other';
+}
+// Ids: the new page may not have an id more often than the old one did.
+function duplicateIds(page, A, B) {
+  const count = doc => { const c = new Map(); for (const el of doc.querySelectorAll('[id]')) c.set(el.id, (c.get(el.id) || 0) + 1); return c; };
+  const [ca, cb] = [count(A.doc), count(B.doc)];
+  return [...cb].filter(([id, k]) => k > 1 && k > (ca.get(id) || 0))
+    .map(([id, k]) => ({page, area: 'dom', change: 'duplicate id', line: `id="${id}"`, before: ca.get(id) || 0, after: k, invariant: true}));
+}
+
+function comparePage(page, before, after, ends) {
   const A = extract(before), B = extract(after), items = [];
   for (const [change, list, other] of [['removed', A.files, B.files], ['added', B.files, A.files]])
     for (const what of list) if (!other.includes(what)) items.push({page, area: 'file', change, what});
@@ -523,6 +651,10 @@ function comparePage(page, before, after) {
   const dom = [];
   for (const hunk of diffLines(A.dom, B.dom)) dom.push(...domItems(page, hunk, A.domNodes, B.domNodes));
   items.push(...movedElements(page, dom, A, B));
+  // Invariants (review A2 S1, S3): reveals keep their words, the switch its place, ids stay unique.
+  const reveals = revealChecks(page, A, B, ends);
+  for (const item of items) if (item.area === 'dom' && item.node) { const found = revealOf(item, reveals.status); if (found) item.reveal = found; }
+  items.push(...reveals.items, ...switchCheck(page, A, B), ...duplicateIds(page, A, B));
   // What a changed text lost and gained, word by word; what the page has.
   const count = selector => String(B.doc.querySelectorAll(selector).length);
   const features = {tabsets: count('.panel-tabset'), reveals: count('details.ctm-reveal'), embeds: count('iframe.ctm-embed'), modes: count('.ctm-modes')};
@@ -553,7 +685,7 @@ function test(pattern, value) {
 function matches(rule, item) {
   if (rule.area && rule.area !== item.area) return false;
   for (const field of ['change', 'what', 'object', 'path', 'tag', 'element', 'attribute', 'before', 'after', 'line', 'page', 'effective', 'context',
-    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes'])
+    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes', 'reveal', 'switchOrder'])
     if (rule[field] !== undefined && !test(rule[field], item[field])) return false;
   for (const [field, pattern] of Object.entries(rule.where || {})) {
     const value = field.split('.').reduce((v, k) => (v == null ? v : v[k]), item.item ?? item.attrs);
@@ -563,7 +695,9 @@ function matches(rule, item) {
 }
 function classify(items, categories) {
   for (const item of items) {
-    const category = categories.find(c => (c.match || []).some(rule => matches(rule, item)));
+    // An invariant's breach (a reveal that lost words, a moved switch, a
+    // duplicate id) is never an expected difference.
+    const category = item.invariant ? null : categories.find(c => (c.match || []).some(rule => matches(rule, item)));
     item.category = category ? category.id : null;
   }
   return items;
@@ -573,6 +707,7 @@ function classify(items, categories) {
 function main() {
   const o = options(process.argv.slice(2));
   const categories = loadExpectations(o.expect);
+  const ends = loadRevealEnds(o.revealEnds);
   const pagesBefore = htmlPages(o.before), pagesAfter = htmlPages(o.after);
   const pages = o.pages || [...new Set([...pagesBefore, ...pagesAfter])].sort();
   const items = [];
@@ -580,7 +715,7 @@ function main() {
   for (const page of pages) {
     const [a, b] = [path.join(o.before, page), path.join(o.after, page)];
     if (!fs.existsSync(a) || !fs.existsSync(b)) { items.push({page, area: 'page', change: fs.existsSync(a) ? 'removed' : 'added'}); continue; }
-    const found = comparePage(page, a, b);
+    const found = comparePage(page, a, b, ends);
     if (!found.length) identical++;
     items.push(...found);
   }

@@ -67,13 +67,25 @@ class CompareMatrix(unittest.TestCase):
         entry = matrix[0]
         self.assertEqual((entry['ref'], entry['base_ref'], entry['base'], entry['head'], entry['key']),
                          ('step4/migrate', 'main', 'pin', '', 'ctm-demo-step4-migrate'))
-        self.assertEqual(browsers, matrix)
+        self.assertEqual([{k: v for k, v in e.items() if k not in ('shard', 'part')} for e in browsers], matrix)
+        self.assertEqual(browsers[0]['shard'], '', 'one part')
         self.run_main(EVENT='workflow_dispatch', COURSE='aacchhee/ctm-demo', BROWSER='true', BROWSERS='webkit nonsense')
         self.assertEqual(self.engines, ['webkit'])
         matrix, _ = self.run_main(EVENT='workflow_dispatch', COURSE='examples', BASE='pin')
         self.assertEqual(matrix[0]['base'], '', 'the example site pins nothing')
         matrix, _ = self.run_main(EVENT='workflow_dispatch', COURSE='step4-course', BASE='pin', CONVERT='true')
         self.assertEqual((matrix[0]['path'], matrix[0]['ref']), ('integration/step4-course', ''))
+
+    def test_large_courses_run_their_browser_comparison_in_parts(self):
+        # Every part is a job per browser (compare-browser.mjs --shard), review A2b S4.
+        _, browsers = self.run_main(EVENT='workflow_dispatch', COURSE='aacchhee/ingmat3a_ntnu', COURSE_REF='linalg-branch', BROWSER='true')
+        self.assertEqual([(e['shard'], e['part']) for e in browsers], [(f'{k}/4', f'-part{k}of4') for k in range(1, 5)])
+        _, browsers = self.run_main(EVENT='workflow_dispatch', COURSE='aacchhee/ingmat3a_ntnu', COURSE_REF='main', BROWSER='true')
+        self.assertEqual([e['shard'] for e in browsers], ['1/2', '2/2'])
+        _, browsers = self.run_main(EVENT='workflow_dispatch', COURSE='aacchhee/ingmat3a_ntnu', COURSE_REF='064aefa', BROWSER='true', SHARDS='3')
+        self.assertEqual([e['shard'] for e in browsers], ['1/3', '2/3', '3/3'])
+        _, browsers = self.run_main(EVENT='workflow_dispatch', COURSE='aacchhee/ctm-demo', BROWSER='true')
+        self.assertEqual([e['shard'] for e in browsers], [''])
 
 
 if __name__ == '__main__':
