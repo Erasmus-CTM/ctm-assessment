@@ -317,6 +317,30 @@ class AssetsTests(unittest.TestCase):
                 A.install_carried_bundle(lock, bundle, target)
             self.assertEqual((target / "previous").read_bytes(), b"old assets")
 
+    def test_carried_publish_and_rollback_failure_preserves_recoverable_previous_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            bundle = root / "verified"
+            with patch.object(A, "download", side_effect=downloaded):
+                A.build_from_lock(lock, bundle, root / "cache")
+            target = root / "project/_ctm-assets"
+            target.mkdir(parents=True)
+            (target / "old-answer").write_bytes(b"recoverable")
+            rename = Path.rename
+            def concurrent_destination(source, destination):
+                if source.name == "bundle":
+                    target.mkdir()
+                    (target / "concurrent").write_bytes(b"new owner")
+                    raise OSError("simulated failed publication after concurrent recreation")
+                return rename(source, destination)
+            with patch.object(Path, "rename", concurrent_destination), self.assertRaisesRegex(A.AssetError, "previous assets retained at"):
+                A.install_carried_bundle(lock, bundle, target)
+            retained = list(target.parent.glob(".ctm-assets-previous-*/previous/old-answer"))
+            self.assertEqual(len(retained), 1)
+            self.assertEqual(retained[0].read_bytes(), b"recoverable")
+            self.assertEqual((target / "concurrent").read_bytes(), b"new owner")
+
     @unittest.skipUnless(hasattr(os, "mkfifo"), "POSIX special-entry fixture")
     def test_carried_bundle_rejects_fifo_without_reading_it(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -387,6 +411,24 @@ class MetadataTests(unittest.TestCase):
             pins.write_text(pins.read_text().replace("jsxgraph@1.2.3", "jsxgraph@1"))
             with self.assertRaisesRegex(A.AssetError, "exact"):
                 A.board_versions(pins)
+
+    def test_conflicting_board_home_cannot_be_hidden_by_lock_merge(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = self.sources(root)
+            pins = self.pins(root)
+            versions = {"katex": "0.16.47", "pyodide": "0.28.3", "jsxgraph": "1.2.3",
+                        "mathjax4": "4.0.0", "mathjax-newcm-font": "4.0.0"}
+            for name, npm, version in (("mathjax4", "mathjax", "4.1.2"),
+                                       ("disguised", "mathjax", "4.1.2"),
+                                       ("jsxgraph", "katex", "0.16.47"),
+                                       ("python-alias", "pyodide", "0.28.3")):
+                with self.subTest(name=name):
+                    duplicate = {**table, "assets": {**table["assets"], name: {"npm": npm, "version": version,
+                                 "local": "npm/duplicate@{version}/"}}}
+                    (root / "assets.json").write_bytes(A.json_bytes(duplicate))
+                    with self.assertRaisesRegex(A.AssetError, "belongs to runtime/jsxgraph-pins"):
+                        A.validate_version_homes({"versions": versions}, root, pins)
 
     def test_profiles_preserve_authored_files_and_separate_exam_answers(self):
         with tempfile.TemporaryDirectory() as tmp:

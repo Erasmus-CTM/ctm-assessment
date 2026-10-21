@@ -412,15 +412,29 @@ def install_carried_bundle(lock: dict, source: Path, destination: Path, *, accep
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(data)
         verify_bundle(stage, lock)
-        backup = Path(temporary) / "previous"
+        # Keep the previous bundle outside the stage's auto-cleaned directory.
+        # A failed rollback must leave its only copy recoverable.
+        backup = None
         if destination.exists():
-            destination.rename(backup)
+            backup_parent = Path(tempfile.mkdtemp(prefix=".ctm-assets-previous-", dir=destination.parent))
+            backup = backup_parent / "previous"
+            try:
+                destination.rename(backup)
+            except OSError:
+                backup_parent.rmdir()
+                raise
         try:
             stage.rename(destination)
-        except OSError:
-            if backup.exists():
-                backup.rename(destination)
+        except OSError as publish_error:
+            if backup is not None:
+                try:
+                    backup.rename(destination)
+                except OSError as rollback_error:
+                    raise AssetError(f"Asset publication and rollback failed; previous assets retained at {backup}: {rollback_error}") from publish_error
+                backup.parent.rmdir()
             raise
+        if backup is not None:
+            shutil.rmtree(backup.parent)
     return destination
 
 
@@ -437,7 +451,9 @@ def version_sources(library: Path) -> dict:
     for name, entry in table["assets"].items():
         if not exact.fullmatch(str(entry.get("version", ""))):
             raise AssetError(f"{name}: the asset table needs an exact version")
-        if name == "pyodide" or entry.get("npm") in {"jsxgraph", "@mathjax/mathjax-newcm-font"}:
+        if (name in {"pyodide", "jsxgraph", "mathjax4", "mathjax-newcm-font"}
+                or entry.get("npm") in {"pyodide", "jsxgraph", "@mathjax/mathjax-newcm-font"}
+                or (entry.get("npm") == "mathjax" and entry["version"].split(".", 1)[0] != "3")):
             raise AssetError(f"{name}: version belongs to runtime/jsxgraph-pins, not assets.json")
         relative_path(entry["local"].replace("{version}", entry["version"]).rstrip("/"))
         assets[name] = dict(entry)
@@ -478,7 +494,10 @@ def validate_version_homes(lock: dict, library: Path, pins: Path) -> dict[str, s
     sources = version_sources(library)
     expected = {name: entry["version"] for name, entry in sources["assets"].items()}
     expected["pyodide"] = sources["pyodide"]
-    expected.update(board_versions(pins))
+    boards = board_versions(pins)
+    if set(expected) & set(boards):
+        raise AssetError("Board asset version has a duplicate canonical home")
+    expected.update(boards)
     if lock.get("versions") != expected:
         raise AssetError("Asset lock versions differ from assets.json, runtime constant or jsxgraph-pins.yml; run --update-assets and review the lock")
     return expected
