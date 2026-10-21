@@ -2,6 +2,9 @@ name: Offline asset builder
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+concurrency:
+  group: ctm-assets-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   fixture-contracts:
     runs-on: ubuntu-latest
