@@ -1,0 +1,56 @@
+# ctm-demo's step-4 migration (M-demo, aacchhee/ctm-demo#16) only. Not a
+# course file: compare-courses.yml loads expect/<course>.yml on every run,
+# and these categories must not widen later comparisons. Name it in the
+# dispatch that previews the migration (input expect:
+# "step4-migration.yml step4-migration-ctm-demo.yml"); once the migration has
+# merged, both sides of a comparison have these pages and texts, and the file
+# is not needed.
+#
+# Each rule names exactly what the migration changed, by its words: any
+# other change on these pages (an attribute, an AI context, another row or
+# paragraph) stays unexplained.
+categories:
+  # The test pages are new: nothing to compare them with (compare-browser.mjs
+  # checks them on their own, `new-only`).
+  - id: step4-ui-test-pages
+    title: ctm-demo's step-4 UI test pages, new in its migration
+    match:
+      - {area: page, change: '^added$', page: '^pages/step4-ui(-links|-nb|-nn|-de)?\.html$'}
+
+  # index.qmd: one paragraph after the tabset links the test page.
+  - id: step4-ui-test-link
+    title: The index page links the step-4 UI test page (one paragraph after its tabset)
+    match:
+      - {area: dom, page: '^index\.html$', change: '^added$', ancestors: 'main#quarto-document-content\.content$',
+         line: '^(<p>|</p>|text: CTM Assessment’s reading and navigation features \(reveals, the lecture/reading switch, links into tabs\) have a test page of their own:|text: \.)$'}
+      - {area: dom, page: '^index\.html$', change: '^added$', ancestors: 'main#quarto-document-content\.content > p$',
+         line: '^(<a href="\./pages/step4-ui\.html">|</a>|text: Step-4 UI test page)$'}
+
+  # Help: one paragraph of "What is included?" and two cells of the table in
+  # "Which files do I edit?" name the step-4 Markdown instead of the deleted
+  # site scripts. Only these words; no attribute.
+  - id: help-step4
+    title: The help page's paragraph on the reveals and two cells of its file table name the step-4 Markdown
+    match:
+      # "What is included?", the paragraph after the table.
+      - {area: dom, page: '^pages/help\.html$', change: '^text changed$', ancestors: 'section#what-is-included\.level2 > p$',
+         before: '^buttons open or close the longer explanations\. Hints remain individually expandable\. The small shared tab-navigation script supports links into tabs and browser Back/Forward navigation\.$',
+         after: '^buttons open or close the longer explanations \($'}
+      - {area: dom, page: '^pages/help\.html$', change: '^added$', ancestors: 'section#what-is-included\.level2 > p$',
+         line: '^(<code>|</code>|text: ::: \{\.reading-step title="…"\}|text: ::: \{\.hint\}|text: ::: \{\.solution\})$'}
+      - {area: dom, page: '^pages/help\.html$', change: '^added$', ancestors: 'section#what-is-included\.level2$',
+         line: '^text: (blocks\)\. Hints \(|\) and solutions \(|\) remain individually expandable\. CTM Assessment opens the right tab for links into tabs, also from other pages and on browser Back/Forward\.)$'}
+      # "Which files do I edit?": the _quarto.yml row ...
+      - {area: dom, page: '^pages/help\.html$', change: '^text changed$', ancestors: 'section#which-files-do-i-edit\.level2 > table\.caption-top\.table > tbody > tr\.even > td$',
+         before: '^Site title, sidebar, rendered pages, filters, and English language\.$', after: '^Site title, sidebar, rendered pages, filters \(the first,$'}
+      - {area: dom, page: '^pages/help\.html$', change: '^added$', ancestors: 'section#which-files-do-i-edit\.level2 > table\.caption-top\.table > tbody > tr\.even > td$',
+         line: '^(<code>|</code>|text: tab-ids\.lua)$'}
+      - {area: dom, page: '^pages/help\.html$', change: '^added$', ancestors: 'section#which-files-do-i-edit\.level2 > table\.caption-top\.table > tbody > tr\.even$',
+         line: '^text: , keeps the ids of tab headings\), and English language\.$'}
+      # ... and the styles.css row, which no longer names _includes/site/.
+      - {area: dom, page: '^pages/help\.html$', change: '^removed$', ancestors: 'section#which-files-do-i-edit\.level2 > table\.caption-top\.table > tbody > tr\.odd$',
+         line: '^text: ,$'}
+      - {area: dom, page: '^pages/help\.html$', change: '^removed$', ancestors: 'section#which-files-do-i-edit\.level2 > table\.caption-top\.table > tbody > tr\.odd > td$',
+         line: '^(<code>|</code>|text: _includes/site/)$'}
+      - {area: dom, page: '^pages/help\.html$', change: '^text changed$', ancestors: 'section#which-files-do-i-edit\.level2 > table\.caption-top\.table > tbody > tr\.odd > td$',
+         before: '^Small presentation and navigation helpers\.$', after: '^Small presentation helpers\.$'}

@@ -328,12 +328,17 @@ every summary; print opens the reading steps and hides the switch; each
 embedded page loads; with `--shots`, its switch and the first reveal of each
 kind are kept (not compared). Its links and its console errors are checked
 with the rest. A course's own expected differences go in
-`expect/<course>.yml` (the repository's name), which the workflow adds.
+`expect/<course>.yml` (the repository's name), which the workflow adds to
+every comparison of that course; differences of one course pull request
+only (ctm-demo's migration: `expect/step4-migration-ctm-demo.yml`) go in a
+file named in the dispatch's `expect` input instead, so that they never
+explain anything in later comparisons.
 `tests/compare-browser.browser.cjs` (`npm run test:browser`) runs the tool in
 Chromium on small sites. `known-failures:` in the expect file lists failures that are fixed
 elsewhere and not pinned yet (browsers and checks, both required; optional
 courses, `targets: tab-title`, a `place` pattern for where a link's target
-stands, such as `collapsed callout`, `frame` and `note` patterns): they count as
+stands, such as `collapsed callout` (one Quarto renders collapsed), a
+`target` pattern on the target's `page#id`, `frame` and `note` patterns): they count as
 expected and are reported.
 
 `compare-rendered.mjs` also checks three invariants on every page, which no

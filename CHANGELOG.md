@@ -84,12 +84,15 @@ parity check).
 - `tools/compare-browser.mjs` checks a page that only the new site has (a
   course's test page) on its own (check `new-only`): reveals closed at
   first, the switch, Enter and Space on every summary, print and embedded
-  pages; its links and console are checked as before. `expect/ctm-demo.yml`
-  explains ctm-demo's migration: its step-4 UI test pages, the index
-  page's link to them and the updated help page. A `known-failures` entry
-  can name the `place` of a link's target; `collapsed-callout-target` (in
-  `step4-migration.yml`) records that ctm-nav.js does not open a collapsed
-  callout around a target.
+  pages; its links and console are checked as before.
+  `expect/step4-migration-ctm-demo.yml`, named in the dispatch that previews
+  ctm-demo's migration (not loaded otherwise), explains exactly what it
+  changes: its step-4 UI test pages, the index page's link to them and the
+  edited words of the help page. A `known-failures` entry can name the
+  `place` and the `target` (`page#id`) of a link's target;
+  `collapsed-callout-target` (in `step4-migration.yml`, ctm-demo's test
+  page only) records that ctm-nav.js does not open a collapsed callout
+  around a target.
 
 ## 0.9.0
 
