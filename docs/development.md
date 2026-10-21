@@ -344,7 +344,7 @@ stands, such as `collapsed callout` (one Quarto renders collapsed), a
 `target` pattern on the target's `page#id`, `frame` and `note` patterns): they count as
 expected and are reported.
 
-`compare-rendered.mjs` also checks three invariants on every page, which no
+`compare-rendered.mjs` also checks invariants on every page, which no
 expected category can explain: each `<details>` keeps its words (more only as
 its old words followed by what followed it on old: `reveal: heading` when
 that starts with a heading and old's `<details>` was closed by that heading's
@@ -352,8 +352,18 @@ section, that is, had no `</details>` of its own before it in the old
 course's Markdown (a heading at the fenced-div depth where the `<details>`
 opened: a callout's title, inside its `:::` div, closes nothing); `swallowed`, never explained, when it had one; `grown`
 otherwise), the new switch stands where
-the old one stood or at the top of the page, and no id occurs more often than
-on old. Quarto writes a page's HTML out again, without the stray
+the old one stood or at the top of the page, no id occurs more often than
+on old, and no construct is dropped. A category can explain that old markup
+is gone (the hand-written switch's `div`, the inline site scripts); it cannot
+explain that nothing replaces it, so the tool checks the replacement itself:
+a page whose old side has a switch and reading steps has a switch on the new
+side (`switch dropped`; `switch duplicated` for a second one; a switch on a
+page without reading steps may go, as in the browser comparison), the new
+page has no fewer tabsets, tab panes, `<iframe>`s or callouts than the old
+one (`tabset dropped`, `tab pane dropped`, `embedded page dropped`,
+`callout dropped`), and a hand-written anchor (`<div id="x"></div>`, no other
+attribute) that a link of the old site points to is still on the page
+(`anchor dropped`). Quarto writes a page's HTML out again, without the stray
 `</details>`, so only the Markdown tells how a `<details>` ended:
 `tools/migrate-course-html.py --reveal-ends FILE`, run on the old course,
 records it per page, and both tools take the record as `--reveal-ends FILE`

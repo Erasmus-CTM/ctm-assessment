@@ -146,3 +146,117 @@ test('a migrated course on both sides: the new switch where it stood is no diffe
   assert.deepEqual(invariants(compare(before, before)), []);
   assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${body}${NEW_SWITCH}`), before)), ['switch moved']);
 });
+
+// Constructs a migration may replace but never drop (the review of step 3's
+// set, addendum 3: a migration that dropped the switch was "explained", since
+// modes-switch explains the old switch's removal and says nothing about the
+// new one). No expected category can explain these.
+const BODY = '<section id="a" class="level2"><h2>A</h2>' + reveal('<p>En.</p><p>To.</p><p>Tre.</p>') + '<p>Etter.</p></section>';
+
+test('a migration that drops the switch is unexplained (mutation: the new page has no .ctm-modes)', () => {
+  // As expected, with the switch: nothing.
+  assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${NEW_SWITCH}${BODY}`))), []);
+  // The switch is gone, everything else as expected. The old switch's
+  // removal is still explained (modes-switch), the missing one is not.
+  const items = compare(page(`<p>Innledning.</p>${BODY}`));
+  assert.deepEqual(invariants(items), ['switch dropped']);
+  assert.ok(items.some(item => item.change === 'removed' && item.category === 'modes-switch'), 'the old switch\'s removal is explained');
+  const dropped = items.find(item => item.change === 'switch dropped');
+  assert.deepEqual([dropped.before, dropped.after, dropped.category], [1, 0, null]);
+  // A page that is migrated on both sides loses its switch the same way.
+  assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${BODY}`), page(`<p>Innledning.</p>${NEW_SWITCH}${BODY}`))), ['switch dropped']);
+});
+
+test('a switch on a page without reading steps may go (nothing to switch); a second switch may not come', () => {
+  const none = '<section id="a" class="level2"><h2>A</h2><p>Ingen steg.</p></section>';
+  assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${none}`), page(`<p>Innledning.</p>${OLD_SWITCH}${none}`))), []);
+  assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${NEW_SWITCH}${NEW_SWITCH}${BODY}`))), ['switch duplicated']);
+  // A hand-written switch left behind next to the new one.
+  assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${NEW_SWITCH}${OLD_SWITCH}${BODY}`))), ['switch duplicated']);
+});
+
+const TABSET = '<div class="panel-tabset"><ul class="nav nav-tabs" role="tablist"><li><a class="nav-link active" role="tab">A</a></li></ul>'
+  + '<div class="tab-content"><div id="tabset-1-1" class="tab-pane active" role="tabpanel"><p>I fanen.</p></div></div></div>';
+const CALLOUT = '<div class="callout callout-style-default callout-note"><div class="callout-body-container"><p>Merk.</p></div></div>';
+const EMBED = '<iframe src="assets/svd.html" title="SVD"></iframe>';
+
+test('a tabset, an embedded page or a callout that the new page lacks is unexplained, and named', () => {
+  const full = page(`<p>Innledning.</p>${NEW_SWITCH}${BODY}${TABSET}${EMBED}${CALLOUT}`);
+  assert.deepEqual(invariants(compare(full, full)), []);
+  const without = (...parts) => page(`<p>Innledning.</p>${NEW_SWITCH}${BODY}${parts.join('')}`);
+  assert.deepEqual(invariants(compare(without(EMBED, CALLOUT), full)), ['tabset dropped', 'tab pane dropped']);
+  assert.deepEqual(invariants(compare(without(TABSET, CALLOUT), full)), ['embedded page dropped']);
+  assert.deepEqual(invariants(compare(without(TABSET, EMBED), full)), ['callout dropped']);
+  // More of them than before is no drop.
+  assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${NEW_SWITCH}${BODY}${TABSET}${TABSET.replace('tabset-1-1', 'tabset-2-1')}${EMBED}${CALLOUT}`), full)), []);
+});
+
+test('a hand-written anchor that a link points to must stay; the components\' empty placeholders are no anchors', () => {
+  const link = '<p><a href="#uke6-start">Til starten</a> <a href="other.html#uke6-gone">andre</a></p>';
+  const anchors = '<div id="uke6-start"></div><div id="uke6-gone"></div><div id="qpyodide-insertion-location-1"></div><div id="unlinked"></div>';
+  const before = page(`${OLD_SWITCH}${link}${anchors}${OLD_BODY_FOR_ANCHORS}`);
+  const after = anchors => page(`${NEW_SWITCH}${link}${anchors}${NEW_BODY_FOR_ANCHORS}`);
+  // Kept, also as the tab-title target the migration makes of it.
+  assert.deepEqual(invariants(compare(after(anchors.replace('<div id="uke6-start">', '<div id="uke6-start" class="ctm-tab-target">')), before)), []);
+  // A linked one gone (in-page link, and a link from another page); an unlinked one and a placeholder are not counted.
+  const items = compare(after('<div id="uke6-start"></div>'), before);
+  assert.deepEqual(invariants(items), ['anchor dropped']);
+  assert.equal(items.find(item => item.change === 'anchor dropped').line, '<div id="uke6-gone">');
+});
+const OLD_BODY_FOR_ANCHORS = '<section id="a" class="level2"><h2>A</h2><details class="reading-step"><summary>Gå i dybden</summary><p>En.</p></details></section>';
+const NEW_BODY_FOR_ANCHORS = '<section id="a" class="level2"><h2>A</h2>' + reveal('<p>En.</p>') + '</section>';
+
+test('a course that is not migrated on either side keeps its hand-written switch: no drop', () => {
+  const before = page(`<p>Innledning.</p>${OLD_SWITCH}${OLD_BODY_FOR_ANCHORS}`);
+  assert.deepEqual(invariants(compare(before, before)), []);
+  // ... but loses nothing silently when it goes.
+  assert.deepEqual(invariants(compare(page(`<p>Innledning.</p>${OLD_BODY_FOR_ANCHORS}`), before)), ['switch dropped']);
+});
+
+// A page that grew long (ingmat3a's weeks 8 to 12 after their restructuring:
+// about 12000 lines in the table of the difference) is compared line by line,
+// not as one changed block (the line table was capped at 6e7 cells, and a
+// longer page became one hunk that nothing could explain).
+test('a long page: only what the migration changed differs, and a real change in it is found', () => {
+  const steps = 40, per = 100;
+  const paragraphs = k => Array.from({length: per}, (_, i) => `<p>Avsnitt ${k}.${i} med litt tekst.</p>`).join('');
+  const body = make => Array.from({length: steps}, (_, k) => make(k) + paragraphs(k)).join('');
+  const oldStep = k => `<details class="reading-step"><summary>Gå i dybden</summary><p>Trinn ${k}.</p></details>`;
+  const newStep = k => reveal(`<p>Trinn ${k}.</p>`);
+  const before = page(`<p>Innledning.</p>${OLD_SWITCH}<section id="a" class="level2"><h2>A</h2>${body(oldStep)}</section>`);
+  const after = page(`<p>Innledning.</p>${NEW_SWITCH}<section id="a" class="level2"><h2>A</h2>${body(newStep)}</section>`);
+  const items = compare(after, before);
+  assert.ok(items.length > 0 && items.length < 2000, 'the differences are the migration\'s, not the page: ' + items.length);
+  assert.deepEqual(items.filter(item => !item.category && !item.invariant).slice(0, 3), []);
+  assert.deepEqual(invariants(items), []);
+  // One paragraph in the middle of the page changes: it is reported, and only it.
+  const changed = compare(after.replace('Avsnitt 20.50 med litt tekst.', 'Avsnitt 20.50 med andre ord.'), before);
+  const unexplained = changed.filter(item => !item.category && !item.invariant);
+  assert.ok(unexplained.length > 0 && unexplained.length <= 4, 'the changed paragraph: ' + unexplained.length);
+  assert.ok(JSON.stringify(unexplained).includes('andre ord'));
+});
+
+
+test('a retained switch needs both real mode buttons with nonempty labels (HTML mutations)', () => {
+  const after = controls => page(`<p>Innledning.</p>${controls}${BODY}`);
+  const before = after(NEW_SWITCH);
+  assert.deepEqual(invariants(compare(before)), []);
+  for (const controls of [
+    '<div class="ctm-modes"></div>',
+    '<div class="ctm-modes"><button data-mode="lecture">Lecture</button></div>',
+    '<div class="ctm-modes"><button data-mode="lecture">Lecture</button><button data-mode="other">Reading</button></div>',
+    '<div class="ctm-modes"><span data-mode="lecture">Lecture</span><span data-mode="reading">Reading</span></div>',
+    '<div class="ctm-modes"><button data-mode="lecture"> </button><button data-mode="reading">Reading</button></div>',
+    '<div class="ctm-modes"><button data-mode="lecture">Lecture</button><button data-mode="reading"> </button></div>',
+  ]) {
+    // Check both the original-to-migrated and already-migrated comparisons.
+    for (const baseline of [OLD, before]) {
+      const items = compare(after(controls), baseline);
+      assert.deepEqual(invariants(items), ['switch controls missing'], controls);
+      assert.equal(items.find(item => item.change === 'switch controls missing').category, null);
+    }
+  }
+  // Labels are localized; require content without freezing their wording.
+  const localized = NEW_SWITCH.replace('Forelesning', '<span>Lecture</span>');
+  assert.deepEqual(invariants(compare(after(localized), after(localized))), []);
+});

@@ -356,7 +356,10 @@ function diffLines(a, b) {
   let endA = a.length, endB = b.length;
   while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
   const x = a.slice(start, endA), y = b.slice(start, endB), n = x.length, m = y.length;
-  if (n * m > 6e7) return [{removed: x, added: y, at: start, addedAt: y.map((_, k) => start + k)}];
+  // A long page (the table is n * m): Myers' diff, which needs time and memory
+  // in proportion to the differences, not to the page. Only a page that
+  // differs by more than MYERS_LIMIT lines is one hunk.
+  if (n * m > 6e7) return myersHunks(x, y, start) || [{removed: x, added: y, at: start, addedAt: y.map((_, k) => start + k)}];
   const dp = Array.from({length: n + 1}, () => new Uint32Array(m + 1));
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = x[i] === y[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
   const hunks = [];
@@ -366,6 +369,42 @@ function diffLines(a, b) {
     if (i < n && j < m && x[i] === y[j]) { flush(); i++; j++; }
     else if (j >= m || (i < n && dp[i + 1][j] >= dp[i][j + 1])) { (hunk ||= {removed: [], added: [], addedAt: [], at: start + i}).removed.push(x[i++]); }
     else { (hunk ||= {removed: [], added: [], addedAt: [], at: start + i}).added.push(y[j]); hunk.addedAt.push(start + j++); }
+  }
+  flush();
+  return hunks;
+}
+// Myers' O(ND) difference of two long line lists, as the hunks diffLines
+// returns; null when the lists differ by more than MYERS_LIMIT lines.
+const MYERS_LIMIT = 6000;
+function myersHunks(x, y, start) {
+  const n = x.length, m = y.length, off = MYERS_LIMIT + 1, v = new Int32Array(2 * MYERS_LIMIT + 3), trace = [];
+  let found = -1;
+  for (let d = 0; d <= MYERS_LIMIT && found < 0; d++) {
+    trace.push(v.slice(off - d - 1, off + d + 2));
+    for (let k = -d; k <= d; k += 2) {
+      let i = k === -d || (k !== d && v[off + k - 1] < v[off + k + 1]) ? v[off + k + 1] : v[off + k - 1] + 1, j = i - k;
+      while (i < n && j < m && x[i] === y[j]) { i++; j++; }
+      v[off + k] = i;
+      if (i >= n && j >= m) { found = d; break; }
+    }
+  }
+  if (found < 0) return null;
+  const removed = new Set(), added = new Set();
+  let i = n, j = m;
+  for (let d = found; d > 0; d--) {
+    const before = trace[d], k = i - j;
+    const prevK = k === -d || (k !== d && before[k - 1 + d + 1] < before[k + 1 + d + 1]) ? k + 1 : k - 1;
+    const prevI = before[prevK + d + 1], prevJ = prevI - prevK;
+    if (prevK === k + 1) added.add(prevJ); else removed.add(prevI);
+    i = prevI; j = prevJ;
+  }
+  const hunks = [];
+  let a = 0, b = 0, hunk = null;
+  const flush = () => { if (hunk) { hunks.push(hunk); hunk = null; } };
+  while (a < n || b < m) {
+    if (a < n && b < m && !removed.has(a) && !added.has(b)) { flush(); a++; b++; }
+    else if (a < n && removed.has(a)) { (hunk ||= {removed: [], added: [], addedAt: [], at: start + a}).removed.push(x[a++]); }
+    else { (hunk ||= {removed: [], added: [], addedAt: [], at: start + a}).added.push(y[b]); hunk.addedAt.push(start + b++); }
   }
   flush();
   return hunks;
@@ -610,6 +649,57 @@ function switchCheck(page, A, B) {
   if (now === '' || now === was) return [];
   return [{page, area: 'dom', change: 'switch moved', line: n.outerHTML.slice(0, 80), before: was, after: now.slice(-300), invariant: true}];
 }
+// Constructs that a migration may replace but never drop. A category can
+// explain that the old markup is gone (the old switch's div, the inline site
+// scripts, an anchor's old div) and says nothing about what replaces it, so
+// the replacement is checked here and no category explains a breach:
+//  - the switch: a page whose old side has one (the hand-written one or
+//    ctm-libs') and reading steps has one on the new side too, of either kind
+//    (a switch on a page without reading steps has nothing to switch; the
+//    browser comparison treats it so too), and the new page has no more than
+//    one;
+//  - tabsets, tab panes, embedded pages (<iframe>) and callouts: not fewer
+//    than before;
+//  - the hand-written anchors (<div id="x"></div>: an empty div that has no
+//    attribute but its id) that a link of the old site points to (the
+//    components' empty placeholders and Quarto's are no anchors in this
+//    sense): the id is still on the page (as div.ctm-tab-target, for example).
+const COUNTED = [['tabset', '.panel-tabset'], ['tab pane', '.tab-pane'], ['embedded page', 'iframe'], ['callout', '.callout']];
+const plainAnchors = (doc, linked) => [...doc.body.querySelectorAll('div[id]')]
+  .filter(el => el.attributes.length === 1 && !el.children.length && !el.textContent.trim() && linked.has(el.id)).map(el => el.id);
+// The ids (fragments) that the links of a site's pages point to, on any page.
+function linkTargets(root, pages) {
+  const ids = new Set();
+  for (const page of pages) {
+    for (const [, fragment] of fs.readFileSync(path.join(root, page), 'utf8').matchAll(/\bhref="[^"#]*#([^"]+)"/g)) {
+      try { ids.add(decodeURIComponent(fragment)); } catch (_) { ids.add(fragment); }
+    }
+  }
+  return ids;
+}
+function constructChecks(page, A, B, linked) {
+  const items = [], count = (doc, selector) => doc.querySelectorAll(selector).length;
+  const add = (change, construct, before, after, line) =>
+    items.push({page, area: 'dom', change, construct, before, after, ...(line ? {line} : {}), invariant: true});
+  const switches = doc => count(doc, `${OLD_SWITCH}, ${NEW_SWITCH}`);
+  const [was, now] = [switches(A.doc), switches(B.doc)];
+  if (was > 0 && now === 0 && count(A.doc, 'details.reading-step') > 0) add('switch dropped', 'switch', was, now);
+  else if (now > Math.max(was, 1)) add('switch duplicated', 'switch', was, now);
+  // A retained wrapper must still offer both modes; migration expectations
+  // may explain its descendants changing, but cannot explain lost controls.
+  for (const control of B.doc.querySelectorAll(`${OLD_SWITCH}, ${NEW_SWITCH}`)) {
+    const missing = ['lecture', 'reading'].filter(mode =>
+      ![...control.querySelectorAll(`button[data-mode="${mode}"]`)].some(button => button.textContent.trim()));
+    if (missing.length) add('switch controls missing', 'switch', ['lecture', 'reading'], missing, control.outerHTML.slice(0, 160));
+  }
+  for (const [name, selector] of COUNTED) {
+    const [before, after] = [count(A.doc, selector), count(B.doc, selector)];
+    if (after < before) add(name + ' dropped', name, before, after);
+  }
+  const ids = new Set([...B.doc.querySelectorAll('[id]')].map(el => el.id));
+  for (const id of plainAnchors(A.doc, linked)) if (!ids.has(id)) add('anchor dropped', 'anchor', 1, 0, `<div id="${id}">`);
+  return items;
+}
 // A moved element: "above-to-below" when it stood above the old switch and
 // stands directly below the new one (the switch went to the top of the
 // page): the words between the new switch and it are those that stood
@@ -629,7 +719,7 @@ function duplicateIds(page, A, B) {
     .map(([id, k]) => ({page, area: 'dom', change: 'duplicate id', line: `id="${id}"`, before: ca.get(id) || 0, after: k, invariant: true}));
 }
 
-function comparePage(page, before, after, ends) {
+function comparePage(page, before, after, ends, linked) {
   const A = extract(before), B = extract(after), items = [];
   for (const [change, list, other] of [['removed', A.files, B.files], ['added', B.files, A.files]])
     for (const what of list) if (!other.includes(what)) items.push({page, area: 'file', change, what});
@@ -653,10 +743,10 @@ function comparePage(page, before, after, ends) {
   const dom = [];
   for (const hunk of diffLines(A.dom, B.dom)) dom.push(...domItems(page, hunk, A.domNodes, B.domNodes));
   items.push(...movedElements(page, dom, A, B));
-  // Invariants (review A2 S1, S3): reveals keep their words, the switch its place, ids stay unique.
+  // Invariants (review A2 S1, S3): reveals keep their words, the switch its place, constructs are not dropped, ids stay unique.
   const reveals = revealChecks(page, A, B, ends);
   for (const item of items) if (item.area === 'dom' && item.node) { const found = revealOf(item, reveals.status); if (found) item.reveal = found; }
-  items.push(...reveals.items, ...switchCheck(page, A, B), ...duplicateIds(page, A, B));
+  items.push(...reveals.items, ...switchCheck(page, A, B), ...constructChecks(page, A, B, linked), ...duplicateIds(page, A, B));
   // What a changed text lost and gained, word by word; what the page has.
   const count = selector => String(B.doc.querySelectorAll(selector).length);
   const features = {tabsets: count('.panel-tabset'), reveals: count('details.ctm-reveal'), embeds: count('iframe.ctm-embed'), modes: count('.ctm-modes')};
@@ -712,12 +802,12 @@ function main() {
   const ends = loadRevealEnds(o.revealEnds);
   const pagesBefore = htmlPages(o.before), pagesAfter = htmlPages(o.after);
   const pages = o.pages || [...new Set([...pagesBefore, ...pagesAfter])].sort();
-  const items = [];
+  const items = [], linked = linkTargets(o.before, pagesBefore);
   let identical = 0;
   for (const page of pages) {
     const [a, b] = [path.join(o.before, page), path.join(o.after, page)];
     if (!fs.existsSync(a) || !fs.existsSync(b)) { items.push({page, area: 'page', change: fs.existsSync(a) ? 'removed' : 'added'}); continue; }
-    const found = comparePage(page, a, b, ends);
+    const found = comparePage(page, a, b, ends, linked);
     if (!found.length) identical++;
     items.push(...found);
   }
@@ -743,3 +833,4 @@ function main() {
 }
 
 try { main(); } catch (error) { console.error(error); process.exit(2); }
+

@@ -4,7 +4,7 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "a35c9f156cf256953dd947fb5441da91fcabb2fb",
+      "commit": "1f7a3a5de7b765d108fe2ca4ec98b36635c6814f",
       "extensions": [
         "ctm-libs"
       ],
@@ -28,7 +28,7 @@
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
       "branch": "main",
-      "commit": "8c3db5e670684aeb5e31fcb5b3823e97ca23ae63"
+      "commit": "9e042dc5e57a1636be64ca5d08910c9af5ff1371"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
@@ -52,3 +52,4 @@
     }
   }
 }
+
