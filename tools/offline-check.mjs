@@ -71,7 +71,48 @@ export function installOfflineAudit({channel}) {
         auditErrors.push(String(error));
       });
     };
+    let resources;
+    const collectResources = entries => entries.forEach(entry => record(entry.name, 'resource'));
+    try {
+      resources = new PerformanceObserver(list => collectResources(list.getEntries()));
+      resources.observe({type: 'resource', buffered: true});
+    } catch (error) { auditErrors.push('resource audit unavailable: ' + String(error)); }
+    const checkSource = (value, kind) => {
+      if (value === null) return;
+      let html = value;
+      if (kind === 'src') {
+        if (!/^data:text\/html(?:[;,])/i.test(value)) return;
+        try {
+          const comma = value.indexOf(',');
+          html = /;base64$/i.test(value.slice(0, comma)) ? atob(value.slice(comma + 1)) : decodeURIComponent(value.slice(comma + 1));
+        } catch { auditErrors.push('unaudited opaque document: invalid data HTML'); return; }
+      }
+      if (!html.includes('data-ctm-offline-audit') || !html.includes(JSON.stringify(channel)))
+        auditErrors.push('unaudited opaque document: dynamic ' + kind + ' is refused');
+    };
+    const checkFrame = frame => {
+      if (frame.hasAttribute('srcdoc')) checkSource(frame.getAttribute('srcdoc'), 'srcdoc');
+      else checkSource(frame.getAttribute('src'), 'src');
+    };
+    const inspectMutations = records => {
+      for (const mutation of records) {
+        if (mutation.type === 'attributes' && mutation.target.matches('iframe')) {
+          checkSource(mutation.oldValue, mutation.attributeName);
+          checkFrame(mutation.target);
+        } else if (mutation.type === 'childList') {
+          for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) if (node.nodeType === 1) {
+            if (node.matches('iframe')) checkFrame(node);
+            node.querySelectorAll('iframe').forEach(checkFrame);
+          }
+        }
+      }
+    };
+    const mutations = new MutationObserver(inspectMutations);
+    mutations.observe(document, {subtree: true, childList: true, attributes: true,
+      attributeFilter: ['src', 'srcdoc'], attributeOldValue: true});
     globalThis.__ctmOfflineDrainAttempts = async () => {
+      if (resources) collectResources(resources.takeRecords());
+      inspectMutations(mutations.takeRecords());
       while (pending.size) {
         const completed = await Promise.race([Promise.allSettled([...pending]).then(() => true),
           new Promise(resolve => setTimeout(() => resolve(false), 10000))]);
@@ -151,6 +192,7 @@ export async function offlineContext(browser, baseURL) {
   const channel = 'ctm-offline-' + randomUUID();
   const script = '<script data-ctm-offline-audit>(' + installOfflineAudit.toString() + ')(' + JSON.stringify({channel}) + ');</script>';
   const errors = [], external = [], responses = [], failed = [], attempts = [];
+  const documents = new Map(), verified = new Set(), committed = new Set();
   // Playwright 1.55's serviceWorkers:'block' script reads navigator.serviceWorker,
   // whose getter throws in opaque sandboxed frames. Block registration ourselves
   // through the constructor prototype without reading that getter.
@@ -163,16 +205,22 @@ export async function offlineContext(browser, baseURL) {
   const drain = async () => {
     for (const page of context.pages()) for (const frame of page.frames()) {
       try {
-        const state = await frame.evaluate(async () => {
+        const state = await frame.evaluate(async expectedChannel => {
+          const early = [...document.querySelectorAll('script[data-ctm-offline-audit]')]
+            .some(script => script.textContent.includes(JSON.stringify(expectedChannel)));
+          if (!early) return {installed: false, reason: 'unaudited opaque or replaced document', documentURL: document.URL};
           if (globalThis.__ctmOfflineAudit?.version !== 1 || !globalThis.__ctmOfflineAudit.installed ||
               typeof globalThis.__ctmOfflineDrainAttempts !== 'function') {
             return {installed: false, marker: globalThis.__ctmOfflineAudit || null, baseURI: document.baseURI,
               fetch: typeof globalThis.fetch, binding: typeof globalThis.__ctmOfflineRecordAttempt};
           }
           return {installed: true, problems: await globalThis.__ctmOfflineDrainAttempts()};
-        });
+        }, channel);
         if (!state.installed) failed.push({url: frame.url(), error: 'request audit not installed: ' + JSON.stringify(state)});
-        else failed.push(...state.problems.map(error => ({url: frame.url(), error: 'request audit: ' + error})));
+        else {
+          verified.add(frame);
+          failed.push(...state.problems.map(error => ({url: frame.url(), error: 'request audit: ' + error})));
+        }
       } catch (error) { failed.push({url: frame.url(), error: 'request audit drain: ' + String(error.message)}); }
     }
   };
@@ -202,7 +250,23 @@ export async function offlineContext(browser, baseURL) {
   });
   context.on('response', response => { if (response.status() >= 400) responses.push({url: response.url(), status: response.status()}); });
   context.on('requestfailed', request => failed.push({url: request.url(), error: request.failure()?.errorText}));
-  context.on('page', page => page.on('pageerror', error => errors.push(error.message)));
+  context.on('page', page => {
+    page.on('pageerror', error => errors.push(error.message));
+    for (const frame of page.frames()) documents.set(frame, frame.url());
+    page.on('frameattached', frame => documents.set(frame, frame.url()));
+    page.on('framenavigated', frame => {
+      if (committed.has(frame) && documents.get(frame) !== 'about:blank' && !verified.has(frame))
+        failed.push({url: documents.get(frame), error: 'unaudited document navigated before verification'});
+      documents.set(frame, frame.url());
+      committed.add(frame);
+      verified.delete(frame);
+    });
+    page.on('framedetached', frame => {
+      if (!verified.has(frame)) failed.push({url: documents.get(frame) || '', error: 'unaudited frame detached before verification'});
+      documents.delete(frame);
+      committed.delete(frame);
+    });
+  });
   return {context, drain, evidence: {external, responses, failed, errors, attempts}};
 }
 

@@ -92,6 +92,20 @@ document.addEventListener('click', event => {
   fs.writeFileSync(path.join(root, 'caught-data.html'), html(
     '<iframe data-ctm-board name="iframeJXG-data" sandbox="allow-scripts" style="width:300px;height:180px;border:0" src="data:text/html;base64,' +
     Buffer.from(dataDocument).toString('base64') + '"></iframe>'));
+  fs.writeFileSync(path.join(root, 'caught-image.html'), html(frame('caught-image', box('caught-image') +
+    '<img src="https://offline.invalid/caught-image" onerror="document.body.dataset.imageCaught=&quot;true&quot;">')));
+  for (const mode of ['append', 'remove', 'reassign']) {
+    const child = '<!doctype html><html><body>' + firstScript + box('dynamic-' + mode) +
+      '<script>fetch("https://offline.invalid/dynamic-' + mode + '").catch(function(){parent.postMessage({dynamicDone:true,first:window.__ctmFirstScriptAudit},"*");});</script></body></html>';
+    const encoded = JSON.stringify(child).replaceAll('</script', '<\\/script');
+    const initial = mode === 'reassign' ? frame('reassigned', box('initial')) : '';
+    const setup = mode === 'reassign' ? 'var iframe=document.querySelector("iframe");' :
+      'var iframe=document.createElement("iframe");iframe.setAttribute("sandbox","allow-scripts");iframe.setAttribute("data-ctm-board","");document.body.append(iframe);';
+    fs.writeFileSync(path.join(root, 'dynamic-' + mode + '.html'), html(initial +
+      '<script>window.addEventListener("message",function(e){if(e.data?.dynamicDone){document.body.dataset.dynamicFirst=JSON.stringify(e.data.first);' +
+      (mode === 'remove' ? 'document.querySelector("iframe")?.remove();' : '') +
+      'document.body.dataset.dynamicDone="true";}});setTimeout(function(){' + setup + 'iframe.srcdoc=' + encoded + ';},10);</script>'));
+  }
   fs.writeFileSync(path.join(root, 'same-origin.html'), html('<script>fetch("_ctm-assets/local.txt").then(function(r){return r.text();}).then(function(t){document.body.dataset.parentLocal=t;});</script>' + frame('same-origin', box('same-origin') +
     '<script>Promise.all([fetch(new URL("__BASE___ctm-assets/local.txt")).then(function(r){return r.text();}),' +
     'fetch(new Request("__BASE___ctm-assets/local.txt")).then(function(r){return r.text();}),' +

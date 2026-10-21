@@ -178,6 +178,38 @@ test('caught data-frame requests are audited before the first author script with
   }
 });
 
+test('failed caught opaque image loads have actual buffered resource URL evidence', {timeout: 60000}, async () => {
+  const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL,
+    pages: [{path: 'caught-image.html', boards: 1}], probes: [async page => {
+      const frame = page.frames().find(frame => frame.parentFrame());
+      await frame.waitForFunction(() => document.body.dataset.imageCaught === 'true');
+    }]});
+  evidence.contracts.push(result);
+  for (const load of result.results) {
+    assert.equal(load.ok, false, JSON.stringify(load));
+    assert.deepEqual(load.evidence.errors, []);
+    assert.ok(load.evidence.external.includes('https://offline.invalid/caught-image'), JSON.stringify(load.evidence));
+    assert.ok(load.evidence.attempts.some(attempt => attempt.kind === 'resource' &&
+      attempt.url === 'https://offline.invalid/caught-image'), JSON.stringify(load.evidence));
+  }
+});
+
+test('unaudited dynamic opaque documents are refused even after removal or srcdoc reassignment', {timeout: 120000}, async () => {
+  for (const mode of ['append', 'remove', 'reassign']) {
+    const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL,
+      pages: [{path: 'dynamic-' + mode + '.html'}], probes: [async page => {
+        await page.waitForFunction(() => document.body.dataset.dynamicDone === 'true');
+        return JSON.parse(await page.locator('body').getAttribute('data-dynamic-first'));
+      }]});
+    evidence.contracts.push(result);
+    for (const load of result.results) {
+      assert.equal(load.ok, false, JSON.stringify(load));
+      assert.deepEqual(load.evidence.errors, [], 'caught child errors must not drive refusal');
+      assert.ok(load.evidence.failed.some(failure => /unaudited/.test(failure.error)), JSON.stringify(load));
+    }
+  }
+});
+
 test('local string/URL/Request and opaque-frame requests succeed; data URLs are not external attempts', {timeout: 60000}, async () => {
   const result = await checkOfflinePages({scope: 'checker-contract', browser, baseURL: server.baseURL,
     pages: [{path: 'same-origin.html', boards: 1}],
@@ -192,8 +224,9 @@ test('local string/URL/Request and opaque-frame requests succeed; data URLs are 
   assert.ok(result.ok, JSON.stringify(result));
   for (const load of result.results) {
     assert.deepEqual(load.evidence.external, []);
-    assert.ok(load.evidence.attempts.length >= 4, JSON.stringify(load.evidence));
-    assert.ok(load.evidence.attempts.every(attempt => attempt.url === server.baseURL + '_ctm-assets/local.txt'));
+    const calls = load.evidence.attempts.filter(attempt => ['fetch', 'xhr'].includes(attempt.kind));
+    assert.ok(calls.length >= 4, JSON.stringify(load.evidence));
+    assert.ok(calls.every(attempt => attempt.url === server.baseURL + '_ctm-assets/local.txt'));
   }
 });
 
