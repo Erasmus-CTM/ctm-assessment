@@ -16,7 +16,7 @@ jobs:
       - name: Compile shared builder
         run: python -m py_compile scripts/ctm_assets.py
       - name: Integrity, extraction, licence and carried-bundle contracts
-        run: python -m unittest discover -s tests -p 'test_ctm_assets.py' -v
+        run: python -m unittest discover -s tests -p '*assets*.py' -v
   official-metadata:
     needs: fixture-contracts
     runs-on: ubuntu-latest
@@ -138,3 +138,53 @@ jobs:
         run: |
           git -C .asset-report-helper add -N -- assets-metadata.json
           python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
+
+  python-subset-candidate:
+    needs: fixture-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache
+          key: ctm-official-archives-${{ hashFiles('integration/assets-metadata.json') }}
+      - name: Inspect actual official selected package licence metadata
+        run: |
+          python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as a
+          result = a.inspect_python_subset(json.loads(Path('integration/assets-metadata.json').read_bytes()), Path('.asset-cache'))
+          for name, package in result['packages'].items():
+              print(json.dumps({'package': name, 'version': package['version'], 'metadata': package['metadata'],
+                                'licence_files': list(package['licence_texts'])}, sort_keys=True))
+          PY
+      - name: Produce deterministic PRIVATE PARTIAL candidate twice
+        run: |
+          python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --output .asset-cache/python-candidate.json
+          python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --output .asset-cache/python-candidate-repeated.json
+          cmp .asset-cache/python-candidate.json .asset-cache/python-candidate-repeated.json
+      - name: Build and verify actual Python bytes, then install carried bundle without network
+        run: |
+          python scripts/ctm_assets.py build --lock .asset-cache/python-candidate.json --cache .asset-cache --bundle .private-python-built
+          python scripts/ctm_assets.py verify --lock .asset-cache/python-candidate.json --bundle .private-python-built
+          python - <<'PY'
+          import json, sys, tarfile
+          from pathlib import Path
+          from unittest.mock import patch
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as a
+          lock = json.loads(Path('.asset-cache/python-candidate.json').read_bytes())
+          with tarfile.open('.asset-cache/python-carried.tar', 'w') as tar:
+              tar.add('.private-python-built', arcname='_ctm-assets')
+          with patch.object(a.urllib.request, 'build_opener', side_effect=AssertionError('carried install attempted network')):
+              a.install_carried_bundle(lock, Path('.asset-cache/python-carried.tar'), Path('.private-python-carried'))
+          assert a.inventory(Path('.private-python-carried')) == lock['files']
+          print('PRIVATE PARTIAL Python candidate: packages=%d files=%d lock_sha256=%s' %
+                (len(lock['python_packages']), len(lock['files']), a.digest(a.json_bytes(lock))))
+          # Only this bounded summary leaves the private cache. No full lock artifact.
+          PY

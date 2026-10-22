@@ -453,6 +453,51 @@ def validate_licence_policy(lock: dict, accepted_licences=()) -> None:
             raise AssetError(f'{archive["id"]}: licence text is required')
 
 
+def materialize_bundle(lock: dict, stage: Path, cache: Path, *, accepted_licences=()) -> None:
+    """Write canonical bundle bytes into an empty private directory."""
+    stage, cache = Path(stage), Path(cache)
+    validate_licence_policy(lock, accepted_licences)
+    if not stage.is_dir() or stage.is_symlink() or any(stage.iterdir()):
+        raise AssetError("Bundle materialization needs an empty regular stage")
+    cache.mkdir(parents=True, exist_ok=True)
+    notices = ["# Third-party notices", ""]
+    for archive in lock["archives"]:
+        archive_file = cache / ("archive-" + digest(json_bytes({k: archive.get(k) for k in ("url", "sha256", "integrity")})))
+        download(archive["url"], archive_file, sha256=archive.get("sha256"), integrity=archive.get("integrity"))
+        extract_selected(archive_file, stage, archive["files"], prefix=archive.get("prefix", "package/"))
+        notices.extend([f'## {archive["id"]}', f'Licence: {archive["licence"]}', "",
+                        *archive["licence_files"], archive.get("source_offer", ""), ""])
+    for item in lock.get("generated", []):
+        name = relative_path(item["path"])
+        if item["path"].endswith("pyodide-lock.full.json"):
+            raise AssetError("Full Pyodide metadata cannot be published")
+        data = item["text"].encode("utf-8")
+        if digest(data) != item["sha256"]:
+            raise AssetError(f"Generated asset sha256 mismatch: {name}")
+        target = stage.joinpath(*name.parts)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+    for archive in lock["archives"]:
+        for name in archive["licence_files"]:
+            if not (stage / str(relative_path(name))).is_file():
+                raise AssetError(f"Licence file was not extracted: {name}")
+    (stage / "THIRD-PARTY-NOTICES.md").write_bytes("\n".join(notices).encode("utf-8"))
+    precompress(stage)
+    manifest = {"v": 1, "versions": lock["versions"], "files": inventory(stage)}
+    (stage / "manifest.json").write_bytes(json_bytes(manifest))
+
+
+def derive_lock_files(lock: dict, cache: Path, *, accepted_licences=()) -> dict[str, str]:
+    """Compute file hashes through the same producer used for actual builds."""
+    cache = Path(cache)
+    cache.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".ctm-lock-", dir=cache) as temporary:
+        stage = Path(temporary) / "bundle"
+        stage.mkdir()
+        materialize_bundle(lock, stage, cache, accepted_licences=accepted_licences)
+        return inventory(stage)
+
+
 def build_from_lock(lock: dict, destination: Path, cache: Path, *, accepted_licences=()) -> Path:
     """Construct into a private stage, verify, then publish to an empty target."""
     if lock.get("v") != 1 or not lock.get("archives"):
@@ -469,30 +514,7 @@ def build_from_lock(lock: dict, destination: Path, cache: Path, *, accepted_lice
     with tempfile.TemporaryDirectory(prefix=".ctm-assets-", dir=destination.parent) as temporary:
         stage = Path(temporary) / "bundle"
         stage.mkdir()
-        notices = ["# Third-party notices", ""]
-        for archive in lock["archives"]:
-            archive_file = cache / ("archive-" + digest(json_bytes({k: archive.get(k) for k in ("url", "sha256", "integrity")})))
-            download(archive["url"], archive_file, sha256=archive.get("sha256"), integrity=archive.get("integrity"))
-            extract_selected(archive_file, stage, archive["files"], prefix=archive.get("prefix", "package/"))
-            for name in archive["licence_files"]:
-                if not (stage / str(relative_path(name))).is_file():
-                    raise AssetError(f"Licence file was not extracted: {name}")
-            notices.extend([f'## {archive["id"]}', f'Licence: {archive["licence"]}', "",
-                            *archive["licence_files"], archive.get("source_offer", ""), ""])
-        for item in lock.get("generated", []):
-            name = relative_path(item["path"])
-            if item["path"].endswith("pyodide-lock.full.json"):
-                raise AssetError("Full Pyodide metadata cannot be published")
-            data = item["text"].encode("utf-8")
-            if digest(data) != item["sha256"]:
-                raise AssetError(f"Generated asset sha256 mismatch: {name}")
-            target = stage.joinpath(*name.parts)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
-        (stage / "THIRD-PARTY-NOTICES.md").write_bytes("\n".join(notices).encode("utf-8"))
-        precompress(stage)
-        manifest = {"v": 1, "versions": lock["versions"], "files": inventory(stage)}
-        (stage / "manifest.json").write_bytes(json_bytes(manifest))
+        materialize_bundle(lock, stage, cache, accepted_licences=accepted_licences)
         # A manifest cannot list its own hash; the reviewed lock lists it.
         verify_bundle(stage, lock)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -854,6 +876,231 @@ def prepare_stdlib_probe(metadata: dict, cache: Path, destination: Path, candida
     return destination
 
 
+
+def _python_archive(metadata: dict, cache: Path) -> tuple[dict, Path]:
+    entries = [item for item in metadata.get("archives", []) if item.get("id") == "pyodide"]
+    if len(entries) != 1:
+        raise AssetError("Python subset needs exactly one official Pyodide archive")
+    entry = entries[0]
+    version = entry.get("version", "")
+    if (not re.fullmatch(r"\d+\.\d+\.\d+", version)
+            or metadata.get("sources", {}).get("pyodide") != version
+            or entry.get("url") != f"https://github.com/pyodide/pyodide/releases/download/{version}/pyodide-{version}.tar.bz2"
+            or not re.fullmatch(r"[a-f0-9]{64}", entry.get("sha256", ""))):
+        raise AssetError("Python subset needs the exact canonical official release URL and SHA-256")
+    cache = Path(cache)
+    cache.mkdir(parents=True, exist_ok=True)
+    archive = cache / ("archive-" + digest(json_bytes({k: entry.get(k) for k in ("url", "sha256", "integrity")})))
+    download(entry["url"], archive, sha256=entry["sha256"], integrity=entry.get("integrity"))
+    return entry, archive
+
+
+def _python_members(archive: Path, wanted) -> dict[str, bytes]:
+    """Read named regular members only; duplicates and unsafe names fail closed."""
+    wanted = set(wanted)
+    for name in wanted:
+        relative_path(name)
+    result, seen = {}, set()
+    with tarfile.open(archive, "r|*") as source:
+        for member in source:
+            name = member.name.rstrip("/")
+            relative_path(name)
+            if name in seen:
+                raise AssetError("Repeated Python archive member: " + name)
+            seen.add(name)
+            if member.isdir():
+                continue
+            if not member.isfile():
+                raise AssetError("Non-regular Python archive member: " + name)
+            if name in wanted:
+                stream = source.extractfile(member)
+                if stream is None:
+                    raise AssetError("Unreadable Python archive member: " + name)
+                result[name] = stream.read()
+    if set(result) != wanted:
+        raise AssetError("Python archive lacks selected files: " + ", ".join(sorted(wanted - result.keys())))
+    return result
+
+
+def inspect_python_subset(metadata: dict, cache: Path, *, extras=()) -> dict:
+    """Inspect actual verified release bytes, not a prior generated report."""
+    import email.parser
+    import zipfile
+    entry, archive = _python_archive(metadata, cache)
+    headers = _python_members(archive, {"pyodide/package.json", "pyodide/pyodide-lock.json"})
+    release_version(headers["pyodide/package.json"], entry["version"])
+    full = _availability_json(headers["pyodide/pyodide-lock.json"], "release lock")
+    if not isinstance(full.get("info"), dict) or not isinstance(full.get("packages"), dict):
+        raise AssetError("Invalid official Python package lock")
+    subset = package_closure(full, (*EXAM_PACKAGES, *extras))
+    core = {"pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm",
+            "python_stdlib.zip", "package.json"}
+    wanted = {"pyodide/" + name for name in core}
+    package_files = set()
+    for name, package in subset["packages"].items():
+        leaf = package.get("file_name")
+        if not isinstance(leaf, str) or len(relative_path(leaf).parts) != 1:
+            raise AssetError("Invalid Python package filename: " + name)
+        if leaf in core or leaf in package_files:
+            raise AssetError("Conflicting Python package filename: " + leaf)
+        package_files.add(leaf)
+        wanted.add("pyodide/" + leaf)
+    payloads = _python_members(archive, wanted)
+    packages = {}
+    for name, package in subset["packages"].items():
+        leaf = package["file_name"]
+        data = payloads["pyodide/" + leaf]
+        verify_bytes(data, sha256=package.get("sha256"))
+        details = {"version": package["version"], "file_name": leaf, "sha256": digest(data),
+                   "package_type": package.get("package_type"), "licence_texts": {}, "metadata": {}}
+        if leaf.endswith(".whl"):
+            with zipfile.ZipFile(io.BytesIO(data)) as wheel:
+                seen = set()
+                for member in wheel.infolist():
+                    path = member.filename.rstrip("/")
+                    relative_path(path)
+                    if path in seen:
+                        raise AssetError("Repeated wheel member: " + path)
+                    seen.add(path)
+                    if member.is_dir():
+                        continue
+                    if (member.external_attr >> 16) & 0o170000 == 0o120000:
+                        raise AssetError("Wheel contains a symlink: " + path)
+                    if path.endswith(".dist-info/METADATA"):
+                        message = email.parser.BytesParser().parsebytes(wheel.read(member))
+                        if details["metadata"]:
+                            raise AssetError("Wheel has ambiguous distribution metadata: " + leaf)
+                        details["metadata"] = {key: message.get_all(key, []) for key in
+                                               ("Name", "Version", "License", "License-Expression", "Classifier")}
+                    if re.search(r"(^|[/_.-])(licen[cs]e|copying|notice|thirdpartynotices)([/_.-]|$)", path, re.I):
+                        if member.file_size > 2_000_000:
+                            raise AssetError("Python licence text exceeds review limit: " + path)
+                        details["licence_texts"][path] = wheel.read(member).decode("utf-8")
+            fields = details["metadata"]
+            if (len(fields.get("Name", [])) != 1
+                    or normalise_package(fields["Name"][0]) != normalise_package(name)
+                    or fields.get("Version") != [package["version"]]):
+                raise AssetError("Wheel metadata does not match the official package lock: " + name)
+        packages[name] = details
+    # Full lock remains in memory/cache only. This report contains the selected closure.
+    return {"entry": entry, "archive": archive, "subset": subset, "packages": packages,
+            "core": {name: digest(payloads["pyodide/" + name]) for name in sorted(core)}}
+
+
+def _curated_python_licences(root: Path, release: str, python: str) -> dict:
+    root = Path(root)
+    provenance = _availability_json((root / "integration/assets-licences/provenance.json").read_bytes(), "licence provenance")
+    result = {}
+    for name, record in provenance["entries"].items():
+        path = relative_path(record["file"])
+        data = root.joinpath(*path.parts).read_bytes()
+        blob = hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
+        if blob != record["git_blob_sha1"]:
+            raise AssetError("Curated Python licence differs from its official Git blob: " + name)
+        result[name] = dict(record, text=data.decode("utf-8"), sha256=digest(data))
+    expected = {
+        "python-stdlib": f"https://github.com/python/cpython/blob/v{python}/LICENSE",
+        "pyodide": f"https://github.com/pyodide/pyodide/blob/{release}/LICENSE",
+    }
+    for name, source in expected.items():
+        if result[name]["source"] != source:
+            raise AssetError("Curated Python licence uses another release: " + name)
+    basis = f"https://github.com/pyodide/pyodide/blob/{release}/Makefile.envs"
+    if any(result[name].get("version_basis") != basis for name in ("python-stdlib", "emscripten")):
+        raise AssetError("Curated Python/Emscripten licence uses another release basis")
+    return result
+
+
+def produce_python_lock(metadata: dict, cache: Path, *, extras=(), licence_policy=None,
+                        accepted_licences=(), licence_root: Path | None = None) -> dict:
+    """Generate a PRIVATE PARTIAL candidate; never represent complete assets."""
+    report = inspect_python_subset(metadata, cache, extras=extras)
+    release = report["entry"]["version"]
+    curated = _curated_python_licences(licence_root or Path(__file__).resolve().parents[1], release, report["subset"]["info"]["python"])
+    policy = licence_policy or {}
+    generated, licenses, expressions = [], [], []
+    def generate(path, text):
+        generated.append({"path": path, "text": text, "sha256": digest(text.encode("utf-8"))})
+    def license_text(path, text):
+        if not text.strip():
+            raise AssetError("Empty Python licence text: " + path)
+        licenses.append(path)
+        generate(path, text)
+    for name in ("python-stdlib", "emscripten", "pyodide"):
+        record = curated[name]
+        license_text(f"LICENSES/pyodide/{name}.txt", record["text"])
+        expressions.append(record["licence"])
+    package_policy, source_offers = {}, []
+    for name, package in report["packages"].items():
+        record = policy.get(name)
+        metadata_fields = package["metadata"]
+        if record is not None:
+            if not isinstance(record, dict) or record.get("version") != package["version"]:
+                raise AssetError("Python licence policy requires exact package version: " + name)
+            expression = record.get("licence")
+            if record.get("source_offer"):
+                source_offers.append(record["source_offer"])
+        elif name in curated:
+            if package["file_name"] not in curated[name]["applies_to"]:
+                raise AssetError("Curated Python licence uses another package version: " + name)
+            expression = curated[name]["licence"]
+        elif package["package_type"] == "cpython_module":
+            expression = curated["python-stdlib"]["licence"]
+        else:
+            values = metadata_fields.get("License-Expression") or metadata_fields.get("License") or []
+            if len(values) != 1:
+                raise AssetError("Python package needs a reviewed exact-version licence policy: " + name)
+            expression = values[0].strip()
+        obligations = allow_licence(name, expression, accepted_licences)
+        if obligations and not (record or {}).get("source_offer"):
+            raise AssetError("Python package needs a source offer: " + name)
+        texts = package["licence_texts"]
+        if texts:
+            for path, text in sorted(texts.items()):
+                license_text(f"LICENSES/python/{name}/{path}", text)
+        else:
+            selected = name if name in curated else "python-stdlib" if package["package_type"] == "cpython_module" else None
+            if selected is None:
+                raise AssetError("Python package has no own or curated licence text: " + name)
+            if selected == name and package["file_name"] not in curated[selected]["applies_to"]:
+                raise AssetError("Curated Python licence uses another package version: " + name)
+            license_text(f"LICENSES/python/{name}/LICENSE.txt", curated[selected]["text"])
+        expressions.append(expression)
+        package_policy[name] = {"version": package["version"], "licence": expression,
+                                "file_name": package["file_name"], "sha256": package["sha256"]}
+    prefix = f"pyodide/{release}/"
+    files = [{"member": name, "path": prefix + name, "sha256": checksum}
+             for name, checksum in sorted(report["core"].items())]
+    files.extend({"member": package["file_name"], "path": prefix + package["file_name"],
+                  "sha256": package["sha256"]} for package in report["packages"].values())
+    subset_text = json_bytes(report["subset"]).decode("utf-8")
+    generate(prefix + "pyodide-lock.json", subset_text)
+    archive = {key: report["entry"][key] for key in ("id", "url", "sha256")}
+    archive.update({"prefix": "pyodide/", "files": sorted(files, key=lambda item: item["member"]),
+                    "licence": " AND ".join("(" + value + ")" for value in sorted(set(expressions))),
+                    "licence_files": sorted(licenses), "source_offer": "\n".join(sorted(set(source_offers)))})
+    lock = {"v": 1, "kind": "private-partial-python-assets-lock", "scope": ["pyodide"],
+            "status": "PRIVATE PARTIAL candidate: Python only; npm/board composition and full offline acceptance pending",
+            "versions": {"pyodide": release}, "archives": [archive],
+            "generated": sorted(generated, key=lambda item: item["path"]),
+            "python_packages": package_policy, "python_roots": sorted(set(EXAM_PACKAGES)),
+            "python_extras": sorted(set(extras)), "provenance": {
+                "metadata_sha256": digest(json_bytes(metadata)),
+                "curated_licences": {key: {k: v for k, v in value.items() if k != "text"}
+                                     for key, value in sorted(curated.items())}}}
+    lock["files"] = derive_lock_files(lock, cache, accepted_licences=accepted_licences)
+    return lock
+
+
+def write_private_lock(lock: dict, destination: Path) -> Path:
+    destination = Path(destination).resolve()
+    if any(part.lower() in {"_ctm-assets", "_site", "_site-exam"} for part in destination.parts):
+        raise AssetError("Partial lock candidates must stay in a private cache outside published assets")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(json_bytes(lock))
+    return destination
+
+
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
@@ -881,6 +1128,23 @@ def main(argv=None):
     index.add_argument("--reviewed-report-sha256", required=True, help="Digest approved independently of this probe invocation")
     index.add_argument("--candidates", type=Path)
     index.add_argument("--output", type=Path, required=True)
+    python_lock = sub.add_parser("python-lock", help="Produce a PRIVATE PARTIAL official Python subset candidate")
+    python_lock.add_argument("--metadata", type=Path, required=True)
+    python_lock.add_argument("--cache", type=Path, required=True)
+    python_lock.add_argument("--output", type=Path, required=True)
+    python_lock.add_argument("--python-packages", default="", help="Explicit comma-separated extras; never all")
+    python_lock.add_argument("--licence-policy", type=Path)
+    python_lock.add_argument("--accept-licence", action="append", default=[])
+    build = sub.add_parser("build", help="Build bytes from an external reviewed lock")
+    build.add_argument("--lock", type=Path, required=True)
+    build.add_argument("--cache", type=Path, required=True)
+    build.add_argument("--bundle", type=Path, required=True)
+    build.add_argument("--accept-licence", action="append", default=[])
+    carried = sub.add_parser("install-carried", help="Verify and install a carried bundle with an external reviewed lock")
+    carried.add_argument("--lock", type=Path, required=True)
+    carried.add_argument("--source", type=Path, required=True)
+    carried.add_argument("--bundle", type=Path, required=True)
+    carried.add_argument("--accept-licence", action="append", default=[])
     args = parser.parse_args(argv)
     if args.command == "metadata":
         refs = dict(value.split("=", 1) for value in args.source_ref)
@@ -903,6 +1167,19 @@ def main(argv=None):
                     reviewed_report_sha256=args.reviewed_report_sha256, candidates=candidates)
         write_private_import_index(index, args.output)
         print(f'Validated {len(index["stdlib_modules"])} available modules into the private import index')
+    elif args.command == "python-lock":
+        policy = _availability_json(args.licence_policy.read_bytes(), "licence policy") if args.licence_policy else None
+        result = produce_python_lock(_availability_json(args.metadata.read_bytes(), "metadata"), args.cache,
+                    extras=tuple(name.strip() for name in args.python_packages.split(",") if name.strip()),
+                    licence_policy=policy, accepted_licences=args.accept_licence)
+        write_private_lock(result, args.output)
+        print(f'PRIVATE PARTIAL Python lock: {len(result["python_packages"])} packages, {len(result["files"])} files')
+    elif args.command == "build":
+        build_from_lock(_availability_json(args.lock.read_bytes(), "lock"), args.bundle, args.cache,
+                        accepted_licences=args.accept_licence)
+    elif args.command == "install-carried":
+        install_carried_bundle(_availability_json(args.lock.read_bytes(), "lock"), args.source, args.bundle,
+                               accepted_licences=args.accept_licence)
     else:
         verify_bundle(args.bundle, json.loads(args.lock.read_text(encoding="utf-8")))
 
