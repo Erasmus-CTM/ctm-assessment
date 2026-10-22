@@ -15,12 +15,6 @@ An automatic id.
 
 A written id with attributes.
 
-```{math-exercise}
-#| label: tab-id-quiz-answer
-#| field-labels: x
-A labelled exercise in this quiz: _[2].
-```
-
 ## Starts active {#starts-active .active}
 
 Quarto shows this tab first.
