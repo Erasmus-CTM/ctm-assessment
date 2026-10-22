@@ -1,0 +1,37 @@
+name: Replay reviewed asset baseline
+# Reproduce the real 294 -> 65 package migration with current comparison tools.
+# Fixed source refs prevent a moving course branch from changing this evidence.
+on:
+  pull_request:
+    paths:
+      - tools/compare-rendered/assets.mjs
+      - tests/compare-rendered-assets.test.cjs
+      - .github/workflows/compare-assets-baseline.yml
+permissions:
+  contents: read
+jobs:
+  examples:
+    uses: ./.github/workflows/compare-courses.yml
+    with:
+      tooling-ref: ${{ github.event.pull_request.head.sha }}
+      course: examples
+      course-ref: main
+      base: 294d5b86d06af5fecb5fcf50dc4562b17ee5c273
+      head: 65be5facbf67f900533a71cd950aa82e5c4c1e95
+  main-course:
+    uses: ./.github/workflows/compare-courses.yml
+    with:
+      tooling-ref: ${{ github.event.pull_request.head.sha }}
+      course: aacchhee/ingmat3a_ntnu
+      course-ref: e45851080f462e84cde281528f21d4f21292a6ba
+      base: 294d5b86d06af5fecb5fcf50dc4562b17ee5c273
+      head: 65be5facbf67f900533a71cd950aa82e5c4c1e95
+  demo:
+    uses: ./.github/workflows/compare-courses.yml
+    with:
+      tooling-ref: ${{ github.event.pull_request.head.sha }}
+      course: aacchhee/ctm-demo
+      course-ref: d65eea624e96bbfc7b65ebb78b7d3a43ebdb3458
+      profile: review
+      base: 294d5b86d06af5fecb5fcf50dc4562b17ee5c273
+      head: 65be5facbf67f900533a71cd950aa82e5c4c1e95
