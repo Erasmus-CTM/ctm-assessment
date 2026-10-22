@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as playwright from 'playwright';
 import {serve} from '../../tools/compare-browser.mjs';
-import {instrument} from './instrument.mjs';
+import {instrument,denyStoreWrites} from './instrument.mjs';
 import {traceResizeObservers} from './resize-diagnostic.mjs';
 
 const root=path.resolve(process.env.CTM_STORE_ROOT || '.store-integration');
@@ -103,13 +103,31 @@ async function codeCell(page,code){
     return unit.editor.getValue();
   },code);
 }
+async function observeRemote(page) {
+  await page.evaluate(()=>{
+    window.__remoteStoreEvents=[];
+    if(window.__remoteStoreObserved)return;
+    window.__remoteStoreObserved=true;
+    document.addEventListener('ctm:store-clear',event=>__remoteStoreEvents.push({type:event.type,detail:event.detail}));
+    window.addEventListener('storage',event=>{
+      if(event.key?.startsWith('ctm|1|'))__remoteStoreEvents.push({type:'storage',key:event.key,removed:event.newValue===null});
+    });
+  });
+}
 async function remoteReset(page,id) {
   // The page clock is paused, so poll from Node rather than relying on its rAF.
   for(let attempt=0;attempt<100;attempt++){
-    if(await cell(page,id).locator('input.math-input').inputValue()==='')return;
+    const delivered=await page.evaluate(()=>__remoteStoreEvents.some(event=>event.type==='ctm:store-clear'));
+    if(delivered && await cell(page,id).locator('input.math-input').inputValue()==='')return;
     await new Promise(resolve=>setTimeout(resolve,20));
   }
-  throw Error('Remote clear did not reset '+id);
+  const state=await page.evaluate(id=>({
+    events:window.__remoteStoreEvents,
+    record:localStorage.getItem(CTMStore.key(id)),
+    reads:__storeAudit.readCalls
+  }),id);
+  state.input=await cell(page,id).locator('input.math-input').inputValue();
+  throw Error('Remote clear did not reset '+id+': '+JSON.stringify(state));
 }
 async function showSaved(offer) {
   // Follow the reader's actual path: open its tab, then its native disclosure.
@@ -239,9 +257,7 @@ try {
     await ctx.close();
   }
   {
-    const ctx=await context(()=>{
-      Storage.prototype.setItem=function(){throw new DOMException('No device storage','QuotaExceededError');};
-    }), page=await open(ctx);
+    const ctx=await context(denyStoreWrites), page=await open(ctx);
     await reveal(page,'store-scalar');
     await cell(page,'store-scalar').locator('input.math-input').fill('memory only');
     await seed(page,'store-scalar','correct',1);
@@ -260,9 +276,13 @@ try {
     await cell(a,'store-scalar').locator('input.math-input').fill('before clear');
     await seed(a,'store-scalar','correct',1);
     await saved(a,'store-scalar',record=>Object.values(record.inputs.fields).includes('before clear'));
+    await observeRemote(b);
     // Hold the real debounce before typing; a slow runner cannot flush it first.
     await b.clock.install({time:new Date('2026-10-21T00:00:00Z')});
-    await b.clock.pauseAt(new Date('2026-10-21T00:00:01Z'));
+    // Playwright clocks span the whole context. Navigation replays its log in
+    // each page, so a target read from only b can be in a's past. Fixed daily
+    // checkpoints exceed this workflow's 15-minute bound for both pages.
+    await b.clock.pauseAt(new Date('2026-10-22T00:00:00Z'));
     await cell(b,'store-scalar').locator('input.math-input').fill('pending remote save');
     assert.equal(await b.evaluate(()=>Object.values(JSON.parse(localStorage.getItem(CTMStore.key('store-scalar'))).inputs.fields).includes('pending remote save')),false);
     await a.locator('[data-ctm-clear-page]').click();
@@ -285,7 +305,8 @@ try {
     await a.locator('[data-ctm-clear-page]').click();
     assert.equal(await cell(b,'store-second').locator('input.math-input').inputValue(),'second page');
     await saved(b,'store-second',record=>Object.values(record.inputs.fields).includes('second page'));
-    await b.clock.pauseAt(await b.evaluate(()=>Date.now()+1000));
+    await observeRemote(b);
+    await b.clock.pauseAt(new Date('2026-10-23T00:00:00Z'));
     await cell(b,'store-second').locator('input.math-input').fill('pending course save');
     assert.equal(await b.evaluate(()=>Object.values(JSON.parse(localStorage.getItem(CTMStore.key('store-second'))).inputs.fields).includes('pending course save')),false);
     await a.locator('[data-ctm-clear-course]').click();

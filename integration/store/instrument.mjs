@@ -78,3 +78,11 @@ export function instrument() {
     };
   });
 }
+
+export function denyStoreWrites() {
+  const original=Storage.prototype.setItem;
+  Storage.prototype.setItem=function(key,value) {
+    if(String(key).startsWith('ctm|1|'))throw new DOMException('No device storage','QuotaExceededError');
+    return Reflect.apply(original,this,arguments);
+  };
+}

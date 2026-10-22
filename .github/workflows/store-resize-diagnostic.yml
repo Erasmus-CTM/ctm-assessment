@@ -29,21 +29,21 @@ jobs:
         with:
           script: |
             const artifact = (await github.rest.actions.getArtifact({
-              owner: context.repo.owner, repo: context.repo.repo, artifact_id: 12386093856
+              owner: context.repo.owner, repo: context.repo.repo, artifact_id: 12413317379
             })).data;
             if (artifact.expired ||
                 artifact.name !== 'store-rendered-fixtures' ||
-                artifact.workflow_run.head_sha !== '290821648f40306c968279bb850508c09e8f2c60' ||
-                artifact.digest !== 'sha256:5da41ad03b9e99963c092456539490c20d2cb7731f6a94bf420b090bff48b7a6') {
+                artifact.workflow_run.head_sha !== 'f9358ccb80cd71bf19139ba251f7578b45c4fa24' ||
+                artifact.digest !== 'sha256:af7cd1f3889fdac75cac8005a57e814b8e7966e98dffbdfa39ac9d8fc5f7bb14') {
               throw new Error('Rendered diagnostic baseline changed or expired');
             }
             core.info(JSON.stringify({artifact: artifact.id, digest: artifact.digest,
-              head: artifact.workflow_run.head_sha, producerRun: 39686767608}));
+              head: artifact.workflow_run.head_sha, producerRun: 39751102918}));
       - run: npx playwright install --with-deps webkit
       - uses: actions/download-artifact@v7
         with:
           name: store-rendered-fixtures
-          run-id: 39686767608
+          run-id: 39751102918
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/store-integration
       - name: Trace the actual WebKit mixed page without filtering errors

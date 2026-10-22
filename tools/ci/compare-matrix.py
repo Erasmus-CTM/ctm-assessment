@@ -21,7 +21,7 @@ On a pull request: the example site; every course of the one course list
 sources, before = the package it pins (the courses are pinned until their
 migration), after = the head; and the step-4 fixture course, before = as it
 is with its pinned package, after = converted with the head, compared with
-expect/step4-migration.yml and in the browser. On workflow_dispatch: the one
+expect/step4-migration.yml and in the browser. On workflow_dispatch or workflow_call: the one
 comparison its inputs describe (COURSE, COURSE_REF, COURSE_BASE_REF, PROFILE,
 BASE, HEAD, CONVERT, EXPECT, BROWSER, BROWSERS, SHARDS).
 """
@@ -71,7 +71,7 @@ def courses():
 
 
 def entries(event, inputs):
-    if event == 'workflow_dispatch':
+    if event in ('workflow_dispatch', 'workflow_call'):
         course = inputs.get('COURSE') or 'aacchhee/ctm-demo'
         entry = {'course': course, 'ref': inputs.get('COURSE_REF') or ('' if course in ('examples', 'step4-course') else 'main'),
                  'base_ref': inputs.get('COURSE_BASE_REF') or '', 'profile': inputs.get('PROFILE') or '',
@@ -118,3 +118,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
