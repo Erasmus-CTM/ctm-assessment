@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {JSDOM} from 'jsdom';
 import * as playwright from 'playwright';
 import {serve} from '../../tools/compare-browser.mjs';
 
@@ -69,6 +70,16 @@ function mathControl(incoming,mode) {
 }
 
 const fixtureHtml=fs.readFileSync(path.join(fixture,'index.html'),'utf8');
+// Inert parsing: no scripts or external resources execute.
+const staticDom=new JSDOM(fixtureHtml);
+const staticMathInputNodes=[...staticDom.window.document.querySelectorAll('input.math-input')];
+const staticMathInputs=staticMathInputNodes.length;
+const staticMathInputIds=staticMathInputNodes.map(input=>input.id);
+staticDom.window.close();
+if(process.env.CTM_RESIZE_STARTUP_ONLY==='1')assert.deepEqual(staticMathInputIds,[
+  'math-exercise-1-f1','math-exercise-2-dm-A-1-1','math-exercise-4-f1',
+  'math-exercise-5-f1','math-exercise-6-f1','math-exercise-7-f1'
+],'frozen HTML retains the exact six build-time input identities');
 // Exact CTM plus enhancement startup dependency set. Inline settings/manifest data stay.
 // Font Awesome/Monaco dynamic style/icon creation is intentionally part of the omitted group.
 const startupPaths=[
@@ -192,7 +203,8 @@ const report={browser:engine,quartoVersion:'1.8.27',sourceSha256,
 if(process.env.CTM_RESIZE_STARTUP_ONLY==='1')report.startup={
   fixtureHtmlSha256:createHash('sha256').update(fixtureHtml).digest('hex'),
   omittedHtmlSha256:createHash('sha256').update(startupControl(fixtureHtml,'omit')).digest('hex'),
-  transport:'matched real HTTP fixture copies; no navigation interception',omittedManifest,scriptInventory};
+  transport:'matched real HTTP fixture copies; no navigation interception',staticMathInputs,staticMathInputIds,
+  omittedManifest,scriptInventory};
 let browser;
 try {
   browser=await playwright[engine].launch({headless:true});
@@ -267,6 +279,7 @@ try {
           controlled:!!navigator.serviceWorker?.controller,
           navigation:performance.getEntriesByType('navigation')[0]?.type},
         storeReady:!!window.CTMStore,startupGlobals:{nav:!!window.CTMNav,reveal:!!window.CTMReveal,assets:!!window.CTMAssets},mathInputs:document.querySelectorAll('input.math-input').length,
+        mathInputIds:[...document.querySelectorAll('input.math-input')].map(input=>input.id),
         mathSavedAnswers:document.querySelectorAll('.math-exercise-cell > .math-saved-answer').length,
         mathSavedResults:document.querySelectorAll('.math-exercise-cell > .math-saved-result').length,
         body:window.__resizeProbe.callbacks.flatMap(callback=>callback.entries).filter(entry=>entry.tag==='BODY').at(-1)?.rect,
@@ -294,7 +307,9 @@ try {
           assert.equal(snapshot.mathInputs,7);assert.equal(snapshot.mathSavedAnswers,7);assert.equal(snapshot.mathSavedResults,7);
         }
         if(control.startupMode==='omit'){
-          assert.equal(snapshot.storeReady,false);assert.equal(snapshot.mathInputs,0);assert.equal(snapshot.mathSetup,null);
+          assert.equal(snapshot.storeReady,false);assert.equal(snapshot.mathInputs,staticMathInputs);assert.equal(snapshot.mathSetup,null);
+          assert.deepEqual(snapshot.mathInputIds,staticMathInputIds);
+          assert.equal(snapshot.mathSavedAnswers,0);assert.equal(snapshot.mathSavedResults,0);
           assert.deepEqual(snapshot.startupGlobals,{nav:false,reveal:false,assets:false});
         }
       }
