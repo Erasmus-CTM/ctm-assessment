@@ -1,5 +1,5 @@
-// Actual Quarto package pages in Chromium, Firefox and WebKit. No component
-// scripts, editor adapters, store implementation or Python runtime are replaced.
+// Diagnostic experiment on actual package pages. Selected policies change only
+// our content-height callback registration through a digest-checked source route.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,6 +7,7 @@ import * as playwright from 'playwright';
 import {serve} from '../../tools/compare-browser.mjs';
 import {instrument,denyStoreWrites} from './instrument.mjs';
 import {traceResizeObservers} from './resize-diagnostic.mjs';
+import {installHeightDiagnostic,patchHeightCallback} from './layout-diagnostic.mjs';
 
 const root=path.resolve(process.env.CTM_STORE_ROOT || '.store-integration');
 const engine=process.env.CTM_BROWSER || 'chromium';
@@ -18,6 +19,10 @@ let browser;
 const checks=[], errors=[];
 const traceResize=process.env.CTM_TRACE_RESIZE==='1';
 const resizeReads=[], resizeFailures=[], resizeFinals=[];
+const layoutPolicy=process.env.CTM_LAYOUT_DEFER || 'none';
+assert.ok(['none','py','cell','both'].includes(layoutPolicy));
+assert.equal(process.env.CTM_RESIZE_DEFER || 'none','none','component-only experiments never defer vendor observer callbacks');
+const layoutPatches=[], layoutPatchErrors=[];
 async function captureResizeFinal(ctx) {
   if(!traceResize)return;
   for(const page of ctx.pages()) {
@@ -26,7 +31,7 @@ async function captureResizeFinal(ctx) {
         if(!window.__ctmResizeTrace)return null;
         await window.__ctmResizeTrace.flush();
         const trace=window.__ctmResizeTrace;
-        return {available:trace.available,callbacks:trace.callbacks,measurementErrors:trace.measurementErrors};
+        return {available:trace.available,callbacks:trace.callbacks,measurementErrors:trace.measurementErrors,height:window.__ctmHeightTrace};
       });
       resizeFinals.push({page:page.url(),phase:checks.length,trace});
     } catch(error) { resizeFinals.push({page:page.url(),phase:checks.length,traceReadError:String(error)}); }
@@ -38,6 +43,20 @@ const quiz=page=>page.locator('[data-ctm-quiz="mixed"] .ctm-progress');
 const pagePanel=page=>page.locator('.ctm-progress-page .ctm-progress');
 async function context(extra) {
   const ctx=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:900}});
+  await ctx.addInitScript(installHeightDiagnostic);
+  await ctx.route(/\/site_libs\/quarto-contrib\/(?:py-exercise|pyodide-interaktiv)-[^/]+\/(?:py-exercise|qpyodide-cell-classes)\.js(?:\?|$)/,async route=>{
+    try {
+      const component=route.request().url().includes('/py-exercise-')?'py':'cell';
+      const response=await route.fetch();
+      const original=await response.text();
+      const record=patchHeightCallback(original,component,layoutPolicy==='both' || layoutPolicy===component);
+      layoutPatches.push({url:route.request().url(),digest:record.digest,component,patched:record.patched});
+      await route.fulfill({response,body:record.source});
+    } catch(error) {
+      layoutPatchErrors.push({url:route.request().url(),error:String(error)});
+      await route.abort('failed');
+    }
+  });
   if(traceResize)await ctx.addInitScript(traceResizeObservers,{defer:process.env.CTM_RESIZE_DEFER || 'none'});
   await ctx.addInitScript(instrument);
   if(extra) await ctx.addInitScript(extra);
@@ -347,13 +366,21 @@ try {
   assert.ok(snapshots.every(row=>!row.traceReadError && (row.trace || row.page==='about:blank') &&
     (!row.trace || (Array.isArray(row.trace.measurementErrors) && row.trace.measurementErrors.length===0))),
     'a controlled policy is inconclusive if a required observer snapshot or measurement fails');
+  assert.deepEqual(layoutPatchErrors,[],'component source intervention must match the exact immutable fixture');
+  const height=resizeFinals.flatMap(row=>row.trace?.height?.callbacks || []);
+  assert.ok(resizeFinals.every(row=>!row.trace?.height?.clockAlreadyInstalled),'native layout scheduling must be captured before the test clock');
+  assert.ok(height.every(row=>row.pending===0 && row.executed===row.queued),'component callback scheduling is inconclusive if an original callback remains queued');
+  for(const component of ['py','cell']) {
+    assert.ok(layoutPatches.some(row=>row.component===component),'actual component source was observed');
+    if(layoutPolicy==='both' || layoutPolicy===component)assert.ok(height.some(row=>row.component===component && row.executed>0),'selected original content-height callbacks execute');
+  }
   const deferred=resizeFinals.flatMap(row=>row.trace?.callbacks || []).filter(row=>row.deferred && row.deliveries);
   assert.ok(deferred.every(row=>row.pending===0 && row.executed===row.deliveries),'a controlled policy is inconclusive unless every queued observer callback executes');
   assert.deepEqual(errors,[],'actual rendered pages have no uncaught errors');
-  console.log(JSON.stringify({browser:engine,checks,errors,...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',resizeFinals}:{})},null,2));
+  console.log(JSON.stringify({browser:engine,checks,errors,...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',layoutPolicy,layoutPatches,layoutPatchErrors,resizeFinals}:{})},null,2));
 } catch(error) {
   await Promise.allSettled(resizeReads);
-  console.error(JSON.stringify({browser:engine,checks,errors,url:active?.url(),...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',resizeFailures,resizeFinals}:{})},null,2));
+  console.error(JSON.stringify({browser:engine,checks,errors,url:active?.url(),...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',layoutPolicy,layoutPatches,layoutPatchErrors,resizeFailures,resizeFinals}:{})},null,2));
   if(active && !active.isClosed()) console.error(await active.locator('body').innerText().catch(()=>'(page closed)'));
   throw error;
 } finally {

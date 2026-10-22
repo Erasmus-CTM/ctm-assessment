@@ -1,4 +1,4 @@
-name: WebKit resize diagnostic
+name: Component editor layout diagnostic
 on:
   push:
     branches: [consolidation/2026-10-store-resize-diagnostic]
@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        defer: [none, quarto, monaco, both]
+        layout: [none, py, cell, both]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -26,8 +26,6 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Calibrate transparent observer instrumentation
-        run: node --test integration/store/resize-diagnostic.test.mjs
       - name: Verify the immutable rendered baseline
         uses: actions/github-script@v8
         with:
@@ -50,11 +48,16 @@ jobs:
           run-id: 39751102918
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/store-integration
+      - name: Calibrate native scheduling and digest-checked component intervention
+        env:
+          CTM_STORE_ROOT: ${{ runner.temp }}/store-integration
+        run: node --test integration/store/resize-diagnostic.test.mjs integration/store/layout-diagnostic.test.mjs
       - name: Trace the actual WebKit mixed page without filtering errors
         env:
           CTM_BROWSER: webkit
           CTM_TRACE_RESIZE: '1'
-          CTM_RESIZE_DEFER: ${{ matrix.defer }}
+          CTM_RESIZE_DEFER: 'none'
+          CTM_LAYOUT_DEFER: ${{ matrix.layout }}
           CTM_STORE_ROOT: ${{ runner.temp }}/store-integration
         run: |
           set -o pipefail
@@ -62,6 +65,6 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: store-resize-webkit-diagnostic-${{ matrix.defer }}
+          name: store-layout-webkit-diagnostic-${{ matrix.layout }}
           path: ${{ runner.temp }}/store-resize-webkit.log
           retention-days: 7
