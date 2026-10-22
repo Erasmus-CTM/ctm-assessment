@@ -8,9 +8,6 @@
       "extensions": [
         "ctm-libs"
       ],
-      "ships-copies": [
-        "ai-feedback"
-      ],
       "review-ref-aliases": [
         "ai-feedback"
       ]

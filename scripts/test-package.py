@@ -200,6 +200,7 @@ assert answer() == 2
 ''')
     result = render(course, expect_ok=False)
     assert result.returncode != 0 and 'combines filters that use different ai-feedback versions' in result.stderr, result.stderr
+    assert 'remove ai-feedback from filters: and delete the old folder.' in result.stderr, result.stderr
     # Without ctm-checkers, a page with a math exercise stops with the install
     # command; a page without one renders.
     away = course / 'ctm-checkers-away'

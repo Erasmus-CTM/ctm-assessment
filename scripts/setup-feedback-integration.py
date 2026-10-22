@@ -125,9 +125,8 @@ def tracked_extensions(source, local, own):
 def extension_folders(config):
     """{repository name: [extension folders it owns]}; the first is its main folder.
 
-    `extensions` lists several folders (CTM Assessment 0.9 and 0.10 packaged
-    ctm-libs' library and its ai-feedback alias), `extension` names one, the
-    default is the name.
+    `extensions` lists the repository's owned folders, `extension` names one,
+    and the default is the repository name.
     """
     folders = {name: list(spec.get('extensions', [spec.get('extension', name)]))
                for name, spec in config['repositories'].items()}
@@ -462,8 +461,7 @@ def main():
         # A declared distribution copy next to the component is allowed: the
         # package copies only the component's own folders, so it never installs
         # it. pyodide-interaktiv 1.9 ships a generated ctm-libs for standalone
-        # use and the ai-feedback forwarder; ctm-libs keeps its ai-feedback
-        # alias until L3x deletes it, no longer packaged (step 3).
+        # use and the ai-feedback forwarder. Neither copy is packaged.
         foreign = shipped - own - set(config['repositories'][name].get('ships-copies', []))
         # A copy inside one of the component's own folders would be shipped: never allowed.
         foreign |= {other for other in owned - own
@@ -491,14 +489,12 @@ def main():
     if args.test or args.browser:
         libs = sources['ctm-libs'] / '_extensions' / 'ctm-libs'
         # CTM_LIBS_EXTENSION: ctm-libs' extension folder (the components' tests
-        # load its runtime, catalogues and feedback files); AI_FEEDBACK_EXTENSION:
-        # its three self-contained feedback files (the umbrella's own tests read
-        # them; it goes with U3c). ctm-checkers, the Python checker library
+        # load its runtime, catalogues and feedback files). ctm-checkers, the Python checker library
         # (math-exercise 0.11 grades with it): CTM_CHECKERS_EXTENSION names the
         # packaged _extensions/ctm-checkers folder (math-exercise's tests),
         # CTM_CHECKERS_SOURCE its repository (ctm-libs' tests install from it).
         env = dict(base_env, CTM_INTEGRATION_SITE=str(site / '_site'), CTM_INTEGRATION_RECORD=str(workspace / 'resolved-repos.json'),
-                   CTM_LIBS_EXTENSION=str(libs), AI_FEEDBACK_EXTENSION=str(libs / 'feedback'),
+                   CTM_LIBS_EXTENSION=str(libs),
                    CTM_CHECKERS_EXTENSION=str(extensions_root / 'ctm-checkers'), CTM_CHECKERS_SOURCE=str(sources['ctm-checkers']))
         run(['npm', 'ci', '--ignore-scripts'], cwd=ROOT)
         if args.test:

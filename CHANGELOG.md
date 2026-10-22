@@ -1,5 +1,12 @@
 # Changes
 
+## Unreleased
+
+- Complete consolidation U3c: ctm-libs no longer ships the ai-feedback
+  extension alias. Keep pyodide-interaktiv's standalone forwarder outside
+  the package, and retain the stale-version check with migration advice.
+  Tests use `CTM_LIBS_EXTENSION` for shared feedback files.
+
 ## 0.13.0
 
 Shared saved answers, progress and quizzes across maths and Python exercises, with page and course deletion and a device saving switch. Restoring an answer never runs Python or checks it automatically. Changed exercises retain the old answer as read-only history and mark old scores outdated.
