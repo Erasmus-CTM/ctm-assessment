@@ -784,3 +784,37 @@ Options compared:
 17. **"Was → now" for changed variants (AC):** each manifest entry stores a compact snapshot of what was approved — the generated variable values and the teacher answers (canonical strings, the same ones the hash covers) — next to the hash. A changed variant is shown on the approval page and in the bot as "was → now" per value and answer, with unchanged ones greyed; no git history is needed. The snapshot is written by the tools only; hand edits to it are rejected by `check`. Low effort is the goal (AC: many STACK authors skip pre-testing variants because it is work): the page and the bot offer "approve again" for changed variants whose answers are unchanged, and the default view shows only what needs a decision.
 18. **Hint after many rejections (AC):** when a question's rejections pass a threshold (for example a third of its decided variants, at least 5), the approval page and the bot show one hint: add a `require(...)` condition to `#| variables:` so such cases are never proposed. The hint lists the rejection reasons and, where the rejected variants share a value the approved ones never have (e.g. `x0 = 0` in all of them), suggests the matching condition (`require(x0 != 0)`) as text to copy — never applied automatically. Kept rejections and approvals are unaffected by adding the condition, since identities are value-based.
 19. **Question tests for every mode, common with STACK (AC, 19 Oct):** one declarative `tests:` key (each test: a name, the answers per field — expressions in the question's variables or `raw("…")` student strings — and the expected verdict per field or overall, optionally score/partial) runs through the exercise's real grading in every mode (`equivalent`, `numeric`, … and `custom`), at build time and in CI; a failure stops the build naming the exercise. Today's `mode: custom` `test(check, symbols)` keeps working. It is its own PR, the first after step 2 (ctm-checkers `testing` runs it), before the variants PRs, which then run the same tests per approved variant; stack-sympy's H1 adopts the same key and format, aligned with STACK's question tests (inputs + expected score/answer note), so one format serves both components.
+
+## Amendment for STACK questions on the Maxima backend (AC, 22 Oct 2026, binding; overrides decision 6 for that backend)
+
+Source: the system design audit of native Maxima, Erasmus-CTM/stack-wasm-maxima
+`reports/2026-10-22-system-design-audit.md` (§4 F-8 and §8, D1).
+
+20. **Each STACK backend generates its own variants.** A STACK question is
+    graded either by the SymPy engine or by native Maxima (`stack: cas: sympy |
+    maxima`, `#| cas:` on a block; the component becomes ctm-stack at step 6).
+    The generator is the grading backend's; there is no shared generator.
+    - **SymPy backend:** decision 6 stands unchanged: imported STACK questions
+      are approved again here.
+    - **Maxima backend:** the seed is STACK's (`stack_randseed`, as STACK seeds
+      a question), so a seed means the same variant as in Moodle once the
+      acceptance test below has passed. The variant tools then import the
+      XML's `<deployedseed>`s into `_variants/<label>.yml` as approved entries
+      (`reason: imported from Moodle`, with the "was → now" snapshot of
+      decision 17 and the resolved question note), so a teacher can bring a
+      course whose variants they are happy with. The XML question tests still
+      run on every imported seed, as for any approved variant (decision 19); a
+      failure stops the build. The approval page shows each imported seed's
+      question note, which the teacher compares with Moodle's "Deploy
+      variants" list (STACK: equal notes, equal variants).
+    - **Acceptance test before the import is offered:** the seed path from
+      STACK's PHP to `stack_randseed` confirmed; Maxima's Lisp Mersenne Twister
+      giving the same numbers under ECL (the Wasm build) as on a Moodle server;
+      and, for STACK sample questions with deployed seeds, equal question notes
+      from desktop STACK and from the Maxima backend. Until it passes, the
+      Maxima backend proposes seeds like any other generator and imported
+      seeds are not marked approved.
+    - **Moving a question from SymPy to Maxima** (moves go one way only) gives
+      it new variants: its manifest entries become "changed" or "gone" by the
+      usual classification and need approval again; saved student answers
+      follow decision 9 (the student is told in one line).
