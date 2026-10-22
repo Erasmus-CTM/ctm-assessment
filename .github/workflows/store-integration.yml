@@ -82,6 +82,7 @@ jobs:
           name: store-rendered-fixtures
           path: ${{ runner.temp }}/store-integration
       - name: Test actual rendered components and persistence
+        shell: bash
         env:
           CTM_BROWSER: ${{ matrix.browser }}
           CTM_STORE_ROOT: ${{ runner.temp }}/store-integration
