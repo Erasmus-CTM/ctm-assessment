@@ -92,3 +92,33 @@ jobs:
         env:
           CTM_ASSETS_LIBS_SOURCE: ${{ github.workspace }}/.asset-sources/libs
         run: node --test --test-concurrency=1 tests/assets-hook-render.test.cjs tests/author-imports-render.test.cjs
+
+  stdlib-availability:
+    needs: fixture-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 4edd42835a8923ebeac1a44b158add3c2698b75c
+          path: .asset-report-helper
+          persist-credentials: false
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache
+          key: ctm-official-archives-${{ hashFiles('integration/assets-metadata.json') }}
+      - name: Stage trusted exact-release runtime with verified archive digest
+        run: python scripts/ctm_assets.py prepare-stdlib-probe --metadata integration/assets-metadata.json --cache .asset-cache --candidates integration/assets-stdlib.json --directory .asset-stdlib-probe
+      - name: Inspect release import availability without authored code or network
+        run: node scripts/probe-pyodide-stdlib.mjs .asset-stdlib-probe .asset-report-helper/assets-metadata.json
+      - name: Emit one checksummed availability report without runner commits
+        run: |
+          git -C .asset-report-helper add -N -- assets-metadata.json
+          python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper

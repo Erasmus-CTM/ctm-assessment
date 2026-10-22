@@ -687,6 +687,62 @@ def inspect_archives(metadata: dict, cache: Path) -> dict:
             "status": "archive digests verified; file selection and licence policy still require review"}
 
 
+
+def prepare_stdlib_probe(metadata: dict, cache: Path, destination: Path, candidates: dict) -> Path:
+    """Stage only verified trusted runtime files for a read-only availability probe."""
+    entries = [entry for entry in metadata.get("archives", []) if entry.get("id") == "pyodide"]
+    if len(entries) != 1:
+        raise AssetError("The stdlib probe needs exactly one official Pyodide archive")
+    entry = entries[0]
+    if not re.fullmatch(r"\d+\.\d+\.\d+", entry.get("version", "")):
+        raise AssetError("The stdlib probe needs an exact Pyodide release")
+    if not re.fullmatch(r"[a-f0-9]{64}", entry.get("sha256", "")):
+        raise AssetError("The Pyodide availability probe requires its official SHA-256 archive digest")
+    cache, destination = Path(cache), Path(destination)
+    if destination.exists():
+        raise AssetError("The private stdlib probe destination must not already exist")
+    cache.mkdir(parents=True, exist_ok=True)
+    archive_file = cache / ("archive-" + digest(json_bytes({k: entry.get(k) for k in ("url", "sha256", "integrity")})))
+    download(entry["url"], archive_file, sha256=entry.get("sha256"), integrity=entry.get("integrity"))
+    required = {"pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm",
+                "python_stdlib.zip", "pyodide-lock.json", "package.json"}
+    destination.mkdir(parents=True)
+    files = {}
+    with tarfile.open(archive_file, "r|*") as archive:
+        for member in archive:
+            name = member.name.rstrip("/")
+            relative_path(name)
+            if member.isdir():
+                continue
+            if not member.isfile():
+                raise AssetError(f"Non-regular archive member: {name}")
+            if name not in {"pyodide/" + leaf for leaf in required}:
+                continue
+            leaf = PurePosixPath(name).name
+            if leaf in files:
+                raise AssetError(f"Repeated probe runtime member: {name}")
+            stream = archive.extractfile(member)
+            if stream is None:
+                raise AssetError(f"Unreadable probe runtime member: {name}")
+            data = stream.read()
+            (destination / leaf).write_bytes(data)
+            files[leaf] = digest(data)
+    if set(files) != required:
+        raise AssetError("The verified Pyodide archive is missing core probe files")
+    release_version((destination / "package.json").read_bytes(), entry["version"])
+    full_lock = json.loads((destination / "pyodide-lock.json").read_text(encoding="utf-8"))
+    python = full_lock.get("info", {}).get("python")
+    if candidates.get("python") != python:
+        raise AssetError("Stdlib candidate names and verified runtime use different Python releases")
+    request = {"v": 1, "python": python, "pyodide": entry["version"],
+               "candidates": candidates["modules"],
+               "candidate_source": candidates.get("source", {}),
+               "source": {key: entry[key] for key in ("url", "sha256") if key in entry},
+               "runtime_files": files}
+    (destination / "probe-input.json").write_bytes(json_bytes(request))
+    return destination
+
+
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
@@ -700,6 +756,11 @@ def main(argv=None):
     inspection.add_argument("--metadata", type=Path, required=True)
     inspection.add_argument("--cache", type=Path, required=True)
     inspection.add_argument("--output", type=Path, required=True)
+    probe = sub.add_parser("prepare-stdlib-probe", help="Stage verified Pyodide core for trusted availability inspection")
+    probe.add_argument("--metadata", type=Path, required=True)
+    probe.add_argument("--cache", type=Path, required=True)
+    probe.add_argument("--directory", type=Path, required=True)
+    probe.add_argument("--candidates", type=Path, required=True)
     verify = sub.add_parser("verify", help="Verify a carried bundle against the reviewed external lock")
     verify.add_argument("--lock", type=Path, required=True)
     verify.add_argument("--bundle", type=Path, required=True)
@@ -716,6 +777,9 @@ def main(argv=None):
         result = inspect_archives(json.loads(args.metadata.read_text(encoding="utf-8")), args.cache)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_bytes(json_bytes(result))
+    elif args.command == "prepare-stdlib-probe":
+        prepare_stdlib_probe(json.loads(args.metadata.read_text(encoding="utf-8")), args.cache, args.directory,
+                             json.loads(args.candidates.read_text(encoding="utf-8")))
     else:
         verify_bundle(args.bundle, json.loads(args.lock.read_text(encoding="utf-8")))
 

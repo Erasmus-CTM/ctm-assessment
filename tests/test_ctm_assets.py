@@ -157,6 +157,106 @@ class AssetsTests(unittest.TestCase):
             report = A.check_python_sources([{"source": "import diagnostic_only"}], full, {"packages": {}}, strict=False)
             self.assertIn("diagnostic_only", report["unmapped"])
 
+
+    def test_dynamic_aliases_cross_fragments_assignments_and_literal_keywords(self):
+        full = {"stdlib_modules": ["importlib", "os"], "packages": {"pandas": {"imports": ["pandas"]}}}
+        for setup, code in (
+            ("from importlib import import_module as load", "load('pandas')"),
+            ("import importlib as il", "il.import_module(name='pandas')"),
+            ("import importlib as il\nload = il.import_module", "load('pandas')"),
+            ("from importlib import import_module as load\nagain = load", "again(name='pandas')"),
+            ("load = importlib.import_module", "load('pandas')"),
+            ("call = __import__", "call('pandas')"),
+        ):
+            with self.subTest(setup=setup), self.assertRaisesRegex(A.AssetError, "pandas"):
+                A.check_python_sources([{"source": setup, "origin": "setup"},
+                                        {"source": code, "origin": "cell"}], full, {"packages": {}})
+        report = A.check_python_sources([
+            {"source": "from importlib import import_module as load"},
+            {"source": "load(name='os')"}], full, {"packages": {}})
+        self.assertEqual(report["imports"], ["importlib", "os"])
+        with self.assertRaisesRegex(A.AssetError, "literal dynamic"):
+            A.check_python_sources([{"source": "load = importlib.import_module"},
+                                    {"source": "load(name=answer)"}], full, {"packages": {}})
+
+    def test_local_helpers_packages_relative_imports_and_cycles_are_inspected_without_execution(self):
+        full = {"stdlib_modules": ["importlib"], "packages": {"pandas": {"imports": ["pandas"]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            helper = root / "helper.py"
+            helper.write_text("import pandas\nraise RuntimeError('never execute')\n", encoding="utf-8")
+            with self.assertRaisesRegex(A.AssetError, "pandas.*local module"):
+                A.check_python_sources([{"source": "import helper"}], full, {"packages": {}}, local_dirs=[root])
+            package = root / "pkg"
+            package.mkdir()
+            (package / "__init__.py").write_text("from . import inner\n", encoding="utf-8")
+            (package / "inner.py").write_text("from . import again\n", encoding="utf-8")
+            (package / "again.py").write_text("from . import inner\nimport pandas\n", encoding="utf-8")
+            with self.assertRaisesRegex(A.AssetError, "pandas"):
+                A.check_python_sources([{"source": "import pkg"}], full, {"packages": {}}, local_dirs=[root])
+            (package / "again.py").write_text("from . import inner\nraise RuntimeError('never execute')\n", encoding="utf-8")
+            report = A.check_python_sources([{"source": "import pkg.inner"}], full, {"packages": {}}, local_dirs=[root])
+            self.assertIn("pkg", report["imports"])
+            helper.write_text("from importlib import import_module as load\n", encoding="utf-8")
+            with self.assertRaisesRegex(A.AssetError, "pandas"):
+                A.check_python_sources([{"source": "import helper\nload('pandas')"}], full, {"packages": {}}, local_dirs=[root])
+
+    def test_scanner_stdin_is_utf8_even_when_native_pipe_encoding_is_ansi(self):
+        scanner = Path(__file__).resolve().parents[1] / "_extensions/ctm-assessment/author-imports.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index, subset = root / "index.json", root / "subset.json"
+            index.write_bytes(A.json_bytes({"v": 1, "python": "fixture", "stdlib_modules": ["os"], "packages": {}}))
+            subset.write_bytes(A.json_bytes({"info": {"python": "fixture"}, "packages": {}}))
+            args = [sys.executable, str(scanner), "--stdin", "--index", str(index), "--subset", str(subset)]
+            environment = dict(__import__("os").environ, PYTHONIOENCODING="cp1252")
+            payload = [{"source": "π = 3.14\nimport os", "origin": "øving π"}]
+            result = subprocess.run(args, input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                                    capture_output=True, env=environment)
+            self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8"))
+            self.assertEqual(json.loads(result.stdout.decode("utf-8"))["imports"], ["os"])
+            payload[0]["source"] = "import missing_module"
+            result = subprocess.run(args, input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                                    capture_output=True, env=environment)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("øving π", result.stderr.decode("utf-8"))
+
+
+    def test_stdlib_probe_stages_only_verified_core_and_checks_runtime_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tar = root / "official.tgz"
+            required = {"pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm",
+                        "python_stdlib.zip", "pyodide-lock.json", "package.json"}
+            entries = {"pyodide/" + name: b"trusted core " + name.encode() for name in required}
+            entries["pyodide/package.json"] = b'{"version":"0.28.3"}'
+            entries["pyodide/pyodide-lock.json"] = b'{"info":{"python":"3.13.2"},"packages":{}}'
+            entries["pyodide/not-needed.whl"] = b"must not be staged for the stdlib probe"
+            archive(tar, list(entries.items()))
+            metadata = {"archives": [{"id": "pyodide", "version": "0.28.3",
+                        "url": "https://github.com/pyodide/pyodide/releases/download/0.28.3/pyodide-0.28.3.tar.bz2",
+                        "sha256": A.digest(tar.read_bytes())}]}
+            def downloaded(url, destination, **checks):
+                data = tar.read_bytes()
+                A.verify_bytes(data, **checks)
+                destination.write_bytes(data)
+            candidates = {"python": "3.13.2", "modules": ["os"], "source": {"purpose": "candidate names only"}}
+            with patch.object(A, "download", side_effect=downloaded):
+                destination = A.prepare_stdlib_probe(metadata, root / "cache", root / "private-probe", candidates)
+                self.assertEqual({file.name for file in destination.iterdir()}, required | {"probe-input.json"})
+                request = json.loads((destination / "probe-input.json").read_text())
+                self.assertEqual(request["pyodide"], "0.28.3")
+                self.assertEqual(request["source"]["sha256"], metadata["archives"][0]["sha256"])
+                self.assertEqual(request["runtime_files"]["pyodide.mjs"], A.digest(entries["pyodide/pyodide.mjs"]))
+                with self.assertRaisesRegex(A.AssetError, "must not already exist"):
+                    A.prepare_stdlib_probe(metadata, root / "cache", destination, candidates)
+                with self.assertRaisesRegex(A.AssetError, "different Python releases"):
+                    A.prepare_stdlib_probe(metadata, root / "cache", root / "wrong-release",
+                                           {**candidates, "python": "3.12.0"})
+                bad = {"archives": [{**metadata["archives"][0], "sha256": "0" * 64}]}
+                with self.assertRaises(A.AssetError):
+                    A.prepare_stdlib_probe(bad, root / "cache", root / "unverified", candidates)
+
     def test_private_import_index_is_release_matched_and_never_written_under_assets(self):
         full = {"info": {"python": "3.13.2"}, "packages": {"extra": {"imports": ["extra"], "sha256": "not copied"}}}
         stdlib = {"v": 1, "python": "3.13.2", "modules": ["os", "sys"]}
