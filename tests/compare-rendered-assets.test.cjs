@@ -261,3 +261,48 @@ test('only an absent captured preload default becoming boolean true is equivalen
    assert.equal(f.run(f.after.replace('</head>',other+settings('true')+'</head>')).status,1,'moved captured array positions stay unexplained');
  }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });
+
+test('additive UI-language and preload defaults compose without accepting another settings change',()=>{
+ const f=fixture();try{
+   const settings=value=>'<script>// qpyodide-document-settings.js\n'+
+     Object.entries(value).map(([key,value])=>'globalThis.'+key+' = '+JSON.stringify(value)+';\n').join('')+'</script>';
+   const old={qpyodideInstallPythonPackagesList:['numpy'],qpyodideFeedbackOptions:{enabled:true,hints:true}};
+   const fresh={...old,qpyodideFeedbackOptions:{...old.qpyodideFeedbackOptions,uiLanguage:'nb'},qpyodidePreloadPackages:true};
+   const run=(before,after)=>{
+     fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',settings(before)+'</head>'));
+     return f.run(f.after.replace('</head>',settings(after)+'</head>'),['--expect','tools/compare-rendered/expect/step3.yml']);
+   };
+   const preloadRow=result=>result.report.items.find(row=>row.object==='qpyodideSettings'&&row.path==='/0/qpyodidePreloadPackages');
+   for(const language of ['en','de','sv','nb','da']){
+     const after={...fresh,qpyodideFeedbackOptions:{...fresh.qpyodideFeedbackOptions,uiLanguage:language}};
+     const result=run(old,after);assert.equal(result.status,0,JSON.stringify(result));
+     assert.equal(preloadRow(result).assets,'preload-default');
+     const ui=result.report.items.find(row=>row.path==='/0/qpyodideFeedbackOptions/uiLanguage');
+     assert.equal(ui.category,'pyodide-ui-language');
+   }
+   const rejects=[
+     ['unrecognized language',old,{...fresh,qpyodideFeedbackOptions:{...fresh.qpyodideFeedbackOptions,uiLanguage:'fr'}}],
+     ['nonstring language',old,{...fresh,qpyodideFeedbackOptions:{...fresh.qpyodideFeedbackOptions,uiLanguage:true}}],
+     ['changed existing language',{...old,qpyodideFeedbackOptions:{...old.qpyodideFeedbackOptions,uiLanguage:'en'}},fresh],
+     ['existing null language',{...old,qpyodideFeedbackOptions:{...old.qpyodideFeedbackOptions,uiLanguage:null}},fresh],
+     ['removed existing language',{...old,qpyodideFeedbackOptions:{...old.qpyodideFeedbackOptions,uiLanguage:'nb'}},{...fresh,qpyodideFeedbackOptions:old.qpyodideFeedbackOptions}],
+     ['missing old options',{qpyodideInstallPythonPackagesList:['numpy']},{qpyodideInstallPythonPackagesList:['numpy'],qpyodideFeedbackOptions:{uiLanguage:'nb'},qpyodidePreloadPackages:true}],
+     ['null old options',{...old,qpyodideFeedbackOptions:null},fresh],
+     ['array old options',{...old,qpyodideFeedbackOptions:[]},fresh],
+     ['null new options',old,{...fresh,qpyodideFeedbackOptions:null}],
+     ['array new options',old,{...fresh,qpyodideFeedbackOptions:[]}],
+     ['another nested option',old,{...fresh,qpyodideFeedbackOptions:{...fresh.qpyodideFeedbackOptions,hints:false}}],
+     ['another top-level option',old,{...fresh,unrelated:true}],
+     ['nonboolean preload',old,{...fresh,qpyodidePreloadPackages:'true'}],
+     ['changed existing false preload',{...old,qpyodidePreloadPackages:false},fresh],
+     ['changed existing null preload',{...old,qpyodidePreloadPackages:null},fresh],
+   ];
+   for(const [name,before,after]of rejects){
+     const result=run(before,after);assert.equal(result.status,1,name+' must stay unexplained');
+     assert.equal(preloadRow(result)?.assets,undefined,name+' must not authorize preload');
+   }
+   const unchanged={...fresh,qpyodidePreloadPackages:true};
+   const result=run(unchanged,unchanged);assert.equal(result.status,0,'unchanged explicit options remain unchanged');
+   assert.equal(preloadRow(result),undefined);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});

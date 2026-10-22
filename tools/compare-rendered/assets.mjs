@@ -257,6 +257,16 @@ function markPreloadDefault(A,B,items,context){
  const old=a[0],fresh=b[0];
  if(!old||!fresh||Array.isArray(old)||Array.isArray(fresh)||Object.hasOwn(old,'qpyodidePreloadPackages')||fresh.qpyodidePreloadPackages!==true)return;
  const rest={...fresh};delete rest.qpyodidePreloadPackages;
- if(!same(sorted(old),sorted(rest)))return;
+ // Step 3 can also add the separately reviewed UI-language override. Compose
+ // only that absent field, keeping every other captured setting identical.
+ if(!same(sorted(old),sorted(rest))){
+  const previous=old.qpyodideFeedbackOptions,next=fresh.qpyodideFeedbackOptions;
+  const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+  if(!object(previous)||!object(next)||Object.hasOwn(previous,'uiLanguage')||
+     !Object.hasOwn(next,'uiLanguage')||!['en','de','sv','nb','da'].includes(next.uiLanguage))return;
+  const options={...next};delete options.uiLanguage;
+  rest.qpyodideFeedbackOptions=options;
+  if(!same(sorted(old),sorted(rest)))return;
+ }
  for(const item of items)if(item.area==='config'&&item.change==='changed'&&item.object==='qpyodideSettings'&&item.path==='/0/qpyodidePreloadPackages'&&item.before===undefined&&item.after===true)item.assets='preload-default';
 }

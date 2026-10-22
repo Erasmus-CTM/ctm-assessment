@@ -1,0 +1,36 @@
+name: Replay additive step4 defaults
+
+on:
+  pull_request:
+    paths:
+      - tools/compare-rendered/assets.mjs
+      - tests/compare-rendered-assets.test.cjs
+      - .github/workflows/compare-step4-defaults.yml
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: node --test tests/compare-rendered-assets.test.cjs
+
+  step4:
+    uses: ./.github/workflows/compare-courses.yml
+    with:
+      tooling-ref: ${{ github.event.pull_request.head.sha }}
+      course: step4-course
+      base: 9ed46a449f41518d98fbd1b0964f6b3dce1ba0d7
+      head: f4875e8f0a01e219b983e0824c70c382fde87e40
+      convert: true
+      expect: step4-migration.yml
