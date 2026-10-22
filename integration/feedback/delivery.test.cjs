@@ -21,6 +21,7 @@ const PYODIDE_BUNDLES = /globalThis\.QP_L\s*=|globalThis\.qpyodideStorage\s*=|qp
 const EXPECTED = [
   'ai-feedback/feedback-core.js', 'ai-feedback/feedback-dom.js', 'ai-feedback/ai-feedback.js', 'ai-feedback/ai-feedback.css',
   'ctm-runtime/pyodide-runtime.js', 'ctm-locale/ctm-locale.js', 'ctm-locale/common.js', 'ctm-nav/ctm-nav.js', 'ctm-ui/ctm-ui.css',
+  'ctm-copy/ctm-copy.js', 'ctm-export/ctm-export.js', 'ctm-locale-ui/ui.js', 'ctm-store/ctm-store.js', 'math-exercise/math-store.js',
   'ctm-locale-math-exercise/math-exercise.js', 'ctm-locale-py-exercise/py-exercise.js',
   'math-exercise/matrix-input.css', 'math-exercise/math-exercise.css', 'math-exercise/matrix-input.js', 'math-exercise/math-exercise.js',
   'py-exercise-feedback/py-exercise-feedback.js', 'py-exercise/py-exercise.css', 'py-exercise/py-exercise.js',
