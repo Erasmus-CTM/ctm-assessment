@@ -90,7 +90,7 @@ async function probe() {
     'unmodified exact frame recovered from course23e WebKit job120022757378');
   const fixtureURL = 'data:text/html;base64,' + fixture.toString('base64');
   const fixtureText = fixture.toString('utf8');
-  const config = '<script>window.MathJax = {options: {enableSpeech: false, enableBraille: false}};</script>\n';
+  const config = '<script>window.MathJax = {options: {enableSpeech: false, enableBraille: false, menuOptions: {settings: {speech: false, braille: false}}}};</script>\n';
   const loader = '<script id="MathJax-script"';
   assert.equal(fixtureText.split(loader).length, 2, 'one exact async MathJax loader');
   const configuredText = fixtureText.replace(loader, config + loader);
@@ -197,6 +197,10 @@ async function probe() {
               enableSpeech: MathJax.startup.document.options.enableSpeech,
               enableBraille: MathJax.startup.document.options.enableBraille
             } : null,
+            speechMenuOptions: window.MathJax?.startup?.document?.menu?.settings ? {
+              speech: MathJax.startup.document.menu.settings.speech,
+              braille: MathJax.startup.document.menu.settings.braille
+            } : null,
             boards: Object.keys(window.JXG?.boards || {}).length,
             trace: window.__ctmWorkerTrace || []
           }));
@@ -227,6 +231,8 @@ async function probe() {
   assert.ok(frame, 'configured copy still initializes the actual board');
   assert.equal(frame.effectiveOrigin, 'null', 'configured copy retains its opaque sandbox');
   assert.deepEqual(frame.speechOptions, {enableSpeech: false, enableBraille: false});
+  assert.deepEqual(frame.speechMenuOptions, {speech: false, braille: false},
+    'menu defaults cannot re-enable the configured worker options');
   assert.equal(intervention.renderer?.svg, true, 'configured copy renders actual mathematical SVG');
   assert.ok(intervention.renderer.glyphs > 0, 'SVG contains rendered glyphs');
   assert.equal(frame.trace.filter(item => item.kind === 'worker-create').length, 0,
