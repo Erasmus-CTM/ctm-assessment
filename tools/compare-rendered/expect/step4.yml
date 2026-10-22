@@ -20,3 +20,16 @@ categories:
     title: Links into tabs (ctm-libs ui/ctm-nav.js and ui/ctm-ui.css) on pages with a tabset, on by default
     match:
       - {area: file, change: added, what: '^(script ctm-nav/ctm-nav\.js|css ctm-ui/ctm-ui\.css)$', tabsets: '^[1-9]\d*$'}
+
+  # Observed in PR28's complete examples report (133 rows, b045f850).
+  # The tool sets these flags only after validating the full v1 manifest,
+  # matching component metadata, shipped locale and exact generated bar.
+  # No removed/changed prose, grading payload or existing metadata is covered.
+  - id: store
+    title: Shared saved-answer metadata and generated page controls
+    match:
+      - {area: file, change: added, store: '^dependency$'}
+      - {area: config, change: added, object: '^ctm-store-manifest$', path: '^/$', store: '^manifest$'}
+      - {area: config, change: changed, store: '^(py-metadata|cell-metadata)$'}
+      - {area: dom, change: added, store: '^bar$'}
+      - {area: dom, change: attribute added, store: '^attribute$'}

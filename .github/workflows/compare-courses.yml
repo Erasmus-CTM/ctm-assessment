@@ -296,6 +296,10 @@ jobs:
       - name: Log converted tracked source for connector recovery
         if: ${{ inputs['emit-converted-source'] && matrix.convert == true }}
         run: python tools/ci/emit-converted-source.py "$RUNNER_TEMP/out/after"
+      - name: Calibrate store bindings on the actual example pages
+        continue-on-error: ${{ matrix.informational == true }}
+        if: matrix.course == 'examples' && steps.build.outcome == 'success'
+        run: node tests/compare-rendered-store-calibration.cjs "$RUNNER_TEMP/out/before/_site" "$RUNNER_TEMP/out/after/_site"
       - name: Compare the rendered pages
         id: compare
         continue-on-error: ${{ matrix.informational == true }}

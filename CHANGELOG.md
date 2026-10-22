@@ -7,6 +7,14 @@
   the package, and retain the stale-version check with migration advice.
   Tests use `CTM_LIBS_EXTENSION` for shared feedback files.
 
+## 0.13.0
+
+Shared saved answers, progress and quizzes across maths and Python exercises, with page and course deletion and a device saving switch. Restoring an answer never runs Python or checks it automatically. Changed exercises retain the old answer as read-only history and mark old scores outdated.
+
+Copy controls remain available when saving is off. “Export my answers” opens selectable text with “Copy all” first; Markdown and HTML downloads are secondary. Pyodide cells save code only; current output and plots can be copied or exported without storing output.
+
+Pins for this review set: ctm-libs 1320be6ac38a25269abffe82652feea8f1af8636, math-exercise 59c4e95f332ba314ea11031ff44ef77bd3bdd68a, py-exercise e9af7a40bb67801ff37d77cae68cdb4cb1483258, pyodide-interaktiv c0acbada72e2cf29c74ca0c88fc537eb85506370 and ctm-checkers a1637dc95b9e11d8a0c838c801cd53e20997eceb. The checker pin supplies the declarative author-test API required by this math-exercise revision; the installed archive is tested with passing and deliberately failing built-in and legacy custom assertions. The JSXGraph pin is unchanged. The step-4 design clarifies that correctness rules supplied outside a block participate in its source hash.
+
 ## 0.12.0
 
 The last set before the ingmat3a migration: **links into collapsed callouts

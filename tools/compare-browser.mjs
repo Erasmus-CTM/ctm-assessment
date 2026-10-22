@@ -231,7 +231,11 @@ const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 // Playwright's routes, so the served files point them at a closed port.
 const HEAVY = /https?:\/\/[\w.-]+(?=[^\s"'`()<>]*?(?:\/pyodide\/v[\d.]+\/|\/monaco-editor@))/g;
 const BLOCKED = 'http://127.0.0.1:9';
-function serve(roots, isolated = true) {
+// The optional policy keeps existing callers on credentialless. require-corp
+// lets engines without credentialless support use real cross-origin isolation.
+export function serve(roots, isolated = true, coep = 'credentialless') {
+  if (!['credentialless', 'require-corp'].includes(coep))
+    throw new TypeError('COEP must be credentialless or require-corp');
   const server = http.createServer((request, response) => {
     const parts = decodeURIComponent(new URL(request.url, 'http://x').pathname).split('/');
     const root = roots[parts[1]];
@@ -241,7 +245,7 @@ function serve(roots, isolated = true) {
     if (!root || !file.startsWith(root) || !fs.existsSync(file)) { response.writeHead(404); response.end(); return; }
     // Without the isolation headers (--first-visit), as GitHub Pages serves a course.
     response.writeHead(200, {'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
-      ...(isolated ? {'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'credentialless'} : {})});
+      ...(isolated ? {'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': coep} : {})});
     let body = fs.readFileSync(file);
     if (!isolated && ['.html', '.js', '.mjs'].includes(path.extname(file))) body = body.toString('utf8').replace(HEAVY, BLOCKED);
     response.end(body);
