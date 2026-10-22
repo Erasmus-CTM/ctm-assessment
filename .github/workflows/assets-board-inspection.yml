@@ -21,6 +21,7 @@ jobs:
         with:
           path: .asset-cache/boards
           key: ctm-board-archives-${{ hashFiles('integration/assets-board-metadata.json') }}
+      - run: python -m pip install fonttools brotli
       - name: Inspect official integrity-verified board archives
         run: |
           python - <<'PY'
@@ -48,7 +49,45 @@ jobs:
               print('CTM_BOARD_INSPECTION ' + json.dumps({'chunk': i // 3000, 'base64': encoded[i:i+3000]}))
           print('CTM_BOARD_INSPECTION ' + json.dumps({'complete': True}))
           PY
+      - name: Inspect the actual font copyright and licence records
+        run: |
+          python - <<'PY'
+          import base64, collections, importlib.util, io, json, pathlib, tarfile
+          from fontTools.ttLib import TTFont
+          spec = importlib.util.spec_from_file_location('assets', 'scripts/ctm_assets.py')
+          assets = importlib.util.module_from_spec(spec); spec.loader.exec_module(assets)
+          metadata = json.loads(pathlib.Path('integration/assets-board-metadata.json').read_text())
+          entry, = [item for item in metadata['archives'] if item['id'] == 'mathjax-newcm-font']
+          cache = pathlib.Path('.asset-cache/boards')
+          archive = cache / ('archive-' + assets.digest(assets.json_bytes({key: entry.get(key) for key in ('url', 'sha256', 'integrity')})))
+          assets.download(entry['url'], archive, integrity=entry['integrity'])
+          fonts, definitions = [], {}
+          with tarfile.open(archive, 'r|*') as source:
+              for member in source:
+                  if not member.isfile():
+                      continue
+                  if member.name.endswith('.woff2') or member.name == 'package/def/mathjax-newcm.ts':
+                      data = source.extractfile(member).read()
+                      if member.name.endswith('.woff2'):
+                          font = TTFont(io.BytesIO(data))
+                          names = {str(key): sorted({record.toUnicode() for record in font['name'].names if record.nameID == key}) for key in (0, 1, 2, 5, 13, 14)}
+                          fonts.append({'member': member.name, 'sha256': assets.digest(data), 'names': names})
+                          font.close()
+                      else:
+                          definitions[member.name] = {'sha256': assets.digest(data), 'text': data.decode('utf-8')}
+          assert fonts
+          result = {'source': entry, 'fonts': fonts, 'definitions': definitions}
+          raw = assets.json_bytes(result)
+          pathlib.Path('.private-extensions/board-font-records.json').write_bytes(raw)
+          print('CTM_BOARD_FONT ' + json.dumps({'bytes': len(raw), 'sha256': assets.digest(raw), 'git_blob_sha1': assets.git_blob_sha1(raw)}))
+          encoded = base64.b64encode(raw).decode()
+          for i in range(0, len(encoded), 3000):
+              print('CTM_BOARD_FONT ' + json.dumps({'chunk': i // 3000, 'base64': encoded[i:i+3000]}))
+          print('CTM_BOARD_FONT ' + json.dumps({'complete': True}))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: verified-board-archive-inspection
-          path: .private-extensions/board-inspection.json
+          path: |
+            .private-extensions/board-inspection.json
+            .private-extensions/board-font-records.json
