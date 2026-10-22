@@ -966,7 +966,7 @@ def inspect_python_subset(metadata: dict, cache: Path, *, extras=()) -> dict:
                         continue
                     if (member.external_attr >> 16) & 0o170000 == 0o120000:
                         raise AssetError("Wheel contains a symlink: " + path)
-                    if path.endswith(".dist-info/METADATA"):
+                    if len(PurePosixPath(path).parts) == 2 and path.endswith(".dist-info/METADATA"):
                         message = email.parser.BytesParser().parsebytes(wheel.read(member))
                         if details["metadata"]:
                             raise AssetError("Wheel has ambiguous distribution metadata: " + leaf)

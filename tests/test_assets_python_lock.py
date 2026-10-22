@@ -170,6 +170,62 @@ class PythonSubsetTests(unittest.TestCase):
             output = A.write_private_lock({"kind": "private"}, root / ".private/candidate.json")
             self.assertEqual(json.loads(output.read_bytes()), {"kind": "private"})
 
+    def test_curated_licences_bind_release_python_and_package_filename(self):
+        for release, python in (("0.28.4", "3.13.2"), ("0.28.3", "3.13.3")):
+            with self.subTest(release=release, python=python), self.assertRaisesRegex(A.AssetError, "another release"):
+                A._curated_python_licences(ROOT, release, python)
+        with tempfile.TemporaryDirectory() as tmp:
+            metadata, cache = self.fixture(Path(tmp), extra=("libopenblas", wheel("libopenblas", text=False), "shared_library"))
+            with self.assertRaisesRegex(A.AssetError, "another package version"):
+                A.produce_python_lock(metadata, cache, extras=("libopenblas",))
+
+    def test_wheel_identity_duplicate_metadata_and_archive_duplicates_rejected(self):
+        for kind in ("identity", "duplicate-metadata", "duplicate-archive"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                def mutate(payloads, full):
+                    if kind == "identity":
+                        data = wheel("wrong")
+                    elif kind == "duplicate-metadata":
+                        data = wheel("numpy", duplicate=True)
+                    else:
+                        return
+                    payloads["pyodide/numpy-1.0.whl"] = data
+                    full["packages"]["numpy"]["sha256"] = A.digest(data)
+                    payloads["pyodide/pyodide-lock.json"] = A.json_bytes(full)
+                metadata, cache = self.fixture(root, mutate=mutate)
+                if kind == "duplicate-archive":
+                    archive = root / "official.tar.bz2"
+                    data = archive.read_bytes()
+                    with tarfile.open(fileobj=io.BytesIO(data), mode="r:bz2") as old:
+                        records = [(member.name, old.extractfile(member).read()) for member in old]
+                    with tarfile.open(archive, "w:bz2") as out:
+                        for name, value in records + [records[0]]:
+                            member = tarfile.TarInfo(name)
+                            member.size = len(value)
+                            out.addfile(member, io.BytesIO(value))
+                    metadata["archives"][0]["sha256"] = A.digest(archive.read_bytes())
+                    entry = metadata["archives"][0]
+                    target = cache / ("archive-" + A.digest(A.json_bytes({key: entry.get(key) for key in ("url", "sha256", "integrity")})))
+                    target.write_bytes(archive.read_bytes())
+                with self.assertRaises(A.AssetError):
+                    A.produce_python_lock(metadata, cache)
+
+    def test_vendored_metadata_is_not_the_distribution_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            def mutate(payloads, full):
+                output = io.BytesIO(wheel("numpy"))
+                with zipfile.ZipFile(output, "a") as archive:
+                    archive.writestr("numpy/_vendor/other-2.0.dist-info/METADATA", "Name: other\nVersion: 2.0\n")
+                    archive.writestr("numpy/_vendor/other-2.0.dist-info/LICENSE", "Bundled other licence\n")
+                data = output.getvalue()
+                payloads["pyodide/numpy-1.0.whl"] = data
+                full["packages"]["numpy"]["sha256"] = A.digest(data)
+                payloads["pyodide/pyodide-lock.json"] = A.json_bytes(full)
+            metadata, cache = self.fixture(Path(tmp), mutate=mutate)
+            lock = A.produce_python_lock(metadata, cache)
+            self.assertTrue(any("numpy/_vendor/other-2.0.dist-info/LICENSE" in item["path"] for item in lock["generated"]))
+
     def test_build_and_carried_clis_use_external_lock(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
