@@ -1,0 +1,13 @@
+---
+title: Second Python window
+lang: en
+---
+
+This page provides another Python window. Use **Run** after editing the code.
+
+```{pyodide-python}
+#| label: python-ide-nested
+#| autorun: false
+numbers = [1, 2, 3, 4]
+print("Sum:", sum(numbers))
+```

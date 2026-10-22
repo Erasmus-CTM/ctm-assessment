@@ -1,0 +1,15 @@
+---
+title: Python
+lang: en
+---
+
+Edit the code and select **Run**. Python and its installed libraries run in this browser; no internet connection is needed.
+
+```{pyodide-python}
+#| label: python-ide
+#| autorun: false
+import sys
+
+print("Python", sys.version.split()[0])
+print("Ready to write Python")
+```
