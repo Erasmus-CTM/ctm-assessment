@@ -31,6 +31,21 @@ export function instrument() {
       });
       return parents;
     }
+    function marginTargets(html=false) {
+      return [...(window.document?.querySelectorAll(
+        '.column-margin.column-container > *, .margin-caption, .aside')||[])].slice(0,6).map(node=>({
+        tag:node.tagName,id:String(node.id||'').slice(0,100),
+        classes:String(node.getAttribute('class')||'').slice(0,180),
+        marginTop:String(node.style.marginTop||'').slice(0,100),
+        ...(html?{html:String(node.outerHTML).slice(0,600)}:{})
+      }));
+    }
+    function bodyState() {
+      return {readyState:window.document?.readyState,
+        classes:String(window.document?.body?.className||'').slice(0,200),
+        style:String(window.document?.body?.getAttribute('style')||'').slice(0,300),
+        children:window.document?.body?.childElementCount};
+    }
     function record(kind,data) {
       trace.events.push({sequence:++trace.count,kind,...data});
       if(trace.events.length>48)trace.events.shift();
@@ -73,17 +88,20 @@ export function instrument() {
       if(typeof callback!=='function')return Reflect.construct(constructor,args,newTarget);
       return Reflect.construct(constructor,[function(entries,observer) {
         watchEditors();
-        record('resize-callback',{observer:id,entries:[...entries].slice(0,4).map(entry=>({
+        const bodyCallback=[...entries].some(entry=>entry.target===window.document?.body);
+        record('resize-callback',{observer:id,...(bodyCallback?{body:bodyState(),margins:marginTargets()}:{}),entries:[...entries].slice(0,4).map(entry=>({
           target:target(entry.target),
           rect:{x:entry.contentRect.x,y:entry.contentRect.y,width:entry.contentRect.width,height:entry.contentRect.height}
         }))});
-        return Reflect.apply(callback,this,arguments);
+        const result=Reflect.apply(callback,this,arguments);
+        if(bodyCallback)record('resize-return',{observer:id,body:bodyState(),margins:marginTargets()});
+        return result;
       },...args.slice(1)],newTarget);
     }});
     window.addEventListener('error',event=>{
       if(String(event.message).includes('ResizeObserver') && trace.emitted++<3) {
         console.log('CTM_RESIZE_TRACE '+JSON.stringify({
-          message:event.message,events:trace.events.slice(-24),observers:trace.observers
+          message:event.message,body:bodyState(),margins:marginTargets(true),events:trace.events.slice(-24),observers:trace.observers
         }));
       }
     });
