@@ -1,0 +1,13 @@
+---
+title: Resize lifecycle upstream control
+format:
+  html:
+    toc: false
+---
+
+This page uses stock Quarto HTML, Bootstrap and its native page resize observer.
+It has no CTM extension, editor, saved-answer adapter or navigation helper.
+
+::: {#height-control style="height: 1200px;"}
+Fixed-height content makes the page taller than the test viewport.
+:::
