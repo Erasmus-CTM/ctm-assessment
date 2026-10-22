@@ -38,6 +38,10 @@ const PYODIDE = [
   'pyodide-interaktiv-feedback/qpyodide-feedback.js',
 ];
 
+function assetHelperCount(doc) {
+  return [...doc.scripts].filter(script=>page.dependency(script.getAttribute('src')||'')?.name==='ctm-assets').length;
+}
+
 function resources(html) {
   return [...html.matchAll(/<(?:script[^>]*\ssrc|link[^>]*\shref)="([^"]+)"/g)].map(m => m[1]);
 }
@@ -59,6 +63,10 @@ test('each CTM script and style is one cacheable file per page, after its config
     }
     const doc = new JSDOM(html).window.document;
     const assetConfig=[...doc.scripts].filter(script=>script.textContent.trim().startsWith('globalThis.CTM_ASSETS='));
+    assert.equal(assetConfig.length,assetHelperCount(doc),file+': helper/config registrations agree');
+    const consumers=[...doc.scripts].some(script=>script.textContent.includes('CTMAssets.url(')||['ctm-runtime','math-exercise','py-exercise','pyodide-interaktiv'].includes(page.dependency(script.getAttribute('src')||'')?.name));
+    if(consumers)assert.equal(assetConfig.length,1,file+': asset consumers have registration');
+    if(assetConfig.length){
     assert.equal(assetConfig.length,1,file+': one asset configuration');
     assert.equal(assetConfig[0].parentElement,doc.head,file+': asset configuration in head');
     const assetHelper=[...doc.scripts].filter(script=>page.dependency(script.getAttribute('src')||'')?.name==='ctm-assets');
@@ -68,6 +76,7 @@ test('each CTM script and style is one cacheable file per page, after its config
     for(const consumer of scripts.filter(script=>script.textContent.includes('CTMAssets.url('))){
       assert.ok(scripts.indexOf(assetConfig[0])<scripts.indexOf(consumer),file+': asset config before consumer');
       assert.ok(scripts.indexOf(assetHelper[0])<scripts.indexOf(consumer),file+': asset helper before consumer');
+    }
     }
     for (const script of doc.querySelectorAll('script:not([src])')) {
       assert.doesNotMatch(script.textContent, BUNDLES, file);

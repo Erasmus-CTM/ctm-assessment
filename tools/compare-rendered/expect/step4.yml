@@ -42,3 +42,5 @@ categories:
       - {area: file, assets: '^resource$'}
       - {area: inline, change: added, assets: '^configuration$'}
       - {area: inline, change: changed, assets: '^monaco$'}
+
+      - {area: dom, change: attribute changed, tag: '^iframe$', attribute: '^src$', assets: '^board-defaults$'}

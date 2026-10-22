@@ -7,7 +7,7 @@ const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
 const sorted=x=>x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,sorted(x[k])])):x;
 function fixture(){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'asset-compare-')),project=path.join(dir,'project');
-  const pins={repositories:{'ctm-libs':{repository:'fixture/libs',commit:'1'.repeat(40)},'pyodide-interaktiv':{repository:'fixture/python',commit:'2'.repeat(40)}}};
+  const pins={repositories:{'ctm-libs':{repository:'fixture/libs',commit:'1'.repeat(40)},'pyodide-interaktiv':{repository:'fixture/python',commit:'2'.repeat(40)},jsxgraph:{repository:'fixture/board',commit:'3'.repeat(40)}}};
   const record={repositories:structuredClone(pins.repositories),extension_sha256:{}};
   const put=(folder,file,text)=>{
     const p=path.join(project,'_extensions',folder,file);fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,text);
@@ -39,7 +39,7 @@ function fixture(){
     const p=spawnSync(process.execPath,['tools/compare-rendered.mjs','--before',path.join(dir,'before'),'--after',path.join(dir,'after'),'--expect','tools/compare-rendered/expect/step4.yml','--report',report,'--asset-sources',project,'--asset-pins',pinsFile,...extra],{cwd:root,encoding:'utf8'});
     return {status:p.status,stderr:p.stderr,report:fs.existsSync(report)?JSON.parse(fs.readFileSync(report)):null};
   };
-  return {dir,project,pinsFile,helperFile,after,before,run,record,table,math};
+  return {dir,project,pinsFile,helperFile,after,before,run,record,table,math,put};
 }
 test('only ten structurally verified asset rows are eligible',()=>{
   const f=fixture();try{
@@ -64,6 +64,11 @@ const mutations={
   grading:s=>s.replace('"answer":2','"answer":3'),
   ids:s=>s.replace('id="lesson"','id="other"'),
   'unrelated script':s=>s.replace('src="checker.js"','src="different.js"'),
+  'unrelated raw query':s=>s.replace('src="checker.js"','src="checker.js?tamper=1"'),
+  'unrelated duplicate':s=>s.replace('<script src="checker.js"></script>','<script src="checker.js"></script><script src="checker.js"></script>'),
+  'unrelated async':s=>s.replace('src="checker.js"','async src="checker.js"'),
+  'unrelated module':s=>s.replace('src="checker.js"','type="module" src="checker.js"'),
+  'unrelated onload':s=>s.replace('src="checker.js"','onload="changed()" src="checker.js"'),
   'missing registration':s=>s.replace(/<script>window.__mathExerciseConfig=.*?<\/script>/,'')
 };
 for(const [name,mutate]of Object.entries(mutations))test(name+' remains unexplained',()=>{
@@ -99,4 +104,53 @@ test('an unchanged existing asset capability remains comparable',()=>{
     assert.equal(f.run().status,0);
     assert.equal(f.run(f.after.replace('0.46.0/min/vs/loader.js','0.46.0/min/vs/loader.js?tamper')).status,1);
   }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
+
+test('legacy polyfill query aliases and inline kind collisions stay unexplained',()=>{
+  const f=fixture();try{
+    assert.equal(f.run(f.after.replace('</head>','<script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=changed"></script></head>')).status,1);
+    const collision="<script>// Configure the Monaco Editor's loader\nrequire.config({paths:{'vs': 'authored'}});</script>";
+    fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',collision+'</head>'));
+    assert.equal(f.run(f.after.replace('</head>',collision.replace('authored','changed')+'</head>')).status,1);
+  }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
+function boardDoc(jxg,mjx,css){
+ return '<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <script id="MathJax-script" async src="'+mjx+'"></script> <script src="'+jxg+'"></script> <style>@import url("'+css+'");</style> <style>html,body{margin:0;}</style> </head> <body> <div id="JXG12345678_1234_1234_1234_12345678" class="jxgbox"></div> <script>window.BOARDID="JXG12345678_1234_1234_1234_12345678"; const board=JXG.JSXGraph.initBoard(BOARDID,{});</script> </body> </html>';
+}
+test('only exact canonical board default URL changes are eligible',()=>{
+ const f=fixture();try{
+   const old=boardDoc('https://cdn.jsdelivr.net/npm/jsxgraph@1/distrib/jsxgraphcore.js','https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-svg.js','https://cdn.jsdelivr.net/npm/jsxgraph@1/distrib/jsxgraph.css');
+   const current=old.replaceAll('jsxgraph@1/','jsxgraph@1.14.1/').replaceAll('mathjax@4/','mathjax@4.1.3/');
+   const frame=html=>'<iframe id="JXG12345678_1234_1234_1234_12345678" src="data:text/html;base64,'+Buffer.from(html).toString('base64')+'"></iframe>';
+   f.put('ctm-assessment','jsxgraph-pins.yml','jsxgraph:\n  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraphcore.js\n  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraph.css\n  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js\n');
+   fs.writeFileSync(path.join(f.project,'resolved-repos.json'),JSON.stringify(f.record));
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),'<html><body>'+frame(old)+'</body></html>');
+   // Existing asset capability is identical; only embedded board pin URLs vary.
+   const registered=f.after.replace('</body>',frame(old)+'</body>');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),registered.replaceAll('jsxgraph@1/','jsxgraph@1.14.1/').replaceAll('mathjax@4/','mathjax@4.1.3/'));
+   fs.cpSync(path.join(f.dir,'after/site_libs'),path.join(f.dir,'before/site_libs'),{recursive:true});
+   const make=board=>f.after.replaceAll('jsxgraph@1/','jsxgraph@1.14.1/').replaceAll('mathjax@4/','mathjax@4.1.3/').replace('</body>',frame(board)+'</body>');
+   const good=f.run(make(current));assert.equal(good.status,0,JSON.stringify(good));
+   assert.ok(good.report.items.some(i=>i.assets==='board-defaults'));
+   for(const bad of [current.replace('jsxgraph@1.14.1/','jsxgraph@1.14.2/'),current.replace('initBoard(BOARDID,{})','initBoard(BOARDID,{axis:true})'),current.replace('class="jxgbox"','class="different"'),current.replace(' async ',' defer '),current.replace('jsxgraphcore.js','jsxgraphcore.js?tamper=1'),current.replace('jsxgraph.css','different.css'),current.replace('</head>','<script src="other.js"></script></head>')]){
+     const r=f.run(make(bad));assert.equal(r.status,1,JSON.stringify(r));
+   }
+   assert.equal(f.run(make(current).replace('<iframe id=', '<iframe sandbox="allow-scripts" id=')).status,1);
+   assert.equal(f.run(make(current).replace('src="data:text/html;base64,','src="https://untrusted.invalid/?payload=')).status,1);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
+
+test('unchanged standalone pages need no asset capability',()=>{
+ const f=fixture();try{
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),'<html><body><p>Standalone page</p></body></html>');
+   assert.equal(f.run('<html><body><p>Standalone page</p></body></html>').status,0);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
+test('polyfill removal permits zero actual loaders but never a deleted real loader',()=>{
+ const f=fixture();try{
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace(f.math,''));
+   assert.equal(f.run(f.after.replace(f.math,'')).status,0);
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before);
+   assert.equal(f.run(f.after.replace(f.math,'')).status,1);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });

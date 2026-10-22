@@ -23,7 +23,16 @@ export function loadAssetSources(project,pinsFile) {
   const records=candidates.map(p=>JSON.parse(fs.readFileSync(p,'utf8')));
   insist(records.every(r=>same(sorted(r),sorted(records[0]))),'Conflicting installed source records');
   const record=records[0];
-  for(const name of ['ctm-libs','pyodide-interaktiv']) {
+  for(const [folder,entries]of Object.entries(record.extension_sha256||{})){
+    const normalized=Object.create(null);
+    for(const [name,digest]of Object.entries(entries)){
+      const key=name.replaceAll(String.fromCharCode(92),'/');
+      insist(!Object.hasOwn(normalized,key),'Ambiguous source hash path: '+folder+'/'+key);
+      normalized[key]=digest;
+    }
+    record.extension_sha256[folder]=normalized;
+  }
+  for(const name of ['ctm-libs','pyodide-interaktiv','jsxgraph']) {
     const pin=pins.repositories?.[name], actual=record.repositories?.[name];
     insist(pin&&/^[a-f0-9]{40}$/.test(pin.commit||'')&&actual?.repository===pin.repository&&actual.commit===pin.commit&&!actual.local_override&&!(actual.dirty_files||[]).length,'Asset source tuple mismatch: '+name);
   }
@@ -58,13 +67,23 @@ export function loadAssetSources(project,pinsFile) {
   const template=read('pyodide-interaktiv','qpyodide-monaco-editor-init.html').toString('utf8');
   const body=/<script type="module" id="qpyodide-monaco-editor-init">([\s\S]*?)<\/script>/.exec(template);
   insist(body&&monacoCode(body[1],"CTMAssets\\.url\\('monaco-editor', 'min/vs'\\)"),'Unexpected canonical Monaco initializer');
-  return {config:{v:1,mode:'cdn',bases},helperHash:hash(helper),table};
+  return {config:{v:1,mode:'cdn',bases},helperHash:hash(helper),table,board};
 }
 export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
+  markBoardChanges(items,context,page);
   const configScripts=doc=>[...doc.querySelectorAll('script:not([src])')].filter(s=>s.textContent.includes('CTM_ASSETS'));
   const helperScripts=doc=>resources(doc).filter(e=>normalize(raw(e))==='ctm-assets/assets.js');
   const active=configScripts(A.doc).length||configScripts(B.doc).length||helperScripts(A.doc).length||helperScripts(B.doc).length;
   if(!active&&!context)return;
+  checkRetainedResources(A.doc,B.doc,items,page);
+  if(!active){
+    const consumer=doc=>[...doc.scripts].some(e=>e.textContent.includes('CTMAssets.url(')||
+      /^(?:ctm-runtime|math-exercise|py-exercise|pyodide-interaktiv)\//.test(normalize(e.getAttribute('src')||''))||
+      /(?:globalThis\.qpyodideCellDetails|window\.__mathExerciseConfig|window\.__pyExerciseConfig)/.test(e.textContent)||
+      /(?:monaco-editor@|font-awesome\/[^/]+\/js\/all\.min\.js|@fortawesome\/fontawesome-free@)/.test(e.getAttribute('src')||''));
+    if(consumer(A.doc)||consumer(B.doc))items.push({page,area:'assets',change:'invalid',what:'Missing asset registrations on consumer page',invariant:true});
+    return;
+  }
   const fail=message=>items.push({page,area:'assets',change:'invalid',what:message,invariant:true});
   try {
     insist(context,'Canonical installed asset sources are required');
@@ -140,18 +159,73 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
     const oldPoly=ra.filter(e=>raw(e)===poly);
     if(oldPoly.length){
       const ma=A.doc.querySelectorAll('script#MathJax-script'),mb=B.doc.querySelectorAll('script#MathJax-script');
-      insist(oldPoly.length===1&&!rb.some(e=>raw(e)===poly)&&oldPoly[0].attributes.length===1,'Unexpected legacy polyfill change');
-      insist(ma.length===1&&mb.length===1&&ma[0].outerHTML===mb[0].outerHTML,'Actual MathJax loader changed');
+      insist(oldPoly.length===1&&ra.filter(e=>normalize(raw(e))===normalize(poly)).length===1&&!rb.some(e=>normalize(raw(e))===normalize(poly))&&oldPoly[0].attributes.length===1,'Unexpected legacy polyfill change');
+      insist(ma.length===mb.length&&ma.length<=1&&(!ma.length||ma[0].outerHTML===mb[0].outerHTML),'Actual MathJax loader changed: '+JSON.stringify({before:[...ma].map(e=>e.outerHTML),after:[...mb].map(e=>e.outerHTML)}));
       eligible.add('script '+normalize(poly));
     }
     for(const [a,b] of pairs)for(const [x,y] of pairs)insist((ra.indexOf(a)<ra.indexOf(x))===(rb.indexOf(b)<rb.indexOf(y)),'Migrated resource order changed');
     eligible.add('script ctm-assets/assets.js');
     const configKind=B.inline.find(i=>i.code===config.textContent.trim())?.kind;
     const initKind=monacoPresent?A.inline.find(i=>i.code===initA[0].textContent.trim())?.kind:null;
+    if(monacoPresent)insist(A.inline.filter(i=>i.kind===initKind).length===1&&B.inline.filter(i=>i.kind===initKind).length===1,'Ambiguous Monaco inline kind');
     for(const item of items){
       if(item.area==='file'&&eligible.has(item.what))item.assets='resource';
       if(item.area==='inline'&&item.change==='added'&&item.what===configKind)item.assets='configuration';
       if(item.area==='inline'&&item.change==='changed'&&item.what===initKind)item.assets='monaco';
     }
   }catch(error){fail(error.message);}
+}
+
+// Only the three default resource URLs may differ inside a generated board.
+// Full decoded bytes (after the comparator's existing UUID/space normalization)
+// must otherwise agree, including every authored board statement and element.
+function markBoardChanges(items,context,page){
+  const {JSDOM}=require('jsdom');
+  for(const item of items){
+    if(item.area!=='dom'||item.change!=='attribute changed'||item.tag!=='iframe'||item.attribute!=='src'||
+       !/^iframe\|JXG\*$/.test(item.element||'')||!String(item.before).startsWith('data:text/html;decoded,'))continue;
+    try{
+      insist(context,'Canonical installed board sources are required');
+      const prefix='data:text/html;decoded,';
+      insist(String(item.after).startsWith(prefix),'Board delivery encoding changed');
+      let before=item.before.slice(prefix.length),after=item.after.slice(prefix.length);
+      const a=new JSDOM(before).window.document,b=new JSDOM(after).window.document;
+      let changed=0;
+      for(const [key,kind]of [['src_jxg','script'],['src_mjx','math'],['src_css','style']]){
+        const target=context.board[key];
+        const match=/^(https:\/\/cdn\.jsdelivr\.net\/npm\/(?:@[^/]+\/)?[^/@]+@)(\d+)\.\d+\.\d+(\/[^?#]+)$/.exec(target||'');
+        insist(match,'Board target is not an exact canonical release');
+        const historical=match[1]+match[2]+match[3];
+        const old=kind==='style'?[...a.querySelectorAll('head > style')].filter(e=>e.textContent.trim()==='@import url("'+historical+'");'):
+          [...a.querySelectorAll('head > script[src]')].filter(e=>e.getAttribute('src')===historical);
+        const fresh=kind==='style'?[...b.querySelectorAll('head > style')].filter(e=>e.textContent.trim()==='@import url("'+target+'");'):
+          [...b.querySelectorAll('head > script[src]')].filter(e=>e.getAttribute('src')===target);
+        insist(old.length===1&&fresh.length===1,'Board default resource pair missing or duplicated');
+        if(kind==='math')insist(old[0].id==='MathJax-script'&&fresh[0].id==='MathJax-script','Board MathJax identity changed');
+        insist(same(attrs(old[0],kind==='style'?undefined:'src'),attrs(fresh[0],kind==='style'?undefined:'src')),'Board resource attributes changed');
+        insist(before.split(historical).length===2&&after.split(target).length===2,'Ambiguous embedded resource URL');
+        before=before.replace(historical,target);changed++;
+      }
+      insist(changed===3&&before===after,'Embedded board changed beyond canonical resource pins');
+      item.assets='board-defaults';
+    }catch(error){
+      items.push({page,area:'assets',change:'invalid',what:error.message,invariant:true});
+    }
+  }
+}
+
+// Keep queries and attributes that the general render-noise URL normalization
+// does not expose. A canonical asset migration never excuses another loader.
+function checkRetainedResources(a,b,items,page){
+ const before=resources(a),after=resources(b);
+ const url=e=>{const u=raw(e),q=u.indexOf('?');return normalize(u)+(q<0?'':u.slice(q));};
+ for(const old of before){
+   const matches=after.filter(e=>e.tagName===old.tagName&&normalize(raw(e))===normalize(raw(old)));
+   const oldCount=before.filter(e=>e.tagName===old.tagName&&normalize(raw(e))===normalize(raw(old))).length;
+   if(matches.length&&matches.length!==oldCount)items.push({page,area:'assets',change:'invalid',what:'Retained resource multiplicity changed',invariant:true});
+   if(matches.length!==1)continue;
+   const fresh=matches[0],attribute=old.tagName==='LINK'?'href':'src';
+   if(url(old)!==url(fresh)||!same(attrs(old,attribute),attrs(fresh,attribute)))
+     items.push({page,area:'assets',change:'invalid',what:'Retained resource URL/attributes changed: '+normalize(raw(old)),invariant:true});
+ }
 }
