@@ -1,0 +1,19 @@
+name: Complete asset lock composition contracts
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: ctm-assets-compose-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Complete materialization, private evidence and adversarial controls
+        run: python -m unittest discover -s tests -p 'test_assets_composition.py' -v
+      - name: Preserve core npm selection and carried contracts
+        run: python -m unittest discover -s tests -p 'test_assets_npm_lock.py' -v
