@@ -1152,7 +1152,7 @@ def _npm_licence_member(name: str) -> bool:
 
 
 def select_npm_archives(metadata: dict, assets: dict, selection: dict, cache: Path, *,
-                        allowed_extras=(), accepted_licences=()) -> tuple[list[dict], dict]:
+                        allowed_extras=(), accepted_licences=(), curated_licences=None) -> tuple[list[dict], dict]:
     """Validate official npm identity, integrity, licence texts and runtime selection."""
     if metadata.get("v") != 1 or metadata.get("kind") != "official-asset-metadata":
         raise AssetError("An official asset metadata record is required")
@@ -1180,6 +1180,8 @@ def select_npm_archives(metadata: dict, assets: dict, selection: dict, cache: Pa
         if (entry.get("npm") != package or entry.get("version") != version
                 or entry.get("metadata_url") != metadata_url or entry.get("url") != tarball_url):
             raise AssetError(f"{name}: npm package, version or official source URL differs from the canonical npm source")
+        if not isinstance(entry.get("integrity"), str) or not entry["integrity"].startswith("sha512-"):
+            raise AssetError(f"{name}: official npm metadata needs SHA-512 integrity")
         selected_metadata.append(entry)
     inspection = inspect_archives({**metadata, "archives": selected_metadata}, cache)
     archives = []
@@ -1213,7 +1215,8 @@ def select_npm_archives(metadata: dict, assets: dict, selection: dict, cache: Pa
         license_members = sorted(member for member in members if _npm_licence_member(member))
         root_licenses = [member for member in license_members if "/" not in member
                          and re.match(r"^(licen[cs]e|copying)([_.-]|$)", member, re.I)]
-        if not root_licenses:
+        supplement = (curated_licences or {}).get(name)
+        if not root_licenses and not supplement:
             raise AssetError(f"{name}: verified archive has no root licence text")
         for member in license_members:
             text = texts.get("package/" + member)
@@ -1241,10 +1244,23 @@ def select_npm_archives(metadata: dict, assets: dict, selection: dict, cache: Pa
         relative_path(local.rstrip("/"))
         files = [{"member": member, "path": local + member, "sha256": members[member]["sha256"]}
                  for member in sorted(selected)]
+        licence_files = [local + member for member in license_members]
+        if supplement:
+            effective = supplement["licence"]
+            if allow_licence(name, effective, accepted_licences):
+                raise AssetError(f"{name}: curated npm licence needs a reviewed source offer")
+            for item in supplement["files"]:
+                relative_path(item["path"])
+                if not item["text"].strip() or digest(item["text"].encode("utf-8")) != item["sha256"]:
+                    raise AssetError(f"{name}: invalid curated licence text")
+                licence_files.append(item["path"])
+            if not supplement["files"]:
+                raise AssetError(f"{name}: empty curated licence supplement")
+            licence = effective
         archives.append({
             "id": name, "version": asset["version"], "npm": asset["npm"],
             "url": inspected["url"], "integrity": inspected["integrity"], "prefix": "package/",
-            "licence": licence, "licence_files": [local + member for member in license_members],
+            "licence": licence, "licence_files": licence_files,
             "files": files, "package_json_sha256": digest(package_data.encode("utf-8")),
         })
     return archives, inspection
