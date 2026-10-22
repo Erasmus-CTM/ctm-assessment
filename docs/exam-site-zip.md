@@ -4,6 +4,11 @@ This first website contains two Python IDE pages using the existing Pyodide
 windows. It initially carries the complete verified asset bundle. It does not
 contain course graders, JSXGraph boards, or Maxima.
 
+This IDE opts out of the frontend's default background package preloads;
+explicit Python imports still request their required local packages. The
+reviewed frontend commit is explicit in the workflow. Timing and request
+measurements establish the observed effect; no speed threshold is assumed.
+
 The workflow consumes the reviewed prebuilt artifact from run 39818419447,
 checks complete-lock SHA256
 `93e96c89432d46f90be347fe8c65a6596e3467f9cbf2ee8cbc15f59ab08ec3be`,
@@ -21,7 +26,8 @@ without speed thresholds. The plain-LAN contexts record actual Pyodide requests
 from before navigation; strict-probe request lists cover only the probe interval. The existing strict
 checker runs five fresh loads per page with isolation headers. A separate
 ordinary static server tests plain LAN HTTP without custom headers.
-The website artifact is uploaded only after acceptance.
+The website artifact is uploaded only after acceptance. Its single ZIP is
+uploaded as-is (archive:false), so downloading it does not add an outer ZIP.
 
 The header-equipped server is CI evidence, not an IT installation requirement.
 Plain-LAN results determine whether basic Run needs hosting changes. Interactive

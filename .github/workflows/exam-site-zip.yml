@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 60
     env:
       ASSET_RUN_ID: '39818419447'
+      IDE_PYODIDE_COMMIT: '16561e6604a8047027a4b053ad0d7b8e140efe7f'
       REVIEWED_LOCK_SHA256: 93e96c89432d46f90be347fe8c65a6596e3467f9cbf2ee8cbc15f59ab08ec3be
     steps:
       - uses: actions/checkout@v7
@@ -46,9 +47,10 @@ jobs:
           path: ${{ runner.temp }}/prebuilt-assets
       - name: Install the existing Python frontend
         run: |
+          IDE_REVIEW_REFS="$(python -c 'import json,os; print(json.dumps({**json.loads(os.environ.get("CTM_REVIEW_REFS") or "{}"), "pyodide-interaktiv": os.environ["IDE_PYODIDE_COMMIT"]}))')"
           python scripts/build-course.py --path integration/offline-ide \
             --dest "$RUNNER_TEMP/python-site" --workspace "$RUNNER_TEMP/package" \
-            --review-refs "$CTM_REVIEW_REFS" --no-render
+            --review-refs "$IDE_REVIEW_REFS" --no-render
       - name: Verify and copy prebuilt assets; create standard profiles
         run: |
           python - <<'PY'
@@ -253,6 +255,7 @@ jobs:
           name: python-offline-website
           path: ${{ runner.temp }}/python-offline-website.zip
           compression-level: 0
+          archive: false
           if-no-files-found: error
       - name: Preserve acceptance evidence
         if: always()

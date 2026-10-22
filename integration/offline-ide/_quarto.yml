@@ -16,3 +16,4 @@ format:
 filters: [ctm-assessment]
 pyodide:
   feedback: false
+  preload-packages: false
