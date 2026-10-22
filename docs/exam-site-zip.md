@@ -15,8 +15,10 @@ The ZIP holds the contents of `_site-exam`, with `index.html` at its root.
 CI extracts that exact ZIP and tests both pages at the web root and below
 `/dept/python/`. Real editor changes and Run execute basic Python; the nested page separately
 checks an optional local NumPy import while external requests are refused.
-Editor-ready, Run-enabled, first-run and warm-run timings are recorded without
-speed thresholds. Actual Pyodide requests are recorded to identify startup cost. The existing strict
+Editor-ready and Run-enabled times are observation upper bounds, not exact
+readiness events. First-run and warm-run durations are measured separately,
+without speed thresholds. The plain-LAN contexts record actual Pyodide requests
+from before navigation; strict-probe request lists cover only the probe interval. The existing strict
 checker runs five fresh loads per page with isolation headers. A separate
 ordinary static server tests plain LAN HTTP without custom headers.
 The website artifact is uploaded only after acceptance.

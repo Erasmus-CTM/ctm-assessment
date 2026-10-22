@@ -106,6 +106,8 @@ jobs:
                   assert not any(p.startswith('.private-') or p in {'.git', '.quarto', '_freeze', '_site-exam'} for p in relative.parts)
                   assert file.name not in {'complete-lock.json', 'assets-imports.json', 'pyodide-lock.full.json'}
                   if relative.parts[0] != '_ctm-assets':
+                      assert '_extensions' not in relative.parts
+                      assert not (file.name.startswith('_quarto') and file.suffix in {'.yml', '.yaml'})
                       assert file.suffix not in {'.qmd', '.lua', '.py'}
                   archive.write(file, relative.as_posix())
           deployed = root / 'deployed'
@@ -142,11 +144,11 @@ jobs:
             page.on('request', request => {if (/\/_ctm-assets\/pyodide\//.test(request.url())) requests.push(request.url());});
             await page.waitForFunction(() => globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.editor,
               null, {timeout: 180000});
-            const editorReadyMs = await page.evaluate(() => performance.now());
+            const editorObservedReadyMs = await page.evaluate(() => performance.now());
             await page.waitForFunction(() => globalThis.qpyodideCellsReady === true &&
               [...document.querySelectorAll('.qpyodide-button-run')].some(b => !b.disabled),
               null, {timeout: 180000});
-            const runEnabledMs = await page.evaluate(() => performance.now());
+            const runObservedEnabledMs = await page.evaluate(() => performance.now());
             await page.evaluate(code => qpyodideCellContainer.cells[0].primaryUnit.editor.setValue(code), code);
             const firstStart = Date.now();
             await page.locator('.qpyodide-button-run').first().click({timeout: 180000});
@@ -162,8 +164,8 @@ jobs:
               ?.innerText.includes('IDE_WARM_OK 42'), null, {timeout: 180000});
             return {...await page.evaluate(() => ({secureContext: isSecureContext, isolated: crossOriginIsolated,
               output: document.querySelector('.qpyodide-output-code-area').innerText})),
-              editorReadyMs, runEnabledMs, firstRunMs, warmRunMs: Date.now() - warmStart,
-              observedPythonRequests: requests};
+              editorObservedReadyMs, runObservedEnabledMs, firstRunMs, warmRunMs: Date.now() - warmStart,
+              pythonRequestsObservedDuringProbe: requests};
           }
           try {
             for (const baseURL of ['http://127.0.0.1:8766/', 'http://127.0.0.1:8768/dept/python/']) {
@@ -176,7 +178,12 @@ jobs:
             for (const baseURL of ['http://' + ip + ':8765/', 'http://' + ip + ':8767/dept/python/']) {
               for (const name of ['index.html', 'nested/index.html']) {
                 const context = await browser.newContext({serviceWorkers: 'block'});
-                const evidence = {baseURL, path: name, external: [], errors: [], failed: [], responses: []};
+                const evidence = {baseURL, path: name, external: [], errors: [], failed: [], responses: [], pythonRequests: []};
+                let navigationStart = 0;
+                context.on('request', request => {
+                  if (/\/_ctm-assets\/pyodide\//.test(request.url()))
+                    evidence.pythonRequests.push({url: request.url(), msAfterNavigationStart: Date.now() - navigationStart});
+                });
                 await context.route('**/*', route => {
                   if (new URL(route.request().url()).origin !== new URL(baseURL).origin) {
                     evidence.external.push(route.request().url()); return route.abort('blockedbyclient');
@@ -189,8 +196,11 @@ jobs:
                 context.on('response', response => {if (response.status() >= 400) evidence.responses.push(response.url());});
                 try {
                   const page = await context.newPage();
+                  navigationStart = Date.now();
                   await page.goto(new URL(name, baseURL).href, {waitUntil: 'load'});
                   evidence.python = await runIDE(page, {path: name});
+                  if (baseURL.endsWith(':8765/') && name === 'index.html')
+                    await page.screenshot({path: path.join(root, 'python-ide.png'), fullPage: true});
                   assert.equal(evidence.python.secureContext, false, 'ordinary insecure LAN HTTP');
                   for (const key of ['external', 'errors', 'failed', 'responses']) assert.deepEqual(evidence[key], [], key);
                 } finally {report.plainLAN.push(evidence); await context.close();}
@@ -216,6 +226,7 @@ jobs:
           name: python-offline-website-evidence
           path: |
             ${{ runner.temp }}/python-offline-checks.json
+            ${{ runner.temp }}/python-ide.png
             ${{ runner.temp }}/plain.log
             ${{ runner.temp }}/subdirectory.log
             ${{ runner.temp }}/headers.log
