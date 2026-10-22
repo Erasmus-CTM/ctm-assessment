@@ -257,6 +257,15 @@ function markPreloadDefault(A,B,items,context){
  const old=a[0],fresh=b[0];
  if(!old||!fresh||Array.isArray(old)||Array.isArray(fresh)||Object.hasOwn(old,'qpyodidePreloadPackages')||fresh.qpyodidePreloadPackages!==true)return;
  const rest={...fresh};delete rest.qpyodidePreloadPackages;
+ // Step 3 separately classifies the missing feedback UI language becoming
+ // the unchanged document language. Keep that row subject to its own rule.
+ const priorFeedback=old.qpyodideFeedbackOptions,nextFeedback=rest.qpyodideFeedbackOptions;
+ if(priorFeedback&&nextFeedback&&!Array.isArray(priorFeedback)&&!Array.isArray(nextFeedback)&&
+    !Object.hasOwn(priorFeedback,'uiLanguage')&&typeof old.qpyodideLang==='string'&&
+    old.qpyodideLang===fresh.qpyodideLang&&nextFeedback.uiLanguage===fresh.qpyodideLang){
+   rest.qpyodideFeedbackOptions={...nextFeedback};
+   delete rest.qpyodideFeedbackOptions.uiLanguage;
+ }
  if(!same(sorted(old),sorted(rest)))return;
  for(const item of items)if(item.area==='config'&&item.change==='changed'&&item.object==='qpyodideSettings'&&item.path==='/0/qpyodidePreloadPackages'&&item.before===undefined&&item.after===true)item.assets='preload-default';
 }

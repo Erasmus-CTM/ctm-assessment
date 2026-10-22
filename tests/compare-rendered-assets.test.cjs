@@ -261,3 +261,27 @@ test('only an absent captured preload default becoming boolean true is equivalen
    assert.equal(f.run(f.after.replace('</head>',other+settings('true')+'</head>')).status,1,'moved captured array positions stay unexplained');
  }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });
+
+test('the preload default composes only with the separately validated legacy UI language addition',()=>{
+ const f=fixture();try{
+   const settings=(lang,feedback,preload)=>'<script>// qpyodide-document-settings.js\nglobalThis.qpyodideLang='+JSON.stringify(lang)+';\nglobalThis.qpyodideFeedbackOptions='+JSON.stringify(feedback)+';\n'+(preload===undefined?'':'globalThis.qpyodidePreloadPackages='+JSON.stringify(preload)+';\n')+'</script>';
+   const feedback={enabled:true,storage:'local',hints:true};
+   const before=(lang='nb',options=feedback,preload)=>fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',settings(lang,options,preload)+'</head>'));
+   const after=(lang='nb',options={...feedback,uiLanguage:'nb'},preload=true)=>f.after.replace('</head>',settings(lang,options,preload)+'</head>');
+   const run=(html=after(),extra=[])=>f.run(html,['--expect','tools/compare-rendered/expect/step3.yml',...extra]);
+   before();
+   const good=run();assert.equal(good.status,0,JSON.stringify(good));
+   assert.equal(good.report.items.find(i=>i.path==='/0/qpyodidePreloadPackages').category,'pyodide-default-preloads');
+   assert.equal(good.report.items.find(i=>i.path==='/0/qpyodideFeedbackOptions/uiLanguage').category,'pyodide-ui-language');
+   assert.equal(f.run(after()).status,1,'language addition still requires its independent step3 expectation');
+   for(const preload of [false,'true',null,1])assert.equal(run(after('nb',{...feedback,uiLanguage:'nb'},preload)).status,1,'only boolean true preserves preloads');
+   for(const options of [{...feedback,uiLanguage:'en'},{...feedback,uiLanguage:'nb',hints:false},{...feedback,uiLanguage:'nb',extra:true}])
+     assert.equal(run(after('nb',options)).status,1,'other nested settings stay unexplained');
+   assert.equal(run(after('en',{...feedback,uiLanguage:'en'})).status,1,'document language must remain identical');
+   before('zz');assert.equal(run(after('zz',{...feedback,uiLanguage:'zz'})).status,1,'unsupported language remains unexplained by step3');
+   before('nb',{...feedback,uiLanguage:null});assert.equal(run().status,1,'existing null UI language cannot be replaced');
+   before('nb',{...feedback,uiLanguage:'en'});assert.equal(run().status,1,'existing UI language changes prevent preload calibration');
+   before('nb',feedback,false);assert.equal(run().status,1,'existing false preload cannot become true');
+   before();assert.equal(run(after().replace('</head>',settings('nb',feedback)+'</head>')).status,1,'an additional settings object stays unexplained');
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
