@@ -32,13 +32,14 @@ export function instrument() {
       return parents;
     }
     function marginTargets(html=false) {
-      return [...(window.document?.querySelectorAll(
-        '.column-margin.column-container > *, .margin-caption, .aside')||[])].slice(0,6).map(node=>({
+      const nodes=[...(window.document?.querySelectorAll(
+        '.column-margin.column-container > *, .margin-caption, .aside')||[])];
+      return {count:nodes.length,targets:nodes.slice(0,6).map(node=>({
         tag:node.tagName,id:String(node.id||'').slice(0,100),
         classes:String(node.getAttribute('class')||'').slice(0,180),
         marginTop:String(node.style.marginTop||'').slice(0,100),
         ...(html?{html:String(node.outerHTML).slice(0,600)}:{})
-      }));
+      }))};
     }
     function bodyState() {
       return {readyState:window.document?.readyState,
