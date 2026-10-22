@@ -1,7 +1,14 @@
-// Read-only diagnostic boundary; never schedule, resize, or suppress page errors.
-export function traceResizeObservers() {
+// Diagnostic-only boundary. Default capture is transparent; controlled policies
+// defer only the selected owner's callback by one animation frame. Never filter errors.
+export function traceResizeObservers(options={}) {
+  const host=window;
+  const defer=options.defer || 'none';
+  if(!['none','quarto','monaco','both'].includes(defer))throw Error('Unknown observer diagnostic policy');
+  // Capture the browser scheduler before any Playwright clock installation.
+  const nativeFrame=host.requestAnimationFrame.bind(host);
   const Native=window.ResizeObserver;
-  const trace=window.__ctmResizeTrace={available:typeof Native==='function',constructors:[],deliveries:[],measurementErrors:[]};
+  const trace=window.__ctmResizeTrace={available:typeof Native==='function',constructors:[],deliveries:[],measurementErrors:[],callbacks:[]};
+  Object.defineProperty(trace,'flush',{value:()=>new Promise(resolve=>nativeFrame(()=>nativeFrame(resolve)))});
   if(typeof Native!=='function')return;
   let sequence=0;
   function push(list,value,limit) {
@@ -20,8 +27,14 @@ export function traceResizeObservers() {
       } catch(error) {
         push(trace.measurementErrors,String(error),8);
       }
+      const owner=stack.includes('/quarto-html/quarto.js')?'quarto':
+        stack.includes('/monaco-editor@')?'monaco':'other';
+      const deferred=owner!=='other' && (defer===owner || defer==='both');
+      const activity={id,owner,deferred,deliveries:0,queued:0,executed:0,pending:0};
+      push(trace.callbacks,activity,16);
       const forwarded=args.slice();
       forwarded[0]=function(...callbackArgs) {
+        activity.deliveries++;
         try {
           const entries=callbackArgs[0];
           const targets=[];
@@ -40,6 +53,18 @@ export function traceResizeObservers() {
           // this catch, so its original return/exception remains untouched.
           push(trace.measurementErrors,String(error),8);
         }
+        if(deferred) {
+          // Controlled intervention only: preserve the actual callback and every
+          // delivery, but move its execution outside this observer broadcast.
+          const receiver=this;
+          activity.queued++;activity.pending++;
+          nativeFrame(()=>{
+            activity.pending--;activity.executed++;
+            return Reflect.apply(callback,receiver,callbackArgs);
+          });
+          return;
+        }
+        activity.executed++;
         return Reflect.apply(callback,this,callbackArgs);
       };
       return Reflect.construct(target,forwarded,newTarget);

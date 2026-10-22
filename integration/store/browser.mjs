@@ -17,14 +17,28 @@ const base='http://127.0.0.1:'+server.address().port+'/course/';
 let browser;
 const checks=[], errors=[];
 const traceResize=process.env.CTM_TRACE_RESIZE==='1';
-const resizeReads=[], resizeFailures=[];
+const resizeReads=[], resizeFailures=[], resizeFinals=[];
+async function captureResizeFinal(ctx) {
+  if(!traceResize)return;
+  for(const page of ctx.pages()) {
+    try {
+      const trace=await page.evaluate(async()=>{
+        if(!window.__ctmResizeTrace)return null;
+        await window.__ctmResizeTrace.flush();
+        const trace=window.__ctmResizeTrace;
+        return {available:trace.available,callbacks:trace.callbacks,measurementErrors:trace.measurementErrors};
+      });
+      resizeFinals.push({page:page.url(),phase:checks.length,trace});
+    } catch(error) { resizeFinals.push({page:page.url(),phase:checks.length,traceReadError:String(error)}); }
+  }
+}
 let active;
 function cell(page,id){return page.locator('[data-ctm-component="math-exercise"][data-ctm-id="'+id+'"]');}
 const quiz=page=>page.locator('[data-ctm-quiz="mixed"] .ctm-progress');
 const pagePanel=page=>page.locator('.ctm-progress-page .ctm-progress');
 async function context(extra) {
   const ctx=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:900}});
-  if(traceResize)await ctx.addInitScript(traceResizeObservers);
+  if(traceResize)await ctx.addInitScript(traceResizeObservers,{defer:process.env.CTM_RESIZE_DEFER || 'none'});
   await ctx.addInitScript(instrument);
   if(extra) await ctx.addInitScript(extra);
   ctx.on('page',page=>{
@@ -45,6 +59,7 @@ async function open(ctx,name='index.html'){
   await goto(page,name);return page;
 }
 async function goto(page,name='index.html'){
+  await captureResizeFinal(page.context());
   await page.goto(base+name,{waitUntil:'domcontentloaded'});
   await ready(page,name);
 }
@@ -191,6 +206,7 @@ try {
     assert.equal(await page.evaluate(()=>JSON.parse(document.getElementById('ctm-store-manifest').textContent).exercises.filter(e=>e.component!=='pyodide-interaktiv' && !e.save).length),3);
     await saved(page,'store-matrix',record=>record.inputs.matrices.A.rows===2 && record.inputs.matrices.A.cols===2);
     await saved(page,'store-pool',record=>record.variant.n===2);
+    await captureResizeFinal(ctx);
     await page.reload({waitUntil:'domcontentloaded'});await ready(page);
     assert.equal(await cell(page,'store-scalar').locator('input.math-input').inputValue(),'2');
     assert.deepEqual(await cell(page,'store-matrix').locator('input.math-input').evaluateAll(fields=>fields.map(f=>f.value)),['1','2','3','4']);
@@ -234,6 +250,7 @@ try {
     await noRestorePython(page);
     checks.push('changed ordinary/variant/Python source offers read-only old answers and outdated tiles without rechecking');
     if(traceResize)await Promise.allSettled(resizeReads);
+    await captureResizeFinal(ctx);
     await ctx.close();roots.course=path.join(root,'before','_site');
   }
   {
@@ -254,6 +271,7 @@ try {
     checks.push('device saving off deletes answers, keeps live copy/export and remains off after navigation');
     await noRestorePython(page);
     if(traceResize)await Promise.allSettled(resizeReads);
+    await captureResizeFinal(ctx);
     await ctx.close();
   }
   {
@@ -268,6 +286,7 @@ try {
     checks.push('unavailable device storage falls back without persisting or executing restored code');
     await noRestorePython(page);
     if(traceResize)await Promise.allSettled(resizeReads);
+    await captureResizeFinal(ctx);
     await ctx.close();
   }
   {
@@ -321,13 +340,16 @@ try {
     checks.push('page/course clear across two actual tabs cancels pending writes and preserves the other page until course clear');
     await noRestorePython(a);await noRestorePython(b);
     if(traceResize)await Promise.allSettled(resizeReads);
+    await captureResizeFinal(ctx);
     await ctx.close();
   }
+  const deferred=resizeFinals.flatMap(row=>row.trace?.callbacks || []).filter(row=>row.deferred && row.deliveries);
+  assert.ok(deferred.every(row=>row.pending===0 && row.executed===row.deliveries),'a controlled policy is inconclusive unless every queued observer callback executes');
   assert.deepEqual(errors,[],'actual rendered pages have no uncaught errors');
-  console.log(JSON.stringify({browser:engine,checks,errors},null,2));
+  console.log(JSON.stringify({browser:engine,checks,errors,...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',resizeFinals}:{})},null,2));
 } catch(error) {
   await Promise.allSettled(resizeReads);
-  console.error(JSON.stringify({browser:engine,checks,errors,url:active?.url(),...(traceResize?{resizeFailures}:{})},null,2));
+  console.error(JSON.stringify({browser:engine,checks,errors,url:active?.url(),...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',resizeFailures,resizeFinals}:{})},null,2));
   if(active && !active.isClosed()) console.error(await active.locator('body').innerText().catch(()=>'(page closed)'));
   throw error;
 } finally {

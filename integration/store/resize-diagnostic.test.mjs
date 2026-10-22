@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {traceResizeObservers} from './resize-diagnostic.mjs';
 
-function nativeFixture() {
+function nativeFixture(defer='none') {
   const calls=[];
   class ResizeObserver {
     constructor(callback,...rest) {
@@ -11,11 +11,12 @@ function nativeFixture() {
     }
     observe(...args){calls.push({receiver:this,args});return 'native observed';}
   }
-  const world={ResizeObserver};
+  const frames=[];
+  const world={ResizeObserver,requestAnimationFrame(fn){frames.push(fn);return frames.length;}};
   const original=globalThis.window;
   globalThis.window=world;
-  try {traceResizeObservers();} finally {globalThis.window=original;}
-  return {world,Native:ResizeObserver,calls};
+  try {traceResizeObservers({defer});} finally {globalThis.window=original;}
+  return {world,Native:ResizeObserver,calls,frames};
 }
 function entry(id) {
   return {target:{id,tagName:'DIV',className:'fixture'},contentRect:{x:1,y:2,width:3,height:4}};
@@ -91,4 +92,36 @@ test('retention is bounded and delivery keeps its owning constructor stack',()=>
   assert.equal(trace.deliveries.at(-1).id,1);
   assert.match(trace.deliveries.at(-1).stack,/ResizeObserver constructed/);
   assert.ok(trace.deliveries.every(row=>row.stack.length<=4096));
+});
+
+test('controlled policies defer only the selected owner and preserve every actual delivery',()=>{
+  for(const defer of ['none','quarto','monaco','both']) {
+    for(const [owner,url] of [['quarto','https://fixture/quarto-html/quarto.js'],['monaco','https://fixture/monaco-editor@0.46/main.js'],['other','https://fixture/ctm-nav.js']]) {
+      const {world,frames}=nativeFixture(defer);
+      const create=new Function('Observer','callback','return new Observer(callback);\n//# sourceURL='+url);
+      const calls=[], receiver={}, first=[entry('first')],second=[entry('second')];
+      const callback=function(...args){calls.push({receiver:this,args});return 'actual return';};
+      const observer=create(world.ResizeObserver,callback);
+      const shouldDefer=owner!=='other' && (defer===owner || defer==='both');
+      assert.equal(Reflect.apply(observer.callback,receiver,[first,observer]),shouldDefer?undefined:'actual return');
+      assert.equal(Reflect.apply(observer.callback,receiver,[second,observer]),shouldDefer?undefined:'actual return');
+      assert.equal(calls.length,shouldDefer?0:2,defer+'/'+owner);
+      assert.equal(frames.length,shouldDefer?2:0,'each real delivery survives separately');
+      // A later clock shim must not capture the diagnostic's native scheduler.
+      world.requestAnimationFrame=()=>{throw Error('mocked clock scheduler used');};
+      frames.forEach(frame=>frame());
+      assert.equal(calls.length,2);assert.equal(calls[0].receiver,receiver);
+      const activity=world.__ctmResizeTrace.callbacks[0];
+      assert.equal(activity.deliveries,2);assert.equal(activity.executed,2);
+      assert.equal(activity.queued,shouldDefer?2:0);assert.equal(activity.pending,0);
+      assert.equal(calls[0].args[0],first);assert.equal(calls[1].args[0],second);
+      assert.equal(calls[1].args[1],observer);
+      const thrown={nativeCallbackFailure:true};
+      const failing=create(world.ResizeObserver,()=>{throw thrown;});
+      if(shouldDefer) {
+        failing.callback([entry('error')],failing);
+        assert.throws(()=>frames.at(-1)(),error=>error===thrown);
+      } else assert.throws(()=>failing.callback([entry('error')],failing),error=>error===thrown);
+    }
+  }
 });
