@@ -151,7 +151,12 @@ class PythonSubsetTests(unittest.TestCase):
                 A.produce_python_lock(metadata, cache, extras=("extra",))
             with self.assertRaisesRegex(A.AssetError, "source offer"):
                 A.produce_python_lock(metadata, cache, extras=("extra",), accepted_licences=("LGPL-2.1",))
-            policy = {"extra": {"version": "1.0", "licence": "LGPL-2.1", "source_offer": "https://example.test/source"}}
+            actual = A.inspect_python_subset(metadata, cache, extras=("extra",))["packages"]["extra"]
+            policy = {"extra": {"version": "1.0", "licence": "LGPL-2.1",
+                       "sha256": actual["sha256"], "licence_file": "extra-1.0.dist-info/LICENSE",
+                       "source": "https://github.com/example/extra/blob/1.0/LICENSE",
+                       "git_blob_sha1": A.git_blob_sha1(b"Official fixture licence text\n"),
+                       "source_offer": "https://example.test/source"}}
             lock = A.produce_python_lock(metadata, cache, extras=("extra",), licence_policy=policy, accepted_licences=("LGPL-2.1",))
             with self.assertRaises(A.AssetError):
                 A.build_from_lock(lock, Path(tmp) / "bundle", cache)
@@ -167,6 +172,10 @@ class PythonSubsetTests(unittest.TestCase):
                 with self.subTest(dirname=dirname), self.assertRaises(A.AssetError):
                     A.write_private_lock({}, output)
                 self.assertEqual(output.read_bytes(), b"existing")
+            metadata, cache = self.fixture(root)
+            with self.assertRaisesRegex(A.AssetError, "cache must stay outside"):
+                A.produce_python_lock(metadata, root / "_ctm-assets/private-cache")
+            self.assertFalse((root / "_ctm-assets/private-cache").exists())
             output = A.write_private_lock({"kind": "private"}, root / ".private/candidate.json")
             self.assertEqual(json.loads(output.read_bytes()), {"kind": "private"})
 
@@ -226,12 +235,49 @@ class PythonSubsetTests(unittest.TestCase):
             lock = A.produce_python_lock(metadata, cache)
             self.assertTrue(any("numpy/_vendor/other-2.0.dist-info/LICENSE" in item["path"] for item in lock["generated"]))
 
+    def test_materializer_refuses_generated_archive_and_reserved_output_collisions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            metadata, cache = self.fixture(root)
+            lock = A.produce_python_lock(metadata, cache)
+            for path in ("manifest.json", "THIRD-PARTY-NOTICES.md", "pyodide/0.28.3/pyodide.js",
+                         "pyodide/0.28.3/pyodide.js.gz", "pyodide"):
+                changed = copy.deepcopy(lock)
+                changed["generated"].append({"path": path, "text": "collision", "sha256": A.digest(b"collision")})
+                with self.subTest(path=path), self.assertRaisesRegex(A.AssetError, "conflict|Conflicting|parent file"):
+                    A.derive_lock_files(changed, cache)
+
+    def test_legacy_policy_requires_actual_wheel_and_primary_licence_blob(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            metadata, cache = self.fixture(Path(tmp), extra=("extra", wheel("extra", licence="BSD"), "package"))
+            package = A.inspect_python_subset(metadata, cache, extras=("extra",))["packages"]["extra"]
+            record = {"version": "1.0", "sha256": package["sha256"], "licence": "BSD-3-Clause",
+                      "licence_file": "extra-1.0.dist-info/LICENSE",
+                      "source": "https://github.com/example/extra/blob/1.0/LICENSE",
+                      "git_blob_sha1": A.git_blob_sha1(b"Official fixture licence text\n")}
+            lock = A.produce_python_lock(metadata, cache, extras=("extra",), licence_policy={"extra": record})
+            self.assertEqual(lock["provenance"]["licence_policy"]["extra"], record)
+            for key, value in (("version", "2.0"), ("sha256", "0" * 64),
+                               ("licence_file", "missing/LICENSE"), ("source", "https://example.test/LICENSE"),
+                               ("git_blob_sha1", "0" * 40)):
+                bad = dict(record, **{key: value})
+                with self.subTest(key=key), self.assertRaises(A.AssetError):
+                    A.produce_python_lock(metadata, cache, extras=("extra",), licence_policy={"extra": bad})
+
     def test_build_and_carried_clis_use_external_lock(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             metadata, cache = self.fixture(root)
             lock = A.produce_python_lock(metadata, cache)
             lockfile = A.write_private_lock(lock, root / "candidate.json")
+            metadata_file = root / "metadata.json"
+            metadata_file.write_bytes(A.json_bytes(metadata))
+            produced = root / ".private/cli-candidate.json"
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/ctm_assets.py"), "python-lock",
+                                     "--metadata", str(metadata_file), "--cache", str(cache), "--output", str(produced)],
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(produced.read_bytes(), lockfile.read_bytes())
             for args in (["build", "--cache", str(cache), "--bundle", str(root / "bundle")],
                          ["verify", "--bundle", str(root / "bundle")],
                          ["install-carried", "--source", str(root / "bundle"), "--bundle", str(root / "installed")]):
