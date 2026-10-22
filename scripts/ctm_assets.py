@@ -974,6 +974,7 @@ def inspect_python_subset(metadata: dict, cache: Path, *, extras=()) -> dict:
         details = {"version": package["version"], "file_name": leaf, "sha256": digest(data),
                    "package_type": package.get("package_type"), "licence_texts": {}, "metadata": {}}
         if leaf.endswith(".whl"):
+            own_distribution = None
             with zipfile.ZipFile(io.BytesIO(data)) as wheel:
                 seen = set()
                 for member in wheel.infolist():
@@ -990,6 +991,7 @@ def inspect_python_subset(metadata: dict, cache: Path, *, extras=()) -> dict:
                         message = email.parser.BytesParser().parsebytes(wheel.read(member))
                         if details["metadata"]:
                             raise AssetError("Wheel has ambiguous distribution metadata: " + leaf)
+                        own_distribution = PurePosixPath(path).parts[0]
                         details["metadata"] = {key: message.get_all(key, []) for key in
                                                ("Name", "Version", "License", "License-Expression", "Classifier")}
                     if re.search(r"(^|[/_.-])(licen[cs]e|copying|notice|thirdpartynotices)([/_.-]|$)", path, re.I):
@@ -997,10 +999,17 @@ def inspect_python_subset(metadata: dict, cache: Path, *, extras=()) -> dict:
                             raise AssetError("Python licence text exceeds review limit: " + path)
                         details["licence_texts"][path] = wheel.read(member).decode("utf-8")
             fields = details["metadata"]
-            if (len(fields.get("Name", [])) != 1
+            directory_name, _, directory_version = (own_distribution or "").removesuffix(".dist-info").rpartition("-")
+            if (not directory_name or normalise_package(directory_name) != normalise_package(name)
+                    or directory_version != package["version"].replace("-", "_")
+                    or len(fields.get("Name", [])) != 1
                     or normalise_package(fields["Name"][0]) != normalise_package(name)
                     or fields.get("Version") != [package["version"]]):
                 raise AssetError("Wheel metadata does not match the official package lock: " + name)
+            details["own_licence_files"] = sorted(path for path in details["licence_texts"]
+                if PurePosixPath(path).parts[0] == own_distribution)
+        else:
+            details["own_licence_files"] = []
         packages[name] = details
     # Full lock remains in memory/cache only. This report contains the selected closure.
     return {"entry": entry, "archive": archive, "subset": subset, "packages": packages,
@@ -1062,6 +1071,8 @@ def produce_python_lock(metadata: dict, cache: Path, *, extras=(), licence_polic
                     or not re.fullmatch(r"https://github\.com/[^/]+/[^/]+/blob/[^?#]+", record["source"])
                     or not re.fullmatch(r"[a-f0-9]{40}", record.get("git_blob_sha1", ""))):
                 raise AssetError("Python licence policy needs pinned wheel and primary source evidence: " + name)
+            if record.get("licence_file") not in package["own_licence_files"]:
+                raise AssetError("Python licence policy must identify the distribution's own licence: " + name)
             text = package["licence_texts"].get(record.get("licence_file"))
             if text is None or git_blob_sha1(text.encode("utf-8")) != record["git_blob_sha1"]:
                 raise AssetError("Python licence text differs from the primary source Git blob: " + name)
@@ -1082,17 +1093,16 @@ def produce_python_lock(metadata: dict, cache: Path, *, extras=(), licence_polic
         obligations = allow_licence(name, expression, accepted_licences)
         if obligations and not (record or {}).get("source_offer"):
             raise AssetError("Python package needs a source offer: " + name)
-        texts = package["licence_texts"]
-        if texts:
-            for path, text in sorted(texts.items()):
-                license_text(f"LICENSES/python/{name}/{path}", text)
-        else:
+        if not package["own_licence_files"]:
             selected = name if name in curated else "python-stdlib" if package["package_type"] == "cpython_module" else None
             if selected is None:
                 raise AssetError("Python package has no own or curated licence text: " + name)
             if selected == name and package["file_name"] not in curated[selected]["applies_to"]:
                 raise AssetError("Curated Python licence uses another package version: " + name)
             license_text(f"LICENSES/python/{name}/LICENSE.txt", curated[selected]["text"])
+        # Preserve all bundled notices, while requiring separate own evidence.
+        for path, text in sorted(package["licence_texts"].items()):
+            license_text(f"LICENSES/python/{name}/{path}", text)
         expressions.append(expression)
         package_policy[name] = {"version": package["version"], "licence": expression,
                                 "file_name": package["file_name"], "sha256": package["sha256"]}

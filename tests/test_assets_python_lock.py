@@ -264,6 +264,25 @@ class PythonSubsetTests(unittest.TestCase):
                 with self.subTest(key=key), self.assertRaises(A.AssetError):
                     A.produce_python_lock(metadata, cache, extras=("extra",), licence_policy={"extra": bad})
 
+    def test_vendored_licence_cannot_substitute_for_missing_own_licence(self):
+        output = io.BytesIO(wheel("extra", text=False))
+        vendor_path = "extra/_vendor/other-2.0.dist-info/LICENSE"
+        vendor_text = b"Official fixture licence text\n"
+        with zipfile.ZipFile(output, "a") as archive:
+            archive.writestr(vendor_path, vendor_text)
+        with tempfile.TemporaryDirectory() as tmp:
+            metadata, cache = self.fixture(Path(tmp), extra=("extra", output.getvalue(), "package"))
+            package = A.inspect_python_subset(metadata, cache, extras=("extra",))["packages"]["extra"]
+            self.assertEqual(package["own_licence_files"], [])
+            self.assertIn(vendor_path, package["licence_texts"])
+            with self.assertRaisesRegex(A.AssetError, "no own or curated"):
+                A.produce_python_lock(metadata, cache, extras=("extra",))
+            record = {"version": "1.0", "sha256": package["sha256"], "licence": "MIT",
+                      "licence_file": vendor_path, "git_blob_sha1": A.git_blob_sha1(vendor_text),
+                      "source": "https://github.com/example/extra/blob/1.0/LICENSE"}
+            with self.assertRaisesRegex(A.AssetError, "distribution's own licence"):
+                A.produce_python_lock(metadata, cache, extras=("extra",), licence_policy={"extra": record})
+
     def test_build_and_carried_clis_use_external_lock(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

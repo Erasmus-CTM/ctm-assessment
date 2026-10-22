@@ -15,7 +15,10 @@ npm/board composition, installer readiness or complete offline acceptance.
 Named extras use `--python-packages pandas,...`; `all` and unknown names fail.
 Each selected payload is checked against its official release-lock SHA-256.
 Wheel METADATA and licence texts are inspected without importing any code.
-Unknown licence expressions or missing own/curated texts fail. The reviewed
+Unknown licence expressions or missing own/curated texts fail. A wheel must
+carry its matching distribution licence under its root dist-info directory;
+vendored notices are retained but cannot substitute for its own licence,
+including through a policy override. The reviewed
 `--licence-policy integration/assets-python-licences.json` mapping binds legacy
 metadata to an exact package version, wheel SHA-256, primary source URL and
 Git blob identity of the actual embedded licence file. Every override must
