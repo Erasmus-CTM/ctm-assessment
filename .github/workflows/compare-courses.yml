@@ -364,6 +364,12 @@ jobs:
     if: ${{ !cancelled() && needs.courses.result == 'success' && needs.courses.outputs.browsers != '[]' }}
     name: browser ${{ matrix.entry.course }}${{ matrix.entry.ref && format(' @ {0}', matrix.entry.ref) || '' }} (${{ matrix.browser }}${{ matrix.entry.shard && format(', part {0}', matrix.entry.shard) || '' }})
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.1-noble
+      options: --user 1001
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 150
     strategy:
       fail-fast: false
@@ -376,12 +382,15 @@ jobs:
           repository: Erasmus-CTM/ctm-assessment
           ref: ${{ inputs['tooling-ref'] }}
           persist-credentials: false
+      - uses: actions/setup-python@v7
+        if: ${{ inputs['emit-browser-shots'] && matrix.browser == 'chromium' && (!matrix.entry.shard || startsWith(matrix.entry.shard, '1/')) }}
+        with:
+          python-version: '3.12'
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps ${{ matrix.browser }}
       - uses: actions/download-artifact@v7
         with:
           name: sites-${{ matrix.entry.key }}
