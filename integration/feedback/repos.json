@@ -20,7 +20,7 @@
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "98c8fe54fded2b189c50f5f0cd9c0ea7688366ba"
+      "commit": "b282111da4bb208effd8bad8d7e6df7020d0db0a"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
@@ -30,7 +30,7 @@
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "feature/shared-feedback-integration",
-      "commit": "e85d9af4f39128180b0b0ad14ce53a087b079d93",
+      "commit": "95af2cc10868dfb515a8a60f54417e1ec27512a1",
       "ships-copies": [
         "ai-feedback",
         "ctm-libs"

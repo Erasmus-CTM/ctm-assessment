@@ -62,7 +62,10 @@ jobs:
   browser:
     needs: render
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.1-noble
+      options: --user 1001
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -74,12 +77,12 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps ${{ matrix.browser }}
       - uses: actions/download-artifact@v7
         with:
           name: store-rendered-fixtures
           path: ${{ runner.temp }}/store-integration
       - name: Test actual rendered components and persistence
+        shell: bash
         env:
           CTM_BROWSER: ${{ matrix.browser }}
           CTM_STORE_ROOT: ${{ runner.temp }}/store-integration

@@ -44,3 +44,9 @@ categories:
       - {area: inline, change: changed, assets: '^monaco$'}
 
       - {area: dom, change: attribute changed, tag: '^iframe$', attribute: '^src$', assets: '^board-defaults$'}
+
+  # Captured settings must otherwise be identical; only absent -> boolean true.
+  - id: pyodide-default-preloads
+    title: Explicit true preserves the historical automatic package preloads
+    match:
+      - {area: config, change: changed, object: '^qpyodideSettings$', path: '^/0/qpyodidePreloadPackages$', assets: '^preload-default$'}

@@ -116,13 +116,13 @@ test('legacy polyfill query aliases and inline kind collisions stay unexplained'
   }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });
 function boardDoc(jxg,mjx,css){
- return '<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <script id="MathJax-script" async src="'+mjx+'"></script> <script src="'+jxg+'"></script> <style>@import url("'+css+'");</style> <style>html,body{margin:0;}</style> </head> <body> <div id="JXG12345678_1234_1234_1234_12345678" class="jxgbox"></div> <script>window.BOARDID="JXG12345678_1234_1234_1234_12345678"; const board=JXG.JSXGraph.initBoard(BOARDID,{});</script> </body> </html>';
+ return '<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <script id="MathJax-script" async src="'+mjx+'"></script> <script src="'+jxg+'"></script> <style>@import url("'+css+'");</style> <style>html,body{margin:0;}</style> </head> <body> <div id="JXG12345678_1234_1234_1234_12345678" class="jxgbox"></div> <script>window.BOARDID="JXG12345678_1234_1234_1234_12345678"; const board=JXG.JSXGraph.initBoard(BOARDID,{}); window.grading={answer:2};</script> </body> </html>';
 }
-test('only exact canonical board default URL changes are eligible',()=>{
+for(const frameId of ['JXG12345678_1234_1234_1234_12345678','assessment-triangle'])test('only exact canonical board default URL changes are eligible: '+frameId,()=>{
  const f=fixture();try{
    const old=boardDoc('https://cdn.jsdelivr.net/npm/jsxgraph@1/distrib/jsxgraphcore.js','https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-svg.js','https://cdn.jsdelivr.net/npm/jsxgraph@1/distrib/jsxgraph.css');
    const current=old.replaceAll('jsxgraph@1/','jsxgraph@1.14.1/').replaceAll('mathjax@4/','mathjax@4.1.3/');
-   const frame=html=>'<iframe id="JXG12345678_1234_1234_1234_12345678" src="data:text/html;base64,'+Buffer.from(html).toString('base64')+'"></iframe>';
+   const frame=html=>'<iframe id="'+frameId+'" src="data:text/html;base64,'+Buffer.from(html).toString('base64')+'"></iframe>';
    f.put('ctm-assessment','jsxgraph-pins.yml','jsxgraph:\n  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraphcore.js\n  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraph.css\n  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js\n');
    fs.writeFileSync(path.join(f.project,'resolved-repos.json'),JSON.stringify(f.record));
    fs.writeFileSync(path.join(f.dir,'before/page.html'),'<html><body>'+frame(old)+'</body></html>');
@@ -133,7 +133,7 @@ test('only exact canonical board default URL changes are eligible',()=>{
    const make=board=>f.after.replaceAll('jsxgraph@1/','jsxgraph@1.14.1/').replaceAll('mathjax@4/','mathjax@4.1.3/').replace('</body>',frame(board)+'</body>');
    const good=f.run(make(current));assert.equal(good.status,0,JSON.stringify(good));
    assert.ok(good.report.items.some(i=>i.assets==='board-defaults'));
-   for(const bad of [current.replace('jsxgraph@1.14.1/','jsxgraph@1.14.2/'),current.replace('initBoard(BOARDID,{})','initBoard(BOARDID,{axis:true})'),current.replace('class="jxgbox"','class="different"'),current.replace(' async ',' defer '),current.replace('jsxgraphcore.js','jsxgraphcore.js?tamper=1'),current.replace('jsxgraph.css','different.css'),current.replace('</head>','<script src="other.js"></script></head>')]){
+   for(const bad of [current.replace('jsxgraph@1.14.1/','jsxgraph@1.14.2/'),current.replace('initBoard(BOARDID,{})','initBoard(BOARDID,{axis:true})'),current.replace('class="jxgbox"','class="different"'),current.replace('answer:2','answer:3'),current.replace(' async ',' defer '),current.replace('jsxgraphcore.js','jsxgraphcore.js?tamper=1'),current.replace('jsxgraph.css','different.css'),current.replace('</head>','<script src="other.js"></script></head>')]){
      const r=f.run(make(bad));assert.equal(r.status,1,JSON.stringify(r));
    }
    assert.equal(f.run(make(current).replace('<iframe id=', '<iframe sandbox="allow-scripts" id=')).status,1);
@@ -193,4 +193,71 @@ test('actual-page calibration handles MathJax loaders without ids and truly abse
      assert.ok(result.stdout.includes('real-altered-helper:'));
    }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
  }
+});
+
+
+test('resource-order failures retain their full diagnostic evidence',()=>{
+ const f=fixture();try{
+   const after=f.after.replace('<script src="checker.js"></script><script src="ordinary.js"></script>','<script src="ordinary.js"></script><script src="checker.js"></script>');
+   const result=f.run(after);
+   assert.equal(result.status,1);
+   const failure=result.report.items.find(i=>i.what==='Retained resource order changed');
+   assert.ok(failure&&failure.before.length&&failure.after.length);
+   assert.deepEqual(failure.before.slice(-2).map(i=>i.url),['checker.js','ordinary.js']);
+   assert.deepEqual(failure.after.slice(-2).map(i=>i.url),['ordinary.js','checker.js']);
+   assert.ok(result.stderr.includes('Retained resource order evidence: '));
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
+
+
+test('historical asset replay fixes both package sides and course sources',()=>{
+ const workflow=require('js-yaml').load(fs.readFileSync(path.join(root,'.github/workflows/compare-assets-baseline.yml'),'utf8'));
+ assert.equal(Object.keys(workflow.jobs).length,3);
+ const sides=new Set(),bases=new Set();
+ for(const job of Object.values(workflow.jobs)){
+   assert.equal(job.uses,'./.github/workflows/compare-courses.yml');
+   assert.equal(job.with['tooling-ref'],'${{ github.event.pull_request.head.sha }}');
+   assert.match(job.with.base,/^[a-f0-9]{40}$/);
+   assert.match(job.with.head,/^[a-f0-9]{40}$/);
+   assert.notEqual(job.with.base,job.with.head);
+   sides.add(job.with.head);bases.add(job.with.base);
+   if(job.with.course!=='examples')assert.match(job.with['course-ref'],/^[a-f0-9]{40}$/);
+   assert.equal(job.with.convert,undefined);
+   assert.equal(job.with['review-refs'],undefined);
+ }
+ assert.equal(bases.size,1);
+ assert.equal(sides.size,2);
+ assert.equal(workflow.jobs.examples.with.head,workflow.jobs.demo.with.head);
+ assert.notEqual(workflow.jobs['main-course'].with.head,workflow.jobs.demo.with.head);
+});
+
+
+test('only an absent captured preload default becoming boolean true is equivalent',()=>{
+ const f=fixture();try{
+   const settings=(value,extra='')=>'<script>// qpyodide-document-settings.js\nglobalThis.qpyodideInstallPythonPackagesList = ["numpy"];\n'+(value===undefined?'':'globalThis.qpyodidePreloadPackages = '+value+';\n')+extra+'</script>';
+   const before=f.before.replace('</head>',settings()+'</head>');
+   const after=(value,extra='')=>f.after.replace('</head>',settings(value,extra)+'</head>');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),before);
+   const good=f.run(after('true'));assert.equal(good.status,0,JSON.stringify(good));
+   const row=good.report.items.find(i=>i.assets==='preload-default');
+   assert.equal(row.category,'pyodide-default-preloads');
+   assert.equal(row.path,'/0/qpyodidePreloadPackages');
+   assert.equal(row.after,true);assert.equal(row.before,undefined);
+   for(const value of ['false','"true"','1','null','[]','{}'])assert.equal(f.run(after(value)).status,1,value+' must stay unexplained');
+   assert.equal(f.run(after('true','globalThis.unrelated = true;\n')).status,1,'additional fields stay unexplained');
+   assert.equal(f.run(after('true').replace('["numpy"]','["scipy"]')).status,1,'other keys stay unexplained');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',settings('true')+'</head>'));
+   assert.equal(f.run(after('true')).status,0,'existing true remains unchanged');
+   assert.equal(f.run(after('false')).status,1,'true to false stays unexplained');
+   assert.equal(f.run(after()).status,1,'removing an existing option stays unexplained');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',settings('false')+'</head>'));
+   assert.equal(f.run(after('true')).status,1,'existing false cannot become true silently');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',settings('null')+'</head>'));
+   assert.equal(f.run(after('true')).status,1,'existing null cannot become true silently');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),before.replace('</head>',settings()+'</head>'));
+   assert.equal(f.run(after('true').replace('</head>',settings()+'</head>')).status,1,'additional captured array positions stay unexplained');
+   const other=settings().replace('["numpy"]','["sympy"]');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),before.replace('</head>',other+'</head>'));
+   assert.equal(f.run(f.after.replace('</head>',other+settings('true')+'</head>')).status,1,'moved captured array positions stay unexplained');
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });

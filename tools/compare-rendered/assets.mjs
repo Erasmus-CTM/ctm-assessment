@@ -72,6 +72,7 @@ export function loadAssetSources(project,pinsFile) {
 }
 export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
   markBoardChanges(items,context,page);
+  markPreloadDefault(A,B,items,context);
   const configScripts=doc=>[...doc.querySelectorAll('script:not([src])')].filter(s=>s.textContent.includes('CTM_ASSETS'));
   const helperScripts=doc=>resources(doc).filter(e=>normalize(raw(e))==='ctm-assets/assets.js');
   const active=configScripts(A.doc).length||configScripts(B.doc).length||helperScripts(A.doc).length||helperScripts(B.doc).length;
@@ -185,12 +186,13 @@ function markBoardChanges(items,context,page){
   const {JSDOM}=require('jsdom');
   for(const item of items){
     if(item.area!=='dom'||item.change!=='attribute changed'||item.tag!=='iframe'||item.attribute!=='src'||
-       !/^iframe\|JXG\*$/.test(item.element||'')||!String(item.before).startsWith('data:text/html;decoded,'))continue;
+       !String(item.before).startsWith('data:text/html;decoded,'))continue;
     try{
       insist(context,'Canonical installed board sources are required');
       const prefix='data:text/html;decoded,';
       insist(String(item.after).startsWith(prefix),'Board delivery encoding changed');
       let before=item.before.slice(prefix.length),after=item.after.slice(prefix.length);
+      const original=before,evidence=[];
       const a=new JSDOM(before).window.document,b=new JSDOM(after).window.document;
       let changed=0;
       for(const [key,kind]of [['src_jxg','script'],['src_mjx','math'],['src_css','style']]){
@@ -206,9 +208,11 @@ function markBoardChanges(items,context,page){
         if(kind==='math')insist(old[0].id==='MathJax-script'&&fresh[0].id==='MathJax-script','Board MathJax identity changed');
         insist(same(attrs(old[0],kind==='style'?undefined:'src'),attrs(fresh[0],kind==='style'?undefined:'src')),'Board resource attributes changed');
         insist(before.split(historical).length===2&&after.split(target).length===2,'Ambiguous embedded resource URL');
+        evidence.push({historical,target,beforeCount:before.split(historical).length-1,afterCount:after.split(target).length-1});
         before=before.replace(historical,target);changed++;
       }
       insist(changed===3&&before===after,'Embedded board changed beyond canonical resource pins');
+      console.error('Canonical board URL evidence: '+JSON.stringify({page,element:item.element,beforeLength:original.length,afterLength:after.length,beforeSha256:hash(original),afterSha256:hash(after),resources:evidence,exactAfterThreeSubstitutions:before===after}));
       item.assets='board-defaults';
     }catch(error){
       items.push({page,area:'assets',change:'invalid',what:error.message,invariant:true});
@@ -229,8 +233,12 @@ function checkRetainedResources(a,b,items,page){
  };
  const oldGroups=groups(before),newGroups=groups(after);
  const retained=new Set([...oldGroups.keys()].filter(k=>newGroups.has(k)));
- if(!same(before.map(key).filter(k=>retained.has(k)),after.map(key).filter(k=>retained.has(k))))
-   items.push({page,area:'assets',change:'invalid',what:'Retained resource order changed',invariant:true});
+ if(!same(before.map(key).filter(k=>retained.has(k)),after.map(key).filter(k=>retained.has(k)))){
+   const identity=e=>({key:key(e),url:raw(e),attributes:attrs(e,e.tagName==='LINK'?'href':'src')});
+   const evidence={page,before:before.filter(e=>retained.has(key(e))).map(identity),after:after.filter(e=>retained.has(key(e))).map(identity)};
+   console.error('Retained resource order evidence: '+JSON.stringify(evidence));
+   items.push({page,area:'assets',change:'invalid',what:'Retained resource order changed',before:evidence.before,after:evidence.after,invariant:true});
+ }
  for(const [k,old]of oldGroups){
    const fresh=newGroups.get(k);
    if(!fresh)continue; // Removed resource rows remain ordinary differences.
@@ -238,4 +246,17 @@ function checkRetainedResources(a,b,items,page){
    if(!same(old.map(identity),fresh.map(identity)))
      items.push({page,area:'assets',change:'invalid',what:'Retained resource URL/attributes/multiplicity/order changed: '+normalize(raw(old[0])),invariant:true});
  }
+}
+
+// The historical worker always scheduled background preloads. The new option
+// defaults to true; only making that existing behavior explicit is equivalent.
+function markPreloadDefault(A,B,items,context){
+ if(!context)return;
+ const a=A.configs.qpyodideSettings,b=B.configs.qpyodideSettings;
+ if(a?.length!==1||b?.length!==1)return;
+ const old=a[0],fresh=b[0];
+ if(!old||!fresh||Array.isArray(old)||Array.isArray(fresh)||Object.hasOwn(old,'qpyodidePreloadPackages')||fresh.qpyodidePreloadPackages!==true)return;
+ const rest={...fresh};delete rest.qpyodidePreloadPackages;
+ if(!same(sorted(old),sorted(rest)))return;
+ for(const item of items)if(item.area==='config'&&item.change==='changed'&&item.object==='qpyodideSettings'&&item.path==='/0/qpyodidePreloadPackages'&&item.before===undefined&&item.after===true)item.assets='preload-default';
 }
