@@ -1,0 +1,54 @@
+name: Board asset archive inspection
+on:
+  push:
+    branches: [consolidation/2026-10-step5-board-lock]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  official-archives:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache/boards
+          key: ctm-board-archives-${{ hashFiles('integration/assets-board-metadata.json') }}
+      - name: Inspect official integrity-verified board archives
+        run: |
+          python - <<'PY'
+          import base64, collections, importlib.util, json, pathlib
+          spec = importlib.util.spec_from_file_location('assets', 'scripts/ctm_assets.py')
+          assets = importlib.util.module_from_spec(spec); spec.loader.exec_module(assets)
+          metadata = json.loads(pathlib.Path('integration/assets-board-metadata.json').read_text())
+          wanted = {'jsxgraph', 'mathjax4', 'mathjax-newcm-font'}
+          metadata['archives'] = [entry for entry in metadata['archives'] if entry['id'] in wanted]
+          assert {entry['id'] for entry in metadata['archives']} == wanted
+          inspection = assets.inspect_archives(metadata, pathlib.Path('.asset-cache/boards'))
+          output = pathlib.Path('.private-extensions/board-inspection.json')
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_bytes(assets.json_bytes(inspection))
+          review = {'archives': []}
+          for archive in inspection['archives']:
+              review['archives'].append({key: archive[key] for key in ('id', 'version', 'npm', 'integrity', 'texts')} | {
+                  'count': len(archive['members']),
+                  'directories': dict(collections.Counter('/'.join(member['member'].split('/')[:3]) for member in archive['members'])),
+                  'root_members': [member['member'] for member in archive['members'] if member['member'].count('/') == 1]})
+          raw = assets.json_bytes(review)
+          print('CTM_BOARD_INSPECTION ' + json.dumps({'bytes': len(raw), 'git_blob_sha1': assets.git_blob_sha1(raw), 'sha256': assets.digest(raw)}))
+          encoded = base64.b64encode(raw).decode()
+          for i in range(0, len(encoded), 3000):
+              print('CTM_BOARD_INSPECTION ' + json.dumps({'chunk': i // 3000, 'base64': encoded[i:i+3000]}))
+          print('CTM_BOARD_INSPECTION ' + json.dumps({'complete': True}))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-board-archive-inspection
+          path: .private-extensions/board-inspection.json
