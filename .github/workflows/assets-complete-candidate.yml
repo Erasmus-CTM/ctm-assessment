@@ -1,0 +1,60 @@
+name: Official complete asset candidate
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: ctm-complete-assets-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  official-candidate-inspection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 63980a231771f63a4d20000f9fafadea73b136c9
+          path: .asset-sources/composer
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 56b36b43d602eda3971afc144e65a73f9f6cfcbb
+          path: .asset-sources/board
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: 41b2be0a94a5bbf9dd8389fa83458d23692f2b4a
+          path: .asset-sources/libs
+          persist-credentials: false
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache/complete
+          key: ctm-complete-archives-${{ hashFiles('.asset-sources/composer/integration/assets-metadata.json', '.asset-sources/board/integration/assets-board-metadata.json') }}
+      - name: Compile inspector and run canonical composer contracts
+        run: |
+          python -m py_compile scripts/ctm_complete_assets_candidate.py
+          python -m unittest discover -s .asset-sources/composer/tests -p 'test_assets_composition.py' -v
+      - name: Produce the three private partial candidates from frozen official sources
+        run: |
+          python .asset-sources/composer/scripts/ctm_assets.py python-lock --metadata .asset-sources/composer/integration/assets-metadata.json --cache .asset-cache/complete --licence-policy .asset-sources/composer/integration/assets-python-licences.json --output .private-extensions/complete-candidate/python-lock.json
+          python .asset-sources/composer/scripts/ctm_assets.py npm-lock --metadata .asset-sources/composer/integration/assets-metadata.json --libs .asset-sources/libs/_extensions/ctm-libs --cache .asset-cache/complete --output .private-extensions/complete-candidate/npm-lock.json
+          python .asset-sources/board/scripts/ctm_board_assets.py --metadata .asset-sources/board/integration/assets-board-metadata.json --pins .asset-sources/board/_extensions/ctm-assessment/jsxgraph-pins.yml --cache .asset-cache/complete --output .private-extensions/complete-candidate/board-lock.json
+      - name: Derive the private index from independently reviewed strict release availability
+        run: |
+          python .asset-sources/composer/scripts/ctm_assets.py prepare-stdlib-probe --metadata .asset-sources/composer/integration/assets-metadata.json --cache .asset-cache/complete --candidates .asset-sources/composer/integration/assets-stdlib.json --directory .private-extensions/complete-candidate/probe
+          node .asset-sources/composer/scripts/probe-pyodide-stdlib.mjs .private-extensions/complete-candidate/probe .private-extensions/complete-candidate/availability.json
+          python .asset-sources/composer/scripts/ctm_assets.py import-index --probe-core .private-extensions/complete-candidate/probe --availability .private-extensions/complete-candidate/availability.json --reviewed-report-sha256 dd9327e9be5bb2b4fb06afd905077fd72de39e345c7ec67f76a87ff4033afe28 --candidates .asset-sources/composer/integration/assets-stdlib.json --output .private-extensions/complete-candidate/assets-imports.json
+      - name: Emit candidate digests for independent review before any complete composition
+        run: |
+          python scripts/ctm_complete_assets_candidate.py --composer-root .asset-sources/composer --board-root .asset-sources/board --library .asset-sources/libs/_extensions/ctm-libs --pins .asset-sources/board/_extensions/ctm-assessment/jsxgraph-pins.yml --cache .asset-cache/complete --python-lock .private-extensions/complete-candidate/python-lock.json --npm-lock .private-extensions/complete-candidate/npm-lock.json --board-lock .private-extensions/complete-candidate/board-lock.json --private-index .private-extensions/complete-candidate/assets-imports.json --availability .private-extensions/complete-candidate/availability.json --output .private-extensions/complete-candidate/inspection
