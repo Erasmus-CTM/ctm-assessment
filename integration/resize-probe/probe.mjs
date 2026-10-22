@@ -176,17 +176,30 @@ const server=await serve({stock,fixture,plain},true);
 const base='http://127.0.0.1:'+server.address().port;
 const corpServer=await serve({stock,fixture,plain},true,'require-corp');
 const corpBase='http://127.0.0.1:'+corpServer.address().port;
+const startupServers={},startupBases={};
+if(process.env.CTM_RESIZE_STARTUP_ONLY==='1'){
+  for(const mode of ['native','omit']){
+    const copy=output+'-startup-'+mode;
+    fs.cpSync(fixture,copy,{recursive:true});
+    assert.equal(fs.readFileSync(path.join(copy,'index.html'),'utf8'),fixtureHtml);
+    fs.writeFileSync(path.join(copy,'index.html'),startupControl(fixtureHtml,mode));
+    startupServers[mode]=await serve({fixture:copy},true,'require-corp');
+    startupBases[mode]='http://127.0.0.1:'+startupServers[mode].address().port;
+  }
+}
 const report={browser:engine,quartoVersion:'1.8.27',sourceSha256,
   headers:{coop:'same-origin',coep:'credentialless'},samples:[]};
 if(process.env.CTM_RESIZE_STARTUP_ONLY==='1')report.startup={
-  fixtureHtmlSha256:createHash('sha256').update(fixtureHtml).digest('hex'),omittedManifest,scriptInventory};
+  fixtureHtmlSha256:createHash('sha256').update(fixtureHtml).digest('hex'),
+  omittedHtmlSha256:createHash('sha256').update(startupControl(fixtureHtml,'omit')).digest('hex'),
+  transport:'matched real HTTP fixture copies; no navigation interception',omittedManifest,scriptInventory};
 let browser;
 try {
   browser=await playwright[engine].launch({headless:true});
   report.browserVersion=browser.version();
   report.mathSourceBlob=mathSourceBlob;
   const cases=process.env.CTM_RESIZE_STARTUP_ONLY==='1'?[
-    {label:'startup-native-routed',root:'fixture',mode:'native',startupMode:'native',coep:'require-corp',repeats:12},
+    {label:'startup-native-http',root:'fixture',mode:'native',startupMode:'native',coep:'require-corp',repeats:12},
     {label:'startup-omitted',root:'fixture',mode:'native',startupMode:'omit',coep:'require-corp',repeats:12}
   ]:process.env.CTM_RESIZE_MATH_FRAME_ONLY==='1'?[
     {label:'math-native-routed',root:'fixture',mode:'native',mathMode:'native',repeats:12},
@@ -225,11 +238,6 @@ try {
       const response=await route.fetch();mathSubstitutions++;
       await route.fulfill({response,body:mathControl(await response.text(),control.mathMode)});
     });
-    let htmlSubstitutions=0;
-    if(control.startupMode)await ctx.route('**/fixture/index.html',async route=>{
-      const response=await route.fetch();htmlSubstitutions++;
-      await route.fulfill({response,body:startupControl(await response.text(),control.startupMode)});
-    });
     const page=await ctx.newPage();
     page.setDefaultTimeout(90000);
     for(let navigation=0;navigation<(control.navigations||1);navigation++) {
@@ -244,7 +252,7 @@ try {
       const onError=error=>errors.push({message:error.message,stack:error.stack});
       const onFailure=request=>failedRequests.push({url:request.url(),failure:request.failure()});
       page.on('pageerror',onError);page.on('requestfailed',onFailure);page.on('console',onConsole);
-      const origin=control.coep==='require-corp'?corpBase:base;
+      const origin=control.startupMode?startupBases[control.startupMode]:control.coep==='require-corp'?corpBase:base;
       const coep=control.coep || 'credentialless';
       const response=await page.goto(origin+'/'+control.root+'/'+(control.file||'index.html'),{waitUntil:'domcontentloaded'});
       assert.equal(response.status(),200);
@@ -269,9 +277,9 @@ try {
         quarto:document.querySelector('meta[name="generator"]')?.content,
         scripts:[...document.scripts].map(s=>s.src).filter(Boolean)}));
       await page.waitForTimeout(100);
-      report.samples.push({label:control.label,sample,navigation,coep,origin,quartoSubstitutions:substitutions,mathSubstitutions,htmlSubstitutions,startupMode:control.startupMode,errors,failedRequests,consoleMessages,droppedConsole,...snapshot});
+      report.samples.push({label:control.label,sample,navigation,coep,origin,quartoSubstitutions:substitutions,mathSubstitutions,navigationInterceptions:0,startupMode:control.startupMode,errors,failedRequests,consoleMessages,droppedConsole,...snapshot});
       console.log(JSON.stringify({label:control.label,sample,navigation,coep,errors,failedRequests,coi:snapshot.coi,consoleMessages,
-        quartoSubstitutions:substitutions,mathSubstitutions,htmlSubstitutions,startupMode:control.startupMode,mathSetup:snapshot.mathSetup,
+        quartoSubstitutions:substitutions,mathSubstitutions,navigationInterceptions:0,startupMode:control.startupMode,mathSetup:snapshot.mathSetup,
         callbackCount:snapshot.trace.callbacks.length,body:snapshot.body,isolated:snapshot.isolated,marginCount:snapshot.marginCount}));
       if(control.mode==='no-body-observer' && control.root==='stock')assert.equal(snapshot.controlHeight,'1200px');
       else if(control.startupMode==='omit'){assert.equal(snapshot.body?.width,1280);assert.ok(snapshot.body.height>0);}
@@ -311,7 +319,7 @@ try {
     }
     if(routed)assert.equal(substitutions,control.navigations||1);
     if(control.mathMode){assert.equal(mathSubstitutions,1);assert.equal(substitutions,0);}
-    if(control.startupMode){assert.equal(htmlSubstitutions,1);assert.equal(mathSubstitutions,0);assert.equal(substitutions,0);}
+    if(control.startupMode){assert.equal(mathSubstitutions,0);assert.equal(substitutions,0);}
     await ctx.close();
   }
   report.summary=[...new Set(report.samples.map(s=>s.label))].map(label=>{
@@ -327,11 +335,12 @@ try {
     }
   }
   for(const sample of report.samples.filter(s=>s.errors.length))console.log(JSON.stringify({failedSample:sample}));
-  assert.ok(report.samples.some(s=>['actual-store-positive-control','actual-native','math-native-routed','startup-native-routed'].includes(s.label) && s.errors.length),
+  assert.ok(report.samples.some(s=>['actual-store-positive-control','actual-native','math-native-routed','startup-native-http'].includes(s.label) && s.errors.length),
     'positive control must reproduce raw errors; otherwise stock negatives cannot establish causality');
 } finally {
   fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));
   if(browser)await browser.close();
   await new Promise(resolve=>server.close(resolve));
   await new Promise(resolve=>corpServer.close(resolve));
+  for(const server of Object.values(startupServers))await new Promise(resolve=>server.close(resolve));
 }
