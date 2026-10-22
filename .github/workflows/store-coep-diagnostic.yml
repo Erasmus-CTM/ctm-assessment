@@ -1,0 +1,66 @@
+name: Actual mixed-page COEP diagnostic
+on:
+  push:
+    branches: [consolidation/2026-10-store-coep-diagnostic]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: ctm-store-coep-diagnostic-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  webkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        coep: [credentialless, require-corp]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Check the uninstrumented environment experiment
+        run: node --check integration/store/coep-browser.mjs
+      - name: Verify the immutable rendered baseline
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const artifact = (await github.rest.actions.getArtifact({
+              owner: context.repo.owner, repo: context.repo.repo, artifact_id: 12413317379
+            })).data;
+            if (artifact.expired ||
+                artifact.name !== 'store-rendered-fixtures' ||
+                artifact.workflow_run.head_sha !== 'f9358ccb80cd71bf19139ba251f7578b45c4fa24' ||
+                artifact.digest !== 'sha256:af7cd1f3889fdac75cac8005a57e814b8e7966e98dffbdfa39ac9d8fc5f7bb14') {
+              throw new Error('Rendered diagnostic baseline changed or expired');
+            }
+            core.info(JSON.stringify({artifact: artifact.id, digest: artifact.digest,
+              head: artifact.workflow_run.head_sha, producerRun: 39751102918}));
+      - run: npx playwright install --with-deps webkit
+      - uses: actions/download-artifact@v7
+        with:
+          name: store-rendered-fixtures
+          run-id: 39751102918
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/store-integration
+      - name: Exercise the actual mixed page with its real isolation policy
+        env:
+          CTM_BROWSER: webkit
+          CTM_COEP: ${{ matrix.coep }}
+          CTM_STORE_ROOT: ${{ runner.temp }}/store-integration
+        run: |
+          set -o pipefail
+          node integration/store/coep-browser.mjs 2>&1 | tee "$RUNNER_TEMP/store-coep-webkit.log"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: store-coep-webkit-${{ matrix.coep }}
+          path: ${{ runner.temp }}/store-coep-webkit.log
+          retention-days: 7
