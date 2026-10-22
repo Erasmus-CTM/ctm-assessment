@@ -38,6 +38,10 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def git_blob_sha1(data: bytes) -> str:
+    return hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
+
+
 def json_bytes(value) -> bytes:
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
 
@@ -459,6 +463,20 @@ def materialize_bundle(lock: dict, stage: Path, cache: Path, *, accepted_licence
     validate_licence_policy(lock, accepted_licences)
     if not stage.is_dir() or stage.is_symlink() or any(stage.iterdir()):
         raise AssetError("Bundle materialization needs an empty regular stage")
+    outputs = [item["path"] for archive in lock["archives"] for item in archive["files"]]
+    outputs.extend(item["path"] for item in lock.get("generated", []))
+    seen = set()
+    for name in outputs:
+        relative_path(name)
+        portable = name.casefold()
+        if portable in seen or portable in {"manifest.json", "third-party-notices.md"}:
+            raise AssetError("Conflicting bundle output: " + name)
+        seen.add(portable)
+    for name in outputs:
+        if Path(name).suffix in COMPRESS and (name + ".gz").casefold() in seen:
+            raise AssetError("Precompressed bundle output conflicts with a source: " + name)
+        if any(str(parent).casefold() in seen for parent in PurePosixPath(name).parents if str(parent) != "."):
+            raise AssetError("Bundle output is also a parent file: " + name)
     cache.mkdir(parents=True, exist_ok=True)
     notices = ["# Third-party notices", ""]
     for archive in lock["archives"]:
@@ -889,6 +907,8 @@ def _python_archive(metadata: dict, cache: Path) -> tuple[dict, Path]:
             or not re.fullmatch(r"[a-f0-9]{64}", entry.get("sha256", ""))):
         raise AssetError("Python subset needs the exact canonical official release URL and SHA-256")
     cache = Path(cache)
+    if any(part.lower() in {"_ctm-assets", "_site", "_site-exam"} for part in cache.resolve().parts):
+        raise AssetError("The full Python archive cache must stay outside published assets")
     cache.mkdir(parents=True, exist_ok=True)
     archive = cache / ("archive-" + digest(json_bytes({k: entry.get(k) for k in ("url", "sha256", "integrity")})))
     download(entry["url"], archive, sha256=entry["sha256"], integrity=entry.get("integrity"))
@@ -954,6 +974,7 @@ def inspect_python_subset(metadata: dict, cache: Path, *, extras=()) -> dict:
         details = {"version": package["version"], "file_name": leaf, "sha256": digest(data),
                    "package_type": package.get("package_type"), "licence_texts": {}, "metadata": {}}
         if leaf.endswith(".whl"):
+            own_distribution = None
             with zipfile.ZipFile(io.BytesIO(data)) as wheel:
                 seen = set()
                 for member in wheel.infolist():
@@ -970,6 +991,7 @@ def inspect_python_subset(metadata: dict, cache: Path, *, extras=()) -> dict:
                         message = email.parser.BytesParser().parsebytes(wheel.read(member))
                         if details["metadata"]:
                             raise AssetError("Wheel has ambiguous distribution metadata: " + leaf)
+                        own_distribution = PurePosixPath(path).parts[0]
                         details["metadata"] = {key: message.get_all(key, []) for key in
                                                ("Name", "Version", "License", "License-Expression", "Classifier")}
                     if re.search(r"(^|[/_.-])(licen[cs]e|copying|notice|thirdpartynotices)([/_.-]|$)", path, re.I):
@@ -977,10 +999,17 @@ def inspect_python_subset(metadata: dict, cache: Path, *, extras=()) -> dict:
                             raise AssetError("Python licence text exceeds review limit: " + path)
                         details["licence_texts"][path] = wheel.read(member).decode("utf-8")
             fields = details["metadata"]
-            if (len(fields.get("Name", [])) != 1
+            directory_name, _, directory_version = (own_distribution or "").removesuffix(".dist-info").rpartition("-")
+            if (not directory_name or normalise_package(directory_name) != normalise_package(name)
+                    or directory_version != package["version"].replace("-", "_")
+                    or len(fields.get("Name", [])) != 1
                     or normalise_package(fields["Name"][0]) != normalise_package(name)
                     or fields.get("Version") != [package["version"]]):
                 raise AssetError("Wheel metadata does not match the official package lock: " + name)
+            details["own_licence_files"] = sorted(path for path in details["licence_texts"]
+                if PurePosixPath(path).parts[0] == own_distribution)
+        else:
+            details["own_licence_files"] = []
         packages[name] = details
     # Full lock remains in memory/cache only. This report contains the selected closure.
     return {"entry": entry, "archive": archive, "subset": subset, "packages": packages,
@@ -994,7 +1023,7 @@ def _curated_python_licences(root: Path, release: str, python: str) -> dict:
     for name, record in provenance["entries"].items():
         path = relative_path(record["file"])
         data = root.joinpath(*path.parts).read_bytes()
-        blob = hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
+        blob = git_blob_sha1(data)
         if blob != record["git_blob_sha1"]:
             raise AssetError("Curated Python licence differs from its official Git blob: " + name)
         result[name] = dict(record, text=data.decode("utf-8"), sha256=digest(data))
@@ -1037,6 +1066,16 @@ def produce_python_lock(metadata: dict, cache: Path, *, extras=(), licence_polic
         if record is not None:
             if not isinstance(record, dict) or record.get("version") != package["version"]:
                 raise AssetError("Python licence policy requires exact package version: " + name)
+            if (record.get("sha256") != package["sha256"]
+                    or not isinstance(record.get("source"), str)
+                    or not re.fullmatch(r"https://github\.com/[^/]+/[^/]+/blob/[^?#]+", record["source"])
+                    or not re.fullmatch(r"[a-f0-9]{40}", record.get("git_blob_sha1", ""))):
+                raise AssetError("Python licence policy needs pinned wheel and primary source evidence: " + name)
+            if record.get("licence_file") not in package["own_licence_files"]:
+                raise AssetError("Python licence policy must identify the distribution's own licence: " + name)
+            text = package["licence_texts"].get(record.get("licence_file"))
+            if text is None or git_blob_sha1(text.encode("utf-8")) != record["git_blob_sha1"]:
+                raise AssetError("Python licence text differs from the primary source Git blob: " + name)
             expression = record.get("licence")
             if record.get("source_offer"):
                 source_offers.append(record["source_offer"])
@@ -1054,17 +1093,16 @@ def produce_python_lock(metadata: dict, cache: Path, *, extras=(), licence_polic
         obligations = allow_licence(name, expression, accepted_licences)
         if obligations and not (record or {}).get("source_offer"):
             raise AssetError("Python package needs a source offer: " + name)
-        texts = package["licence_texts"]
-        if texts:
-            for path, text in sorted(texts.items()):
-                license_text(f"LICENSES/python/{name}/{path}", text)
-        else:
+        if not package["own_licence_files"]:
             selected = name if name in curated else "python-stdlib" if package["package_type"] == "cpython_module" else None
             if selected is None:
                 raise AssetError("Python package has no own or curated licence text: " + name)
             if selected == name and package["file_name"] not in curated[selected]["applies_to"]:
                 raise AssetError("Curated Python licence uses another package version: " + name)
             license_text(f"LICENSES/python/{name}/LICENSE.txt", curated[selected]["text"])
+        # Preserve all bundled notices, while requiring separate own evidence.
+        for path, text in sorted(package["licence_texts"].items()):
+            license_text(f"LICENSES/python/{name}/{path}", text)
         expressions.append(expression)
         package_policy[name] = {"version": package["version"], "licence": expression,
                                 "file_name": package["file_name"], "sha256": package["sha256"]}
@@ -1086,6 +1124,7 @@ def produce_python_lock(metadata: dict, cache: Path, *, extras=(), licence_polic
             "python_packages": package_policy, "python_roots": sorted(set(EXAM_PACKAGES)),
             "python_extras": sorted(set(extras)), "provenance": {
                 "metadata_sha256": digest(json_bytes(metadata)),
+                "licence_policy": {name: policy[name] for name in sorted(set(policy) & set(report["packages"]))},
                 "curated_licences": {key: {k: v for k, v in value.items() if k != "text"}
                                      for key, value in sorted(curated.items())}}}
     lock["files"] = derive_lock_files(lock, cache, accepted_licences=accepted_licences)
@@ -1343,4 +1382,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
-
