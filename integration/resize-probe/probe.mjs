@@ -81,6 +81,7 @@ try {
   browser=await playwright[engine].launch({headless:true});
   const cases=[
     {label:'stock-quarto-native',root:'stock',mode:'native',repeats:8},
+    {label:'stock-quarto-native-routed',root:'stock',mode:'native',route:true,repeats:8},
     {label:'stock-quarto-entry-width',root:'stock',mode:'entry-width',repeats:8},
     {label:'stock-quarto-no-body-observer',root:'stock',mode:'no-body-observer',repeats:8},
     {label:'plain-native-read',root:'plain',file:'read.html',repeats:8},
@@ -91,7 +92,8 @@ try {
     const ctx=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:900}});
     await ctx.addInitScript(traceNativeObservers);
     let substitutions=0;
-    if(control.mode && control.mode!=='native')await ctx.route('**/site_libs/quarto-html/quarto.js',async route=>{
+    const routed=control.root==='stock' && (control.route || control.mode!=='native');
+    if(routed)await ctx.route('**/site_libs/quarto-html/quarto.js',async route=>{
       const response=await route.fetch();
       const incoming=await response.text();
       assert.equal(incoming,source,'counterfactual uses the exact stock source bytes');
@@ -114,26 +116,30 @@ try {
       await page.waitForTimeout(1000);
       const snapshot=await page.evaluate(()=>({trace:window.__resizeProbe,readyState:document.readyState,
         isolated:crossOriginIsolated,
-        body:{width:document.body.getBoundingClientRect().width,height:document.body.getBoundingClientRect().height},
+        body:window.__resizeProbe.callbacks.flatMap(callback=>callback.entries).filter(entry=>entry.tag==='BODY').at(-1)?.rect,
+        controlHeight:document.getElementById('height-control')?.style.height,
+        viewport:{width:innerWidth,height:innerHeight},
         marginCount:document.querySelectorAll('.column-margin.column-container > *, .margin-caption, .aside').length,
         ctmNodes:document.querySelectorAll('[data-ctm-component]').length,
         quarto:document.querySelector('meta[name="generator"]')?.content,
         scripts:[...document.scripts].map(s=>s.src).filter(Boolean)}));
       await page.waitForTimeout(100);
-      assert.ok(snapshot.body.height>900,'control retains a page taller than the viewport');
+      if(control.mode==='no-body-observer')assert.equal(snapshot.controlHeight,'1200px');
+      else assert.ok(snapshot.body?.height>900,'native BODY entries retain a page taller than the viewport');
+      assert.deepEqual(snapshot.viewport,{width:1280,height:900});
       if(control.root==='stock') {
         assert.equal(snapshot.quarto,'quarto-1.8.27');assert.equal(snapshot.ctmNodes,0);assert.equal(snapshot.marginCount,0);
         assert.ok(!snapshot.scripts.some(s=>/quarto-contrib|ctm-|py-exercise|qpyodide/.test(s)));
         assert.ok(snapshot.scripts.some(s=>/bootstrap.min.js$/.test(s)));
       }
-      if(control.mode==='no-body-observer')assert.equal(snapshot.trace.created.length,0);
+      if(control.mode==='no-body-observer')assert.ok(!snapshot.trace.callbacks.some(c=>c.entries.some(e=>e.tag==='BODY')));
       else assert.ok(snapshot.trace.callbacks.some(c=>c.entries.some(e=>e.tag==='BODY')),'native BODY observation delivered');
       report.samples.push({label:control.label,sample,navigation,errors,failedRequests,...snapshot});
       console.log(JSON.stringify({label:control.label,sample,navigation,errors,failedRequests,
         callbackCount:snapshot.trace.callbacks.length,body:snapshot.body,isolated:snapshot.isolated,marginCount:snapshot.marginCount}));
       page.off('pageerror',onError);page.off('requestfailed',onFailure);
     }
-    if(control.mode && control.mode!=='native')assert.equal(substitutions,control.navigations||1);
+    if(routed)assert.equal(substitutions,control.navigations||1);
     await ctx.close();
   }
   report.summary=[...new Set(report.samples.map(s=>s.label))].map(label=>{
