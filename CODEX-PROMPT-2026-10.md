@@ -31,11 +31,11 @@ STAGE 1 MERGED — 22 October 2026
 AC merged assessment#25 and ingmat3a#16 in order. Verified both merge trees equal the exact reviewed heads and both reviewed heads are merge parents:
 - assessment#25 reviewed4edd42835a8923ebeac1a44b158add3c2698b75c -> merge/mainc5ac2af961d63cea9cea7d272f0f5135dc1995ae, tree277e76c6f5f34e978be7619c5681123b2122c121.
 - ingmat3a#16 revieweda99c8b52ce422e34da1b426909197e545ef9a931 -> merge/main80c3851dd20326c039c0060ae3ada4fc97d1f9b1, tree26d3fec7126e43439e232c2196a6dbbdd8817566.
-Stage2 alias set is being synchronized/reviewed/retested against new assessment main. Libs32 c763 remains unchanged on base45bcb2. Assessment26 old54ff136 must NOT be treated as ready after main moved; await its new head, Astra delta verdict and exact combined CI. No later stage is cleared yet.
+Stage2 alias set refreshed: assessment26 new7a4b0fad3e57195815964ab6d58797ee25c1a144, treef6d8e6c1243d86fd20b5f8b339651e42583423cb, ordered parents old54ff136 then newmainc5ac2af. Exactly7mainpaths overlaid; original9aliaspaths/pinc763+branchmain/ships-copies unchanged. Independent Astra xhigh SOURCE PASS, review5609161893 at https://github.com/Erasmus-CTM/ctm-assessment/pull/26#pullrequestreview-5609161893. Ahead2/behind0; libs32c763/main45bcb2 unchanged. New combined CI RUNNING: comparisons39720824374,test39720824412,parity39720824375,cells39720824498,loading39720824594. No Stage2 merge clearance until exact gates finish and final heads/base checks pass. PR26 description now explicitly states pending CI; old54ff green run is historical.
 
 MERGE REVIEW QUEUE — Stage 1 merged, Stage 2 in preparation
 1. Stage1 course set is MERGED and tree-equality verified above. Do not ask AC to merge assessment25/course16 again.
-2. Stage2 next: libs#32 @c7633d8087ce4f30817080858d9edd4b530ab8d3 -> assessment#26 after its base synchronization, new-head independent Astra review and combined CI. The old assessment54ff136 head is behind the newly merged main and is no longer cleared. Libs32 remains unchanged on main45bcb2.
+2. Stage2 next, pending CI: libs#32 @c7633d8087ce4f30817080858d9edd4b530ab8d3 -> assessment#26 @7a4b0fad3e57195815964ab6d58797ee25c1a144. Base synchronization and independent review are complete; exact combined CI is running. Libs32 remains unchanged on main45bcb2.
 3. Stage3: synchronize/review/recheck assessment#27 @c1f509c301e786f7573b8a5c35745570a4d853d1 before its turn.
 4. Stage4: after server27 merges, synchronize/review/recheck assessment#30 @419ccd741792d7856f28ba4fadf02d5678af4815 before merging. Its bounded checker tooling is independent of unfinished full-offline assets delivery; workflow tests exact server c1f509c. PR30 body reconciled and draft=false, but new main makes its earlier base clearance stale.
 
