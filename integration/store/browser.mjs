@@ -343,6 +343,10 @@ try {
     await captureResizeFinal(ctx);
     await ctx.close();
   }
+  const snapshots=[...resizeFailures,...resizeFinals];
+  assert.ok(snapshots.every(row=>!row.traceReadError && (row.trace || row.page==='about:blank') &&
+    (!row.trace || (Array.isArray(row.trace.measurementErrors) && row.trace.measurementErrors.length===0))),
+    'a controlled policy is inconclusive if a required observer snapshot or measurement fails');
   const deferred=resizeFinals.flatMap(row=>row.trace?.callbacks || []).filter(row=>row.deferred && row.deliveries);
   assert.ok(deferred.every(row=>row.pending===0 && row.executed===row.deliveries),'a controlled policy is inconclusive unless every queued observer callback executes');
   assert.deepEqual(errors,[],'actual rendered pages have no uncaught errors');
