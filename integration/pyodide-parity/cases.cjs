@@ -242,11 +242,12 @@ function boundaryProbes(answer, {decplaces = '', sigfigs = '', tolerance = ''}) 
 // teacher answers that do not fit their cell.
 function pageCases(file, relative, authored = {}, answers = {}) {
   const {w, api} = openPage(file, 'http://localhost/' + relative.split(path.sep).join('/'));
-  const cases = [], skipped = [], cells = [], unshaped = [], misfits = [];
+  const cases = [], skipped = [], cells = [], unshaped = [], misfits = [], generated = [];
   try {
     [...w.document.querySelectorAll('.math-exercise-cell')].forEach((original, position) => {
       const pristine = original.outerHTML, label = original.dataset.label || original.id;
       const base = {page: relative, position, label};
+      if (original.dataset.variants) generated.push({...base, manifest: JSON.parse(original.dataset.variants)});
       const diagram = (original.dataset.response || '').trim();
       const mode = original.dataset.mode || 'equivalent';
       const responses = authored[label] || [];
@@ -329,7 +330,7 @@ function pageCases(file, relative, authored = {}, answers = {}) {
       }
     });
   } finally { w.close(); }
-  return {cases, skipped, cells, unshaped, misfits};
+  return {cases, skipped, cells, unshaped, misfits, generated};
 }
 
 // Rendered HTML pages with math-exercise cells under `root` (a site folder).

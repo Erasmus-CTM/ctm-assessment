@@ -125,7 +125,8 @@ test('authored tests run through ctm-checkers when the build has it, else throug
     fs.writeFileSync(path.join(wheelDir, '__init__.py'), '');
     fs.writeFileSync(path.join(wheelDir, 'authored.py'), run
       + 'def run_question(options, base):\n    run(options, base, "ctm-checkers")\n'
-      + 'def authored_questions(path):\n    yield ' + question.replace('LABEL', '"q (ctm-checkers)"') + '\n');
+      + 'def authored_questions(path):\n    yield ' + question.replace('LABEL', '"q (ctm-checkers)"') + '\n'
+      + '    yield {"label": "recipe", "parameters": "", "tests": "- answers: [\\\"{{ab}}\\\"]\\n  expected: correct"}\n');
     const wheel = path.join(parity, 'ctm_checkers-0.0.0-py3-none-any.whl');
     const zip = spawnSync(python, ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2]); shutil.move(sys.argv[1] + ".zip", sys.argv[3])',
       path.join(dir, 'archive'), path.join(dir, 'wheel'), wheel], {encoding: 'utf8'});
@@ -134,11 +135,13 @@ test('authored tests run through ctm-checkers when the build has it, else throug
     fs.mkdirSync(tree);
     fs.writeFileSync(path.join(tree, 'page.qmd'), 'stand-in\n');
     const program = (wheelPath) => '_ctm_parity_wheel = ' + (wheelPath ? JSON.stringify(wheelPath) : 'None') + '\n'
-      + AUTHORED.split('/ctm-parity/').join(parity + '/') + '\nprint(_ctm_authored(' + JSON.stringify(tree) + ', ["page.qmd"]))\n';
+      + AUTHORED.split('/ctm-parity/').join(parity.split(path.sep).join('/') + '/') + '\nprint(_ctm_authored(' + JSON.stringify(tree) + ', ["page.qmd"]))\n';
     const records = (wheelPath) => {
       const result = spawnSync(python, ['-c', program(wheelPath)], {encoding: 'utf8'});
       assert.equal(result.status, 0, result.stderr);
-      return JSON.parse(result.stdout).map(text => JSON.parse(text));
+      const found = JSON.parse(result.stdout).map(text => JSON.parse(text));
+      assert.equal(found.length, 1, 'the ordinary authored test remains; a parameter recipe uses materialized fixtures');
+      return found;
     };
     const [legacy] = records(null), [current] = records(wheel);
     assert.equal(legacy.label, 'q (0.10)');

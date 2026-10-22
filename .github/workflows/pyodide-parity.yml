@@ -31,6 +31,7 @@ on:
       - integration/feedback/repos.json
       - integration/feedback/page-scripts.cjs
       - tests/python-examples.cases.cjs
+      - tests/parity-*.test.cjs
       - scripts/setup-feedback-integration.py
       - scripts/install-project.py
       - scripts/build-course.py
@@ -55,6 +56,7 @@ on:
       - integration/feedback/repos.json
       - integration/feedback/page-scripts.cjs
       - tests/python-examples.cases.cjs
+      - tests/parity-*.test.cjs
       - scripts/setup-feedback-integration.py
       - scripts/install-project.py
       - scripts/build-course.py
@@ -248,6 +250,10 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm ci --ignore-scripts
         working-directory: integration/pyodide-parity
+      - name: Exercise real materialized triangle fixtures and negative coverage canaries
+        env:
+          CTM_PARITY_VARIANT_BUILD: ${{ runner.temp }}/builds/head
+        run: node --test tests/parity-variants.test.cjs
       - name: Grade every exercise of both builds under Pyodide 0.28.3
         env:
           # The differences this pull request causes on purpose, if any (docs/development.md).

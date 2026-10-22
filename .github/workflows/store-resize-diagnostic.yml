@@ -1,4 +1,4 @@
-name: Component editor layout diagnostic
+name: DOM mutation attribution diagnostic
 on:
   push:
     branches: [consolidation/2026-10-store-resize-diagnostic]
@@ -51,7 +51,7 @@ jobs:
       - name: Calibrate native scheduling and digest-checked component intervention
         env:
           CTM_STORE_ROOT: ${{ runner.temp }}/store-integration
-        run: node --test integration/store/resize-diagnostic.test.mjs integration/store/layout-diagnostic.test.mjs
+        run: node --test integration/store/resize-diagnostic.test.mjs integration/store/layout-diagnostic.test.mjs integration/store/dom-mutation-diagnostic.test.mjs
       - name: Trace the actual WebKit mixed page without filtering errors
         env:
           CTM_BROWSER: webkit

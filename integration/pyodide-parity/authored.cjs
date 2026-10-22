@@ -32,6 +32,11 @@ def _ctm_authored(root, files):
     found = []
     for name in files:
         for options in _questions(Path(root) / name):
+            # variants.lua materializes these recipes before grading. The
+            # native inventory verifies every concrete fixture against the
+            # source producer; do not run unresolved templates as questions.
+            if 'parameters' in options:
+                continue
             if not options.get('tests', '').strip():
                 continue
             record = dict(_ar.record(run, options, root), file=name, label=options.get('label', ''), options=options)

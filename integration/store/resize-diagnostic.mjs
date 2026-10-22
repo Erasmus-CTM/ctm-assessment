@@ -44,28 +44,35 @@ export function traceResizeObservers(options={}) {
               id:element.id,
               tag:element.tagName,
               classes:typeof element.className==='string'?element.className:'',
-              rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}
+              rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},
+              ...(host.__ctmDOMDiagnostic?{parentDepth:host.__ctmDOMDiagnostic.depth(element)}:{})
             });
           }
-          push(trace.deliveries,{id,stack,entryCount:entries.length,targets},32);
+          push(trace.deliveries,{id,stack,entryCount:entries.length,targets,
+            ...(host.__ctmDOMDiagnostic?{at:host.__ctmDOMDiagnostic.now()}:{})},32);
         } catch(error) {
           // Catch measurement failures only. The learner callback is outside
           // this catch, so its original return/exception remains untouched.
           push(trace.measurementErrors,String(error),8);
         }
+        const invokeOriginal=()=>{
+          const diagnostic=host.__ctmDOMDiagnostic;
+          const start=diagnostic?.before(id);
+          try {return Reflect.apply(callback,this,callbackArgs);}
+          finally {diagnostic?.after(id,start);}
+        };
         if(deferred) {
           // Controlled intervention only: preserve the actual callback and every
           // delivery, but move its execution outside this observer broadcast.
-          const receiver=this;
           activity.queued++;activity.pending++;
           nativeFrame(()=>{
             activity.pending--;activity.executed++;
-            return Reflect.apply(callback,receiver,callbackArgs);
+            return invokeOriginal();
           });
           return;
         }
         activity.executed++;
-        return Reflect.apply(callback,this,callbackArgs);
+        return invokeOriginal();
       };
       return Reflect.construct(target,forwarded,newTarget);
     }

@@ -8,15 +8,18 @@ import {serve} from '../../tools/compare-browser.mjs';
 import {instrument,denyStoreWrites} from './instrument.mjs';
 import {traceResizeObservers} from './resize-diagnostic.mjs';
 import {installHeightDiagnostic,patchHeightCallback} from './layout-diagnostic.mjs';
+import {installMutationDiagnostic} from './dom-mutation-diagnostic.mjs';
 
 const root=path.resolve(process.env.CTM_STORE_ROOT || '.store-integration');
 const engine=process.env.CTM_BROWSER || 'chromium';
 assert.ok(['chromium','firefox','webkit'].includes(engine));
 const roots={course:path.join(root,'before','_site')};
-const server=await serve(roots,true);
+const coep='require-corp';
+const server=await serve(roots,true,coep);
 const base='http://127.0.0.1:'+server.address().port+'/course/';
 let browser;
-const checks=[], errors=[];
+const checks=[], errors=[], environments=[], consoleErrors=[], networkFailures=[], httpFailures=[];
+const navigationReads=[], navigation=new WeakMap(), lifecycle=[], pageStage=new WeakMap();
 const traceResize=process.env.CTM_TRACE_RESIZE==='1';
 const resizeReads=[], resizeFailures=[], resizeFinals=[];
 const layoutPolicy=process.env.CTM_LAYOUT_DEFER || 'none';
@@ -31,7 +34,7 @@ async function captureResizeFinal(ctx) {
         if(!window.__ctmResizeTrace)return null;
         await window.__ctmResizeTrace.flush();
         const trace=window.__ctmResizeTrace;
-        return {available:trace.available,callbacks:trace.callbacks,measurementErrors:trace.measurementErrors,height:window.__ctmHeightTrace};
+        return {available:trace.available,callbacks:trace.callbacks,measurementErrors:trace.measurementErrors,height:window.__ctmHeightTrace,dom:window.__ctmDOMDiagnostic?.snapshot()};
       });
       resizeFinals.push({page:page.url(),phase:checks.length,trace});
     } catch(error) { resizeFinals.push({page:page.url(),phase:checks.length,traceReadError:String(error)}); }
@@ -43,6 +46,8 @@ const quiz=page=>page.locator('[data-ctm-quiz="mixed"] .ctm-progress');
 const pagePanel=page=>page.locator('.ctm-progress-page .ctm-progress');
 async function context(extra) {
   const ctx=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:900}});
+  await ctx.addInitScript(()=>{window.__ctmCOEPTimeOrigin={native:performance.timeOrigin,beforeClock:!window.__pwClock};});
+  await ctx.addInitScript(installMutationDiagnostic);
   await ctx.addInitScript(installHeightDiagnostic);
   await ctx.route(/\/site_libs\/quarto-contrib\/(?:py-exercise|pyodide-interaktiv)-[^/]+\/(?:py-exercise|qpyodide-cell-classes)\.js(?:\?|$)/,async route=>{
     try {
@@ -63,11 +68,20 @@ async function context(extra) {
   ctx.on('page',page=>{
     page.setDefaultTimeout(90000);
     page.on('dialog',dialog=>dialog.accept());
+    page.on('console',message=>{if(message.type()==='error')consoleErrors.push({at:Date.now(),stage:pageStage.get(page) || 'active',page:page.url(),phase:checks.length,text:message.text()});});
+    page.on('requestfailed',request=>networkFailures.push({at:Date.now(),stage:pageStage.get(page) || 'active',page:page.url(),phase:checks.length,url:request.url(),type:request.resourceType(),error:request.failure()?.errorText}));
+    page.on('response',response=>{
+      if(response.status()>=400)httpFailures.push({at:Date.now(),stage:pageStage.get(page) || 'active',page:page.url(),phase:checks.length,url:response.url(),status:response.status(),type:response.request().resourceType()});
+      if(!response.request().isNavigationRequest() || response.frame()!==page.mainFrame())return;
+      const read=response.allHeaders().then(headers=>({url:response.url(),status:response.status(),
+        coop:headers['cross-origin-opener-policy'],coep:headers['cross-origin-embedder-policy']}));
+      navigation.set(page,read);navigationReads.push(read);
+    });
     page.on('pageerror',error=>{
-      errors.push({page:page.url(),phase:checks.length,message:error.message,stack:error.stack});
+      errors.push({at:Date.now(),stage:pageStage.get(page) || 'active',page:page.url(),phase:checks.length,message:error.message,stack:error.stack});
       if(traceResize) {
         const at={page:page.url(),phase:checks.length,message:error.message};
-        resizeReads.push(page.evaluate(()=>window.__ctmResizeTrace).then(trace=>resizeFailures.push({...at,trace})).catch(error=>resizeFailures.push({...at,traceReadError:String(error)})));
+        resizeReads.push(page.evaluate(()=>({...window.__ctmResizeTrace,dom:window.__ctmDOMDiagnostic?.snapshot()})).then(trace=>resizeFailures.push({...at,trace})).catch(error=>resizeFailures.push({...at,traceReadError:String(error)})));
       }
     });
   });
@@ -79,10 +93,26 @@ async function open(ctx,name='index.html'){
 }
 async function goto(page,name='index.html'){
   await captureResizeFinal(page.context());
-  await page.goto(base+name,{waitUntil:'domcontentloaded'});
-  await ready(page,name);
+  pageStage.set(page,'navigating');lifecycle.push({at:Date.now(),action:'goto-start',url:base+name,phase:checks.length});
+  try {await page.goto(base+name,{waitUntil:'domcontentloaded'});await ready(page,name);}
+  finally {pageStage.delete(page);lifecycle.push({at:Date.now(),action:'goto-end',url:page.url(),phase:checks.length});}
 }
 async function ready(page,name='index.html'){
+  const headers=await navigation.get(page);
+  assert.ok(headers,'actual top-level navigation headers were observed');
+  assert.equal(headers.status,200);
+  assert.equal(headers.coop,'same-origin');assert.equal(headers.coep,coep);
+  const environment=await page.evaluate(()=>({topLevel:window.top===window,
+    isolated:crossOriginIsolated,secureContext:isSecureContext,timeOrigin:performance.timeOrigin,
+    sharedArrayBuffer:typeof SharedArrayBuffer==='function',nativeTimeOrigin:window.__ctmCOEPTimeOrigin,clockInstalled:Boolean(window.__pwClock),serviceWorkerControlled:Boolean(navigator.serviceWorker?.controller)}));
+  environments.push({phase:checks.length,requestedPolicy:coep,...headers,...environment});
+  assert.equal(environment.topLevel,true,'isolation is measured in the actual top-level document');
+  assert.equal(environment.secureContext,true);
+  assert.equal(environment.serviceWorkerControlled,false,'both policies block service workers equally');
+  assert.ok(Number.isFinite(environment.timeOrigin) && environment.timeOrigin>0);
+  assert.equal(environment.nativeTimeOrigin?.beforeClock,true,'native document time origin is captured before the clock');
+  assert.ok(Number.isFinite(environment.nativeTimeOrigin.native) && environment.nativeTimeOrigin.native>0);
+  if(coep==='require-corp')assert.equal(environment.isolated,true,'require-corp must really isolate this browser');
   await page.locator('.ctm-save-bar').waitFor({state:'visible'});
   await page.waitForFunction(()=>window.CTMStore && window.__storeEntries.some(e=>e.options.component==='math-exercise'));
   if(name==='index.html') await page.waitForFunction(()=>
@@ -226,7 +256,9 @@ try {
     await saved(page,'store-matrix',record=>record.inputs.matrices.A.rows===2 && record.inputs.matrices.A.cols===2);
     await saved(page,'store-pool',record=>record.variant.n===2);
     await captureResizeFinal(ctx);
-    await page.reload({waitUntil:'domcontentloaded'});await ready(page);
+    pageStage.set(page,'reloading');lifecycle.push({at:Date.now(),action:'reload-start',url:page.url(),phase:checks.length});
+    try {await page.reload({waitUntil:'domcontentloaded'});await ready(page);}
+    finally {pageStage.delete(page);lifecycle.push({at:Date.now(),action:'reload-end',url:page.url(),phase:checks.length});}
     assert.equal(await cell(page,'store-scalar').locator('input.math-input').inputValue(),'2');
     assert.deepEqual(await cell(page,'store-matrix').locator('input.math-input').evaluateAll(fields=>fields.map(f=>f.value)),['1','2','3','4']);
     assert.equal(await cell(page,'store-matrix').locator('.math-dynamic-matrix-wrap').evaluate(e=>e.matrixInput.read().rows),2);
@@ -270,6 +302,8 @@ try {
     checks.push('changed ordinary/variant/Python source offers read-only old answers and outdated tiles without rechecking');
     if(traceResize)await Promise.allSettled(resizeReads);
     await captureResizeFinal(ctx);
+    for(const page of ctx.pages())pageStage.set(page,'context-closing');
+    lifecycle.push({at:Date.now(),action:'context-close',phase:checks.length});
     await ctx.close();roots.course=path.join(root,'before','_site');
   }
   {
@@ -291,6 +325,8 @@ try {
     await noRestorePython(page);
     if(traceResize)await Promise.allSettled(resizeReads);
     await captureResizeFinal(ctx);
+    for(const page of ctx.pages())pageStage.set(page,'context-closing');
+    lifecycle.push({at:Date.now(),action:'context-close',phase:checks.length});
     await ctx.close();
   }
   {
@@ -306,6 +342,8 @@ try {
     await noRestorePython(page);
     if(traceResize)await Promise.allSettled(resizeReads);
     await captureResizeFinal(ctx);
+    for(const page of ctx.pages())pageStage.set(page,'context-closing');
+    lifecycle.push({at:Date.now(),action:'context-close',phase:checks.length});
     await ctx.close();
   }
   {
@@ -360,6 +398,8 @@ try {
     await noRestorePython(a);await noRestorePython(b);
     if(traceResize)await Promise.allSettled(resizeReads);
     await captureResizeFinal(ctx);
+    for(const page of ctx.pages())pageStage.set(page,'context-closing');
+    lifecycle.push({at:Date.now(),action:'context-close',phase:checks.length});
     await ctx.close();
   }
   const snapshots=[...resizeFailures,...resizeFinals];
@@ -374,13 +414,18 @@ try {
     assert.ok(layoutPatches.some(row=>row.component===component),'actual component source was observed');
     if(layoutPolicy==='both' || layoutPolicy===component)assert.ok(height.some(row=>row.component===component && row.executed>0),'selected original content-height callbacks execute');
   }
+  assert.ok(snapshots.every(row=>row.page==='about:blank' || (row.trace?.dom?.available &&
+    !row.trace.dom.clockAlreadyInstalled && row.trace.dom.measurementErrors.length===0)),
+    'mutation attribution is inconclusive if native timing or DOM records are unavailable or fail');
   const deferred=resizeFinals.flatMap(row=>row.trace?.callbacks || []).filter(row=>row.deferred && row.deliveries);
   assert.ok(deferred.every(row=>row.pending===0 && row.executed===row.deliveries),'a controlled policy is inconclusive unless every queued observer callback executes');
+  await Promise.all(navigationReads);
+  assert.deepEqual({consoleErrors,networkFailures,httpFailures},{consoleErrors:[],networkFailures:[],httpFailures:[]},'resource failures make diagnostic attribution inconclusive');
   assert.deepEqual(errors,[],'actual rendered pages have no uncaught errors');
-  console.log(JSON.stringify({browser:engine,checks,errors,...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',layoutPolicy,layoutPatches,layoutPatchErrors,resizeFinals}:{})},null,2));
+  console.log(JSON.stringify({browser:engine,coep,checks,errors,environments,consoleErrors,networkFailures,httpFailures,lifecycle,...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',layoutPolicy,layoutPatches,layoutPatchErrors,resizeFinals}:{})},null,2));
 } catch(error) {
   await Promise.allSettled(resizeReads);
-  console.error(JSON.stringify({browser:engine,checks,errors,url:active?.url(),...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',layoutPolicy,layoutPatches,layoutPatchErrors,resizeFailures,resizeFinals}:{})},null,2));
+  console.error(JSON.stringify({browser:engine,coep,checks,errors,environments,consoleErrors,networkFailures,httpFailures,lifecycle,url:active?.url(),...(traceResize?{resizePolicy:process.env.CTM_RESIZE_DEFER || 'none',layoutPolicy,layoutPatches,layoutPatchErrors,resizeFailures,resizeFinals}:{})},null,2));
   if(active && !active.isClosed()) console.error(await active.locator('body').innerText().catch(()=>'(page closed)'));
   throw error;
 } finally {
