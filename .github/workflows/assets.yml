@@ -165,8 +165,8 @@ jobs:
           PY
       - name: Produce deterministic PRIVATE PARTIAL candidate twice
         run: |
-          python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --output .asset-cache/python-candidate.json
-          python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --output .asset-cache/python-candidate-repeated.json
+          python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --licence-policy integration/assets-python-licences.json --output .asset-cache/python-candidate.json
+          python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --licence-policy integration/assets-python-licences.json --output .asset-cache/python-candidate-repeated.json
           cmp .asset-cache/python-candidate.json .asset-cache/python-candidate-repeated.json
       - name: Build and verify actual Python bytes, then install carried bundle without network
         run: |

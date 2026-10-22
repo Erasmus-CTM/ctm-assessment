@@ -15,16 +15,18 @@ npm/board composition, installer readiness or complete offline acceptance.
 Named extras use `--python-packages pandas,...`; `all` and unknown names fail.
 Each selected payload is checked against its official release-lock SHA-256.
 Wheel METADATA and licence texts are inspected without importing any code.
-Unknown licence expressions or missing own/curated texts fail. A reviewed
-`--licence-policy` JSON mapping can supply an exact package-version expression:
-`{"package":{"version":"exact","licence":"SPDX expression","source_offer":"..."}}`.
+Unknown licence expressions or missing own/curated texts fail. The reviewed
+`--licence-policy integration/assets-python-licences.json` mapping binds legacy
+metadata to an exact package version, wheel SHA-256, primary source URL and
+Git blob identity of the actual embedded licence file. Every override must
+match those bytes. It never infers a BSD variant from a classifier.
 Copyleft expressions additionally require explicit `--accept-licence` consent
 and a source offer. Curated CPython, Pyodide and Emscripten texts retain their
 official Git blob identities and are bound to the exact release; curated
 OpenBLAS/OpenSSL records apply only to their recorded package filenames.
 
 ```sh
-python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --output .asset-cache/python-candidate.json
+python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --licence-policy integration/assets-python-licences.json --output .asset-cache/python-candidate.json
 python scripts/ctm_assets.py build --lock .asset-cache/python-candidate.json --cache .asset-cache --bundle .private-python-built
 python scripts/ctm_assets.py verify --lock .asset-cache/python-candidate.json --bundle .private-python-built
 python scripts/ctm_assets.py install-carried --lock .asset-cache/python-candidate.json --source .private-python-built --bundle .private-python-installed

@@ -38,6 +38,10 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def git_blob_sha1(data: bytes) -> str:
+    return hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
+
+
 def json_bytes(value) -> bytes:
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
 
@@ -459,6 +463,20 @@ def materialize_bundle(lock: dict, stage: Path, cache: Path, *, accepted_licence
     validate_licence_policy(lock, accepted_licences)
     if not stage.is_dir() or stage.is_symlink() or any(stage.iterdir()):
         raise AssetError("Bundle materialization needs an empty regular stage")
+    outputs = [item["path"] for archive in lock["archives"] for item in archive["files"]]
+    outputs.extend(item["path"] for item in lock.get("generated", []))
+    seen = set()
+    for name in outputs:
+        relative_path(name)
+        portable = name.casefold()
+        if portable in seen or portable in {"manifest.json", "third-party-notices.md"}:
+            raise AssetError("Conflicting bundle output: " + name)
+        seen.add(portable)
+    for name in outputs:
+        if Path(name).suffix in COMPRESS and (name + ".gz").casefold() in seen:
+            raise AssetError("Precompressed bundle output conflicts with a source: " + name)
+        if any(str(parent).casefold() in seen for parent in PurePosixPath(name).parents if str(parent) != "."):
+            raise AssetError("Bundle output is also a parent file: " + name)
     cache.mkdir(parents=True, exist_ok=True)
     notices = ["# Third-party notices", ""]
     for archive in lock["archives"]:
@@ -889,6 +907,8 @@ def _python_archive(metadata: dict, cache: Path) -> tuple[dict, Path]:
             or not re.fullmatch(r"[a-f0-9]{64}", entry.get("sha256", ""))):
         raise AssetError("Python subset needs the exact canonical official release URL and SHA-256")
     cache = Path(cache)
+    if any(part.lower() in {"_ctm-assets", "_site", "_site-exam"} for part in cache.resolve().parts):
+        raise AssetError("The full Python archive cache must stay outside published assets")
     cache.mkdir(parents=True, exist_ok=True)
     archive = cache / ("archive-" + digest(json_bytes({k: entry.get(k) for k in ("url", "sha256", "integrity")})))
     download(entry["url"], archive, sha256=entry["sha256"], integrity=entry.get("integrity"))
@@ -994,7 +1014,7 @@ def _curated_python_licences(root: Path, release: str, python: str) -> dict:
     for name, record in provenance["entries"].items():
         path = relative_path(record["file"])
         data = root.joinpath(*path.parts).read_bytes()
-        blob = hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
+        blob = git_blob_sha1(data)
         if blob != record["git_blob_sha1"]:
             raise AssetError("Curated Python licence differs from its official Git blob: " + name)
         result[name] = dict(record, text=data.decode("utf-8"), sha256=digest(data))
@@ -1037,6 +1057,14 @@ def produce_python_lock(metadata: dict, cache: Path, *, extras=(), licence_polic
         if record is not None:
             if not isinstance(record, dict) or record.get("version") != package["version"]:
                 raise AssetError("Python licence policy requires exact package version: " + name)
+            if (record.get("sha256") != package["sha256"]
+                    or not isinstance(record.get("source"), str)
+                    or not re.fullmatch(r"https://github\.com/[^/]+/[^/]+/blob/[^?#]+", record["source"])
+                    or not re.fullmatch(r"[a-f0-9]{40}", record.get("git_blob_sha1", ""))):
+                raise AssetError("Python licence policy needs pinned wheel and primary source evidence: " + name)
+            text = package["licence_texts"].get(record.get("licence_file"))
+            if text is None or git_blob_sha1(text.encode("utf-8")) != record["git_blob_sha1"]:
+                raise AssetError("Python licence text differs from the primary source Git blob: " + name)
             expression = record.get("licence")
             if record.get("source_offer"):
                 source_offers.append(record["source_offer"])
@@ -1086,6 +1114,7 @@ def produce_python_lock(metadata: dict, cache: Path, *, extras=(), licence_polic
             "python_packages": package_policy, "python_roots": sorted(set(EXAM_PACKAGES)),
             "python_extras": sorted(set(extras)), "provenance": {
                 "metadata_sha256": digest(json_bytes(metadata)),
+                "licence_policy": {name: policy[name] for name in sorted(set(policy) & set(report["packages"]))},
                 "curated_licences": {key: {k: v for k, v in value.items() if k != "text"}
                                      for key, value in sorted(curated.items())}}}
     lock["files"] = derive_lock_files(lock, cache, accepted_licences=accepted_licences)
@@ -1343,4 +1372,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
-
