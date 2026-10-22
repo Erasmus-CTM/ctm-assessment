@@ -1,6 +1,6 @@
 name: Replay reviewed asset baseline
-# Reproduce the real 294 -> 65 package migration with current comparison tools.
-# Fixed source refs prevent a moving course branch from changing this evidence.
+# Reproduce the asset migration and reviewed B6 order fix with current tools.
+# Exact package and course refs prevent upstream movement from changing evidence.
 on:
   pull_request:
     paths:
@@ -25,7 +25,7 @@ jobs:
       course: aacchhee/ingmat3a_ntnu
       course-ref: e45851080f462e84cde281528f21d4f21292a6ba
       base: 294d5b86d06af5fecb5fcf50dc4562b17ee5c273
-      head: 65be5facbf67f900533a71cd950aa82e5c4c1e95
+      head: a628299e5ae719a4077c9c440d39f4e4914a547d
   demo:
     uses: ./.github/workflows/compare-courses.yml
     with:

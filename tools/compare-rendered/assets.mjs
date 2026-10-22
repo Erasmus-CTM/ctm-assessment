@@ -72,6 +72,7 @@ export function loadAssetSources(project,pinsFile) {
 }
 export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
   markBoardChanges(items,context,page);
+  markPreloadDefault(A,B,items,context);
   const configScripts=doc=>[...doc.querySelectorAll('script:not([src])')].filter(s=>s.textContent.includes('CTM_ASSETS'));
   const helperScripts=doc=>resources(doc).filter(e=>normalize(raw(e))==='ctm-assets/assets.js');
   const active=configScripts(A.doc).length||configScripts(B.doc).length||helperScripts(A.doc).length||helperScripts(B.doc).length;
@@ -245,4 +246,17 @@ function checkRetainedResources(a,b,items,page){
    if(!same(old.map(identity),fresh.map(identity)))
      items.push({page,area:'assets',change:'invalid',what:'Retained resource URL/attributes/multiplicity/order changed: '+normalize(raw(old[0])),invariant:true});
  }
+}
+
+// The historical worker always scheduled background preloads. The new option
+// defaults to true; only making that existing behavior explicit is equivalent.
+function markPreloadDefault(A,B,items,context){
+ if(!context)return;
+ const a=A.configs.qpyodideSettings,b=B.configs.qpyodideSettings;
+ if(a?.length!==1||b?.length!==1)return;
+ const old=a[0],fresh=b[0];
+ if(!old||!fresh||Array.isArray(old)||Array.isArray(fresh)||Object.hasOwn(old,'qpyodidePreloadPackages')||fresh.qpyodidePreloadPackages!==true)return;
+ const rest={...fresh};delete rest.qpyodidePreloadPackages;
+ if(!same(sorted(old),sorted(rest)))return;
+ for(const item of items)if(item.area==='config'&&item.change==='changed'&&item.object==='qpyodideSettings'&&item.path==='/0/qpyodidePreloadPackages'&&item.before===undefined&&item.after===true)item.assets='preload-default';
 }

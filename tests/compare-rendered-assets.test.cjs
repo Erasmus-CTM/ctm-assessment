@@ -213,17 +213,51 @@ test('resource-order failures retain their full diagnostic evidence',()=>{
 test('historical asset replay fixes both package sides and course sources',()=>{
  const workflow=require('js-yaml').load(fs.readFileSync(path.join(root,'.github/workflows/compare-assets-baseline.yml'),'utf8'));
  assert.equal(Object.keys(workflow.jobs).length,3);
- const sides=new Set();
+ const sides=new Set(),bases=new Set();
  for(const job of Object.values(workflow.jobs)){
    assert.equal(job.uses,'./.github/workflows/compare-courses.yml');
    assert.equal(job.with['tooling-ref'],'${{ github.event.pull_request.head.sha }}');
    assert.match(job.with.base,/^[a-f0-9]{40}$/);
    assert.match(job.with.head,/^[a-f0-9]{40}$/);
    assert.notEqual(job.with.base,job.with.head);
-   sides.add(job.with.base+' '+job.with.head);
+   sides.add(job.with.head);bases.add(job.with.base);
    if(job.with.course!=='examples')assert.match(job.with['course-ref'],/^[a-f0-9]{40}$/);
    assert.equal(job.with.convert,undefined);
    assert.equal(job.with['review-refs'],undefined);
  }
- assert.equal(sides.size,1);
+ assert.equal(bases.size,1);
+ assert.equal(sides.size,2);
+ assert.equal(workflow.jobs.examples.with.head,workflow.jobs.demo.with.head);
+ assert.notEqual(workflow.jobs['main-course'].with.head,workflow.jobs.demo.with.head);
+});
+
+
+test('only an absent captured preload default becoming boolean true is equivalent',()=>{
+ const f=fixture();try{
+   const settings=(value,extra='')=>'<script>// qpyodide-document-settings.js\nglobalThis.qpyodideInstallPythonPackagesList = ["numpy"];\n'+(value===undefined?'':'globalThis.qpyodidePreloadPackages = '+value+';\n')+extra+'</script>';
+   const before=f.before.replace('</head>',settings()+'</head>');
+   const after=(value,extra='')=>f.after.replace('</head>',settings(value,extra)+'</head>');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),before);
+   const good=f.run(after('true'));assert.equal(good.status,0,JSON.stringify(good));
+   const row=good.report.items.find(i=>i.assets==='preload-default');
+   assert.equal(row.category,'pyodide-default-preloads');
+   assert.equal(row.path,'/0/qpyodidePreloadPackages');
+   assert.equal(row.after,true);assert.equal(row.before,undefined);
+   for(const value of ['false','"true"','1','null','[]','{}'])assert.equal(f.run(after(value)).status,1,value+' must stay unexplained');
+   assert.equal(f.run(after('true','globalThis.unrelated = true;\n')).status,1,'additional fields stay unexplained');
+   assert.equal(f.run(after('true').replace('["numpy"]','["scipy"]')).status,1,'other keys stay unexplained');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',settings('true')+'</head>'));
+   assert.equal(f.run(after('true')).status,0,'existing true remains unchanged');
+   assert.equal(f.run(after('false')).status,1,'true to false stays unexplained');
+   assert.equal(f.run(after()).status,1,'removing an existing option stays unexplained');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',settings('false')+'</head>'));
+   assert.equal(f.run(after('true')).status,1,'existing false cannot become true silently');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',settings('null')+'</head>'));
+   assert.equal(f.run(after('true')).status,1,'existing null cannot become true silently');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),before.replace('</head>',settings()+'</head>'));
+   assert.equal(f.run(after('true').replace('</head>',settings()+'</head>')).status,1,'additional captured array positions stay unexplained');
+   const other=settings().replace('["numpy"]','["sympy"]');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),before.replace('</head>',other+'</head>'));
+   assert.equal(f.run(f.after.replace('</head>',other+settings('true')+'</head>')).status,1,'moved captured array positions stay unexplained');
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });
