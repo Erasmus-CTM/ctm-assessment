@@ -68,6 +68,76 @@ function mathControl(incoming,mode) {
   return incoming.replace(mathSetupBlock,()=>replacement);
 }
 
+const fixtureHtml=fs.readFileSync(path.join(fixture,'index.html'),'utf8');
+// Exact CTM plus enhancement startup dependency set. Inline settings/manifest data stay.
+// Font Awesome/Monaco dynamic style/icon creation is intentionally part of the omitted group.
+const startupPaths=[
+  "site_libs/quarto-contrib/ctm-assets-0.9.0/assets.js",
+  "site_libs/quarto-contrib/ctm-reveal-0.9.0/ctm-reveal.js",
+  "site_libs/quarto-contrib/ctm-nav-0.9.0/ctm-nav.js",
+  "site_libs/quarto-contrib/ai-feedback-0.9.0/feedback-core.js",
+  "site_libs/quarto-contrib/ai-feedback-0.9.0/feedback-dom.js",
+  "site_libs/quarto-contrib/ai-feedback-0.9.0/ai-feedback.js",
+  "site_libs/quarto-contrib/ctm-runtime-0.9.0/pyodide-runtime.js",
+  "site_libs/quarto-contrib/ctm-checkers-0.6.1.dev0+9ebf60db/ctm-checkers.js",
+  "site_libs/quarto-contrib/ctm-locale-0.9.0/ctm-locale.js",
+  "site_libs/quarto-contrib/ctm-locale-0.9.0/common.js",
+  "site_libs/quarto-contrib/ctm-locale-math-exercise-0.9.0/math-exercise.js",
+  "site_libs/quarto-contrib/ctm-locale-ui-0.9.0/ui.js",
+  "site_libs/quarto-contrib/ctm-copy-0.9.0/ctm-copy.js",
+  "site_libs/quarto-contrib/ctm-store-0.9.0/ctm-store.js",
+  "site_libs/quarto-contrib/ctm-locale-py-exercise-0.9.0/py-exercise.js",
+  "site_libs/quarto-contrib/ctm-worker-0.9.0/pyodide-worker.js",
+  "site_libs/quarto-contrib/ctm-locale-pyodide-interaktiv-0.9.0/pyodide-interaktiv.js",
+  "site_libs/quarto-contrib/pyodide-interaktiv-1.10.0/qpyodide-locale.js",
+  "site_libs/quarto-contrib/pyodide-interaktiv-1.10.0/qpyodide-storage.js",
+  "site_libs/quarto-contrib/pyodide-interaktiv-1.10.0/qpyodide-document-status.js",
+  "site_libs/quarto-contrib/pyodide-interaktiv-1.10.0/qpyodide-storage-settings.js",
+  "site_libs/quarto-contrib/pyodide-interaktiv-1.10.0/qpyodide-worker-plugin.js",
+  "site_libs/quarto-contrib/pyodide-interaktiv-1.10.0/qpyodide-document-engine-initialization.js",
+  "site_libs/quarto-contrib/pyodide-interaktiv-1.10.0/qpyodide-canvas-plots.js",
+  "site_libs/quarto-contrib/ctm-export-0.9.0/ctm-export.js",
+  "site_libs/quarto-contrib/ctm-progress-0.9.0/ctm-progress.js",
+  "site_libs/quarto-contrib/math-exercise-0.11.0/matrix-input.js",
+  "site_libs/quarto-contrib/math-exercise-0.11.0/math-store.js",
+  "site_libs/quarto-contrib/math-exercise-0.11.0/math-exercise.js",
+  "site_libs/quarto-contrib/py-exercise-0.5.0/py-exercise.js",
+  "site_libs/quarto-contrib/pyodide-interaktiv-1.10.0/qpyodide-cell-classes.js",
+  "site_libs/quarto-contrib/pyodide-interaktiv-1.10.0/qpyodide-cell-initialization.js"
+];
+const startupTags=startupPaths.map(src=>'<script src="'+src+'"'+
+  (src.includes('/pyodide-interaktiv-1.10.0/')?' type="module"':'')+'></script>');
+startupTags.push(
+  '<script src="./coi-serviceworker.js"></script>',
+  '<script src="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/js/all.min.js" defer="" crossorigin="anonymous"></script>',
+  '<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs/loader.js"></script>',
+  "<script type=\"module\" id=\"qpyodide-monaco-editor-init\">\n\n  // Configure the Monaco Editor's loader\n  require.config({\n    paths: {\n      'vs': CTMAssets.url('monaco-editor', 'min/vs')\n    }\n  });\n</script>"
+);
+assert.equal(startupTags.length,36);
+const scriptInventory=[...fixtureHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].map(match=>({
+  attrs:match[1],bytes:Buffer.byteLength(match[0]),
+  sha256:createHash('sha256').update(match[0]).digest('hex')
+}));
+const omittedManifest=startupTags.map(tag=>({tag,bytes:Buffer.byteLength(tag),
+  sha256:createHash('sha256').update(tag).digest('hex')}));
+function startupControl(incoming,mode){
+  assert.equal(incoming,fixtureHtml,'startup comparison uses exact original fixture HTML bytes');
+  assert.ok(['native','omit'].includes(mode));
+  for(const tag of startupTags)assert.equal(incoming.split(tag).length,2,'exact startup tag occurs once: '+tag);
+  if(mode==='native')return incoming;
+  let changed=incoming;
+  for(const tag of startupTags)changed=changed.replace(tag,'');
+  // This equality also protects every non-script content/style byte and all retained scripts.
+  const retained=[...incoming.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)]
+    .map(match=>match[0]).filter(tag=>!startupTags.includes(tag));
+  assert.deepEqual([...changed.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]),retained);
+  return changed;
+}
+if(process.env.CTM_RESIZE_STARTUP_ONLY==='1'){
+  console.log(JSON.stringify({startupInventory:scriptInventory,omittedManifest}));
+  startupControl(fixtureHtml,'omit'); // Fail closed before browser work if any expected byte/count differs.
+}
+
 function traceNativeObservers() {
   const trace=window.__resizeProbe={created:[],callbacks:[],errors:[]};
   const NativeResizeObserver=window.ResizeObserver;
@@ -108,12 +178,17 @@ const corpServer=await serve({stock,fixture,plain},true,'require-corp');
 const corpBase='http://127.0.0.1:'+corpServer.address().port;
 const report={browser:engine,quartoVersion:'1.8.27',sourceSha256,
   headers:{coop:'same-origin',coep:'credentialless'},samples:[]};
+if(process.env.CTM_RESIZE_STARTUP_ONLY==='1')report.startup={
+  fixtureHtmlSha256:createHash('sha256').update(fixtureHtml).digest('hex'),omittedManifest,scriptInventory};
 let browser;
 try {
   browser=await playwright[engine].launch({headless:true});
   report.browserVersion=browser.version();
   report.mathSourceBlob=mathSourceBlob;
-  const cases=process.env.CTM_RESIZE_MATH_FRAME_ONLY==='1'?[
+  const cases=process.env.CTM_RESIZE_STARTUP_ONLY==='1'?[
+    {label:'startup-native-routed',root:'fixture',mode:'native',startupMode:'native',coep:'require-corp',repeats:12},
+    {label:'startup-omitted',root:'fixture',mode:'native',startupMode:'omit',coep:'require-corp',repeats:12}
+  ]:process.env.CTM_RESIZE_MATH_FRAME_ONLY==='1'?[
     {label:'math-native-routed',root:'fixture',mode:'native',mathMode:'native',repeats:12},
     {label:'math-frame',root:'fixture',mode:'native',mathMode:'frame',repeats:12},
     {label:'math-native-require-corp',root:'fixture',mode:'native',mathMode:'native',coep:'require-corp',repeats:12},
@@ -150,6 +225,11 @@ try {
       const response=await route.fetch();mathSubstitutions++;
       await route.fulfill({response,body:mathControl(await response.text(),control.mathMode)});
     });
+    let htmlSubstitutions=0;
+    if(control.startupMode)await ctx.route('**/fixture/index.html',async route=>{
+      const response=await route.fetch();htmlSubstitutions++;
+      await route.fulfill({response,body:startupControl(await response.text(),control.startupMode)});
+    });
     const page=await ctx.newPage();
     page.setDefaultTimeout(90000);
     for(let navigation=0;navigation<(control.navigations||1);navigation++) {
@@ -170,7 +250,7 @@ try {
       assert.equal(response.status(),200);
       assert.equal(response.headers()['cross-origin-opener-policy'],'same-origin');
       assert.equal(response.headers()['cross-origin-embedder-policy'],coep);
-      if(control.root==='fixture')await page.locator('.ctm-save-bar').waitFor({state:'visible'});
+      if(control.root==='fixture' && control.startupMode!=='omit')await page.locator('.ctm-save-bar').waitFor({state:'visible'});
       await page.waitForLoadState('load');
       await page.waitForTimeout(1000);
       const snapshot=await page.evaluate(()=>({trace:window.__resizeProbe,readyState:document.readyState,
@@ -178,7 +258,9 @@ try {
         coi:{outcome:window.qpyodideCoiOutcome,inputState:window.qpyodideInputState,
           controlled:!!navigator.serviceWorker?.controller,
           navigation:performance.getEntriesByType('navigation')[0]?.type},
-        storeReady:!!window.CTMStore,mathInputs:document.querySelectorAll('input.math-input').length,
+        storeReady:!!window.CTMStore,startupGlobals:{nav:!!window.CTMNav,reveal:!!window.CTMReveal,assets:!!window.CTMAssets},mathInputs:document.querySelectorAll('input.math-input').length,
+        mathSavedAnswers:document.querySelectorAll('.math-exercise-cell > .math-saved-answer').length,
+        mathSavedResults:document.querySelectorAll('.math-exercise-cell > .math-saved-result').length,
         body:window.__resizeProbe.callbacks.flatMap(callback=>callback.entries).filter(entry=>entry.tag==='BODY').at(-1)?.rect,
         controlHeight:document.getElementById('height-control')?.style.height,
         viewport:{width:innerWidth,height:innerHeight},
@@ -187,9 +269,27 @@ try {
         quarto:document.querySelector('meta[name="generator"]')?.content,
         scripts:[...document.scripts].map(s=>s.src).filter(Boolean)}));
       await page.waitForTimeout(100);
+      report.samples.push({label:control.label,sample,navigation,coep,origin,quartoSubstitutions:substitutions,mathSubstitutions,htmlSubstitutions,startupMode:control.startupMode,errors,failedRequests,consoleMessages,droppedConsole,...snapshot});
+      console.log(JSON.stringify({label:control.label,sample,navigation,coep,errors,failedRequests,coi:snapshot.coi,consoleMessages,
+        quartoSubstitutions:substitutions,mathSubstitutions,htmlSubstitutions,startupMode:control.startupMode,mathSetup:snapshot.mathSetup,
+        callbackCount:snapshot.trace.callbacks.length,body:snapshot.body,isolated:snapshot.isolated,marginCount:snapshot.marginCount}));
       if(control.mode==='no-body-observer' && control.root==='stock')assert.equal(snapshot.controlHeight,'1200px');
+      else if(control.startupMode==='omit'){assert.equal(snapshot.body?.width,1280);assert.ok(snapshot.body.height>0);}
       else if(control.mode!=='no-body-observer')assert.ok(snapshot.body?.height>900,'native BODY entries retain a page taller than the viewport');
-      if(control.root==='fixture'){assert.equal(snapshot.storeReady,true);assert.ok(snapshot.mathInputs>0);}
+      if(control.root==='fixture' && control.startupMode!=='omit'){assert.equal(snapshot.storeReady,true);assert.ok(snapshot.mathInputs>0);}
+      if(control.startupMode){
+        assert.deepEqual(failedRequests,[],'startup comparison retains all required requests');
+        assert.ok(errors.every(error=>error.message==='ResizeObserver loop completed with undelivered notifications.'),
+          'startup omission must not introduce unrelated script/dependency errors');
+        assert.equal(snapshot.ctmNodes,8,'actual build-time CTM content remains');
+        if(control.startupMode==='native'){
+          assert.equal(snapshot.mathInputs,7);assert.equal(snapshot.mathSavedAnswers,7);assert.equal(snapshot.mathSavedResults,7);
+        }
+        if(control.startupMode==='omit'){
+          assert.equal(snapshot.storeReady,false);assert.equal(snapshot.mathInputs,0);assert.equal(snapshot.mathSetup,null);
+          assert.deepEqual(snapshot.startupGlobals,{nav:false,reveal:false,assets:false});
+        }
+      }
       if(coep==='require-corp')assert.equal(snapshot.isolated,true);
       if(control.mathMode){
         assert.equal(snapshot.mathSetup?.phase,'setup-complete-before-preload');
@@ -207,14 +307,11 @@ try {
       }
       if(control.mode==='no-body-observer')assert.ok(!snapshot.trace.callbacks.some(c=>c.entries.some(e=>e.tag==='BODY')));
       else assert.ok(snapshot.trace.callbacks.some(c=>c.entries.some(e=>e.tag==='BODY')),'native BODY observation delivered');
-      report.samples.push({label:control.label,sample,navigation,coep,origin,quartoSubstitutions:substitutions,mathSubstitutions,errors,failedRequests,consoleMessages,droppedConsole,...snapshot});
-      console.log(JSON.stringify({label:control.label,sample,navigation,coep,errors,failedRequests,coi:snapshot.coi,consoleMessages,
-        quartoSubstitutions:substitutions,mathSubstitutions,mathSetup:snapshot.mathSetup,
-        callbackCount:snapshot.trace.callbacks.length,body:snapshot.body,isolated:snapshot.isolated,marginCount:snapshot.marginCount}));
       page.off('pageerror',onError);page.off('requestfailed',onFailure);page.off('console',onConsole);
     }
     if(routed)assert.equal(substitutions,control.navigations||1);
     if(control.mathMode){assert.equal(mathSubstitutions,1);assert.equal(substitutions,0);}
+    if(control.startupMode){assert.equal(htmlSubstitutions,1);assert.equal(mathSubstitutions,0);assert.equal(substitutions,0);}
     await ctx.close();
   }
   report.summary=[...new Set(report.samples.map(s=>s.label))].map(label=>{
@@ -230,7 +327,7 @@ try {
     }
   }
   for(const sample of report.samples.filter(s=>s.errors.length))console.log(JSON.stringify({failedSample:sample}));
-  assert.ok(report.samples.some(s=>['actual-store-positive-control','actual-native','math-native-routed'].includes(s.label) && s.errors.length),
+  assert.ok(report.samples.some(s=>['actual-store-positive-control','actual-native','math-native-routed','startup-native-routed'].includes(s.label) && s.errors.length),
     'positive control must reproduce raw errors; otherwise stock negatives cannot establish causality');
 } finally {
   fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));
