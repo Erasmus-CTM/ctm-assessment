@@ -1328,6 +1328,8 @@ def validate_bound_import_index(index_bytes: bytes, binding: dict, *, public_fil
         raise AssetError("Private index needs the canonical official Python archive")
     verify_bytes(index_bytes, sha256=binding["sha256"])
     index = _availability_json(index_bytes, "private import index")
+    if index_bytes != json_bytes(index):
+        raise AssetError("Private import index must use canonical JSON bytes")
     if (set(index) != {"v", "python", "stdlib_modules", "source", "packages"}
             or type(index.get("v")) is not int or index["v"] != 1 or index["python"] != binding["python"]
             or not isinstance(index["stdlib_modules"], list) or not index["stdlib_modules"]

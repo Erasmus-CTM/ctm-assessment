@@ -221,6 +221,9 @@ class CompleteCompositionTests(unittest.TestCase):
         changed["stdlib_modules"].append("unreviewed_module")
         with self.assertRaises(assets.AssetError):
             self.compose(private_index_bytes=assets.json_bytes(changed))
+        noncanonical = b" " + self.index_bytes
+        with self.assertRaisesRegex(assets.AssetError, "canonical JSON bytes"):
+            self.compose(private_index_bytes=noncanonical, reviewed_index_sha256=assets.digest(noncanonical))
 
     def test_private_schema_and_provenance_mutations_refused(self):
         original = copy.deepcopy(self.index)
