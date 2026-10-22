@@ -12,7 +12,7 @@ AC'S UPDATED PRIORITY (21 October 2026; binding)
 AUTHORITATIVE CHECKPOINT — 22 October 2026, upload recovery
 This replaces the older 21 October progress blocks. Original designs, model rules and handoffs remain binding. The task lists after START HERE describe the original assignment; use the current heads and statuses here.
 
-AC's current request: upload all work that is done. Commit substantial work on its non-main branch, including clearly labelled WIP checkpoints; keep this prompt current. Finish all remaining non-STACK-sympy work first. Significant shared ctm-checkers work that serves other components must be implemented. Use all available workers where independent work permits. AC alone merges; never merge, force-push or tag.
+AC's current request: verify independent reviews, exact green builds and ordered merge sets; provide a sequence of PR links. The upload recovery is complete for all recoverable code. Commit substantial work on its non-main branch, including clearly labelled WIP checkpoints; keep this prompt current. Finish all remaining non-STACK-sympy work first. Significant shared ctm-checkers work that serves other components must be implemented. Use all available workers where independent work permits. AC alone merges; never merge, force-push or tag.
 
 Uploaded code ledger (all PRs below remain draft)
 | Repository / PR | Current uploaded head | Upload scope |
@@ -26,6 +26,23 @@ Uploaded code ledger (all PRs below remain draft)
 | ctm-assessment#29 | 317a120ccc7d2745d821cabffe6e5d6a2a76776a | recovered scanner/probe WIP, 40 native tests |
 | ctm-checkers#15 | 6bd454d5479954d5c639945c94cf98a7bc6f89fd | recovered neutral variant model WIP, bounded source reviewed |
 | ctm-assessment#31 | 54e9e6d2e2fbb8ec0cbd03d98fd0dbe2a440dbf6 | recovered diagnostic WIP, not a cause/fix claim |
+
+MERGE REVIEW QUEUE — verified 22 October 2026
+AC requests that merge candidates have independent review according to the rules and that related PRs are presented in order. Fresh independent Astra xhigh verification checked the existing source verdicts, current heads/bases, dependency pins and exact-head checks. No source changes since those verdicts, no unresolved threads, all six listed heads behind0 at verification.
+
+1. Course set: assessment#25 @4edd42835a8923ebeac1a44b158add3c2698b75c (10 passed/deploy skipped) -> ingmat3a#16 @a99c8b52ce422e34da1b426909197e545ef9a931 (15 passed). Merge this set first, in one sitting.
+2. After assessment main moves, synchronize/review the alias branch delta and rerun combined CI. Then libs#32 @c7633d8087ce4f30817080858d9edd4b530ab8d3 -> assessment#26 @54ff136a2d78eef48799e2a004df060c71f3f2ba (currently14 and18 passed/deploy skipped). Refreshed heads will replace these SHAs; reverify pins before sending.
+3. Synchronize/review/recheck assessment#27 @c1f509c301e786f7573b8a5c35745570a4d853d1 before its turn (currently3 passed/deploy skipped).
+4. After server#27 merges, synchronize/review/recheck assessment#30 @419ccd741792d7856f28ba4fadf02d5678af4815 before merging it (currently12 passed/deploy skipped). Its bounded checker tooling is independent of unfinished full-offline assets delivery; workflow tests exact server c1f509c. PR30 body reconciled and draft=false.
+
+These are separate stages, not an uninterrupted six-PR merge clearance: every assessment main move triggers the base/pin/copy/combined-CI protocol for later stages. AC uses merge commits only; verify each resulting tree equals the reviewed head tree.
+
+Review evidence:
+- libs32 direct exact-head Astra review https://github.com/Erasmus-CTM/ctm-libs/pull/32#pullrequestreview-5606252871.
+- assessment26 direct exact-head source/correction https://github.com/Erasmus-CTM/ctm-assessment/pull/26#pullrequestreview-5606253946 and final set https://github.com/Erasmus-CTM/ctm-assessment/pull/26#pullrequestreview-5606484818.
+- Course25/16, server27 and checker30 independent source approvals are retained in PR descriptions and this handoff checkpoint; their GitHub review lists are empty. Do not describe these as GitHub APPROVED-state submissions. Fresh verification checks readiness, not a new full original-source audit. The original independent source verdicts/coverage and exact tested heads are recorded in the sections below.
+
+All other work remains HOLD: store combined failures/stale pins, assets incomplete integration/overlapping aggregate, question tests still have pending ordinary jobs despite all4 Linux/Windows render jobs now green, variants still model-only WIP, diagnostic not a fix, STACK review findings unclosed. A green component build alone is not a mergeable set.
 
 Environment and recovery
 - The project now has a writable Linux workspace. The earlier disconnected Windows filesystem and functions-store drafts did not survive the transition. GitHub refs, Git objects and Actions output are the recovery sources. Do not wait for a desktop app or gh CI process.
@@ -71,7 +88,7 @@ Assets/offline: partial, no full delivery claim
 - Official metadata4030bytes blobab32ecaae94838d695de0011d250da069f3e5342 committed45dddcec5f8f2e87e5924465a24354b8e96214ad; archive1,142,693bytes/381chunks blob495b5958ac8117adb4ba7f651c45ac3dec927512 reports in jobs119510515691/773. FullPyodide lock CACHE ONLY, no published1MB report. Default28package closure36.66MB, official hashes/licences; not yet full populated installer/offline acceptance.
 - Math assets#29 latest5b13dc4b1c4f002ddc2bf029a1ae9e73529663fc: fresh independent Astra finaldelta SOURCE PASS, all7exactchecksGREEN,165pass/0fail/1expected legacy-capabilityskip. Early used-math assets guard precedes settings read without weakening canonical policy; strict registration regex extended. Union0328 pinned. Combinedassets/offline still separate.
 - Py assets#11 d079c4223a6cafa30933414bc81388fdb84317d7 and B6 assets#7 1194a76b75b2aeacf37c18eec1b58eec9dd2c3c2 remain WIP, not source-approved. Prepared B5pyFiles5paths/B5cellFiles4paths did not survive stores. Recover/reimplement known fixes with fresh tests: missing assets diagnostic before Meta (B6 names umbrella+standalone reinstall), local missingcollector failclosed, eval:false exclude B6 fragments, index URL selection only at load/Meta, local server messages, legacy6f5 workflow. Canonical B6 union copies require generation, no manual edits.
-- Offline checker assessment#30 @419ccd741792d7856f28ba4fadf02d5678af4815, source+exact bounded ChromiumCI PASS17/17 run39687271868/job119524411770. Dynamic append/remove/reassign5each refused, copiedprefix/prependedauthor5refused, opaque earlyfetch/XHR/data/image caught, localpositive5loads20boardchecks. Model alwaysblank5/5/plainhidden20/20blank/refresh0/5blank. This is checker-contract and mechanism MODEL proof, NOT course/full offline or upstreamforkPR2 proof.
+- Offline checker assessment#30 @419ccd741792d7856f28ba4fadf02d5678af4815 is now draft=false, bounded tooling READY at the current base: all12checks passed/deploy skipped, fresh independent Astra readiness verification. Source+exact bounded ChromiumCI PASS17/17 run39687271868/job119524411770. Dynamic append/remove/reassign5each refused, copiedprefix/prependedauthor5refused, opaque earlyfetch/XHR/data/image caught, localpositive5loads20boardchecks. Model alwaysblank5/5/plainhidden20/20blank/refresh0/5blank. This is checker-contract and mechanism MODEL proof, NOT course/full offline or upstreamforkPR2 proof.
 - AC/Claude own JSXGraph fork/upstream PR2; no fork edits. Re-pin only after AC says upstream merged. Floating board/font candidates are not pins; exact versions still a gate. Font base is package root with trailing slash.
 
 Variants and H1
