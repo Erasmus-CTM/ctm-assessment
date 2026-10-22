@@ -68,23 +68,36 @@ def check_sources(sources: list[dict], full_lock: dict, subset: dict, *, local_m
         queue.append(({"source": source, "origin": f"local module {path}"}, package, path))
 
     def inspect_local(module):
-        """Resolve actual .py/package files; namespace directories have no code."""
-        parts = module.split(".")
-        for directory in directories:
-            root = directory / parts[0]
-            if not root.is_dir() and not root.with_suffix(".py").is_file():
-                continue
-            # Importing pkg.sub executes every reachable package __init__ first.
-            for length in range(1, len(parts) + 1):
-                stem = directory.joinpath(*parts[:length])
+        """Resolve regular packages first, retaining all namespace portions."""
+        search = directories
+        rooted = False
+        prefix = []
+        for part in module.split("."):
+            prefix.append(part)
+            namespaces, source, package = [], None, None
+            for directory in search:
+                stem = directory / part
                 initialiser = stem / "__init__.py"
                 if initialiser.is_file():
-                    enqueue_file(initialiser, ".".join(parts[:length]))
-            target = directory.joinpath(*parts)
-            if target.with_suffix(".py").is_file():
-                enqueue_file(target.with_suffix(".py"), module)
-            return True
-        return False
+                    source, package = initialiser, stem
+                    break
+                if stem.with_suffix(".py").is_file():
+                    source = stem.with_suffix(".py")
+                    break
+                if stem.is_dir():
+                    namespaces.append(stem)
+            if source is not None:
+                rooted = True
+                enqueue_file(source, ".".join(prefix))
+                if package is None:
+                    return True
+                search = [package]
+            elif namespaces:
+                rooted = True
+                search = namespaces
+            else:
+                return rooted
+        return rooted
 
     def require_module(module, origin):
         if not module:

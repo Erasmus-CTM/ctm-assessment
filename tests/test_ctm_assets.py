@@ -2,6 +2,7 @@ import base64
 import gzip
 import hashlib
 import importlib.util
+from importlib.machinery import PathFinder
 import io
 import json
 import os
@@ -200,6 +201,44 @@ class AssetsTests(unittest.TestCase):
             helper.write_text("from importlib import import_module as load\n", encoding="utf-8")
             with self.assertRaisesRegex(A.AssetError, "pandas"):
                 A.check_python_sources([{"source": "import helper\nload('pandas')"}], full, {"packages": {}}, local_dirs=[root])
+
+    def test_later_regular_local_package_overrides_earlier_namespace_portion(self):
+        full = {"stdlib_modules": [], "packages": {"pandas": {"imports": ["pandas"]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            project, page = Path(tmp) / "project", Path(tmp) / "page"
+            for directory in (project, page):
+                (directory / "pkg").mkdir(parents=True)
+            helper = page / "pkg" / "__init__.py"
+            helper.write_text("import pandas\nraise RuntimeError('author code must never run')\n", encoding="utf-8")
+            directories = [str(project), str(page)]
+            resolved = PathFinder.find_spec("pkg", directories)
+            self.assertEqual(Path(resolved.origin), helper)
+            with self.assertRaisesRegex(A.AssetError, "pandas.*local module"):
+                A.check_python_sources([{"source": "import pkg"}], full, {"packages": {}}, local_dirs=directories)
+            report = A.check_python_sources([{"source": "import pkg"}], full,
+                                            {"packages": {"pandas": {}}}, local_dirs=directories)
+            self.assertEqual(report["imports"], ["pandas", "pkg"])
+
+    def test_split_namespace_local_submodule_is_inspected_in_later_portion(self):
+        full = {"stdlib_modules": [], "packages": {"pandas": {"imports": ["pandas"]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            project, page = Path(tmp) / "project", Path(tmp) / "page"
+            for directory in (project, page):
+                (directory / "pkg").mkdir(parents=True)
+            helper = page / "pkg" / "inner.py"
+            helper.write_text("import pandas\nraise RuntimeError('author code must never run')\n", encoding="utf-8")
+            directories = [str(project), str(page)]
+            namespace = PathFinder.find_spec("pkg", directories)
+            self.assertIsNone(namespace.origin)
+            resolved = PathFinder.find_spec("pkg.inner", namespace.submodule_search_locations)
+            self.assertEqual(Path(resolved.origin), helper)
+            for authored in ("import pkg.inner", "from pkg import inner"):
+                with self.subTest(authored=authored):
+                    with self.assertRaisesRegex(A.AssetError, "pandas.*local module"):
+                        A.check_python_sources([{"source": authored}], full, {"packages": {}}, local_dirs=directories)
+                    report = A.check_python_sources([{"source": authored}], full,
+                                                    {"packages": {"pandas": {}}}, local_dirs=directories)
+                    self.assertEqual(report["imports"], ["pandas", "pkg"])
 
     def test_scanner_stdin_is_utf8_even_when_native_pipe_encoding_is_ansi(self):
         scanner = Path(__file__).resolve().parents[1] / "_extensions/ctm-assessment/author-imports.py"
