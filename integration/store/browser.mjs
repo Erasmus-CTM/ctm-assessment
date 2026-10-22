@@ -16,6 +16,7 @@ const base='http://127.0.0.1:'+server.address().port+'/course/';
 let browser;
 const checks=[], errors=[];
 let active;
+let layoutReports=0;
 function cell(page,id){return page.locator('[data-ctm-component="math-exercise"][data-ctm-id="'+id+'"]');}
 const quiz=page=>page.locator('[data-ctm-quiz="mixed"] .ctm-progress');
 const pagePanel=page=>page.locator('.ctm-progress-page .ctm-progress');
@@ -26,6 +27,11 @@ async function context(extra) {
   ctx.on('page',page=>{
     page.setDefaultTimeout(90000);
     page.on('dialog',dialog=>dialog.accept());
+    page.on('console',message=>{
+      if(message.type()==='log' && message.text().startsWith('CTM_RESIZE_TRACE ') && layoutReports++<12) {
+        console.log(JSON.stringify({layoutDiagnostic:true,phase:checks.length,page:page.url(),trace:JSON.parse(message.text().slice(17))}));
+      }
+    });
     page.on('pageerror',error=>errors.push({page:page.url(),phase:checks.length,message:error.message,stack:error.stack}));
   });
   return ctx;

@@ -16,6 +16,78 @@ export function instrument() {
     let value;
     Object.defineProperty(window,name,{configurable:true,get:()=>value,set:incoming=>{value=incoming;decorate(incoming);}});
   }
+  // Diagnostic only: retain native callbacks, receivers and scheduling.
+  if (typeof window.ResizeObserver === 'function' && typeof window.addEventListener === 'function') {
+    const trace={events:[],observers:[],count:0,created:0,emitted:0};
+    const watched=new WeakSet();
+    const stack=()=>String(new Error().stack||'').split('\n').slice(2,8).join('\n').slice(0,1000);
+    function target(node) {
+      const parents=[];
+      for(let p=node;p && parents.length<4;p=p.parentElement) parents.push({
+        tag:p.tagName,id:String(p.id||'').slice(0,100),
+        classes:String(p.getAttribute?.('class')||'').slice(0,180),
+        component:String(p.getAttribute?.('data-ctm-component')||'').slice(0,100),label:String(p.getAttribute?.('data-ctm-id')||'').slice(0,100),
+        height:String(p.style?.height||'').slice(0,100)
+      });
+      return parents;
+    }
+    function record(kind,data) {
+      trace.events.push({sequence:++trace.count,kind,...data});
+      if(trace.events.length>48)trace.events.shift();
+    }
+    function watchEditor(editor,element) {
+      if(!editor || watched.has(editor))return;
+      watched.add(editor);
+      record('editor-found',{target:target(element),stack:stack()});
+      const layout=editor.layout;
+      editor.layout=function(...args) {
+        record('editor-layout',{target:target(element),dimensions:{width:args[0]?.width,height:args[0]?.height},stack:stack()});
+        return Reflect.apply(layout,this,args);
+      };
+      editor.onDidContentSizeChange(event=>record('editor-content-size',{
+        target:target(element),contentHeight:event.contentHeight,contentWidth:event.contentWidth,
+        contentHeightChanged:event.contentHeightChanged,contentWidthChanged:event.contentWidthChanged,
+        stack:stack()
+      }));
+    }
+    function watchEditors() {
+      for(const editor of window.monaco?.editor?.getEditors?.()||[]) {
+        watchEditor(editor,editor.getContainerDomNode());
+      }
+    }
+    function decorateMonaco(api) {
+      if(typeof api?.editor?.create!=='function')return;
+      const create=api.editor.create;
+      api.editor.create=function(...args) {
+        const editor=Reflect.apply(create,this,args);
+        watchEditor(editor,args[0]);
+        return editor;
+      };
+    }
+    intercept('monaco',decorateMonaco);
+    const NativeResizeObserver=window.ResizeObserver;
+    window.ResizeObserver=new Proxy(NativeResizeObserver,{construct(constructor,args,newTarget) {
+      const id=trace.created++;
+      if(trace.observers.length<16)trace.observers.push({id,stack:stack()});
+      const callback=args[0];
+      if(typeof callback!=='function')return Reflect.construct(constructor,args,newTarget);
+      return Reflect.construct(constructor,[function(entries,observer) {
+        watchEditors();
+        record('resize-callback',{observer:id,entries:[...entries].slice(0,4).map(entry=>({
+          target:target(entry.target),
+          rect:{x:entry.contentRect.x,y:entry.contentRect.y,width:entry.contentRect.width,height:entry.contentRect.height}
+        }))});
+        return Reflect.apply(callback,this,arguments);
+      },...args.slice(1)],newTarget);
+    }});
+    window.addEventListener('error',event=>{
+      if(String(event.message).includes('ResizeObserver') && trace.emitted++<3) {
+        console.log('CTM_RESIZE_TRACE '+JSON.stringify({
+          message:event.message,events:trace.events.slice(-24),observers:trace.observers
+        }));
+      }
+    });
+  }
   function wrapRuntime(api, methods, prefix) {
     if (!api) return;
     for (const name of methods) {
