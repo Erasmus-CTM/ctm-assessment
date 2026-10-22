@@ -82,10 +82,42 @@ jobs:
         with:
           name: resize-stock-quarto
           path: ${{ runner.temp }}/resize-stock
+      - name: Recover the preceding exact diagnostic report
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const artifact = (await github.rest.actions.getArtifact({
+              owner: context.repo.owner, repo: context.repo.repo, artifact_id: 12460036949
+            })).data;
+            if (artifact.expired || artifact.name !== 'resize-upstream-webkit' ||
+                artifact.workflow_run.head_sha !== 'c14f03f0d1bd2637553effb52cb517de9243f3f4' ||
+                artifact.digest !== 'sha256:a8ca489e0063ba5a9b4959dcba840787075b61bf6878c45bbe8adbf11d9de2cd') {
+              throw new Error('Preceding diagnostic artifact changed or expired');
+            }
+      - uses: actions/download-artifact@v7
+        with:
+          name: resize-upstream-webkit
+          run-id: 39857598359
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/resize-previous-report
+      - name: Print preceding failed-sample observer traces
+        shell: bash
+        run: |
+          node --input-type=module - "$RUNNER_TEMP/resize-previous-report" <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const root=process.argv[2];
+          const entries=fs.readdirSync(root,{recursive:true}).filter(name=>name==='report.json'||name.endsWith('/report.json'));
+          if(entries.length!==1)throw Error('Expected one exact report');
+          const report=JSON.parse(fs.readFileSync(path.join(root,entries[0]),'utf8'));
+          console.log(JSON.stringify({precedingSource:report.sourceSha256,summary:report.summary,
+            failures:report.samples.filter(sample=>sample.errors.length)},null,2));
+          JS
       - name: Probe unchanged upstream and explicit counterfactual controls
         shell: bash
         env:
           CTM_BROWSER: webkit
+          CTM_RESIZE_ACTUAL_ONLY: '1'
           CTM_RESIZE_STOCK: ${{ runner.temp }}/resize-stock
           CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-fixture/before/_site
           CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-report

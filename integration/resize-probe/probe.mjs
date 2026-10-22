@@ -74,12 +74,21 @@ for(const mode of ['read','no-read']) {
 }
 const server=await serve({stock,fixture,plain},true);
 const base='http://127.0.0.1:'+server.address().port;
+const corpServer=await serve({stock,fixture,plain},true,'require-corp');
+const corpBase='http://127.0.0.1:'+corpServer.address().port;
 const report={browser:engine,quartoVersion:'1.8.27',sourceSha256,
   headers:{coop:'same-origin',coep:'credentialless'},samples:[]};
 let browser;
 try {
   browser=await playwright[engine].launch({headless:true});
-  const cases=[
+  report.browserVersion=browser.version();
+  const cases=process.env.CTM_RESIZE_ACTUAL_ONLY==='1'?[
+    {label:'actual-native',root:'fixture',mode:'native',repeats:12},
+    {label:'actual-native-routed',root:'fixture',mode:'native',route:true,repeats:12},
+    {label:'actual-entry-width',root:'fixture',mode:'entry-width',repeats:12},
+    {label:'actual-no-body-observer',root:'fixture',mode:'no-body-observer',repeats:12},
+    {label:'actual-require-corp',root:'fixture',mode:'native',coep:'require-corp',repeats:12}
+  ]:[
     {label:'stock-quarto-native',root:'stock',mode:'native',repeats:8},
     {label:'stock-quarto-native-routed',root:'stock',mode:'native',route:true,repeats:8},
     {label:'stock-quarto-entry-width',root:'stock',mode:'entry-width',repeats:8},
@@ -92,7 +101,7 @@ try {
     const ctx=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:900}});
     await ctx.addInitScript(traceNativeObservers);
     let substitutions=0;
-    const routed=control.root==='stock' && (control.route || control.mode!=='native');
+    const routed=control.route || (control.mode && control.mode!=='native');
     if(routed)await ctx.route('**/site_libs/quarto-html/quarto.js',async route=>{
       const response=await route.fetch();
       const incoming=await response.text();
@@ -103,19 +112,32 @@ try {
     const page=await ctx.newPage();
     page.setDefaultTimeout(90000);
     for(let navigation=0;navigation<(control.navigations||1);navigation++) {
-      const errors=[],failedRequests=[];
+      const errors=[],failedRequests=[],consoleMessages=[];
+      let droppedConsole=0;
+      const onConsole=message=>{
+        const text=message.text();
+        if(['error','warning'].includes(message.type()) || text.startsWith('[qpyodide-coi]')) {
+          if(consoleMessages.length<96)consoleMessages.push({type:message.type(),text});else droppedConsole++;
+        }
+      };
       const onError=error=>errors.push({message:error.message,stack:error.stack});
       const onFailure=request=>failedRequests.push({url:request.url(),failure:request.failure()});
-      page.on('pageerror',onError);page.on('requestfailed',onFailure);
-      const response=await page.goto(base+'/'+control.root+'/'+(control.file||'index.html'),{waitUntil:'domcontentloaded'});
+      page.on('pageerror',onError);page.on('requestfailed',onFailure);page.on('console',onConsole);
+      const origin=control.coep==='require-corp'?corpBase:base;
+      const coep=control.coep || 'credentialless';
+      const response=await page.goto(origin+'/'+control.root+'/'+(control.file||'index.html'),{waitUntil:'domcontentloaded'});
       assert.equal(response.status(),200);
       assert.equal(response.headers()['cross-origin-opener-policy'],'same-origin');
-      assert.equal(response.headers()['cross-origin-embedder-policy'],'credentialless');
+      assert.equal(response.headers()['cross-origin-embedder-policy'],coep);
       if(control.root==='fixture')await page.locator('.ctm-save-bar').waitFor({state:'visible'});
       await page.waitForLoadState('load');
       await page.waitForTimeout(1000);
       const snapshot=await page.evaluate(()=>({trace:window.__resizeProbe,readyState:document.readyState,
         isolated:crossOriginIsolated,
+        coi:{outcome:window.qpyodideCoiOutcome,inputState:window.qpyodideInputState,
+          controlled:!!navigator.serviceWorker?.controller,
+          navigation:performance.getEntriesByType('navigation')[0]?.type},
+        storeReady:!!window.CTMStore,mathInputs:document.querySelectorAll('input.math-input').length,
         body:window.__resizeProbe.callbacks.flatMap(callback=>callback.entries).filter(entry=>entry.tag==='BODY').at(-1)?.rect,
         controlHeight:document.getElementById('height-control')?.style.height,
         viewport:{width:innerWidth,height:innerHeight},
@@ -124,8 +146,10 @@ try {
         quarto:document.querySelector('meta[name="generator"]')?.content,
         scripts:[...document.scripts].map(s=>s.src).filter(Boolean)}));
       await page.waitForTimeout(100);
-      if(control.mode==='no-body-observer')assert.equal(snapshot.controlHeight,'1200px');
-      else assert.ok(snapshot.body?.height>900,'native BODY entries retain a page taller than the viewport');
+      if(control.mode==='no-body-observer' && control.root==='stock')assert.equal(snapshot.controlHeight,'1200px');
+      else if(control.mode!=='no-body-observer')assert.ok(snapshot.body?.height>900,'native BODY entries retain a page taller than the viewport');
+      if(control.root==='fixture'){assert.equal(snapshot.storeReady,true);assert.ok(snapshot.mathInputs>0);}
+      if(coep==='require-corp')assert.equal(snapshot.isolated,true);
       assert.deepEqual(snapshot.viewport,{width:1280,height:900});
       if(control.root==='stock') {
         assert.equal(snapshot.quarto,'quarto-1.8.27');assert.equal(snapshot.ctmNodes,0);assert.equal(snapshot.marginCount,0);
@@ -134,10 +158,10 @@ try {
       }
       if(control.mode==='no-body-observer')assert.ok(!snapshot.trace.callbacks.some(c=>c.entries.some(e=>e.tag==='BODY')));
       else assert.ok(snapshot.trace.callbacks.some(c=>c.entries.some(e=>e.tag==='BODY')),'native BODY observation delivered');
-      report.samples.push({label:control.label,sample,navigation,errors,failedRequests,...snapshot});
-      console.log(JSON.stringify({label:control.label,sample,navigation,errors,failedRequests,
+      report.samples.push({label:control.label,sample,navigation,coep,origin,errors,failedRequests,consoleMessages,droppedConsole,...snapshot});
+      console.log(JSON.stringify({label:control.label,sample,navigation,coep,errors,failedRequests,coi:snapshot.coi,consoleMessages,
         callbackCount:snapshot.trace.callbacks.length,body:snapshot.body,isolated:snapshot.isolated,marginCount:snapshot.marginCount}));
-      page.off('pageerror',onError);page.off('requestfailed',onFailure);
+      page.off('pageerror',onError);page.off('requestfailed',onFailure);page.off('console',onConsole);
     }
     if(routed)assert.equal(substitutions,control.navigations||1);
     await ctx.close();
@@ -148,10 +172,12 @@ try {
       errors:samples.flatMap(s=>s.errors).length,requestFailures:samples.flatMap(s=>s.failedRequests).length};
   });
   console.log(JSON.stringify({diagnosticSummary:report.summary},null,2));
-  assert.ok(report.samples.some(s=>s.label==='actual-store-positive-control' && s.errors.length),
+  for(const sample of report.samples.filter(s=>s.errors.length))console.log(JSON.stringify({failedSample:sample}));
+  assert.ok(report.samples.some(s=>['actual-store-positive-control','actual-native'].includes(s.label) && s.errors.length),
     'positive control must reproduce raw errors; otherwise stock negatives cannot establish causality');
 } finally {
   fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));
   if(browser)await browser.close();
   await new Promise(resolve=>server.close(resolve));
+  await new Promise(resolve=>corpServer.close(resolve));
 }
