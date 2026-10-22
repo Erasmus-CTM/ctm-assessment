@@ -12,7 +12,7 @@ AC'S UPDATED PRIORITY (21 October 2026; binding)
 AUTHORITATIVE CHECKPOINT — 22 October 2026, upload recovery
 This replaces the older 21 October progress blocks. Original designs, model rules and handoffs remain binding. The task lists after START HERE describe the original assignment; use the current heads and statuses here.
 
-AC's current request: verify independent reviews, exact green builds and ordered merge sets; provide a sequence of PR links. The upload recovery is complete for all recoverable code. Commit substantial work on its non-main branch, including clearly labelled WIP checkpoints; keep this prompt current. Finish all remaining non-STACK-sympy work first. Significant shared ctm-checkers work that serves other components must be implemented. Use all available workers where independent work permits. AC alone merges; never merge, force-push or tag.
+AC reports Stage1 merged. Verify both merge trees, then synchronize, independently review and run combined CI for Stage2 before returning its ordered links. The upload recovery is complete for all recoverable code. Commit substantial work on its non-main branch, including clearly labelled WIP checkpoints; keep this prompt current. Finish all remaining non-STACK-sympy work first. Significant shared ctm-checkers work that serves other components must be implemented. Use all available workers where independent work permits. AC alone merges; never merge, force-push or tag.
 
 Uploaded code ledger (all PRs below remain draft)
 | Repository / PR | Current uploaded head | Upload scope |
@@ -27,22 +27,27 @@ Uploaded code ledger (all PRs below remain draft)
 | ctm-checkers#15 | 6bd454d5479954d5c639945c94cf98a7bc6f89fd | recovered neutral variant model WIP, bounded source reviewed |
 | ctm-assessment#31 | 54e9e6d2e2fbb8ec0cbd03d98fd0dbe2a440dbf6 | recovered diagnostic WIP, not a cause/fix claim |
 
-MERGE REVIEW QUEUE — verified 22 October 2026
-AC requests that merge candidates have independent review according to the rules and that related PRs are presented in order. Fresh independent Astra xhigh verification checked the existing source verdicts, current heads/bases, dependency pins and exact-head checks. No source changes since those verdicts, no unresolved threads, all six listed heads behind0 at verification.
+STAGE 1 MERGED — 22 October 2026
+AC merged assessment#25 and ingmat3a#16 in order. Verified both merge trees equal the exact reviewed heads and both reviewed heads are merge parents:
+- assessment#25 reviewed4edd42835a8923ebeac1a44b158add3c2698b75c -> merge/mainc5ac2af961d63cea9cea7d272f0f5135dc1995ae, tree277e76c6f5f34e978be7619c5681123b2122c121.
+- ingmat3a#16 revieweda99c8b52ce422e34da1b426909197e545ef9a931 -> merge/main80c3851dd20326c039c0060ae3ada4fc97d1f9b1, tree26d3fec7126e43439e232c2196a6dbbdd8817566.
+Stage2 alias set is being synchronized/reviewed/retested against new assessment main. Libs32 c763 remains unchanged on base45bcb2. Assessment26 old54ff136 must NOT be treated as ready after main moved; await its new head, Astra delta verdict and exact combined CI. No later stage is cleared yet.
 
-1. Course set: assessment#25 @4edd42835a8923ebeac1a44b158add3c2698b75c (10 passed/deploy skipped) -> ingmat3a#16 @a99c8b52ce422e34da1b426909197e545ef9a931 (15 passed). Merge this set first, in one sitting.
-2. After assessment main moves, synchronize/review the alias branch delta and rerun combined CI. Then libs#32 @c7633d8087ce4f30817080858d9edd4b530ab8d3 -> assessment#26 @54ff136a2d78eef48799e2a004df060c71f3f2ba (currently14 and18 passed/deploy skipped). Refreshed heads will replace these SHAs; reverify pins before sending.
-3. Synchronize/review/recheck assessment#27 @c1f509c301e786f7573b8a5c35745570a4d853d1 before its turn (currently3 passed/deploy skipped).
-4. After server#27 merges, synchronize/review/recheck assessment#30 @419ccd741792d7856f28ba4fadf02d5678af4815 before merging it (currently12 passed/deploy skipped). Its bounded checker tooling is independent of unfinished full-offline assets delivery; workflow tests exact server c1f509c. PR30 body reconciled and draft=false.
+MERGE REVIEW QUEUE — Stage 1 merged, Stage 2 in preparation
+1. Stage1 course set is MERGED and tree-equality verified above. Do not ask AC to merge assessment25/course16 again.
+2. Stage2 next: libs#32 @c7633d8087ce4f30817080858d9edd4b530ab8d3 -> assessment#26 after its base synchronization, new-head independent Astra review and combined CI. The old assessment54ff136 head is behind the newly merged main and is no longer cleared. Libs32 remains unchanged on main45bcb2.
+3. Stage3: synchronize/review/recheck assessment#27 @c1f509c301e786f7573b8a5c35745570a4d853d1 before its turn.
+4. Stage4: after server27 merges, synchronize/review/recheck assessment#30 @419ccd741792d7856f28ba4fadf02d5678af4815 before merging. Its bounded checker tooling is independent of unfinished full-offline assets delivery; workflow tests exact server c1f509c. PR30 body reconciled and draft=false, but new main makes its earlier base clearance stale.
 
-These are separate stages, not an uninterrupted six-PR merge clearance: every assessment main move triggers the base/pin/copy/combined-CI protocol for later stages. AC uses merge commits only; verify each resulting tree equals the reviewed head tree.
+These are separate stages, not an uninterrupted six-PR clearance. Every assessment main move triggers the base/pin/copy/combined-CI protocol for later stages. AC uses merge commits only; verify each resulting tree equals its reviewed head tree. No agent merges a PR or main.
 
 Review evidence:
 - libs32 direct exact-head Astra review https://github.com/Erasmus-CTM/ctm-libs/pull/32#pullrequestreview-5606252871.
 - assessment26 direct exact-head source/correction https://github.com/Erasmus-CTM/ctm-assessment/pull/26#pullrequestreview-5606253946 and final set https://github.com/Erasmus-CTM/ctm-assessment/pull/26#pullrequestreview-5606484818.
 - Course25/16, server27 and checker30 independent source approvals are retained in PR descriptions and this handoff checkpoint; their GitHub review lists are empty. Do not describe these as GitHub APPROVED-state submissions. Fresh verification checks readiness, not a new full original-source audit. The original independent source verdicts/coverage and exact tested heads are recorded in the sections below.
 
-All other work remains HOLD: store combined failures/stale pins, assets incomplete integration/overlapping aggregate, question tests still have pending ordinary jobs despite all4 Linux/Windows render jobs now green, variants still model-only WIP, diagnostic not a fix, STACK review findings unclosed. A green component build alone is not a mergeable set.
+
+All other work remains HOLD: store combined failures/stale pins, assets incomplete integration/overlapping aggregate, question-test ordinary jobs still require final exact status, variants model-only WIP, diagnostic not a fix, STACK findings unclosed. A green component build alone is not a mergeable set.
 
 Environment and recovery
 - The project now has a writable Linux workspace. The earlier disconnected Windows filesystem and functions-store drafts did not survive the transition. GitHub refs, Git objects and Actions output are the recovery sources. Do not wait for a desktop app or gh CI process.
@@ -54,10 +59,10 @@ Environment and recovery
 Merged by AC and verified
 - libs#30 reviewed1f7a3a5de7b765d108fe2ca4ec98b36635c6814f -> main45bcb2a51257151f89bbe706142f22abcd1b5a0c.
 - assessment#24 reviewedd47ccc5a492d3df0cade62f9bc21beb63511846f -> main3d9ebd94565ca302724dc619092ad9d043c1497f.
-- Both merge trees equal reviewed trees. Full parity10541 responses/720 fixtures/34 tests/28 programs, zero differences. No subsequent merge has been reported.
+- Both merge trees equal reviewed trees. Full parity10541 responses/720 fixtures/34 tests/28 programs, zero differences. Stage1 assessment25/course16 merges are now additionally verified above.
 
 Ready and already reported to AC
-- Course order: assessment#25 https://github.com/Erasmus-CTM/ctm-assessment/pull/25 @4edd42835a8923ebeac1a44b158add3c2698b75c, then ingmat3a#16 https://github.com/aacchhee/ingmat3a_ntnu/pull/16 @a99c8b52ce422e34da1b426909197e545ef9a931. Both ready, ahead4/behind0 at last final check. Course15 checks and all12 Chromium/Firefox/WebKit shards GREEN, run39675715982. Native28pages/1713intended/0unexplained/0warnings, convert=false. Independent audit37paths/441constructs,190titles/448fences/440labels and all nonblank prose exact;9negative mutants. Six desktop/390px PNGs verified and reviewed. Existing wide-equation mobile overflow is unchanged; horizontal access not proved. Only course branch consolidation/2026-10-step4-migration may be edited. Base coursea0a34ee508fdd4d00e78e7ea782b00a343fcf682. PR25 scoped followups: --no-renames plus rename regression, reject symlinks. Current converted files are regular.
+- Course order: assessment#25 https://github.com/Erasmus-CTM/ctm-assessment/pull/25 @4edd42835a8923ebeac1a44b158add3c2698b75c, then ingmat3a#16 https://github.com/aacchhee/ingmat3a_ntnu/pull/16 @a99c8b52ce422e34da1b426909197e545ef9a931. Both now merged by AC; reviewed head and merge trees verified equal above. Course15 checks and all12 Chromium/Firefox/WebKit shards GREEN, run39675715982. Native28pages/1713intended/0unexplained/0warnings, convert=false. Independent audit37paths/441constructs,190titles/448fences/440labels and all nonblank prose exact;9negative mutants. Six desktop/390px PNGs verified and reviewed. Existing wide-equation mobile overflow is unchanged; horizontal access not proved. Only course branch consolidation/2026-10-step4-migration may be edited. Base coursea0a34ee508fdd4d00e78e7ea782b00a343fcf682. PR25 scoped followups: --no-renames plus rename regression, reject symlinks. Current converted files are regular.
 - Alias order: libs#32 @c7633d8087ce4f30817080858d9edd4b530ab8d3 -> assessment#26 @54ff136a2d78eef48799e2a004df060c71f3f2ba. Branch consolidation/2026-10-step3-alias-removal, both ready. All7 library/18 combined checks green,257tests/three engines, independent review5606484818. Keep ai-feedback configuration namespace, templates forwarder and stale-extension diagnostic. Refresh assessment base after25 lands.
 - Server assessment#27 @c1f509c301e786f7573b8a5c35745570a4d853d1, branch consolidation/2026-10-step5-server, ready. Source PASS, Python3.12 realHTTP17/17 zero skips job119494131130/run39678389398, all3checks green (deploy skipped). Functional server acceptance only; exam TLS/lockdown/capacity remain unproved.
 
