@@ -6,6 +6,7 @@ import path from 'node:path';
 import * as playwright from 'playwright';
 import {serve} from '../../tools/compare-browser.mjs';
 import {instrument} from './instrument.mjs';
+import {traceResizeObservers} from './resize-diagnostic.mjs';
 
 const root=path.resolve(process.env.CTM_STORE_ROOT || '.store-integration');
 const engine=process.env.CTM_BROWSER || 'chromium';
@@ -15,18 +16,27 @@ const server=await serve(roots,true);
 const base='http://127.0.0.1:'+server.address().port+'/course/';
 let browser;
 const checks=[], errors=[];
+const traceResize=process.env.CTM_TRACE_RESIZE==='1';
+const resizeReads=[], resizeFailures=[];
 let active;
 function cell(page,id){return page.locator('[data-ctm-component="math-exercise"][data-ctm-id="'+id+'"]');}
 const quiz=page=>page.locator('[data-ctm-quiz="mixed"] .ctm-progress');
 const pagePanel=page=>page.locator('.ctm-progress-page .ctm-progress');
 async function context(extra) {
   const ctx=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:900}});
+  if(traceResize)await ctx.addInitScript(traceResizeObservers);
   await ctx.addInitScript(instrument);
   if(extra) await ctx.addInitScript(extra);
   ctx.on('page',page=>{
     page.setDefaultTimeout(90000);
     page.on('dialog',dialog=>dialog.accept());
-    page.on('pageerror',error=>errors.push({page:page.url(),phase:checks.length,message:error.message,stack:error.stack}));
+    page.on('pageerror',error=>{
+      errors.push({page:page.url(),phase:checks.length,message:error.message,stack:error.stack});
+      if(traceResize) {
+        const at={page:page.url(),phase:checks.length,message:error.message};
+        resizeReads.push(page.evaluate(()=>window.__ctmResizeTrace).then(trace=>resizeFailures.push({...at,trace})).catch(error=>resizeFailures.push({...at,traceReadError:String(error)})));
+      }
+    });
   });
   return ctx;
 }
@@ -205,6 +215,7 @@ try {
     assert.equal(await quiz(page).locator('.ctm-progress-outdated').count(),3);
     await noRestorePython(page);
     checks.push('changed ordinary/variant/Python source offers read-only old answers and outdated tiles without rechecking');
+    if(traceResize)await Promise.allSettled(resizeReads);
     await ctx.close();roots.course=path.join(root,'before','_site');
   }
   {
@@ -224,6 +235,7 @@ try {
     assert.equal(await page.evaluate(()=>CTMStore.enabled()),false);
     checks.push('device saving off deletes answers, keeps live copy/export and remains off after navigation');
     await noRestorePython(page);
+    if(traceResize)await Promise.allSettled(resizeReads);
     await ctx.close();
   }
   {
@@ -239,6 +251,7 @@ try {
     assert.equal(await cell(page,'store-scalar').locator('input.math-input').inputValue(),'');
     checks.push('unavailable device storage falls back without persisting or executing restored code');
     await noRestorePython(page);
+    if(traceResize)await Promise.allSettled(resizeReads);
     await ctx.close();
   }
   {
@@ -286,12 +299,14 @@ try {
     await assertRecordMissing(b,'store-second');await assertRecordMissing(a,'store-scalar');
     checks.push('page/course clear across two actual tabs cancels pending writes and preserves the other page until course clear');
     await noRestorePython(a);await noRestorePython(b);
+    if(traceResize)await Promise.allSettled(resizeReads);
     await ctx.close();
   }
   assert.deepEqual(errors,[],'actual rendered pages have no uncaught errors');
   console.log(JSON.stringify({browser:engine,checks,errors},null,2));
 } catch(error) {
-  console.error(JSON.stringify({browser:engine,checks,errors,url:active?.url()},null,2));
+  await Promise.allSettled(resizeReads);
+  console.error(JSON.stringify({browser:engine,checks,errors,url:active?.url(),...(traceResize?{resizeFailures}:{})},null,2));
   if(active && !active.isClosed()) console.error(await active.locator('body').innerText().catch(()=>'(page closed)'));
   throw error;
 } finally {

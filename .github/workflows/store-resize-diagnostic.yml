@@ -1,0 +1,62 @@
+name: WebKit resize diagnostic
+on:
+  push:
+    branches: [consolidation/2026-10-store-resize-diagnostic]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: ctm-store-resize-diagnostic-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  webkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Calibrate transparent observer instrumentation
+        run: node --test integration/store/resize-diagnostic.test.mjs
+      - name: Verify the immutable rendered baseline
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const artifact = (await github.rest.actions.getArtifact({
+              owner: context.repo.owner, repo: context.repo.repo, artifact_id: 12386093856
+            })).data;
+            if (artifact.expired ||
+                artifact.name !== 'store-rendered-fixtures' ||
+                artifact.workflow_run.head_sha !== '290821648f40306c968279bb850508c09e8f2c60' ||
+                artifact.digest !== 'sha256:5da41ad03b9e99963c092456539490c20d2cb7731f6a94bf420b090bff48b7a6') {
+              throw new Error('Rendered diagnostic baseline changed or expired');
+            }
+            core.info(JSON.stringify({artifact: artifact.id, digest: artifact.digest,
+              head: artifact.workflow_run.head_sha, producerRun: 39686767608}));
+      - run: npx playwright install --with-deps webkit
+      - uses: actions/download-artifact@v7
+        with:
+          name: store-rendered-fixtures
+          run-id: 39686767608
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/store-integration
+      - name: Trace the actual WebKit mixed page without filtering errors
+        env:
+          CTM_BROWSER: webkit
+          CTM_TRACE_RESIZE: '1'
+          CTM_STORE_ROOT: ${{ runner.temp }}/store-integration
+        run: |
+          set -o pipefail
+          node integration/store/browser.mjs 2>&1 | tee "$RUNNER_TEMP/store-resize-webkit.log"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: store-resize-webkit-diagnostic
+          path: ${{ runner.temp }}/store-resize-webkit.log
+          retention-days: 7
