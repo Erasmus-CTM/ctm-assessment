@@ -1,3 +1,14 @@
+OFFLINE BUILD RESUMPTION — 22 October 2026 (supersedes stale ready/worker claims below)
+AC confirmed course #18 and assessment #30 merged and instructed: "yes continue towards offline build." Both actual merge commits were independently read back through the connector:
+- aacchhee/ingmat3a_ntnu #18: e45851080f462e84cde281528f21d4f21292a6ba, ordered parents 80c3851dd20326c039c0060ae3ada4fc97d1f9b1 / bbef1e987af86df660daea391622e80f0fa27139, tree 0248458c32d865b8c7357de016af3eda0f0f3888 equals reviewed head.
+- Erasmus-CTM/ctm-assessment #30: 97f73d3a26925502f44d4e50ef2d30322e39997e, ordered parents e7f532f89c2a6cb1f4f9bb9ddafb004c0dbbb7fc / 23f2b6413741c67bb650c76cad29ccc1ddbe66f7, tree 272900fdc4c7229c718f73c76baec98e7f44a2c4 equals reviewed head.
+Do not ask to merge #18/#30 again. Store, quiz and complete offline sets remain HOLD. Later assessment branches need the new main incorporated and reviewed; course #17 needs the accepted applet source as its deliberate preservation baseline.
+Current worker allocation: Sol6.1 medium python_assets owns assessment Python partial-lock producer; libs_assets owns ctm-libs store/assets union and production MathJax Meta seam; component_assets owns Pyodide #7 and coordinated component sync/pins. Astra xhigh review_python_assets/review_libs_assets/review_components are independent reviewers. Root alone updates prompt and owns separate npm partial-lock producer/composition work. No worker may overwrite another's paths.
+Exact Quarto1.8.27 MathJax probe #36 job119822622175 passed all four cases; probe artifact12425058888 SHA256405ac818896e6f46762f94f9d5c637c3c43d250a07b298d0ba5017ea0b81e64a. This is probe evidence, not production fix or course acceptance.
+Read handoff files and approved offline design before edits. aacchhee/jsxgraph-quarto has no HANDOFF file at the specified path; its handoff is recorded inside ctm-demo's HANDOFF. Fork/upstream remains AC/Claude-owned; no fork edits or re-pin before AC's instruction.
+Native runtime recovered: Node24.20.0, Quarto1.9.35 and physical Python3.14.3 available. They supplement, not replace, exact CI Node22/Python3.12/Quarto1.8.27. No unpublished results are acceptance.
+Private partial lock candidates must use actual official checksummed bytes, canonical materialization and explicit license records; full-lock/private reports stay unpublished. Complete npm/board composition must precede full installer flags and full-offline claims.
+
 You are continuing the CTM Assessment consolidation for Andrey Chesnokov (AC).
 
 Repositories: Erasmus-CTM/{ctm-assessment,ctm-libs,ctm-checkers,math-exercise,py-exercise,pyodide-interaktiv,stack-sympy}; aacchhee/{ctm-demo,ingmat3a_ntnu,jsxgraph-quarto}. Pyodide's working base is feature/shared-feedback-integration.
