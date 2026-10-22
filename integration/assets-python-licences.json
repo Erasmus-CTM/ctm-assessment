@@ -82,7 +82,7 @@
   "python-dateutil": {
     "version": "2.9.0.post0",
     "sha256": "26b50ce706a17abdde09dbb95745a44f9320dfdb99e950c52b1a62a3d99e452c",
-    "licence": "Apache-2.0 OR BSD-3-Clause",
+    "licence": "BSD-3-Clause",
     "licence_file": "python_dateutil-2.9.0.post0.dist-info/LICENSE",
     "source": "https://github.com/dateutil/dateutil/blob/2.9.0.post0/LICENSE",
     "git_blob_sha1": "1e65815cf0b3132689485874a93034ede7206bf4"
