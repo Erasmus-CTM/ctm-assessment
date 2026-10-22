@@ -19,7 +19,7 @@ In VS Code, **Terminal → Run Task…** offers the same commands (`.vscode/task
 
 The builder renders one `example.html` from `example.qmd` and topic includes,
 using the components pinned in `integration/feedback/repos.json`: ctm-libs (the
-library; its `ai-feedback` alias is a declared copy, no longer packaged), math-exercise, ctm-checkers (the Python
+library only), math-exercise, ctm-checkers (the Python
 checker library math-exercise grades with from 0.11 on: the generated
 `_extensions/ctm-checkers` folder with its wheel and page script),
 py-exercise, pyodide-interaktiv and JSXGraph (the upstream
@@ -33,9 +33,8 @@ wheel, and math-exercise's only Python files are `variants.py` and the
 `question-tests.py` script; `tests/test_one_home.py`), and tests installed
 shared loading, filter order, context reuse and browser behavior. The components' tests run against the
 pinned ctm-libs and ctm-checkers: `CTM_LIBS_EXTENSION` names its
-`_extensions/ctm-libs` folder and `AI_FEEDBACK_EXTENSION` its `feedback`
-folder (the umbrella's own tests load the three feedback files from there;
-it goes with step 3's U3c), `CTM_CHECKERS_EXTENSION` the packaged `_extensions/ctm-checkers`
+`_extensions/ctm-libs` folder (the umbrella's own tests load its `feedback/`
+files from there), `CTM_CHECKERS_EXTENSION` the packaged `_extensions/ctm-checkers`
 folder and `CTM_CHECKERS_SOURCE` the ctm-checkers checkout (ctm-libs' tests
 install it from there); they get a temporary folder outside this checkout.
 `--test` also runs ctm-checkers' `tools/build.py --check`: the packaged folder
