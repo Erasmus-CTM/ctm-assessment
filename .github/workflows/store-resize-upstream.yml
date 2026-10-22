@@ -102,8 +102,10 @@ jobs:
           path: ${{ runner.temp }}/resize-previous-report
       - name: Print preceding failed-sample observer traces
         shell: bash
+        env:
+          CTM_PREVIOUS_REPORT: ${{ runner.temp }}/resize-previous-report
         run: |
-          node --input-type=module - "$RUNNER_TEMP/resize-previous-report" <<'JS'
+          node --input-type=module - "$CTM_PREVIOUS_REPORT" <<'JS'
           import fs from 'node:fs';
           import path from 'node:path';
           const root=process.argv[2];
@@ -123,13 +125,12 @@ jobs:
           CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-report
         run: |
           set -o pipefail
+          mkdir -p "$CTM_RESIZE_REPORT"
           node --check integration/resize-probe/probe.mjs
-          node integration/resize-probe/probe.mjs 2>&1 | tee "$RUNNER_TEMP/resize-probe.log"
+          node integration/resize-probe/probe.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: resize-upstream-webkit
-          path: |
-            ${{ runner.temp }}/resize-report
-            ${{ runner.temp }}/resize-probe.log
+          path: ${{ runner.temp }}/resize-report
           retention-days: 7
