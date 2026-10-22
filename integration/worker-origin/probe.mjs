@@ -145,7 +145,7 @@ async function probe() {
         assert.equal(result.topIsolated, true, 'real isolated parent page');
         const frame = page.frames().find(value => value.parentFrame() === page.mainFrame());
         assert.ok(frame, 'actual embedded frame exists');
-        await frame.waitForFunction(() => window.MathJax?.startup?.promise, null, {timeout: 90000});
+        await frame.waitForFunction(() => !!window.MathJax?.startup?.promise, null, {timeout: 90000});
         await withinDeadline(frame.evaluate(() => MathJax.startup.promise), 90000, 'MathJax startup');
         await frame.waitForFunction(() => Object.values(window.JXG?.boards || {}).length > 0,
           null, {timeout: 30000});
