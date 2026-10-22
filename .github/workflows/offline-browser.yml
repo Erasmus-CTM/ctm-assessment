@@ -29,8 +29,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Erasmus-CTM/ctm-assessment
-          # Canonical server PR27; replace this checkout after AC merges it.
-          ref: c1f509c301e786f7573b8a5c35745570a4d853d1
+          # Exact reviewed server head from merged PR27; dependency pins use reviewed heads.
+          ref: 7b1903d1c4f4b2fcf0cc29f2773c9d2857144cf9
           path: server-source
           persist-credentials: false
       - uses: actions/setup-node@v4

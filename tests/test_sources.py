@@ -18,12 +18,11 @@ class SourceSelection(unittest.TestCase):
         # ctm-checkers, the Python checker library math-exercise grades with: its generated extension folder.
         self.assertEqual(repositories['ctm-checkers']['repository'], 'Erasmus-CTM/ctm-checkers')
         self.assertEqual(repositories['jsxgraph']['extension'], 'jsxgraph')
-        # ai-feedback became ctm-libs: one repository. Its alias extension is
-        # no longer packaged (step 3, U3b) but still in the repository until
-        # L3x: a declared copy. The old name stays a review-ref alias.
+        # ai-feedback became ctm-libs: the extension alias is removed (L3x),
+        # while the repository name stays a review-ref alias.
         self.assertEqual(repositories['ctm-libs']['repository'], 'Erasmus-CTM/ctm-libs')
         self.assertEqual(repositories['ctm-libs']['extensions'], ['ctm-libs'])
-        self.assertEqual(repositories['ctm-libs']['ships-copies'], ['ai-feedback'])
+        self.assertNotIn('ships-copies', repositories['ctm-libs'])
         self.assertEqual(repositories['ctm-libs']['review-ref-aliases'], ['ai-feedback'])
         for name, source in repositories.items():
             with self.subTest(repository=name):
@@ -79,8 +78,8 @@ class SourceSelection(unittest.TestCase):
         repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
         declared = {name: spec['ships-copies'] for name, spec in repositories.items() if 'ships-copies' in spec}
         # pyodide-interaktiv 1.9 ships a generated ctm-libs and the ai-feedback
-        # forwarder (N1: kept through U3b and U3c); ctm-libs its alias until L3x.
-        self.assertEqual(declared, {'pyodide-interaktiv': ['ai-feedback', 'ctm-libs'], 'ctm-libs': ['ai-feedback']})
+        # forwarder (N1: kept through U3b and U3c).
+        self.assertEqual(declared, {'pyodide-interaktiv': ['ai-feedback', 'ctm-libs']})
 
     def test_check_pins_names_the_pins_not_on_their_branch(self):
         # A stacked set pins reviewed heads; after its merges each is on its branch.
