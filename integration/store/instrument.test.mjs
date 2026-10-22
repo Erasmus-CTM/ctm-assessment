@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const source=fs.readFileSync(new URL('./instrument.mjs',import.meta.url),'utf8');
 function fixture() {
   const world={navigator:{}};world.window=world;
-  vm.runInNewContext(source.replace('export function instrument','function instrument')+'\ninstrument();',world);
+  vm.runInNewContext(source.replaceAll('export function ','function ')+'\ninstrument();',world);
   world.MathExerciseRuntime={ensurePyodide(){},ensureCheckers(){},callCheckers(){}};
   world.mainPyodide={globals:{set(name,value){return value;}},runPythonAsync(code){return code;},runCell(code,wantPickle){return {code,wantPickle};}};
   world.CTMStore={register:options=>({restore:()=>{options.effect?.();return {state:'restored'};}})};
@@ -84,4 +84,24 @@ test('both native clipboard write paths capture plaintext without OS writes',asy
   assert.equal(world.__storeAudit.copies[0],'plain answer');
   assert.equal(world.__storeAudit.copies[1],'Monaco answer');
   assert.equal(types[0],'text/plain');
+});
+
+test('unavailable CTM writes preserve unrelated Quarto storage behavior',()=>{
+  const records=new Map();
+  class Storage {
+    setItem(key,value){records.set(String(key),String(value));}
+    getItem(key){return records.get(String(key)) ?? null;}
+  }
+  class DOMException extends Error {
+    constructor(message,name){super(message);this.name=name;}
+  }
+  const world={Storage,DOMException};
+  vm.runInNewContext(source.replaceAll('export function ','function ')+'\ndenyStoreWrites();',world);
+  const storage=new Storage();
+  storage.setItem('quarto-persistent-tabsets-data','{}');
+  assert.equal(storage.getItem('quarto-persistent-tabsets-data'),'{}');
+  for(const key of ['ctm|1|course|~prefs','ctm|1|course|page|answer']) {
+    assert.throws(()=>storage.setItem(key,'saved'),error=>error.name==='QuotaExceededError');
+    assert.equal(storage.getItem(key),null);
+  }
 });
