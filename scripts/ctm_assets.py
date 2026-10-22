@@ -217,6 +217,117 @@ def private_import_index(full_lock: dict, stdlib: dict) -> dict:
                          for name, entry in sorted(full_lock.get("packages", {}).items())}}
 
 
+def _availability_json(data: bytes, label: str) -> dict:
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise AssetError(f"Stdlib availability: duplicate {label} key: {key}")
+            result[key] = value
+        return result
+    def constant(value):
+        raise AssetError(f"Stdlib availability: non-finite {label} value: {value}")
+    try:
+        value = json.loads(data.decode("utf-8"), object_pairs_hook=pairs, parse_constant=constant)
+    except (UnicodeError, ValueError) as error:
+        raise AssetError(f"Stdlib availability: invalid {label}: {error}") from None
+    if not isinstance(value, dict):
+        raise AssetError(f"Stdlib availability: {label} must be an object")
+    return value
+
+
+def private_import_index_from_availability(report_bytes: bytes, core: Path, *, reviewed_report_sha256: str,
+                                           candidates: dict | None = None) -> dict:
+    """Consume reviewed v2 evidence against the verified private probe stage.
+
+    The digest is an independently reviewed input, never learned from this
+    invocation's probe output. Rehash all staged files before using the full
+    release lock. The existing v1 index/AST-scanner protocol stays unchanged.
+    """
+    def require(condition, message):
+        if not condition:
+            raise AssetError("Stdlib availability: " + message)
+    def sha256(value):
+        return isinstance(value, str) and re.fullmatch(r"[a-f0-9]{64}", value)
+    def names(value, label):
+        require(isinstance(value, list) and bool(value)
+                and all(isinstance(name, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in value),
+                label + " need canonical module names")
+        require(value == sorted(set(value)), label + " must be sorted and unique")
+        return set(value)
+    require(sha256(reviewed_report_sha256), "an independently reviewed report sha256 is required")
+    verify_bytes(report_bytes, sha256=reviewed_report_sha256)
+    facts = _availability_json(report_bytes, "report")
+    require(set(facts) == {"v", "kind", "python", "pyodide", "source", "modules", "unavailable"}
+            and type(facts["v"]) is int and facts["v"] == 2
+            and facts["kind"] == "pyodide-stdlib-availability", "unsupported report schema")
+    core = Path(core)
+    require(core.is_dir() and not core.is_symlink(), "probe core must be a real directory")
+    def read(name):
+        file = core / name
+        require(file.is_file() and not file.is_symlink(), "missing or non-regular probe file: " + name)
+        return file.read_bytes()
+    request = _availability_json(read("probe-input.json"), "probe request")
+    require(set(request) == {"v", "python", "pyodide", "candidates", "candidate_source", "source", "runtime_files"}
+            and type(request["v"]) is int and request["v"] == 1, "unsupported probe request")
+    release, python = request["pyodide"], request["python"]
+    require(isinstance(release, str) and re.fullmatch(r"\d+\.\d+\.\d+", release)
+            and isinstance(python, str) and re.fullmatch(r"3\.\d+\.\d+", python), "probe needs exact release versions")
+    require(facts["pyodide"] == release and facts["python"] == python, "report and probe release versions differ")
+    archive = request["source"]
+    require(isinstance(archive, dict) and set(archive) == {"url", "sha256"}
+            and archive["url"] == f"https://github.com/pyodide/pyodide/releases/download/{release}/pyodide-{release}.tar.bz2"
+            and sha256(archive["sha256"]), "probe needs exact official archive provenance")
+    files = request["runtime_files"]
+    required = {"pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm",
+                "python_stdlib.zip", "pyodide-lock.json", "package.json"}
+    require(isinstance(files, dict) and set(files) == required and all(sha256(value) for value in files.values()),
+            "probe needs all seven runtime sha256 values")
+    source = facts["source"]
+    require(isinstance(source, dict) and set(source) == {"url", "sha256", "runtime_files", "candidate_source", "method"},
+            "report needs complete provenance")
+    require({key: source[key] for key in ("url", "sha256")} == archive
+            and source["runtime_files"] == files, "report and probe archive/runtime provenance differ")
+    require(source["method"] == "Successful imports of trusted release stdlib candidates plus actual builtin/frozen inventory; network disabled; no authored execution",
+            "unsupported probe method")
+    if candidates is None:
+        candidates = _availability_json((Path(__file__).resolve().parents[1] / "integration/assets-stdlib.json").read_bytes(), "candidates")
+    require(isinstance(candidates, dict) and type(candidates.get("v")) is int and candidates["v"] == 1
+            and candidates.get("python") == python, "candidate facts use another Python release")
+    wanted = names(candidates.get("modules"), "candidates")
+    candidate_source = candidates.get("source")
+    require(isinstance(candidate_source, dict) and set(candidate_source) == {"url", "git_blob_sha1"}
+            and candidate_source["url"] == f"https://github.com/python/cpython/blob/v{python}/Python/stdlib_module_names.h"
+            and isinstance(candidate_source["git_blob_sha1"], str)
+            and re.fullmatch(r"[a-f0-9]{40}", candidate_source["git_blob_sha1"]), "invalid candidate provenance")
+    require(request["candidates"] == candidates["modules"] and request["candidate_source"] == candidate_source
+            and source["candidate_source"] == candidate_source, "candidate names/provenance differ")
+    available = names(facts["modules"], "available modules")
+    unavailable = facts["unavailable"]
+    require(isinstance(unavailable, dict)
+            and all(isinstance(name, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)
+                    and isinstance(error, str) and bool(error.strip()) for name, error in unavailable.items()),
+            "unavailable modules need canonical names and diagnostic text")
+    require(not available.intersection(unavailable), "available and unavailable modules overlap")
+    require(wanted <= available.union(unavailable), "probe omitted candidate modules")
+    # Extra builtin/frozen names are covered by the reviewed report digest;
+    # do not silently reclassify them as CPython candidate names.
+    runtime = {}
+    for name in sorted(required):
+        runtime[name] = read(name)
+        require(hmac.compare_digest(digest(runtime[name]), files[name]), "staged runtime sha256 mismatch: " + name)
+    release_version(runtime["package.json"], release)
+    full_lock = _availability_json(runtime["pyodide-lock.json"], "release lock")
+    require(isinstance(full_lock.get("info"), dict) and full_lock["info"].get("python") == python,
+            "release lock uses another Python version")
+    require(isinstance(full_lock.get("packages"), dict)
+            and all(isinstance(entry, dict) and isinstance(entry.get("imports", []), list)
+                    and all(isinstance(name, str) for name in entry.get("imports", []))
+                    for entry in full_lock["packages"].values()), "invalid release package import map")
+    provenance = dict(source, kind=facts["kind"], pyodide=release, availability_sha256=reviewed_report_sha256)
+    return private_import_index(full_lock, {"v": 1, "python": python, "modules": facts["modules"], "source": provenance})
+
+
 def write_private_import_index(index: dict, destination: Path) -> Path:
     destination = Path(destination).resolve()
     if any(part.lower() == "_ctm-assets" for part in destination.parts):
@@ -764,6 +875,12 @@ def main(argv=None):
     verify = sub.add_parser("verify", help="Verify a carried bundle against the reviewed external lock")
     verify.add_argument("--lock", type=Path, required=True)
     verify.add_argument("--bundle", type=Path, required=True)
+    index = sub.add_parser("import-index", help="Consume reviewed release availability into a private scanner index")
+    index.add_argument("--availability", type=Path, required=True)
+    index.add_argument("--probe-core", type=Path, required=True)
+    index.add_argument("--reviewed-report-sha256", required=True, help="Digest approved independently of this probe invocation")
+    index.add_argument("--candidates", type=Path)
+    index.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.command == "metadata":
         refs = dict(value.split("=", 1) for value in args.source_ref)
@@ -780,6 +897,12 @@ def main(argv=None):
     elif args.command == "prepare-stdlib-probe":
         prepare_stdlib_probe(json.loads(args.metadata.read_text(encoding="utf-8")), args.cache, args.directory,
                              json.loads(args.candidates.read_text(encoding="utf-8")))
+    elif args.command == "import-index":
+        candidates = _availability_json(args.candidates.read_bytes(), "candidates") if args.candidates else None
+        index = private_import_index_from_availability(args.availability.read_bytes(), args.probe_core,
+                    reviewed_report_sha256=args.reviewed_report_sha256, candidates=candidates)
+        write_private_import_index(index, args.output)
+        print(f'Validated {len(index["stdlib_modules"])} available modules into the private import index')
     else:
         verify_bundle(args.bundle, json.loads(args.lock.read_text(encoding="utf-8")))
 

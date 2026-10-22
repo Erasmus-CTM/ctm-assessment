@@ -118,6 +118,22 @@ jobs:
         run: python scripts/ctm_assets.py prepare-stdlib-probe --metadata integration/assets-metadata.json --cache .asset-cache --candidates integration/assets-stdlib.json --directory .asset-stdlib-probe
       - name: Inspect release import availability without authored code or network
         run: node scripts/probe-pyodide-stdlib.mjs .asset-stdlib-probe .asset-report-helper/assets-metadata.json
+      - name: Consume the independently reviewed availability report into a private scanner index
+        env:
+          # Reviewed release evidence, not a digest learned from this job.
+          # A changed report requires a new independent evidence review.
+          REVIEWED_STDLIB_AVAILABILITY_SHA256: dd9327e9be5bb2b4fb06afd905077fd72de39e345c7ec67f76a87ff4033afe28
+        run: |
+          python scripts/ctm_assets.py import-index --probe-core .asset-stdlib-probe \
+            --availability .asset-report-helper/assets-metadata.json \
+            --reviewed-report-sha256 "$REVIEWED_STDLIB_AVAILABILITY_SHA256" \
+            --output .private-extensions/assets-imports.json
+          python - <<'PY'
+          import os, runpy
+          runpy.run_path('tests/test_ctm_assets.py')['release_availability_smoke'](
+              '.asset-stdlib-probe', '.asset-report-helper/assets-metadata.json',
+              '.private-extensions/assets-imports.json', os.environ['REVIEWED_STDLIB_AVAILABILITY_SHA256'])
+          PY
       - name: Emit one checksummed availability report without runner commits
         run: |
           git -C .asset-report-helper add -N -- assets-metadata.json

@@ -1,4 +1,5 @@
 import base64
+import copy
 import gzip
 import hashlib
 import importlib.util
@@ -30,6 +31,172 @@ def archive(path, entries):
             else:
                 info.size = len(value)
                 out.addfile(info, io.BytesIO(value))
+
+
+def availability_fixture(root):
+    core = root / "verified core"
+    core.mkdir()
+    full = {"info": {"python": "3.13.2", "version": "0.28.3.dev0"},
+            "packages": {"sympy": {"imports": ["sympy"], "sha256": "not copied"},
+                         "math-data": {"imports": ["math"]}}}
+    data = {name: b"trusted fixture " + name.encode() for name in (
+        "pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip")}
+    data["package.json"] = A.json_bytes({"version": "0.28.3"})
+    data["pyodide-lock.json"] = A.json_bytes(full)
+    for name, value in data.items():
+        (core / name).write_bytes(value)
+    candidates = {"v": 1, "python": "3.13.2", "modules": ["math", "os", "sys", "winreg"],
+                  "source": {"url": "https://github.com/python/cpython/blob/v3.13.2/Python/stdlib_module_names.h",
+                             "git_blob_sha1": "c" * 40}}
+    request = {"v": 1, "python": "3.13.2", "pyodide": "0.28.3", "candidates": list(candidates["modules"]),
+               "candidate_source": dict(candidates["source"]), "runtime_files": {name: A.digest(value) for name, value in data.items()},
+               "source": {"url": "https://github.com/pyodide/pyodide/releases/download/0.28.3/pyodide-0.28.3.tar.bz2",
+                          "sha256": "a" * 64}}
+    (core / "probe-input.json").write_bytes(A.json_bytes(request))
+    facts = {"v": 2, "kind": "pyodide-stdlib-availability", "python": "3.13.2", "pyodide": "0.28.3",
+             "source": {**request["source"], "runtime_files": dict(request["runtime_files"]), "candidate_source": dict(candidates["source"]),
+                        "method": "Successful imports of trusted release stdlib candidates plus actual builtin/frozen inventory; network disabled; no authored execution"},
+             "modules": ["_pyodide_core", "math", "os", "sys"], "unavailable": {"winreg": "ModuleNotFoundError: fixture"}}
+    return core, candidates, request, facts, full
+
+
+class AvailabilityTests(unittest.TestCase):
+    def test_v2_consumption_preserves_v1_scanner_protocol_and_package_precedence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core, candidates, request, facts, full = availability_fixture(Path(tmp))
+            raw = A.json_bytes(facts)
+            index = A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+            self.assertEqual(index["v"], 1)
+            self.assertEqual(index["stdlib_modules"], facts["modules"])
+            self.assertNotIn("winreg", index["stdlib_modules"])
+            self.assertNotIn("unavailable", index)
+            self.assertNotIn("sha256", index["packages"]["sympy"])
+            self.assertEqual(index["source"]["availability_sha256"], A.digest(raw))
+            self.assertEqual(index["source"]["runtime_files"], request["runtime_files"])
+            self.assertEqual(index["source"]["pyodide"], "0.28.3")
+            subset = {"info": full["info"], "packages": {}}
+            self.assertEqual(A.check_python_sources([{"source": "import os\nraise RuntimeError('never execute')"}], index, subset)["imports"], ["os"])
+            with self.assertRaisesRegex(A.AssetError, "winreg"):
+                A.check_python_sources([{"source": "import winreg"}], index, subset)
+            with self.assertRaisesRegex(A.AssetError, "math-data"):
+                A.check_python_sources([{"source": "import math"}], index, subset)
+            subset["packages"]["math-data"] = full["packages"]["math-data"]
+            self.assertEqual(A.check_python_sources([{"source": "import math"}], index, subset)["imports"], ["math"])
+
+    def test_v2_rejects_changed_report_without_a_new_independent_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core, candidates, request, facts, full = availability_fixture(Path(tmp))
+            raw = A.json_bytes(facts)
+            facts["modules"].append("winreg")
+            with self.assertRaisesRegex(A.AssetError, "sha256 mismatch"):
+                A.private_import_index_from_availability(A.json_bytes(facts), core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+            for digest in ("", "0" * 63, None):
+                with self.subTest(digest=digest), self.assertRaises(A.AssetError):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=digest, candidates=candidates)
+
+    def test_v2_rejects_malformed_schema_and_provenance_even_with_matching_bytes_digest(self):
+        mutations = [
+            lambda f: f.update(v=True), lambda f: f.update(kind="cpython-stdlib"),
+            lambda f: f.update(extra="unknown"), lambda f: f.update(pyodide="0.28.4"), lambda f: f.update(python="3.12.0"),
+            lambda f: f["source"].update(url="https://github.com/other/release.tar.bz2"),
+            lambda f: f["source"].update(sha256="b" * 64),
+            lambda f: f["source"]["runtime_files"].update({"pyodide.mjs": "d" * 64}),
+            lambda f: f["source"]["runtime_files"].pop("python_stdlib.zip"),
+            lambda f: f["source"]["candidate_source"].update(git_blob_sha1="e" * 40),
+            lambda f: f["source"].update(method="unreviewed method"),
+            lambda f: f["modules"].append("winreg"), lambda f: f["modules"].append("sys"),
+            lambda f: f["modules"].reverse(), lambda f: f["modules"].append("a.b"),
+            lambda f: f["unavailable"].pop("winreg"), lambda f: f["unavailable"].update(winreg=""),
+            lambda f: f["unavailable"].update({"bad/name": "error"})]
+        for number, mutate in enumerate(mutations):
+            with self.subTest(mutation=number), tempfile.TemporaryDirectory() as tmp:
+                core, candidates, request, facts, full = availability_fixture(Path(tmp))
+                mutate(facts)
+                raw = A.json_bytes(facts)
+                with self.assertRaises(A.AssetError):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+
+    def test_v2_rehashes_every_staged_file_including_same_python_release_lock(self):
+        for file in ("pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json", "package.json"):
+            with self.subTest(file=file), tempfile.TemporaryDirectory() as tmp:
+                core, candidates, request, facts, full = availability_fixture(Path(tmp))
+                (core / file).write_bytes((core / file).read_bytes() + b" ")
+                raw = A.json_bytes(facts)
+                with self.assertRaisesRegex(A.AssetError, "staged runtime sha256 mismatch"):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+
+    def test_v2_rejects_request_candidate_and_release_provenance_mismatches(self):
+        mutations = [lambda r: r.update(v=2), lambda r: r.update(candidates=["os"]),
+                     lambda r: r["candidate_source"].update(url="https://example.test/candidates"),
+                     lambda r: r["source"].update(sha256="b" * 64),
+                     lambda r: r["runtime_files"].pop("pyodide.js")]
+        for number, mutate in enumerate(mutations):
+            with self.subTest(mutation=number), tempfile.TemporaryDirectory() as tmp:
+                core, candidates, request, facts, full = availability_fixture(Path(tmp))
+                mutate(request)
+                (core / "probe-input.json").write_bytes(A.json_bytes(request))
+                raw = A.json_bytes(facts)
+                with self.assertRaises(A.AssetError):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+
+    def test_v2_rejects_duplicate_json_keys_and_non_finite_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core, candidates, request, facts, full = availability_fixture(Path(tmp))
+            for raw in (b'{"v":2,"v":2}', b'{"v":NaN}', b'[]', b'\xff'):
+                with self.subTest(raw=raw), self.assertRaises(A.AssetError):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+
+    def test_import_index_cli_writes_private_output_and_failed_validation_preserves_it(self):
+        with tempfile.TemporaryDirectory(prefix="ctm availability ") as tmp:
+            root = Path(tmp)
+            core, candidates, request, facts, full = availability_fixture(root)
+            report, names = root / "availability.json", root / "candidates.json"
+            report.write_bytes(A.json_bytes(facts))
+            names.write_bytes(A.json_bytes(candidates))
+            output = root / "private cache/imports.json"
+            args = [sys.executable, str(Path(A.__file__)), "import-index", "--probe-core", str(core),
+                    "--availability", str(report), "--candidates", str(names), "--reviewed-report-sha256", A.digest(report.read_bytes()),
+                    "--output", str(output)]
+            result = subprocess.run(args, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            previous = output.read_bytes()
+            self.assertNotIn("winreg", json.loads(previous)["stdlib_modules"])
+            report.write_bytes(report.read_bytes() + b" ")
+            result = subprocess.run(args, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(output.read_bytes(), previous)
+            report.write_bytes(A.json_bytes(facts))
+            args[-1] = str(root / "_ctm-assets/imports.json")
+            result = subprocess.run(args, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((root / "_ctm-assets").exists())
+
+
+def release_availability_smoke(core, report, index_file, reviewed_sha256):
+    """Called by the official-release producer job, using private real bytes."""
+    case = unittest.TestCase()
+    core, report, index_file = Path(core), Path(report), Path(index_file)
+    index = json.loads(index_file.read_text(encoding="utf-8"))
+    actual = A.private_import_index_from_availability(report.read_bytes(), core, reviewed_report_sha256=reviewed_sha256)
+    case.assertEqual(index, actual)
+    facts = json.loads(report.read_bytes())
+    request = json.loads((core / "probe-input.json").read_bytes())
+    case.assertEqual((facts["pyodide"], facts["python"]), ("0.28.3", "3.13.2"))
+    case.assertEqual((len(facts["modules"]), len(facts["unavailable"]), len(request["candidates"])), (247, 49, 290))
+    case.assertEqual(set(index["stdlib_modules"]), set(facts["modules"]))
+    case.assertFalse(set(index["stdlib_modules"]).intersection(facts["unavailable"]))
+    full = json.loads((core / "pyodide-lock.json").read_bytes())
+    empty = {"info": full["info"], "packages": {}}
+    case.assertEqual(A.check_python_sources([{"source": "import os\nimport math\nraise RuntimeError('never execute')"}], index, empty)["imports"], ["math", "os"])
+    with case.assertRaisesRegex(A.AssetError, "winreg"):
+        A.check_python_sources([{"source": "import winreg"}], index, empty)
+    collision = copy.deepcopy(index)
+    collision["stdlib_modules"].append("sympy")
+    with case.assertRaisesRegex(A.AssetError, "sympy"):
+        A.check_python_sources([{"source": "import sympy"}], collision, empty)
+    subset = A.package_closure(full, ["sympy"])
+    case.assertEqual(A.check_python_sources([{"source": "import sympy"}], collision, subset)["imports"], ["sympy"])
+    print("Reviewed Pyodide 0.28.3 availability: 247 admitted, 49 unavailable, 290 candidates accounted; private CLI/scanner/package-precedence canaries passed")
 
 
 class AssetsTests(unittest.TestCase):
