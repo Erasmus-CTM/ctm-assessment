@@ -8,8 +8,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const {pathToFileURL} = require('node:url');
 
-const TOOL = path.resolve(__dirname, '..', 'tools', 'compare-browser.mjs');
+const TOOL = pathToFileURL(path.resolve(__dirname, '..', 'tools', 'compare-browser.mjs')).href;
 const page = main => `<!doctype html><html><head><title>t</title><script src="site_libs/ctm-libs/ctm-nav.js"></script></head>`
   + `<body><main>${main}</main></body></html>`;
 const pane = (id, body, active = '') => `<div id="${id}" class="tab-pane${active}">${body}</div>`;
@@ -52,6 +53,49 @@ test('the first visit loads a target of each kind on each page, and says which',
     // One of each kind, and every tab title: fewer loads than the full run.
     assert.equal(sample.targets.length, full.every.length);
     assert.ok(sample.targets.length < full.targets.length);
+  } finally {
+    fs.rmSync(root, {recursive: true, force: true});
+  }
+});
+
+test('the HTTP server preserves the default and exposes an explicit standard isolation policy', async t => {
+  const {serve} = await import(TOOL);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-browser-headers-'));
+  const html = '<!doctype html><title>Actual served bytes</title><script src="runtime.js"></script>';
+  const script = 'const runtime = "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js";';
+  fs.writeFileSync(path.join(root, 'index.html'), html);
+  fs.writeFileSync(path.join(root, 'runtime.js'), script);
+  try {
+    for (const [name, args, expected] of [
+      ['existing default', [], 'credentialless'],
+      ['explicit credentialless', [true, 'credentialless'], 'credentialless'],
+      ['standard require-corp', [true, 'require-corp'], 'require-corp'],
+      ['first visit stays unisolated', [false, 'require-corp'], null],
+    ]) {
+      await t.test(name, async () => {
+        const server = await serve({course: root}, ...args);
+        try {
+          for (const file of ['index.html', 'runtime.js']) {
+            const response = await fetch('http://127.0.0.1:' + server.address().port + '/course/' + file,
+              {headers: {connection: 'close'}});
+            assert.equal(response.status, 200);
+            assert.equal(response.headers.get('cross-origin-opener-policy'), expected ? 'same-origin' : null);
+            assert.equal(response.headers.get('cross-origin-embedder-policy'), expected);
+            const body = await response.text();
+            if (file === 'index.html') assert.equal(body, html);
+            else if (expected) assert.equal(body, script, 'isolated serving leaves runtime bytes intact');
+            else {
+              assert.match(body, /127\.0\.0\.1:9\//, 'first visit retains its existing heavy-runtime rewrite');
+              assert.doesNotMatch(body, /cdn\.jsdelivr\.net/);
+            }
+          }
+        } finally {
+          await new Promise(resolve => server.close(resolve));
+        }
+      });
+    }
+    for (const policy of ['', 'unsafe-none', 'require-corp\r\nx-header: bad', null, {}])
+      assert.throws(() => serve({course: root}, true, policy), /COEP must be credentialless or require-corp/);
   } finally {
     fs.rmSync(root, {recursive: true, force: true});
   }
