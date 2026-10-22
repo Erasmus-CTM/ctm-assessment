@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraphcore.js"></script>
+<style>@import url("https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraph.css");</style>
+<style>html,body{margin:0;padding:0;width:100%;height:100%;}.jxgbox{border:none;border-radius:0px;}</style>
+</head>
+<body>
+<div id="JXG5721c9a0_165f_1989_2ffd_7f6d71f2" class="jxgbox" style="width:100%;height:100%;display:block;object-fit:fill;box-sizing:border-box;"></div>
+<script>(function () {
+  'use strict';
+  const protocol = 'jsxgraph-quarto-assessment';
+  const version = 1;
+  const assessmentId = "JXG5721c9a0_165f_1989_2ffd_7f6d71f2";
+  const boardId = "JXG5721c9a0_165f_1989_2ffd_7f6d71f2";
+  // A size for a board that must start while hidden (an assessment request):
+  // a hidden iframe lays nothing out, but JSXGraph reads a container's CSS
+  // pixel size then. The board gets its real size when it is shown.
+  const provisionalSize = [760, 400];
+  let provisional = null;
+  let registration = null;
+
+  async function svgToPng(dataUri, board) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(board.canvasWidth || image.width || 800));
+        canvas.height = Math.max(1, Math.round(board.canvasHeight || image.height || 600));
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      image.onerror = () => reject(new Error('Could not render the JSXGraph board'));
+      image.src = dataUri;
+    });
+  }
+
+  function resolveBoard(spec) {
+    if (spec && typeof spec.board === 'function') return spec.board();
+    if (spec && spec.board) return spec.board;
+    const boards = Object.values(JXG.boards || {});
+    return boards.length ? boards[0] : null;
+  }
+
+  // The board fills the iframe. Hidden tabs and collapsed blocks give the
+  // iframe no size; resizing follows the iframe, without fixing the
+  // container's pixel size, and shows the intended view: the bounding box the
+  // board was created with, or the one the page's code or the user set later.
+  function validBox(box) {
+    return Array.isArray(box) && box.length === 4 && box.every(Number.isFinite) &&
+      box[2] > box[0] && box[1] > box[3];
+  }
+  function sameBox(a, b) {
+    return validBox(a) && validBox(b) && a.every((value, i) => Math.abs(value - b[i]) <= 1e-9 * Math.max(1, Math.abs(b[i])));
+  }
+  const containerObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => scheduleBoardRefresh()) : null;
+  function remember(board) {
+    // With unitX/unitY (and originX/originY) JSXGraph ignores boundingbox, so
+    // the view the board was created with is its current one.
+    const attr = board.attr || {}, current = board.getBoundingBox();
+    const initial = !(attr.unitx || attr.unity) && attr.boundingbox;
+    board.quartoView = {intended: validBox(initial) ? initial.slice() : (validBox(current) ? current.slice() : null), last: current,
+      units: !!(attr.unitx || attr.unity), provisional: !!provisional};
+    // Follow the container itself too: board code may resize it (a side panel).
+    // One observer for all containers: observing an element again is a no-op,
+    // so boards that are freed and created again do not add observers.
+    if (containerObserver && board.containerObj) containerObserver.observe(board.containerObj);
+  }
+  // The extension resizes the boards (below); JSXGraph's own resize observer
+  // would adjust the view a second time. Board code can still enable it.
+  if (JXG.Options && JXG.Options.board && JXG.Options.board.resize) JXG.Options.board.resize.enabled = false;
+  // Record each board's view as created, before any later change.
+  if (JXG.JSXGraph && typeof JXG.JSXGraph.initBoard === 'function') {
+    const initBoard = JXG.JSXGraph.initBoard;
+    JXG.JSXGraph.initBoard = function () {
+      const board = initBoard.apply(this, arguments);
+      try { remember(board); } catch (error) { /* keep the board usable */ }
+      return board;
+    };
+  }
+  // With keepaspectratio the whole intended box stays visible: one scale for
+  // both directions, centred (JSXGraph's setBoundingBox may crop instead).
+  function fit(box, board, width, height) {
+    if (!board.keepaspectratio) return box.slice();
+    const scale = Math.min(width / (box[2] - box[0]), height / (box[1] - box[3]));
+    const cx = (box[0] + box[2]) / 2, cy = (box[1] + box[3]) / 2;
+    return [cx - width / (2 * scale), cy + height / (2 * scale), cx + width / (2 * scale), cy - height / (2 * scale)];
+  }
+  function refreshBoards() {
+    const visible = window.innerWidth > 0 && window.innerHeight > 0;
+    // Still hidden after a provisional start: leave the boards as created (a
+    // layout message may arrive before the iframe is shown).
+    if (provisional && !visible) return;
+    // Shown at last: the container fills the iframe again.
+    if (provisional) {
+      if (provisional.element.style.width === provisional.width) provisional.element.style.width = provisional.previous[0];
+      if (provisional.element.style.height === provisional.height) provisional.element.style.height = provisional.previous[1];
+      provisional = null;
+    }
+    Object.values(JXG.boards || {}).forEach((board) => {
+      const container = board.containerObj;
+      if (!container || typeof board.resizeContainer !== 'function') return;
+      // The container keeps its CSS size (100% of the iframe unless the board
+      // code lays it out otherwise), so its size is the board's size.
+      const width = container.clientWidth, height = container.clientHeight;
+      if (!(width > 0 && height > 0)) return;
+      if (!board.quartoView) remember(board);
+      const view = board.quartoView, current = board.getBoundingBox();
+      // A view set since the last refresh (by the page's code or the user's pan
+      // or zoom) becomes the one to keep.
+      const adopted = validBox(current) && !sameBox(current, view.last);
+      if (adopted) view.intended = current.slice();
+      const changed = Math.abs((board.canvasWidth || 0) - width) > 1 || Math.abs((board.canvasHeight || 0) - height) > 1;
+      // First real size after a hidden start: a board set up with origin and
+      // units keeps them, as if it had started visible at this size
+      // (resizeContainer would move the origin by half the size change).
+      // A box the code set meanwhile is kept instead (above).
+      const keepOrigin = view.provisional && view.units && !adopted && board.origin && board.origin.scrCoords
+        ? [board.origin.scrCoords[1], board.origin.scrCoords[2] ] : null;
+      if (changed) board.resizeContainer(width, height, true, true);
+      if (view.provisional) {
+        view.provisional = false;
+        if (keepOrigin && typeof board.moveOrigin === 'function') board.moveOrigin(keepOrigin[0], keepOrigin[1]);
+        if (view.units && !adopted) view.intended = board.getBoundingBox().slice();
+      }
+      if (view.intended && (changed || !validBox(current))) board.setBoundingBox(fit(view.intended, board, width, height), board.keepaspectratio);
+      view.last = board.getBoundingBox();
+      if (typeof board.fullUpdate === 'function') board.fullUpdate();
+      else if (typeof board.update === 'function') board.update();
+    });
+  }
+
+  function scheduleBoardRefresh() {
+    refreshBoards();
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        refreshBoards();
+        requestAnimationFrame(refreshBoards);
+      });
+    }
+  }
+
+  JXG.QuartoAssessment = {
+    register(spec) {
+      registration = typeof spec === 'function' ? { response: spec } : spec;
+      if (!registration || typeof registration.response !== 'function') {
+        throw new TypeError('Assessment registration requires a response function');
+      }
+    }
+  };
+
+  window.addEventListener('message', async (event) => {
+    const message = event.data;
+    if (event.source !== window.parent || !message || message.protocol !== protocol ||
+        message.version !== version || message.assessmentId !== assessmentId) return;
+    if (message.type === 'layout') {
+      scheduleBoardRefresh();
+      return;
+    }
+    if (message.type !== 'request') return;
+    // Board code may register in a load handler: wait for the page's load
+    // event (MathJax may still be loading), at most a few seconds.
+    if (!registration && document.readyState !== 'complete') {
+      await new Promise((resolve) => {
+        window.addEventListener('load', resolve, {once: true});
+        setTimeout(resolve, 3000);
+      });
+    }
+
+    const reply = {
+      protocol,
+      version,
+      type: 'response',
+      assessmentId,
+      requestId: message.requestId
+    };
+    try {
+      if (!registration) throw new Error('No JSXGraph assessment response is registered');
+      const raw = await registration.response();
+      reply.payload = JSON.parse(JSON.stringify(raw));
+      if (message.includeAI && registration.ai) {
+        const aiSpec = registration.ai;
+        const summary = typeof aiSpec.summary === 'function'
+          ? await aiSpec.summary(reply.payload)
+          : aiSpec.summary;
+        reply.ai = {};
+        if (summary !== undefined) reply.ai.summary = summary;
+        if (aiSpec.render) {
+          const board = resolveBoard(registration);
+          if (!board || !board.renderer || typeof board.renderer.dumpToDataURI !== 'function') {
+            throw new Error('No renderable JSXGraph board is available');
+          }
+          reply.ai.image = await svgToPng(board.renderer.dumpToDataURI(false), board);
+        }
+      }
+    } catch (error) {
+      reply.error = error && error.message ? error.message : String(error);
+    }
+    window.parent.postMessage(reply, '*');
+  });
+  window.addEventListener('resize', scheduleBoardRefresh);
+  if (typeof ResizeObserver === 'function') new ResizeObserver(scheduleBoardRefresh).observe(document.documentElement);
+
+  // The board code runs while the page is parsed, as in upstream, so
+  // DOMContentLoaded, load and document.write behave as always. A hidden tab
+  // or collapsed block gives the iframe no size and lays nothing out; JSXGraph
+  // then reads the container's CSS pixel size, so the container gets a
+  // provisional one until the iframe is shown (refreshBoards).
+  const box = document.getElementById(boardId);
+  if (box && !(window.innerWidth > 0 && window.innerHeight > 0)) {
+    const width = provisionalSize[0] + 'px', height = provisionalSize[1] + 'px';
+    provisional = {element: box, width, height, previous: [box.style.width, box.style.height]};
+    box.style.width = width;
+    box.style.height = height;
+  }
+})();
+</script>
+<script>(function () {
+  'use strict';
+
+  function merge(base, extra) {
+    return Object.assign({}, base, extra || {});
+  }
+
+  function summarizeGraph(data, options) {
+    data = data || {};
+    options = options || {};
+    var nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    var rawEdges = Array.isArray(data.edges) ? data.edges : [];
+    var vertexIds = nodes.map(function (node) { return node.id; }).sort(function (a, b) { return a - b; });
+    var adjacency = {};
+    vertexIds.forEach(function (id) { adjacency[id] = []; });
+    var edges = rawEdges.map(function (edge) {
+      var source = edge[0];
+      var target = edge[1];
+      if (adjacency[source]) adjacency[source].push(target);
+      if (adjacency[target]) adjacency[target].push(source);
+      return source < target ? [source, target] : [target, source];
+    }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    vertexIds.forEach(function (id) { adjacency[id].sort(function (a, b) { return a - b; }); });
+
+    var visited = {};
+    var components = [];
+    vertexIds.forEach(function (start) {
+      if (visited[start]) return;
+      var component = [];
+      var queue = [start];
+      visited[start] = true;
+      while (queue.length) {
+        var id = queue.shift();
+        component.push(id);
+        adjacency[id].forEach(function (neighbor) {
+          if (!visited[neighbor]) {
+            visited[neighbor] = true;
+            queue.push(neighbor);
+          }
+        });
+      }
+      component.sort(function (a, b) { return a - b; });
+      components.push(component);
+    });
+
+    var summary = {
+      representation: data.representation || 'undirected-graph',
+      vertexCount: vertexIds.length,
+      edgeCount: edges.length,
+      vertexIds: vertexIds,
+      edges: edges,
+      degrees: vertexIds.map(function (id) { return { vertex: id, degree: adjacency[id].length }; }),
+      connected: components.length === 1,
+      componentCount: components.length,
+      components: components,
+      isolatedVertices: vertexIds.filter(function (id) { return adjacency[id].length === 0; }),
+      cycleRank: edges.length - vertexIds.length + components.length
+    };
+    if (options.feedbackPolicy !== undefined) {
+      summary.feedbackPolicy = String(options.feedbackPolicy);
+    }
+    if (options.extra && typeof options.extra === 'object') {
+      summary.extra = options.extra;
+    }
+    return summary;
+  }
+
+  function createGraphEditor(options) {
+    options = options || {};
+    var board = options.board;
+    if (!board || typeof board.create !== 'function') {
+      throw new TypeError('Graph editor requires a JSXGraph board');
+    }
+
+    var labels = merge({
+      deleteSelected: 'Delete selected',
+      clearGraph: 'Clear graph',
+      showControls: 'Show controls',
+      hideControls: 'Hide controls'
+    }, options.labels);
+    var instructions = options.instructions || [
+      'Click empty space to add a vertex.',
+      'Click two vertices to add or remove their edge.',
+      'Drag a vertex to move it.',
+      'Select a vertex, then choose Delete selected to remove it.'
+    ];
+    var pointAttributes = merge({
+      size: 6,
+      fixed: false,
+      showInfobox: false,
+      highlight: false
+    }, options.pointAttributes);
+    var edgeAttributes = merge({
+      strokeColor: '#475569',
+      strokeWidth: 3,
+      fixed: true,
+      highlight: false
+    }, options.edgeAttributes);
+    var normalStyle = merge({ fillColor: '#2563eb', strokeColor: '#1d4ed8' }, options.normalStyle);
+    var selectedStyle = merge({ fillColor: '#f59e0b', strokeColor: '#92400e' }, options.selectedStyle);
+    // Read the view when a click happens: a board started while hidden has no
+    // valid view yet, and resizing may change it.
+    function editableBottom() {
+      return options.editableBottom === undefined ? board.getBoundingBox()[3] + 0.9 : Number(options.editableBottom);
+    }
+    var vertices = [];
+    var edges = [];
+    var selectedVertex = null;
+    var pointerStart = null;
+    var nextVertexId = 1;
+    var controlsVisible = false;
+    var clickToleranceSquared = 36;
+
+    function setSelected(vertex) {
+      if (selectedVertex) selectedVertex.point.setAttribute(normalStyle);
+      selectedVertex = vertex;
+      if (selectedVertex) selectedVertex.point.setAttribute(selectedStyle);
+      board.update();
+    }
+
+    function addVertex(x, y) {
+      x = Number(x);
+      y = Number(y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        throw new TypeError('Vertex coordinates must be finite numbers');
+      }
+      var vertex = { id: nextVertexId++ };
+      vertex.point = board.create('point', [x, y], merge(pointAttributes, merge(normalStyle, {
+        name: String(vertex.id)
+      })));
+      vertices.push(vertex);
+      setSelected(null);
+      return vertex.id;
+    }
+
+    function findVertex(id) {
+      return vertices.find(function (vertex) { return vertex.id === id; }) || null;
+    }
+
+    function edgeKey(a, b) {
+      return a.id < b.id ? a.id + ':' + b.id : b.id + ':' + a.id;
+    }
+
+    function toggleEdgeVertices(a, b) {
+      if (!a || !b || a === b) return false;
+      var key = edgeKey(a, b);
+      var index = edges.findIndex(function (edge) { return edge.key === key; });
+      if (index >= 0) {
+        board.removeObject(edges[index].segment);
+        edges.splice(index, 1);
+        setSelected(null);
+        return false;
+      }
+      edges.push({
+        key: key,
+        source: a,
+        target: b,
+        segment: board.create('segment', [a.point, b.point], edgeAttributes)
+      });
+      setSelected(null);
+      return true;
+    }
+
+    function toggleEdge(sourceId, targetId) {
+      var source = findVertex(sourceId);
+      var target = findVertex(targetId);
+      if (!source || !target) throw new Error('Cannot connect an unknown vertex');
+      return toggleEdgeVertices(source, target);
+    }
+
+    function handleVertexClick(vertex) {
+      if (!selectedVertex) setSelected(vertex);
+      else if (selectedVertex === vertex) setSelected(null);
+      else toggleEdgeVertices(selectedVertex, vertex);
+    }
+
+    function deleteSelected() {
+      if (!selectedVertex) return false;
+      var doomed = selectedVertex;
+      edges.slice().forEach(function (edge) {
+        if (edge.source === doomed || edge.target === doomed) {
+          board.removeObject(edge.segment);
+          edges.splice(edges.indexOf(edge), 1);
+        }
+      });
+      board.removeObject(doomed.point);
+      vertices.splice(vertices.indexOf(doomed), 1);
+      selectedVertex = null;
+      board.update();
+      return true;
+    }
+
+    function clear() {
+      setSelected(null);
+      edges.forEach(function (edge) { board.removeObject(edge.segment); });
+      vertices.forEach(function (vertex) { board.removeObject(vertex.point); });
+      edges = [];
+      vertices = [];
+      nextVertexId = 1;
+      board.update();
+    }
+
+    function response() {
+      return {
+        representation: 'undirected-graph',
+        nodes: vertices.map(function (vertex) {
+          return {
+            id: vertex.id,
+            x: Number(vertex.point.X().toFixed(4)),
+            y: Number(vertex.point.Y().toFixed(4))
+          };
+        }),
+        edges: edges.map(function (edge) { return [edge.source.id, edge.target.id]; })
+      };
+    }
+
+    var panel = document.createElement('div');
+    panel.setAttribute('role', 'note');
+    panel.setAttribute('aria-label', 'Graph editor controls');
+    panel.setAttribute('data-graph-editor-control', 'true');
+    panel.style.cssText = [
+      'position:absolute', 'top:48px', 'right:12px', 'z-index:20',
+      'display:none', 'width:min(270px,calc(100% - 24px))',
+      'box-sizing:border-box', 'padding:10px 12px', 'border:1px solid #94a3b8',
+      'border-radius:7px', 'background:rgba(255,255,255,0.96)',
+      'color:#1e293b', 'font:14px/1.35 sans-serif', 'box-shadow:0 3px 12px rgba(15,23,42,0.18)'
+    ].join(';');
+    var list = document.createElement('ol');
+    list.style.cssText = 'margin:0;padding-left:1.35rem';
+    instructions.forEach(function (instruction) {
+      var item = document.createElement('li');
+      item.textContent = instruction;
+      list.appendChild(item);
+    });
+    panel.appendChild(list);
+    board.containerObj.style.position = board.containerObj.style.position || 'relative';
+    board.containerObj.appendChild(panel);
+
+    var controlBar = document.createElement('div');
+    controlBar.setAttribute('data-graph-editor-control', 'true');
+    controlBar.style.cssText = [
+      'position:absolute', 'left:12px', 'bottom:10px', 'z-index:20',
+      'display:flex', 'gap:8px', 'flex-wrap:wrap', 'font:14px/1.2 sans-serif'
+    ].join(';');
+    board.containerObj.appendChild(controlBar);
+
+    function createControl(label, handler) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      button.style.cssText = [
+        'padding:6px 10px', 'border:1px solid #94a3b8', 'border-radius:5px',
+        'background:#fff', 'color:#1e293b', 'cursor:pointer'
+      ].join(';');
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        handler();
+      });
+      controlBar.appendChild(button);
+      return button;
+    }
+
+    var toggleButton;
+    function showControls(show) {
+      controlsVisible = show === undefined ? !controlsVisible : !!show;
+      panel.style.display = controlsVisible ? 'block' : 'none';
+      if (toggleButton) toggleButton.textContent = controlsVisible ? labels.hideControls : labels.showControls;
+      board.update();
+      return controlsVisible;
+    }
+
+    createControl(labels.deleteSelected, deleteSelected);
+    createControl(labels.clearGraph, clear);
+    toggleButton = createControl(labels.showControls, function () { showControls(); });
+
+    function isControlEvent(event) {
+      return !!(event.target && event.target.closest &&
+        event.target.closest('button, input, [data-graph-editor-control]'));
+    }
+
+    function vertexAt(screen) {
+      for (var i = vertices.length - 1; i >= 0; i--) {
+        if (vertices[i].point.hasPoint(screen[0], screen[1])) return vertices[i];
+      }
+      return null;
+    }
+
+    function userPosition(screen) {
+      var width = board.containerObj.clientWidth || board.canvasWidth;
+      var height = board.containerObj.clientHeight || board.canvasHeight;
+      var bounds = board.getBoundingBox();
+      if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0 && bounds.every(Number.isFinite)) {
+        return [
+          bounds[0] + screen[0] / width * (bounds[2] - bounds[0]),
+          bounds[1] - screen[1] / height * (bounds[1] - bounds[3])
+        ];
+      }
+      var coords = new JXG.Coords(JXG.COORDS_BY_SCREEN, screen, board);
+      return [coords.usrCoords[1], coords.usrCoords[2]];
+    }
+
+    board.on('down', function (event) {
+      pointerStart = null;
+      if (isControlEvent(event)) return;
+      var screen = board.getMousePosition(event);
+      pointerStart = {
+        screen: screen,
+        vertex: vertexAt(screen)
+      };
+    });
+
+    board.on('up', function (event) {
+      if (!pointerStart || isControlEvent(event)) {
+        pointerStart = null;
+        return;
+      }
+      var screen = board.getMousePosition(event);
+      var dx = screen[0] - pointerStart.screen[0];
+      var dy = screen[1] - pointerStart.screen[1];
+      if (dx * dx + dy * dy <= clickToleranceSquared) {
+        if (pointerStart.vertex) {
+          handleVertexClick(pointerStart.vertex);
+        } else if (!vertexAt(screen)) {
+        var position = userPosition(screen);
+        if (position[1] > editableBottom()) addVertex(position[0], position[1]);
+        }
+      }
+      pointerStart = null;
+    });
+
+    board.containerObj.setAttribute('data-graph-editor-ready', 'true');
+
+    if (options.controlsInitiallyVisible) showControls(true);
+
+    var api = {
+      board: board,
+      addVertex: addVertex,
+      toggleEdge: toggleEdge,
+      deleteSelected: deleteSelected,
+      clear: clear,
+      response: response,
+      summarize: function (summaryOptions) { return summarizeGraph(response(), summaryOptions); },
+      showControls: showControls,
+      register: function (spec) {
+        if (!JXG.QuartoAssessment || typeof JXG.QuartoAssessment.register !== 'function') {
+          throw new Error('Graph editor registration requires the Quarto assessment bridge');
+        }
+        JXG.QuartoAssessment.register(merge(spec, { board: board, response: response }));
+        return api;
+      }
+    };
+    return api;
+  }
+
+  function createBoard(options) {
+    options = options || {};
+    var container = options.container || document.querySelector('.jxgbox');
+    if (!container) throw new Error('Graph editor could not find its JSXGraph container');
+    var board = JXG.JSXGraph.initBoard(container.id, merge({
+      boundingbox: [-5, 4, 5, -4],
+      axis: false,
+      pan: { enabled: false },
+      zoom: { enabled: false },
+      showNavigation: false,
+      showCopyright: false
+    }, options.boardAttributes));
+    var editor = createGraphEditor(merge(options, { board: board }));
+
+    function resizeToVisibleContainer() {
+      var width = container.clientWidth;
+      var height = container.clientHeight;
+      if (!(width > 0 && height > 0) || typeof board.resizeContainer !== 'function') return false;
+      if (Math.abs((board.canvasWidth || 0) - width) > 1 ||
+          Math.abs((board.canvasHeight || 0) - height) > 1) {
+        // Keep the container fluid (CSS size): fixing it in px would stop it
+        // following the iframe on narrow screens.
+        board.resizeContainer(width, height, true);
+        if (typeof board.fullUpdate === 'function') board.fullUpdate();
+      }
+      return true;
+    }
+
+    editor.resize = resizeToVisibleContainer;
+    if (typeof ResizeObserver !== 'undefined') {
+      var observer = new ResizeObserver(resizeToVisibleContainer);
+      observer.observe(container);
+      editor.resizeObserver = observer;
+    }
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(function () {
+        resizeToVisibleContainer();
+        requestAnimationFrame(resizeToVisibleContainer);
+      });
+    }
+    resizeToVisibleContainer();
+    return editor;
+  }
+
+  JXG.QuartoGraphEditor = {
+    create: createGraphEditor,
+    createBoard: createBoard,
+    summarize: summarizeGraph
+  };
+})();
+
+</script>
+<script>window.BOARDID = "JXG5721c9a0_165f_1989_2ffd_7f6d71f2";
+var board = JXG.JSXGraph.initBoard("JXG5721c9a0_165f_1989_2ffd_7f6d71f2", {
+  boundingbox: [0, -0.15, 6.8, -8.15],
+  axis: false,
+  showCopyright: false,
+  showNavigation: false,
+  pan: { enabled: false },
+  zoom: { enabled: false }
+});
+
+var logTwo = Math.log10(2);
+for (var p = 1; p <= 7; p++) {
+  var threshold = -p - logTwo;
+  board.create('segment', [[0.75, threshold], [6.45, threshold]], {
+    strokeColor: '#a7a7a7',
+    strokeWidth: 1,
+    dash: 2,
+    fixed: true,
+    highlight: false
+  });
+  board.create('text', [0.12, threshold, 'p=' + p], {
+    fixed: true,
+    fontSize: 12,
+    anchorY: 'middle'
+  });
+}
+
+board.create('arrow', [[0.65, -7.85], [0.65, -0.55]], {
+  strokeColor: '#333333',
+  fixed: true,
+  highlight: false
+});
+board.create('text', [0.85, -0.38, 'Absolutt feil |e| (logaritmisk skala)'], {
+  fixed: true,
+  fontSize: 13
+});
+
+var examples = [
+  { error: 3.2e-2, x: 1.7, color: '#1f77b4', name: 'A', label: '3.2·10⁻²' },
+  { error: 4.0e-4, x: 3.5, color: '#ff7f0e', name: 'B', label: '4.0·10⁻⁴' },
+  { error: 2.0e-7, x: 5.3, color: '#2ca02c', name: 'C', label: '2.0·10⁻⁷' }
+];
+
+for (var i = 0; i < examples.length; i++) {
+  var item = examples[i];
+  var logError = Math.log10(item.error);
+  board.create('point', [item.x, logError], {
+    name: '',
+    size: 5,
+    fillColor: item.color,
+    strokeColor: item.color,
+    fixed: true,
+    highlight: false
+  });
+  board.create('text', [item.x + 0.16, logError + 0.08, item.label], {
+    fixed: true,
+    fontSize: 14,
+    anchorY: 'bottom'
+  });
+  board.create('text', [item.x, -7.82, 'Beregning ' + item.name], {
+    fixed: true,
+    fontSize: 13,
+    anchorX: 'middle'
+  });
+}</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+name: Diagnose embedded worker origins
+
+on:
+  pull_request:
+    paths:
+      - integration/worker-origin/**
+      - .github/workflows/worker-origin-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-origin-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.1-noble
+      options: --user 1001
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run exact frame under strict isolation
+        env:
+          CTM_BROWSER: ${{ matrix.browser }}
+          CTM_WORKER_REPORT: ${{ runner.temp }}/worker-origin-${{ matrix.browser }}.json
+        run: node integration/worker-origin/probe.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: worker-origin-${{ matrix.browser }}
+          path: ${{ runner.temp }}/worker-origin-${{ matrix.browser }}.json
+          retention-days: 7
