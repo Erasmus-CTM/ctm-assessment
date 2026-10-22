@@ -21,3 +21,11 @@ Full partial/complete locks, availability data and the scanner index remain
 private in the runner. The workflow emits no public asset set and performs no
 course installation. Complete composition does not establish runtime/fork
 generic-option acceptance or full offline course/browser acceptance.
+
+The fixed record in `integration/assets-complete-reviewed-digests.json` was
+reviewed independently from successful discovery jobs 119872057770 and
+119871890521 at inspector source 82747c86. It binds the three partials,
+canonical private-index bytes and previously reviewed availability report.
+The subsequent workflow regenerates them and must match that record before
+calling the complete composer. A changed source/input digest requires a new
+independent discovery review; the workflow never updates its own record.

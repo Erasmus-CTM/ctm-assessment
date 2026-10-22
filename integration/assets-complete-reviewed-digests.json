@@ -1,0 +1,10 @@
+{
+  "availability_sha256": "dd9327e9be5bb2b4fb06afd905077fd72de39e345c7ec67f76a87ff4033afe28",
+  "import_index_sha256": "b8177517815176b3d38d99bbe6ae7d046de51768e5175d1cbabb367a5d9e4ebc",
+  "partial_sha256": {
+    "private-partial-board-assets-lock": "a97b3486cb1f34e63a78f3566969c8040b6fb274fa26f8b11606cc1df403bc5e",
+    "private-partial-npm-assets-lock": "5308a259f69789e1f90a49be2bc7c00faba815decf0d3250fceefb75d69e2bec",
+    "private-partial-python-assets-lock": "4867d3500ef0ae5b4feefc9b7335ec4df8f7711158978a2a4261756b6c00f560"
+  },
+  "v": 1
+}
