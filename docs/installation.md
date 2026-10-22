@@ -173,13 +173,8 @@ environment variable `CTM_FEEDBACK=off`. No page can turn it back on. Nothing
 of AI feedback reaches the HTML: no feedback scripts, configuration, activity
 data, criteria, starters or Feedback buttons. Activities show their task;
 checks, Run and Reset work as before. A page that asked for feedback gets one
-build message naming what was left out; the render succeeds. A clean site
-without AI feedback needs `filters: [ctm-assessment]`: pages that list filters
-themselves with pyodide-interaktiv before ctm-libs (`filters:
-[pyodide-interaktiv, ai-feedback]`), or that use components released before
-CTM Assessment 0.9, keep those components' own feedback code and Feedback
-buttons, disabled by their scripts with a note that ai-feedback is missing
-([details](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/reference.md#a-site-without-ai-feedback)).
+build message naming what was left out; the render succeeds. Use `filters: [ctm-assessment]`, or standalone pyodide-interaktiv 1.9 or
+later, so every component uses the shared feedback switch.
 
 ## Components are parts of the package
 
@@ -207,12 +202,13 @@ filters on a page, not both. A page that combines the package with a separately
 added ai-feedback 0.8 (the version before ctm-libs) stops with a message naming
 both: a page uses one version.
 
-**Projects set up for ai-feedback.** The package no longer installs the
-`ai-feedback` alias (step 3): list `filters: [ctm-assessment]`. `quarto add
-Erasmus-CTM/ai-feedback` still installs ctm-libs and, until ctm-libs deletes
-it, the alias, with which `filters: [ai-feedback]` keeps working with one
-build warning. An old ai-feedback 0.8 listed next to the package's components
-stops the page with what to do.
+**Projects set up for ai-feedback.** Install CTM Assessment and list
+`filters: [ctm-assessment]`. `quarto add Erasmus-CTM/ai-feedback` now installs
+ctm-libs only; on a fresh installation, listing `ai-feedback` fails with
+Quarto's extension-not-found error. Remove the old filter entry and its
+folder. A stale standalone ai-feedback 0.8.1 listed next to the package's
+components still stops with the migration message. Standalone
+pyodide-interaktiv 1.9 keeps its generated forwarder for older projects.
 
 **JSXGraph is part of the package.** Do not also run `quarto add
 jsxgraph/jsxgraph-quarto` in the same project: Quarto would place that copy
