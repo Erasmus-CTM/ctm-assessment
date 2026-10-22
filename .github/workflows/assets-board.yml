@@ -1,0 +1,88 @@
+name: Canonical board asset subset
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: ctm-board-assets-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Board tar bytes, exact pins, licence evidence and carried bundle
+        run: python -m unittest discover -s tests -p 'test_assets_*_lock.py' -v
+  official-boards:
+    needs: contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache/boards
+          key: ctm-board-archives-${{ hashFiles('integration/assets-board-metadata.json') }}
+      - name: Produce a private partial lock from exact official board archives
+        run: |
+          python scripts/ctm_board_assets.py --metadata integration/assets-board-metadata.json --pins _extensions/ctm-assessment/jsxgraph-pins.yml --cache .asset-cache/boards --output .private-extensions/board-lock.json
+          python scripts/ctm_assets.py build --lock .private-extensions/board-lock.json --cache .asset-cache/boards --bundle .private-extensions/board-bundle
+          python scripts/ctm_assets.py verify --lock .private-extensions/board-lock.json --bundle .private-extensions/board-bundle
+      - name: Verify complete runtime families and carry actual bytes without downloads
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          from unittest.mock import patch
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as assets
+          import ctm_board_assets as boards
+          lock = json.loads(pathlib.Path('.private-extensions/board-lock.json').read_text())
+          pins = pathlib.Path('_extensions/ctm-assessment/jsxgraph-pins.yml')
+          assert lock['versions'] == assets.board_versions(pins)
+          assert lock['scope'] == sorted(lock['versions'])
+          assert lock['provenance']['board_pins_sha256'] == assets.digest(pins.read_bytes())
+          root = pathlib.Path('.private-extensions/board-bundle')
+          assert assets.inventory(root) == lock['files']
+          with patch.object(assets, 'download', side_effect=AssertionError('Carried install attempted a download')):
+              assets.install_carried_bundle(lock, root, pathlib.Path('.private-extensions/board-carried'))
+          assert assets.inventory(pathlib.Path('.private-extensions/board-carried')) == lock['files']
+          metadata = json.loads(pathlib.Path('integration/assets-board-metadata.json').read_text())
+          metadata['archives'] = [entry for entry in metadata['archives'] if entry['id'] in boards.PACKAGES]
+          inspection = assets.inspect_archives(metadata, pathlib.Path('.asset-cache/boards'))
+          counts = {}
+          for inspected in inspection['archives']:
+              archive, = [item for item in lock['archives'] if item['id'] == inspected['id']]
+              source = {member['member'][len('package/'):]: member['sha256'] for member in inspected['members']}
+              selected = {item['member']: item['sha256'] for item in archive['files']}
+              if inspected['id'] != 'jsxgraph':
+                  assert selected == source, 'A MathJax/font runtime member was omitted'
+              else:
+                  assert {key: value for key, value in source.items() if key.startswith('distrib/')} .items() <= selected.items()
+              counts[inspected['id']] = len(selected)
+          policy = json.loads(pathlib.Path('integration/assets-board-licences.json').read_text())
+          font, = [item for item in lock['archives'] if item['id'] == 'mathjax-newcm-font']
+          assert font['licence'] == 'Apache-2.0 AND GUST-Font-License'
+          assert len(policy['member_sha256']) == 105
+          assert len(font['licence_files']) == 4
+          summary = {'kind': lock['kind'], 'scope': lock['scope'], 'files': len(lock['files']),
+                     'selected_members': counts, 'font_licences': font['licence_files'],
+                     'carried_network_calls': 0}
+          pathlib.Path('.private-extensions/board-summary.json').write_bytes(assets.json_bytes(summary))
+          print(json.dumps(summary))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: partial-board-lock-and-summary
+          path: |
+            .private-extensions/board-lock.json
+            .private-extensions/board-summary.json

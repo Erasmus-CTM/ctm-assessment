@@ -208,7 +208,9 @@ Answer: _[].
     html = (course / 'example.html').read_text()
     once(html, SCRIPTS, ' next to standalone copies')
     frames = ' '.join(base64.b64decode(m).decode('utf8', 'replace') for m in re.findall(r'data:text/html;base64,([A-Za-z0-9+/=]+)', html))
-    assert 'jsxgraph@1/distrib/jsxgraphcore.js' in frames, 'JSXGraph boards do not load the package library versions'
+    pins = (extensions / 'ctm-assessment' / 'jsxgraph-pins.yml').read_text()
+    board_script, = re.findall(r'(?m)^\s*src_jxg:\s*(\S+)\s*$', pins)
+    assert board_script in frames, 'JSXGraph boards do not load the exact installed package library URL'
     for name, spec in record['repositories'].items():
         own = extensions / spec['extensions'][0]
         notice = (extensions / 'ctm-assessment' / 'licenses' / (name + '.txt')).is_file()
