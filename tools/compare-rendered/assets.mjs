@@ -10,6 +10,7 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const sorted=x=>x&&typeof x==='object'?(Array.isArray(x)?x.map(sorted):Object.fromEntries(Object.keys(x).sort().map(k=>[k,sorted(x[k])]))):x;
 const attrs=(el,except)=>[...el.attributes].filter(a=>a.name!==except).map(a=>[a.name,a.value]).sort();
 const raw=el=>el.getAttribute(el.tagName==='LINK'?'href':'src');
+const mathJaxScripts=doc=>[...doc.scripts].filter(e=>e.id==='MathJax-script'||/(?:^|\/)mathjax(?:[@\/.-]|$)/i.test(e.getAttribute('src')||''));
 const resources=doc=>[...doc.querySelectorAll('script[src],link[rel="stylesheet"]')];
 const normalize=u=>u.split('?')[0].replace(/(?:^|.*\/)(?:site_libs\/|[^/]*_files\/libs\/)/,'').replace(/quarto-contrib\/([\w-]+?)-\d+\.\d+\.\d+[^/]*\//,'$1/');
 const monacoCode=(s,expression)=>new RegExp('^// Configure the Monaco Editor\'s loader\\s+require\\.config\\(\\{\\s*paths\\s*:\\s*\\{\\s*[\'"]vs[\'"]\\s*:\\s*'+expression+'\\s*\\}\\s*\\}\\);$').test(s.trim());
@@ -134,7 +135,8 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
       for(const e of ra){
         if(e===old[0])continue;
         const retained=rb.filter(x=>raw(x)===raw(e)&&x.tagName===e.tagName);
-        if(retained.length===1)insist((ra.indexOf(e)<ra.indexOf(old[0]))===(rb.indexOf(retained[0])<rb.indexOf(fresh[0])),'Asset resource order changed');
+        const occurrences=ra.filter(x=>raw(x)===raw(e)&&x.tagName===e.tagName);
+        if(retained.length===occurrences.length)insist((ra.indexOf(e)<ra.indexOf(old[0]))===(rb.indexOf(retained[occurrences.indexOf(e)])<rb.indexOf(fresh[0])),'Asset resource order changed');
       }
       pairs.push([old[0],fresh[0]]);
       eligible.add((old[0].tagName==='LINK'?'css ':'script ')+normalize(oldURL));
@@ -158,7 +160,7 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
     const poly='https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6';
     const oldPoly=ra.filter(e=>raw(e)===poly);
     if(oldPoly.length){
-      const ma=A.doc.querySelectorAll('script#MathJax-script'),mb=B.doc.querySelectorAll('script#MathJax-script');
+      const ma=mathJaxScripts(A.doc),mb=mathJaxScripts(B.doc);
       insist(oldPoly.length===1&&ra.filter(e=>normalize(raw(e))===normalize(poly)).length===1&&!rb.some(e=>normalize(raw(e))===normalize(poly))&&oldPoly[0].attributes.length===1,'Unexpected legacy polyfill change');
       insist(ma.length===mb.length&&ma.length<=1&&(!ma.length||ma[0].outerHTML===mb[0].outerHTML),'Actual MathJax loader changed: '+JSON.stringify({before:[...ma].map(e=>e.outerHTML),after:[...mb].map(e=>e.outerHTML)}));
       eligible.add('script '+normalize(poly));
@@ -219,13 +221,21 @@ function markBoardChanges(items,context,page){
 function checkRetainedResources(a,b,items,page){
  const before=resources(a),after=resources(b);
  const url=e=>{const u=raw(e),q=u.indexOf('?');return normalize(u)+(q<0?'':u.slice(q));};
- for(const old of before){
-   const matches=after.filter(e=>e.tagName===old.tagName&&normalize(raw(e))===normalize(raw(old)));
-   const oldCount=before.filter(e=>e.tagName===old.tagName&&normalize(raw(e))===normalize(raw(old))).length;
-   if(matches.length&&matches.length!==oldCount)items.push({page,area:'assets',change:'invalid',what:'Retained resource multiplicity changed',invariant:true});
-   if(matches.length!==1)continue;
-   const fresh=matches[0],attribute=old.tagName==='LINK'?'href':'src';
-   if(url(old)!==url(fresh)||!same(attrs(old,attribute),attrs(fresh,attribute)))
-     items.push({page,area:'assets',change:'invalid',what:'Retained resource URL/attributes changed: '+normalize(raw(old)),invariant:true});
+ const key=e=>e.tagName+'\0'+normalize(raw(e));
+ const groups=list=>{
+   const result=new Map();
+   for(const e of list){const k=key(e);if(!result.has(k))result.set(k,[]);result.get(k).push(e);}
+   return result;
+ };
+ const oldGroups=groups(before),newGroups=groups(after);
+ const retained=new Set([...oldGroups.keys()].filter(k=>newGroups.has(k)));
+ if(!same(before.map(key).filter(k=>retained.has(k)),after.map(key).filter(k=>retained.has(k))))
+   items.push({page,area:'assets',change:'invalid',what:'Retained resource order changed',invariant:true});
+ for(const [k,old]of oldGroups){
+   const fresh=newGroups.get(k);
+   if(!fresh)continue; // Removed resource rows remain ordinary differences.
+   const identity=e=>[url(e),attrs(e,e.tagName==='LINK'?'href':'src')];
+   if(!same(old.map(identity),fresh.map(identity)))
+     items.push({page,area:'assets',change:'invalid',what:'Retained resource URL/attributes/multiplicity/order changed: '+normalize(raw(old[0])),invariant:true});
  }
 }

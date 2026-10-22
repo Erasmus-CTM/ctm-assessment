@@ -27,7 +27,7 @@ function fixture(){
   const monaco=(v)=>'<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monaco-editor@'+v+'/min/vs/editor/editor.main.css"><script src="https://cdn.jsdelivr.net/npm/monaco-editor@'+v+'/min/vs/loader.js"></script>';
   const init=x=>'<script type="module" id="qpyodide-monaco-editor-init">'+code(x)+'</script>';
   const math='<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" id="MathJax-script" async type="text/javascript"></script>';
-  const body='<p id="lesson">Unchanged prose and <span class="math">x+1</span>.</p><script>window.__mathExerciseConfig={"grading":{"answer":2}};</script><script src="checker.js"></script>';
+  const body='<p id="lesson">Unchanged prose and <span class="math">x+1</span>.</p><script>window.__mathExerciseConfig={"grading":{"answer":2}};</script><script src="checker.js"></script><script src="ordinary.js"></script>';
   const before='<!doctype html><html><head>'+monaco('0.46')+'<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script><script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>'+math+init("'https://cdn.jsdelivr.net/npm/monaco-editor@0.46/min/vs'")+'</head><body>'+body+'</body></html>';
   const after='<!doctype html><html><head><script src="site_libs/quarto-contrib/ctm-assets-1.0.0/assets.js"></script><script>globalThis.CTM_ASSETS='+JSON.stringify(sorted(config))+';</script>'+monaco('0.46.0')+'<script src="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/js/all.min.js"></script>'+math+init("CTMAssets.url('monaco-editor', 'min/vs')")+'</head><body>'+body+'</body></html>';
   for(const side of ['before','after'])fs.mkdirSync(path.join(dir,side));
@@ -64,6 +64,7 @@ const mutations={
   grading:s=>s.replace('"answer":2','"answer":3'),
   ids:s=>s.replace('id="lesson"','id="other"'),
   'unrelated script':s=>s.replace('src="checker.js"','src="different.js"'),
+  'unrelated loader order':s=>s.replace('<script src="checker.js"></script><script src="ordinary.js"></script>','<script src="ordinary.js"></script><script src="checker.js"></script>'),
   'unrelated raw query':s=>s.replace('src="checker.js"','src="checker.js?tamper=1"'),
   'unrelated duplicate':s=>s.replace('<script src="checker.js"></script>','<script src="checker.js"></script><script src="checker.js"></script>'),
   'unrelated async':s=>s.replace('src="checker.js"','async src="checker.js"'),
@@ -153,4 +154,43 @@ test('polyfill removal permits zero actual loaders but never a deleted real load
    fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before);
    assert.equal(f.run(f.after.replace(f.math,'')).status,1);
  }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
+
+test('retained duplicate groups preserve each ordered raw URL and attribute identity',()=>{
+ const f=fixture();try{
+   const one='<script src="checker.js"></script>',two=one+one;
+   const before=f.before.replace(one,two),after=f.after.replace(one,two);
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),before);
+   assert.equal(f.run(after).status,0);
+   for(const changed of [
+      after.replace(one,'<script async src="checker.js"></script>'),
+      after.replace(one,'<script type="module" src="checker.js"></script>'),
+      after.replace(one,'<script src="checker.js?changed=1"></script>'),
+      after.replace(one,'<script onload="changed()" src="checker.js"></script>')
+   ])assert.equal(f.run(changed).status,1);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
+
+test('MathJax loader preservation also covers default scripts without an id',()=>{
+ const f=fixture();try{
+   const before=f.before.replace(' id="MathJax-script"',''),after=f.after.replace(' id="MathJax-script"','');
+   fs.writeFileSync(path.join(f.dir,'before/page.html'),before);
+   assert.equal(f.run(after).status,0);
+   assert.equal(f.run(after.replace(/<script src="https:\/\/cdn.jsdelivr.net\/npm\/mathjax[^>]+><\/script>/,'')).status,1);
+   assert.equal(f.run(after.replace('mathjax@3/es5','mathjax@4/es5')).status,1);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
+test('actual-page calibration handles MathJax loaders without ids and truly absent loaders',()=>{
+ for(const hasLoader of [true,false]){
+   const f=fixture();try{
+     const before=hasLoader?f.before.replace(' id="MathJax-script"',''):f.before.replace(f.math,'');
+     const after=hasLoader?f.after.replace(' id="MathJax-script"',''):f.after.replace(f.math,'');
+     fs.writeFileSync(path.join(f.dir,'before/page.html'),before);
+     fs.writeFileSync(path.join(f.dir,'after/page.html'),after);
+     const result=spawnSync(process.execPath,['tests/compare-rendered-store-calibration.cjs',path.join(f.dir,'before'),path.join(f.dir,'after'),'--asset-sources',f.project,'--asset-pins',f.pinsFile],{cwd:root,encoding:'utf8'});
+     assert.equal(result.status,0,result.stdout+result.stderr);
+     assert.ok(result.stdout.includes(hasLoader?'real-missing-MathJax:':'No actual MathJax loader in this render'));
+     assert.ok(result.stdout.includes('real-altered-helper:'));
+   }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+ }
 });
