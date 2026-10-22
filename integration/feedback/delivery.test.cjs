@@ -13,12 +13,13 @@ const page = require('./page-scripts.cjs');
 const site = process.env.CTM_INTEGRATION_SITE;
 
 // Code of ctm-libs or a component that must come from a file, never inline.
-const BUNDLES = /MathExerciseRuntime\s*=|CTMLocales\.add\(|root\.AIFeedback\s*=|root\.CTMWorker\s*=|var ME_CFG =|var MODULE_PY = \[|root\.PyExerciseFeedback\s*=|function setupExercise\(/;
+const BUNDLES = /root\.CTMAssets\s*=|MathExerciseRuntime\s*=|CTMLocales\.add\(|root\.AIFeedback\s*=|root\.CTMWorker\s*=|var ME_CFG =|var MODULE_PY = \[|root\.PyExerciseFeedback\s*=|function setupExercise\(/;
 // pyodide-interaktiv's modules (1.9 and later; 1.8 inlined them): a line of each.
 const PYODIDE_BUNDLES = /globalThis\.QP_L\s*=|globalThis\.qpyodideStorage\s*=|qpyodideStartupMessage\s*=\s*document\.createElement|globalThis\.QPYODIDE_WORKER_PLUGIN\s*=|globalThis\.qpyodideCellsReady\s*=|class CellContainer\b|qpyodideCellContainer\.addCell\(|function buildStorageSection\(|globalThis\.qpyodideCanvasPlots\s*=|root\.qpyodideFeedback\s*=/;
 // The mixed example page (activities, mathematics, Python, Pyodide, JSXGraph;
 // its tabsets load ctm-libs' links into tabs, on by default since step 4).
 const EXPECTED = [
+  'ctm-assets/assets.js',
   'ai-feedback/feedback-core.js', 'ai-feedback/feedback-dom.js', 'ai-feedback/ai-feedback.js', 'ai-feedback/ai-feedback.css',
   'ctm-runtime/pyodide-runtime.js', 'ctm-locale/ctm-locale.js', 'ctm-locale/common.js', 'ctm-nav/ctm-nav.js', 'ctm-ui/ctm-ui.css',
   'ctm-copy/ctm-copy.js', 'ctm-export/ctm-export.js', 'ctm-locale-ui/ui.js', 'ctm-store/ctm-store.js', 'math-exercise/math-store.js',
@@ -36,6 +37,10 @@ const PYODIDE = [
     'qpyodide-cell-initialization.js'].map(file => 'pyodide-interaktiv/' + file),
   'pyodide-interaktiv-feedback/qpyodide-feedback.js',
 ];
+
+function assetHelperCount(doc) {
+  return [...doc.scripts].filter(script=>page.dependency(script.getAttribute('src')||'')?.name==='ctm-assets').length;
+}
 
 function resources(html) {
   return [...html.matchAll(/<(?:script[^>]*\ssrc|link[^>]*\shref)="([^"]+)"/g)].map(m => m[1]);
@@ -57,6 +62,22 @@ test('each CTM script and style is one cacheable file per page, after its config
       assert.ok(fs.existsSync(path.resolve(site, src.split('?')[0])), file + ': missing ' + src);
     }
     const doc = new JSDOM(html).window.document;
+    const assetConfig=[...doc.scripts].filter(script=>script.textContent.trim().startsWith('globalThis.CTM_ASSETS='));
+    assert.equal(assetConfig.length,assetHelperCount(doc),file+': helper/config registrations agree');
+    const consumers=[...doc.scripts].some(script=>script.textContent.includes('CTMAssets.url(')||['ctm-runtime','math-exercise','py-exercise','pyodide-interaktiv'].includes(page.dependency(script.getAttribute('src')||'')?.name));
+    if(consumers)assert.equal(assetConfig.length,1,file+': asset consumers have registration');
+    if(assetConfig.length){
+    assert.equal(assetConfig.length,1,file+': one asset configuration');
+    assert.equal(assetConfig[0].parentElement,doc.head,file+': asset configuration in head');
+    const assetHelper=[...doc.scripts].filter(script=>page.dependency(script.getAttribute('src')||'')?.name==='ctm-assets');
+    assert.equal(assetHelper.length,1,file+': one cacheable asset helper');
+    assert.equal(assetHelper[0].parentElement,doc.head,file+': helper in head');
+    const scripts=[...doc.scripts];
+    for(const consumer of scripts.filter(script=>script.textContent.includes('CTMAssets.url('))){
+      assert.ok(scripts.indexOf(assetConfig[0])<scripts.indexOf(consumer),file+': asset config before consumer');
+      assert.ok(scripts.indexOf(assetHelper[0])<scripts.indexOf(consumer),file+': asset helper before consumer');
+    }
+    }
     for (const script of doc.querySelectorAll('script:not([src])')) {
       assert.doesNotMatch(script.textContent, BUNDLES, file);
       assert.doesNotMatch(script.textContent, PYODIDE_BUNDLES, file + ': a pyodide-interaktiv module is inlined');

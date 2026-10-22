@@ -33,3 +33,14 @@ categories:
       - {area: config, change: changed, store: '^(py-metadata|cell-metadata)$'}
       - {area: dom, change: added, store: '^bar$'}
       - {area: dom, change: attribute added, store: '^attribute$'}
+
+  # The assets validator checks raw URLs, source provenance, bytes and pairing.
+  # No DOM, content, grading, general inline code or MathJax change is covered.
+  - id: assets
+    title: Canonical CDN asset migration
+    match:
+      - {area: file, assets: '^resource$'}
+      - {area: inline, change: added, assets: '^configuration$'}
+      - {area: inline, change: changed, assets: '^monaco$'}
+
+      - {area: dom, change: attribute changed, tag: '^iframe$', attribute: '^src$', assets: '^board-defaults$'}

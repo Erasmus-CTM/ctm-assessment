@@ -299,7 +299,7 @@ jobs:
       - name: Calibrate store bindings on the actual example pages
         continue-on-error: ${{ matrix.informational == true }}
         if: matrix.course == 'examples' && steps.build.outcome == 'success'
-        run: node tests/compare-rendered-store-calibration.cjs "$RUNNER_TEMP/out/before/_site" "$RUNNER_TEMP/out/after/_site"
+        run: node tests/compare-rendered-store-calibration.cjs "$RUNNER_TEMP/out/before/_site" "$RUNNER_TEMP/out/after/_site" --asset-sources "$RUNNER_TEMP/ws-after/site" --asset-pins "$RUNNER_TEMP/after/integration/feedback/repos.json"
       - name: Compare the rendered pages
         id: compare
         continue-on-error: ${{ matrix.informational == true }}
@@ -321,9 +321,12 @@ jobs:
             python tools/migrate-course-html.py --project "$RUNNER_TEMP/out/before" --ctm-libs "$libs" --reveal-ends "$RUNNER_TEMP/out/reveal-ends.json"
             expect+=(--reveal-ends "$RUNNER_TEMP/out/reveal-ends.json")
           fi
+          assetSources="$RUNNER_TEMP/out/after"
+          [ "$COURSE" = examples ] && assetSources="$RUNNER_TEMP/ws-after/site"
           status=0
           for output in "${outputs[@]}"; do
             node tools/compare-rendered.mjs --before "$RUNNER_TEMP/out/before/$output" --after "$RUNNER_TEMP/out/after/$output" "${expect[@]}" \
+              --asset-sources "$assetSources" --asset-pins "$RUNNER_TEMP/after/integration/feedback/repos.json" \
               --name "$COURSE${COURSE_REF:+@$COURSE_REF} $output ($BEFORE -> $AFTER)" --report "$RUNNER_TEMP/reports/$name$output.json" --summary "$RUNNER_TEMP/reports/$name$output.md" || status=1
           done
           cat "$RUNNER_TEMP"/reports/*.md

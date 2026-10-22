@@ -119,3 +119,16 @@ test('every job checks out the umbrella tools and retains first-visit and reveal
   for (const file of ['step2.yml', 'step3.yml', 'step4.yml']) assert.ok(compare.includes('/expect/' + file));
   assert.ok(compare.includes('/expect/$name.yml'));
 });
+
+test('asset validation uses installed after sources and after pins',()=>{
+ const steps=workflow.jobs.compare.steps;
+ const calibration=steps.find(s=>s.name==='Calibrate store bindings on the actual example pages').run;
+ const comparison=steps.find(s=>s.id==='compare').run;
+ assert.ok(calibration.includes('--asset-sources'));
+ assert.ok(calibration.includes('$RUNNER_TEMP/ws-after/site'));
+ assert.ok(calibration.includes('$RUNNER_TEMP/after/integration/feedback/repos.json'));
+ assert.ok(comparison.includes('assetSources=\"$RUNNER_TEMP/out/after\"'));
+ assert.ok(comparison.includes('$RUNNER_TEMP/ws-after/site'));
+ assert.ok(comparison.includes('--asset-sources \"$assetSources\" --asset-pins \"$RUNNER_TEMP/after/integration/feedback/repos.json\"'));
+ assert.ok(comparison.includes('--reveal-ends'));
+});
