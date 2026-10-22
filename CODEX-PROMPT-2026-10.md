@@ -14,16 +14,16 @@ This replaces the older 21 October progress blocks. Original designs, model rule
 
 AC reports Stage1 merged. Verify both merge trees, then synchronize, independently review and run combined CI for Stage2 before returning its ordered links. The upload recovery is complete for all recoverable code. Commit substantial work on its non-main branch, including clearly labelled WIP checkpoints; keep this prompt current. Finish all remaining non-STACK-sympy work first. Significant shared ctm-checkers work that serves other components must be implemented. Use all available workers where independent work permits. AC alone merges; never merge, force-push or tag.
 
-Uploaded code ledger (all PRs below remain draft)
+Uploaded code ledger (question-test pair now ready; other listed work remains draft)
 | Repository / PR | Current uploaded head | Upload scope |
 |---|---|---|
 | ctm-libs#31 | 18f03f873695a69503468beed56bf23d6fdb6b05 | explicit remote resets, optional per-entry forget; source reviewed |
 | ctm-libs#35 | d0a3752b969acbf4cbd18df060a994721733f507 | six locale messages; source reviewed |
-| ctm-checkers#14 | a1637dc95b9e11d8a0c838c801cd53e20997eceb | six canonical generated files; independently verified |
-| math-exercise#28 | d9f1442765f4e1d3b791b788dcc66d5a32603c79 | canonical checker pin plus fixture corrections; all10 exact checks now green |
+| ctm-checkers#14 | a1637dc95b9e11d8a0c838c801cd53e20997eceb | READY question set, 18/18 checks, independent final review5609256527 |
+| math-exercise#28 | d9f1442765f4e1d3b791b788dcc66d5a32603c79 | READY after checker14, 10/10 checks, independent final review5609258605 |
 | pyodide-interaktiv#6 | 9f5d06782a3ee2f1e7e0732e853bc7dda9fa3a72 | saved-history invalidation; source reviewed, seven CI checks green |
-| ctm-assessment#28 | 786e41dca81f0b36bd57f2e7493f4432ae632162 | scoped quota checks plus two fixture corrections; new delta review/CI pending |
-| ctm-assessment#29 | 317a120ccc7d2745d821cabffe6e5d6a2a76776a | recovered scanner/probe WIP, 40 native tests |
+| ctm-assessment#28 | 842c3221ea189f5ec2979f3456132b727a8a2c1c | fixture source PASS/canaries green; full store pins/combined gates HOLD |
+| ctm-assessment#29 | d96f8071969cb45a9dd2f99173e883f8f22c158d | namespace resolver fix, 42 tests/6 Quarto hooks/probe green; rereview pending |
 | ctm-checkers#15 | 6bd454d5479954d5c639945c94cf98a7bc6f89fd | recovered neutral variant model WIP, bounded source reviewed |
 | ctm-assessment#31 | 54e9e6d2e2fbb8ec0cbd03d98fd0dbe2a440dbf6 | recovered diagnostic WIP, not a cause/fix claim |
 
@@ -47,7 +47,20 @@ Review evidence:
 - Course25/16, server27 and checker30 independent source approvals are retained in PR descriptions and this handoff checkpoint; their GitHub review lists are empty. Do not describe these as GitHub APPROVED-state submissions. Fresh verification checks readiness, not a new full original-source audit. The original independent source verdicts/coverage and exact tested heads are recorded in the sections below.
 
 
-All other work remains HOLD: store combined failures/stale pins, assets incomplete integration/overlapping aggregate, question-test ordinary jobs still require final exact status, variants model-only WIP, diagnostic not a fix, STACK findings unclosed. A green component build alone is not a mergeable set.
+All other work remains HOLD: store combined failures/stale pins, assets incomplete integration/overlapping aggregate, question-test pair is separately ready as set Q above, variants model-only WIP, diagnostic not a fix, STACK findings unclosed. A green component build alone is not a mergeable set.
+
+ADDITIONAL READY SET Q — shared question tests
+Checker14 @a1637dc95b9e11d8a0c838c801cd53e20997eceb -> math28 @d9f1442765f4e1d3b791b788dcc66d5a32603c79. Both now draft=false; all18/all10 exact-head checks GREEN, behind0 on their unchanged respective mains9e042/f0b063. This pair can be reviewed independently of Stage2's assessment-base refresh.
+Independent Astra xhigh final set reviews:
+- https://github.com/Erasmus-CTM/ctm-checkers/pull/14#pullrequestreview-5609256527
+- https://github.com/Erasmus-CTM/math-exercise/pull/28#pullrequestreview-5609258605
+Reviews distinguish previously accepted source audits from fresh canonical six-payload/pin/fixture verification. Native3.9/3.12/3.13 each85source+85actual built-wheel tests; four combined math render jobs each10/10 zero skips including Windows, exact d9/a163. Fresh producer six payload hashes match; synthetic trees equal reviewed heads e7c117c88dd54163b36ed6d38002168ef9dd5c9e/2a0057e619653a96422bf4052abca59b843f1ecd. No review-ref trailers. AC merge commits only, recheck heads/bases before and resulting merge trees after. Do not mark other work ready from this pair.
+
+LATEST PARALLEL REVIEW RESULTS
+- Math store27@5c06fd66eb417cb1a8644111f2b3916215e86369 SOURCE PASS,13/13,4 independent mutants: https://github.com/Erasmus-CTM/math-exercise/pull/27#pullrequestreview-5609237020 .
+- Py store10 latest94454dc7f79e0ee8dabe114ae1f01e44c699c11c SOURCE PASS,5/5,6 independent mutants: https://github.com/Erasmus-CTM/py-exercise/pull/10#pullrequestreview-5609238359 . Predecessor e285 published a stale counter assertion (4/5); corrected one test line to compare pre-forget count. Source unchanged; author and Astra verified/re-ran exact published blobs. Neither hook has coherent store-set merge clearance.
+- Assessment store28 latest842c3221ea189f5ec2979f3456132b727a8a2c1c, parent786: bare tab fixture restored Python-free; packaged-only genuine math cell, exact progress-marker/quiz membership/pane ownership assertions. Independent Astra SOURCE PASS35Node/JSDOM checks incl8extra mutants. Both Quarto1.8.27/release canaries119638388767/119638388680 GREEN; full builds active. Earlier resource-list fix retained. Prior786 review findings are closed. Pins remain old6f5/34116, so real remote-reset set gate remains HOLD.
+- Assessment assets29 latestd96f8071969cb45a9dd2f99173e883f8f22c158d, parent317, tree267364e3b253b888811dfe847c7cb690af77bba6: exactly scannerhelper/tests, namespace regular-package/split-portion fix plus PathFinder regressions. Actual42/42 and Quarto hooks6/6 zero skips + bounded probe green in39722158470. Astra rereview underway; facts remain private/v1consumer migration unfinished. No pins/base/libs/facts/probe modifications in this commit.
 
 Environment and recovery
 - The project now has a writable Linux workspace. The earlier disconnected Windows filesystem and functions-store drafts did not survive the transition. GitHub refs, Git objects and Actions output are the recovery sources. Do not wait for a desktop app or gh CI process.
