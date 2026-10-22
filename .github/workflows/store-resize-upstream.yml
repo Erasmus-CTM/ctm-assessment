@@ -120,6 +120,7 @@ jobs:
         env:
           CTM_BROWSER: webkit
           CTM_RESIZE_ACTUAL_ONLY: '1'
+          CTM_RESIZE_MATH_FRAME_ONLY: '1'
           CTM_RESIZE_STOCK: ${{ runner.temp }}/resize-stock
           CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-fixture/before/_site
           CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-report

@@ -40,6 +40,34 @@ const source=fs.readFileSync(path.join(stock,'site_libs/quarto-html/quarto.js'),
 for(const mode of ['native','entry-width','no-body-observer'])sourceControl(source,mode);
 const sourceSha256=createHash('sha256').update(source).digest('hex');
 
+const mathSource=fs.readFileSync(path.join(fixture,'site_libs/quarto-contrib/math-exercise-0.11.0/math-exercise.js'),'utf8');
+const mathSourceBlob=createHash('sha1').update('blob '+Buffer.byteLength(mathSource)+'\0').update(mathSource).digest('hex');
+assert.equal(mathSourceBlob,'84ecea4405576614c22f87adb10b4aefe719e453','actual fixture uses the exact reviewed math module');
+const mathSetupBlock='    if (!cells.length) return;\n    cells.forEach(setupCell);';
+function mathControl(incoming,mode) {
+  assert.equal(incoming,mathSource,'timing intervention uses the exact original math module');
+  assert.equal(incoming.split(mathSetupBlock).length,2,'interactive setup boundary is unique');
+  assert.ok(['native','frame'].includes(mode));
+  const replacement=[
+    '    if (!cells.length) return;',
+    "    window.__mathSetupProbe={phase:'before-setup',started:performance.now(),visible:document.visibilityState,",
+    "      katexReady:katexReady,katexFunctions:typeof katexLib.renderToString==='function',cells:cells.length};",
+    ...(mode==='frame'?[
+      "    if(document.visibilityState!=='visible')throw new Error('Visible-fixture timing counterfactual only');",
+      '    await new Promise(resolve=>requestAnimationFrame(resolve));'
+    ]:[]),
+    '    cells.forEach(setupCell);',
+    "    var katexProbe=document.createElement('span');katexProbe.textContent='$x^2$';",
+    '    renderMathInQuestion(katexProbe);',
+    "    window.__mathSetupProbe={...window.__mathSetupProbe,phase:'setup-complete-before-preload',completed:performance.now(),",
+    "      katexRendered:!!katexProbe.querySelector('.katex'),",
+    "      inputCount:document.querySelectorAll('input.math-input').length,",
+    "      adapterNotes:[...cells].filter(cell=>cell.querySelector(':scope > .math-saved-answer')).length,",
+    "      adapterResults:[...cells].filter(cell=>cell.querySelector(':scope > .math-saved-result')).length};"
+  ].join('\n');
+  return incoming.replace(mathSetupBlock,()=>replacement);
+}
+
 function traceNativeObservers() {
   const trace=window.__resizeProbe={created:[],callbacks:[],errors:[]};
   const NativeResizeObserver=window.ResizeObserver;
@@ -51,13 +79,15 @@ function traceNativeObservers() {
     if(typeof callback!=='function')return Reflect.construct(constructor,args,newTarget);
     return Reflect.construct(constructor,[function(entries,observer) {
       if(trace.callbacks.length<64)trace.callbacks.push({id,time:performance.now(),readyState:document.readyState,
+        mathSetup:window.__mathSetupProbe?{...window.__mathSetupProbe}:null,
         entries:[...entries].slice(0,4).map(entry=>({tag:entry.target.tagName,id:entry.target.id,
           rect:{width:entry.contentRect.width,height:entry.contentRect.height}}))});
       return Reflect.apply(callback,this,arguments);
     },...args.slice(1)],newTarget);
   }});
   addEventListener('error',event=>{
-    if(trace.errors.length<32)trace.errors.push({message:event.message,time:performance.now(),readyState:document.readyState});
+    if(trace.errors.length<32)trace.errors.push({message:event.message,time:performance.now(),readyState:document.readyState,
+      mathSetup:window.__mathSetupProbe?{...window.__mathSetupProbe}:null});
   });
 }
 const plain=path.join(output,'plain');fs.mkdirSync(plain,{recursive:true});
@@ -82,7 +112,13 @@ let browser;
 try {
   browser=await playwright[engine].launch({headless:true});
   report.browserVersion=browser.version();
-  const cases=process.env.CTM_RESIZE_ACTUAL_ONLY==='1'?[
+  report.mathSourceBlob=mathSourceBlob;
+  const cases=process.env.CTM_RESIZE_MATH_FRAME_ONLY==='1'?[
+    {label:'math-native-routed',root:'fixture',mode:'native',mathMode:'native',repeats:12},
+    {label:'math-frame',root:'fixture',mode:'native',mathMode:'frame',repeats:12},
+    {label:'math-native-require-corp',root:'fixture',mode:'native',mathMode:'native',coep:'require-corp',repeats:12},
+    {label:'math-frame-require-corp',root:'fixture',mode:'native',mathMode:'frame',coep:'require-corp',repeats:12}
+  ]:process.env.CTM_RESIZE_ACTUAL_ONLY==='1'?[
     {label:'actual-native',root:'fixture',mode:'native',repeats:12},
     {label:'actual-native-routed',root:'fixture',mode:'native',route:true,repeats:12},
     {label:'actual-entry-width',root:'fixture',mode:'entry-width',repeats:12},
@@ -109,6 +145,11 @@ try {
       substitutions++;
       await route.fulfill({response,body:sourceControl(incoming,control.mode)});
     });
+    let mathSubstitutions=0;
+    if(control.mathMode)await ctx.route('**/site_libs/quarto-contrib/math-exercise-0.11.0/math-exercise.js',async route=>{
+      const response=await route.fetch();mathSubstitutions++;
+      await route.fulfill({response,body:mathControl(await response.text(),control.mathMode)});
+    });
     const page=await ctx.newPage();
     page.setDefaultTimeout(90000);
     for(let navigation=0;navigation<(control.navigations||1);navigation++) {
@@ -133,7 +174,7 @@ try {
       await page.waitForLoadState('load');
       await page.waitForTimeout(1000);
       const snapshot=await page.evaluate(()=>({trace:window.__resizeProbe,readyState:document.readyState,
-        isolated:crossOriginIsolated,
+        isolated:crossOriginIsolated,mathSetup:window.__mathSetupProbe?{...window.__mathSetupProbe}:null,
         coi:{outcome:window.qpyodideCoiOutcome,inputState:window.qpyodideInputState,
           controlled:!!navigator.serviceWorker?.controller,
           navigation:performance.getEntriesByType('navigation')[0]?.type},
@@ -150,6 +191,14 @@ try {
       else if(control.mode!=='no-body-observer')assert.ok(snapshot.body?.height>900,'native BODY entries retain a page taller than the viewport');
       if(control.root==='fixture'){assert.equal(snapshot.storeReady,true);assert.ok(snapshot.mathInputs>0);}
       if(coep==='require-corp')assert.equal(snapshot.isolated,true);
+      if(control.mathMode){
+        assert.equal(snapshot.mathSetup?.phase,'setup-complete-before-preload');
+        assert.equal(snapshot.mathSetup.visible,'visible');
+        assert.equal(snapshot.mathSetup.katexReady,true);assert.equal(snapshot.mathSetup.katexFunctions,true);
+        assert.equal(snapshot.mathSetup.katexRendered,true);assert.equal(snapshot.mathSetup.cells,7);
+        assert.equal(snapshot.mathSetup.adapterNotes,7);assert.equal(snapshot.mathSetup.adapterResults,7);
+        assert.equal(snapshot.mathSetup.inputCount,7);assert.equal(snapshot.mathInputs,7);
+      }
       assert.deepEqual(snapshot.viewport,{width:1280,height:900});
       if(control.root==='stock') {
         assert.equal(snapshot.quarto,'quarto-1.8.27');assert.equal(snapshot.ctmNodes,0);assert.equal(snapshot.marginCount,0);
@@ -158,12 +207,14 @@ try {
       }
       if(control.mode==='no-body-observer')assert.ok(!snapshot.trace.callbacks.some(c=>c.entries.some(e=>e.tag==='BODY')));
       else assert.ok(snapshot.trace.callbacks.some(c=>c.entries.some(e=>e.tag==='BODY')),'native BODY observation delivered');
-      report.samples.push({label:control.label,sample,navigation,coep,origin,errors,failedRequests,consoleMessages,droppedConsole,...snapshot});
+      report.samples.push({label:control.label,sample,navigation,coep,origin,quartoSubstitutions:substitutions,mathSubstitutions,errors,failedRequests,consoleMessages,droppedConsole,...snapshot});
       console.log(JSON.stringify({label:control.label,sample,navigation,coep,errors,failedRequests,coi:snapshot.coi,consoleMessages,
+        quartoSubstitutions:substitutions,mathSubstitutions,mathSetup:snapshot.mathSetup,
         callbackCount:snapshot.trace.callbacks.length,body:snapshot.body,isolated:snapshot.isolated,marginCount:snapshot.marginCount}));
       page.off('pageerror',onError);page.off('requestfailed',onFailure);page.off('console',onConsole);
     }
     if(routed)assert.equal(substitutions,control.navigations||1);
+    if(control.mathMode){assert.equal(mathSubstitutions,1);assert.equal(substitutions,0);}
     await ctx.close();
   }
   report.summary=[...new Set(report.samples.map(s=>s.label))].map(label=>{
@@ -172,8 +223,14 @@ try {
       errors:samples.flatMap(s=>s.errors).length,requestFailures:samples.flatMap(s=>s.failedRequests).length};
   });
   console.log(JSON.stringify({diagnosticSummary:report.summary},null,2));
+  if(process.env.CTM_RESIZE_MATH_FRAME_ONLY==='1') {
+    for(const coep of ['credentialless','require-corp']){
+      const dimensions=report.samples.filter(s=>s.coep===coep).map(s=>JSON.stringify(s.body));
+      assert.equal(new Set(dimensions).size,1,'real final native BODY geometry matches across math timing controls');
+    }
+  }
   for(const sample of report.samples.filter(s=>s.errors.length))console.log(JSON.stringify({failedSample:sample}));
-  assert.ok(report.samples.some(s=>['actual-store-positive-control','actual-native'].includes(s.label) && s.errors.length),
+  assert.ok(report.samples.some(s=>['actual-store-positive-control','actual-native','math-native-routed'].includes(s.label) && s.errors.length),
     'positive control must reproduce raw errors; otherwise stock negatives cannot establish causality');
 } finally {
   fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));
