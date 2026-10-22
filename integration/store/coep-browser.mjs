@@ -16,8 +16,8 @@ assert.ok(['credentialless','require-corp'].includes(coep));
 const server=await serve(roots,true,coep);
 const base='http://127.0.0.1:'+server.address().port+'/course/';
 let browser;
-const checks=[], errors=[], environments=[];
-const navigationReads=[], navigation=new WeakMap();
+const checks=[], errors=[], environments=[], consoleErrors=[], networkFailures=[], httpFailures=[];
+const navigationReads=[], navigation=new WeakMap(), lifecycle=[], pageStage=new WeakMap();
 let active;
 function cell(page,id){return page.locator('[data-ctm-component="math-exercise"][data-ctm-id="'+id+'"]');}
 const quiz=page=>page.locator('[data-ctm-quiz="mixed"] .ctm-progress');
@@ -30,13 +30,16 @@ async function context(extra) {
   ctx.on('page',page=>{
     page.setDefaultTimeout(90000);
     page.on('dialog',dialog=>dialog.accept());
+    page.on('console',message=>{if(message.type()==='error')consoleErrors.push({at:Date.now(),stage:pageStage.get(page) || 'active',page:page.url(),phase:checks.length,text:message.text()});});
+    page.on('requestfailed',request=>networkFailures.push({at:Date.now(),stage:pageStage.get(page) || 'active',page:page.url(),phase:checks.length,url:request.url(),type:request.resourceType(),error:request.failure()?.errorText}));
     page.on('response',response=>{
+      if(response.status()>=400)httpFailures.push({at:Date.now(),stage:pageStage.get(page) || 'active',page:page.url(),phase:checks.length,url:response.url(),status:response.status(),type:response.request().resourceType()});
       if(!response.request().isNavigationRequest() || response.frame()!==page.mainFrame())return;
       const read=response.allHeaders().then(headers=>({url:response.url(),status:response.status(),
         coop:headers['cross-origin-opener-policy'],coep:headers['cross-origin-embedder-policy']}));
       navigation.set(page,read);navigationReads.push(read);
     });
-    page.on('pageerror',error=>errors.push({page:page.url(),phase:checks.length,message:error.message,stack:error.stack}));
+    page.on('pageerror',error=>errors.push({at:Date.now(),stage:pageStage.get(page) || 'active',page:page.url(),phase:checks.length,message:error.message,stack:error.stack}));
   });
   return ctx;
 }
@@ -45,8 +48,9 @@ async function open(ctx,name='index.html'){
   await goto(page,name);return page;
 }
 async function goto(page,name='index.html'){
-  await page.goto(base+name,{waitUntil:'domcontentloaded'});
-  await ready(page,name);
+  pageStage.set(page,'navigating');lifecycle.push({at:Date.now(),action:'goto-start',url:base+name,phase:checks.length});
+  try {await page.goto(base+name,{waitUntil:'domcontentloaded'});await ready(page,name);}
+  finally {pageStage.delete(page);lifecycle.push({at:Date.now(),action:'goto-end',url:page.url(),phase:checks.length});}
 }
 async function ready(page,name='index.html'){
   const headers=await navigation.get(page);
@@ -207,7 +211,9 @@ try {
     assert.equal(await page.evaluate(()=>JSON.parse(document.getElementById('ctm-store-manifest').textContent).exercises.filter(e=>e.component!=='pyodide-interaktiv' && !e.save).length),3);
     await saved(page,'store-matrix',record=>record.inputs.matrices.A.rows===2 && record.inputs.matrices.A.cols===2);
     await saved(page,'store-pool',record=>record.variant.n===2);
+    pageStage.set(page,'reloading');lifecycle.push({at:Date.now(),action:'reload-start',url:page.url(),phase:checks.length});
     await page.reload({waitUntil:'domcontentloaded'});await ready(page);
+    pageStage.delete(page);lifecycle.push({at:Date.now(),action:'reload-end',url:page.url(),phase:checks.length});
     assert.equal(await cell(page,'store-scalar').locator('input.math-input').inputValue(),'2');
     assert.deepEqual(await cell(page,'store-matrix').locator('input.math-input').evaluateAll(fields=>fields.map(f=>f.value)),['1','2','3','4']);
     assert.equal(await cell(page,'store-matrix').locator('.math-dynamic-matrix-wrap').evaluate(e=>e.matrixInput.read().rows),2);
@@ -249,6 +255,8 @@ try {
     assert.equal(await quiz(page).locator('.ctm-progress-outdated').count(),3);
     await noRestorePython(page);
     checks.push('changed ordinary/variant/Python source offers read-only old answers and outdated tiles without rechecking');
+    for(const closing of ctx.pages())pageStage.set(closing,'context-closing');
+    lifecycle.push({at:Date.now(),action:'context-close',phase:checks.length});
     await ctx.close();roots.course=path.join(root,'before','_site');
   }
   {
@@ -268,6 +276,8 @@ try {
     assert.equal(await page.evaluate(()=>CTMStore.enabled()),false);
     checks.push('device saving off deletes answers, keeps live copy/export and remains off after navigation');
     await noRestorePython(page);
+    for(const closing of ctx.pages())pageStage.set(closing,'context-closing');
+    lifecycle.push({at:Date.now(),action:'context-close',phase:checks.length});
     await ctx.close();
   }
   {
@@ -281,6 +291,8 @@ try {
     assert.equal(await cell(page,'store-scalar').locator('input.math-input').inputValue(),'');
     checks.push('unavailable device storage falls back without persisting or executing restored code');
     await noRestorePython(page);
+    for(const closing of ctx.pages())pageStage.set(closing,'context-closing');
+    lifecycle.push({at:Date.now(),action:'context-close',phase:checks.length});
     await ctx.close();
   }
   {
@@ -333,13 +345,18 @@ try {
     await assertRecordMissing(b,'store-second');await assertRecordMissing(a,'store-scalar');
     checks.push('page/course clear across two actual tabs cancels pending writes and preserves the other page until course clear');
     await noRestorePython(a);await noRestorePython(b);
+    for(const closing of ctx.pages())pageStage.set(closing,'context-closing');
+    lifecycle.push({at:Date.now(),action:'context-close',phase:checks.length});
     await ctx.close();
   }
   await Promise.all(navigationReads);
   assert.deepEqual(errors,[],'actual rendered pages have no uncaught errors');
-  console.log(JSON.stringify({browser:engine,coep,checks,errors,environments},null,2));
+  assert.deepEqual(consoleErrors,[],'real browser console errors make isolation evidence inconclusive');
+  assert.deepEqual(networkFailures,[],'failed real asset requests make isolation evidence inconclusive');
+  assert.deepEqual(httpFailures,[],'HTTP failures make isolation evidence inconclusive');
+  console.log(JSON.stringify({browser:engine,coep,checks,errors,environments,consoleErrors,networkFailures,httpFailures,lifecycle},null,2));
 } catch(error) {
-  console.error(JSON.stringify({browser:engine,coep,checks,errors,environments,url:active?.url()},null,2));
+  console.error(JSON.stringify({browser:engine,coep,checks,errors,environments,consoleErrors,networkFailures,httpFailures,lifecycle,url:active?.url()},null,2));
   if(active && !active.isClosed()) console.error(await active.locator('body').innerText().catch(()=>'(page closed)'));
   throw error;
 } finally {
