@@ -108,7 +108,7 @@ jobs:
                   if relative.parts[0] != '_ctm-assets':
                       assert '_extensions' not in relative.parts
                       assert not (file.name.startswith('_quarto') and file.suffix in {'.yml', '.yaml'})
-                      assert file.suffix not in {'.qmd', '.lua', '.py'}
+                      assert file.suffix != '.qmd'
                   archive.write(file, relative.as_posix())
           deployed = root / 'deployed'
           with zipfile.ZipFile(output) as archive:
@@ -134,7 +134,9 @@ jobs:
           import fs from 'node:fs';
           import path from 'node:path';
           import {launchOfflineBrowser, checkOfflinePages} from './tools/offline-check.mjs';
+          import {chromium} from 'playwright';
           const root = process.env.RUNNER_TEMP, browser = await launchOfflineBrowser();
+          let plainBrowser;
           const report = {scope: 'two-page Python IDE only; no graders, boards or Maxima', strict: [], plainLAN: []};
           const basicCode = 'print("IDE_OFFLINE_OK", 20 + 22)';
           const optionalCode = 'import numpy as np\nprint("IDE_OFFLINE_OK", int(np.array([20, 22]).sum()))';
@@ -162,9 +164,32 @@ jobs:
             await page.locator('.qpyodide-button-run').first().click();
             await page.waitForFunction(() => document.querySelector('.qpyodide-output-code-area')
               ?.innerText.includes('IDE_WARM_OK 42'), null, {timeout: 180000});
+            const warmRunMs = Date.now() - warmStart;
+            console.log('IDE_RUN_TIMING ' + JSON.stringify({url: page.url(), editorObservedReadyMs,
+              runObservedEnabledMs, firstRunMs, warmRunMs}));
+            await page.waitForFunction(() => [...document.querySelectorAll('.qpyodide-button-run')]
+              .every(b => b.innerText.trim() !== QP_L.stopLabel.replace(/<[^>]*>/g, '').trim()));
+            if (!fs.existsSync(path.join(root, 'python-ide.png')))
+              await page.screenshot({path: path.join(root, 'python-ide.png'), fullPage: true});
+            await page.evaluate(() => qpyodideCellContainer.cells[0].primaryUnit.editor.setValue(
+              'loops = 0\ntry:\n    while True:\n        loops += 1\nexcept KeyboardInterrupt:\n    print("IDE_INTERRUPTED")'));
+            await page.locator('.qpyodide-button-run').first().click();
+            await page.waitForFunction(() => [...document.querySelectorAll('.qpyodide-button-run')]
+              .some(b => b.innerText.trim() === QP_L.stopLabel.replace(/<[^>]*>/g, '').trim()));
+            await page.waitForTimeout(500);
+            const stopStart = Date.now();
+            await page.locator('.qpyodide-button-run').first().click();
+            await page.waitForFunction(() => [...document.querySelectorAll('.qpyodide-button-run')]
+              .every(b => b.innerText.trim() !== QP_L.stopLabel.replace(/<[^>]*>/g, '').trim()),
+              null, {timeout: 180000});
+            await page.evaluate(() => qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('print("IDE_AFTER_STOP_OK")'));
+            await page.locator('.qpyodide-button-run').first().click({timeout: 180000});
+            await page.waitForFunction(() => document.querySelector('.qpyodide-output-code-area')
+              ?.innerText.includes('IDE_AFTER_STOP_OK'), null, {timeout: 180000});
+            const stopRecoveryMs = Date.now() - stopStart;
             return {...await page.evaluate(() => ({secureContext: isSecureContext, isolated: crossOriginIsolated,
               output: document.querySelector('.qpyodide-output-code-area').innerText})),
-              editorObservedReadyMs, runObservedEnabledMs, firstRunMs, warmRunMs: Date.now() - warmStart,
+              editorObservedReadyMs, runObservedEnabledMs, firstRunMs, warmRunMs, stopRecoveryMs,
               pythonRequestsObservedDuringProbe: requests};
           }
           try {
@@ -173,11 +198,16 @@ jobs:
                 pages: [{path: 'index.html', boards: 0}, {path: 'nested/index.html', boards: 0}],
                 probes: [runIDE], scope: 'Python IDE root/subdirectory with isolation headers'}));
             }
+            assert.ok(report.strict.every(result => result.ok), 'strict network-refused IDE acceptance');
             const ip = fs.readFileSync(path.join(root, 'lan-ip'), 'utf8').trim();
-            assert.ok(ip && ip !== '127.0.0.1');
+            assert.match(ip, /^\d{1,3}(?:\.\d{1,3}){3}$/);
+            assert.notEqual(ip, '127.0.0.1');
+            plainBrowser = await chromium.launch({headless: true, channel: 'chromium', args: [
+              '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE ' + ip,
+              '--disable-background-networking', '--no-proxy-server']});
             for (const baseURL of ['http://' + ip + ':8765/', 'http://' + ip + ':8767/dept/python/']) {
               for (const name of ['index.html', 'nested/index.html']) {
-                const context = await browser.newContext({serviceWorkers: 'block'});
+                const context = await plainBrowser.newContext({serviceWorkers: 'block'});
                 const evidence = {baseURL, path: name, external: [], errors: [], failed: [], responses: [], pythonRequests: []};
                 let navigationStart = 0;
                 context.on('request', request => {
@@ -209,6 +239,11 @@ jobs:
             assert.ok(report.strict.every(result => result.ok), 'strict network-refused IDE acceptance');
           } finally {
             fs.writeFileSync(path.join(root, 'python-offline-checks.json'), JSON.stringify(report, null, 2));
+            console.log('IDE_ACCEPTANCE ' + JSON.stringify({scope: report.scope,
+              strict: report.strict.map(r => ({ok: r.ok, loads: r.loads,
+                results: r.results.map(x => ({path: x.path, load: x.load, ok: x.ok, problems: x.problems, probes: x.probes}))})),
+              plainLAN: report.plainLAN}));
+            if (plainBrowser) await plainBrowser.close();
             await browser.close();
           }
           JS

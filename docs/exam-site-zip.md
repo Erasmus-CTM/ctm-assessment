@@ -25,8 +25,9 @@ The website artifact is uploaded only after acceptance.
 
 The header-equipped server is CI evidence, not an IT installation requirement.
 Plain-LAN results determine whether basic Run needs hosting changes. Interactive
-`input()` and interruption have separate browser security requirements and are
-not claimed by this first ZIP. Whole-course, board and Maxima acceptance remain
+`input()` has separate browser security requirements and is not claimed by this
+first ZIP. Stop and a subsequent Run are exercised on the actual deployed site;
+plain HTTP may restart the Python worker rather than interrupt its interpreter. Whole-course, board and Maxima acceptance remain
 separate.
 
 This paragraph is included in the ZIP as `README-IT.txt`:
