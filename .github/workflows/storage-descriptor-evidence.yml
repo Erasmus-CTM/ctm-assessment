@@ -1,0 +1,52 @@
+name: Inspect existing math storage descriptors
+
+on:
+  push:
+    branches: [consolidation/2026-10-storage-descriptor-evidence]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          artifact-ids: '12447892507'
+          run-id: '39828744742'
+          github-token: ${{ github.token }}
+          repository: Erasmus-CTM/ctm-assessment
+          path: ${{ runner.temp }}/descriptor-reports
+          merge-multiple: true
+      - name: Print complete existing descriptor evidence
+        env:
+          REPORTS: ${{ runner.temp }}/descriptor-reports
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ["REPORTS"])
+          count = 0
+          for path in sorted(root.rglob("*.json")):
+              report = json.loads(path.read_text())
+              print("REPORT", path.name, json.dumps(report["summary"], sort_keys=True))
+              for item in report["items"]:
+                  if item.get("attribute") != "data-storage-variants":
+                      continue
+                  assert item["page"] == "pages/stack-oppgaver.html"
+                  before = json.loads(item["before"])
+                  after = json.loads(item["after"])
+                  assert isinstance(before, list) and isinstance(after, list)
+                  print("DESCRIPTORS", json.dumps({
+                      "report": path.name, "page": item["page"], "element": item["element"],
+                      "parsed_equal_preserving_array_order": before == after,
+                      "raw_equal": item["before"] == item["after"],
+                      "before": before, "after": after,
+                      "raw_before": item["before"], "raw_after": item["after"],
+                  }, ensure_ascii=False, sort_keys=True))
+                  count += 1
+          assert count == 4, f"expected four existing descriptor differences, got {count}"
+          print("INSPECTED", count, "existing differences; no course render or normalizer change")
+          PY
