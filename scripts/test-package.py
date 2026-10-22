@@ -157,7 +157,78 @@ board.create('circle', [[0,0],1]);
     html = (course / 'example.html').read_text()
     once(html, SCRIPTS, ' next to standalone copies')
     frames = ' '.join(base64.b64decode(m).decode('utf8', 'replace') for m in re.findall(r'data:text/html;base64,([A-Za-z0-9+/=]+)', html))
-    assert 'jsxgraph@1/distrib/jsxgraphcore.js' in frames, 'JSXGraph boards do not load the package library versions'
+    pins = (extensions / 'ctm-assessment' / 'jsxgraph-pins.yml').read_text()
+    board_script, = re.findall(r'(?m)^\s*src_jxg:\s*(\S+)\s*
+    for name, spec in record['repositories'].items():
+        own = extensions / spec['extensions'][0]
+        notice = (extensions / 'ctm-assessment' / 'licenses' / (name + '.txt')).is_file()
+        assert notice or any(p.name.upper().startswith(('LICENSE', 'COPYING')) for p in own.iterdir() if p.is_file()), name + ' licence not installed'
+    # Standalone copies may be older or newer than the package: an old
+    # standalone ai-feedback 0.8.1 and a newer ctm-libs under Erasmus-CTM/ are
+    # ignored; the page uses the package's ctm-libs.
+    assert version(extensions / 'Erasmus-CTM' / 'ai-feedback') == '0.8.1'
+    standalone = extensions / 'Erasmus-CTM' / 'ctm-libs' / '_extension.yml'
+    standalone.write_text(re.sub(r'(?m)^version:.*$', 'version: 9.9.9', standalone.read_text()))
+    # A JSXGraph added with `quarto add` lands inside the package's copy: warned about, harmless.
+    nested = extensions / 'jsxgraph' / 'jsxgraph'
+    shutil.copytree(extensions / 'jsxgraph', nested, ignore=shutil.ignore_patterns('jsxgraph'))
+    result = render(course)
+    assert 'separately added JSXGraph extension was installed inside' in result.stderr, result.stderr
+    html = (course / 'example.html').read_text()
+    assert 'ai-feedback-0.8.1' not in html and 'ai-feedback-9.9.9' not in html and 'ai-feedback-' + libs_version + '/' in html, \
+        'the package must keep its own ctm-libs'
+    once(html, SCRIPTS, ' next to an old ai-feedback and a newer ctm-libs')
+    shutil.rmtree(nested)
+    # One page combining the old standalone ai-feedback 0.8.1 with the
+    # package's components stops clearly: a page uses one version.
+    (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [mixed.qmd]\nfilters: [Erasmus-CTM/ai-feedback, math-exercise, py-exercise]\npy-exercise:\n  feedback: true\n')
+    (course / 'mixed.qmd').write_text('''---
+format: html
+---
+
+```{math-exercise}
+#| context: none
+Compute 2+2: _[4]
+```
+
+```{py-exercise}
+#| task: Return two.
+def answer():
+    return 0
+## TESTS ##
+assert answer() == 2
+```
+''')
+    result = render(course, expect_ok=False)
+    assert result.returncode != 0 and 'combines filters that use different ai-feedback versions' in result.stderr, result.stderr
+    # Without ctm-checkers, a page with a math exercise stops with the install
+    # command; a page without one renders.
+    away = course / 'ctm-checkers-away'
+    shutil.move(extensions / 'ctm-checkers', away)
+    (course / 'python.qmd').write_text('---\nformat: html\n---\n\n```{py-exercise}\n#| task: Return two.\n'
+                                       'def answer():\n    return 2\n## TESTS ##\nassert answer() == 2\n```\n')
+    for page in ('mixed.qmd', 'python.qmd'):
+        (course / '_quarto.yml').write_text(f'project:\n  type: default\n  render: [{page}]\nfilters: [ctm-assessment]\n')
+        result = render(course, expect_ok=page == 'python.qmd')
+        if page == 'mixed.qmd':
+            assert result.returncode != 0 and 'needs ctm-checkers' in result.stderr and INSTALL in result.stderr, result.stderr
+    shutil.move(away, extensions / 'ctm-checkers')
+    # Without ctm-libs, a component stops with the install command (decision 3).
+    shutil.rmtree(extensions / 'Erasmus-CTM')
+    shutil.rmtree(extensions / 'ctm-libs')
+    for filters in ('math-exercise', 'py-exercise', 'pyodide-interaktiv'):
+        (course / '_quarto.yml').write_text(f'project:\n  type: default\n  render: [mixed.qmd]\nfilters: [{filters}]\n')
+        result = render(course, expect_ok=False)
+        assert result.returncode != 0 and 'needs its library ctm-libs' in result.stderr and INSTALL in result.stderr, result.stderr
+    (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [mixed.qmd]\nfilters: [ctm-assessment]\n')
+    assert render(course, expect_ok=False).returncode != 0, 'the package must not render without ctm-libs'
+print('Installable archive passed: all five components render from a fresh course with one copy of each script, no ai-feedback folder, '
+      'also next to standalone copies (an old ai-feedback 0.8.1, a newer ctm-libs, a standalone pyodide-interaktiv); '
+      'an old ai-feedback listed with the package stops; '
+      'without ctm-libs a component stops with the install command; JSXGraph release line and licence notices; '
+      'tab-ids.lua keeps tab-heading ids at pre-ast.')
+, pins)
+    assert board_script in frames, 'JSXGraph boards do not load the exact installed package library URL'
     for name, spec in record['repositories'].items():
         own = extensions / spec['extensions'][0]
         notice = (extensions / 'ctm-assessment' / 'licenses' / (name + '.txt')).is_file()
