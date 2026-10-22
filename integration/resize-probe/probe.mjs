@@ -125,28 +125,34 @@ startupTags.push(
   "<script type=\"module\" id=\"qpyodide-monaco-editor-init\">\n\n  // Configure the Monaco Editor's loader\n  require.config({\n    paths: {\n      'vs': CTMAssets.url('monaco-editor', 'min/vs')\n    }\n  });\n</script>"
 );
 assert.equal(startupTags.length,36);
+const fontAwesomeTag=startupTags[33];
+assert.equal(Buffer.byteLength(fontAwesomeTag),135);
+assert.equal(createHash('sha256').update(fontAwesomeTag).digest('hex'),'679f1f3adf45edbfcb859cd80fdad6dcf3a2e4a73c4672e3b5b66e30d536102f');
+const omittedStartupMode=process.env.CTM_RESIZE_FONT_AWESOME_ONLY==='1'?'font-awesome':'omit';
 const scriptInventory=[...fixtureHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].map(match=>({
   attrs:match[1],bytes:Buffer.byteLength(match[0]),
   sha256:createHash('sha256').update(match[0]).digest('hex')
 }));
 const omittedManifest=startupTags.map(tag=>({tag,bytes:Buffer.byteLength(tag),
   sha256:createHash('sha256').update(tag).digest('hex')}));
+const selectedOmittedManifest=omittedStartupMode==='font-awesome'?omittedManifest.filter(item=>item.tag===fontAwesomeTag):omittedManifest;
 function startupControl(incoming,mode){
   assert.equal(incoming,fixtureHtml,'startup comparison uses exact original fixture HTML bytes');
-  assert.ok(['native','omit'].includes(mode));
+  assert.ok(['native','omit','font-awesome'].includes(mode));
   for(const tag of startupTags)assert.equal(incoming.split(tag).length,2,'exact startup tag occurs once: '+tag);
   if(mode==='native')return incoming;
+  const removed=mode==='font-awesome'?[fontAwesomeTag]:startupTags;
   let changed=incoming;
-  for(const tag of startupTags)changed=changed.replace(tag,'');
+  for(const tag of removed)changed=changed.replace(tag,'');
   // This equality also protects every non-script content/style byte and all retained scripts.
   const retained=[...incoming.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)]
-    .map(match=>match[0]).filter(tag=>!startupTags.includes(tag));
+    .map(match=>match[0]).filter(tag=>!removed.includes(tag));
   assert.deepEqual([...changed.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi)].map(match=>match[0]),retained);
   return changed;
 }
 if(process.env.CTM_RESIZE_STARTUP_ONLY==='1'){
-  console.log(JSON.stringify({startupInventory:scriptInventory,omittedManifest}));
-  startupControl(fixtureHtml,'omit'); // Fail closed before browser work if any expected byte/count differs.
+  console.log(JSON.stringify({startupInventory:scriptInventory,omittedManifest:selectedOmittedManifest,guardedTagCount:startupTags.length}));
+  startupControl(fixtureHtml,omittedStartupMode); // Fail closed before browser work if any expected byte/count differs.
 }
 
 function traceNativeObservers() {
@@ -189,7 +195,7 @@ const corpServer=await serve({stock,fixture,plain},true,'require-corp');
 const corpBase='http://127.0.0.1:'+corpServer.address().port;
 const startupServers={},startupBases={};
 if(process.env.CTM_RESIZE_STARTUP_ONLY==='1'){
-  for(const mode of ['native','omit']){
+  for(const mode of ['native',omittedStartupMode]){
     const copy=output+'-startup-'+mode;
     fs.cpSync(fixture,copy,{recursive:true});
     assert.equal(fs.readFileSync(path.join(copy,'index.html'),'utf8'),fixtureHtml);
@@ -202,15 +208,19 @@ const report={browser:engine,quartoVersion:'1.8.27',sourceSha256,
   headers:{coop:'same-origin',coep:'credentialless'},samples:[]};
 if(process.env.CTM_RESIZE_STARTUP_ONLY==='1')report.startup={
   fixtureHtmlSha256:createHash('sha256').update(fixtureHtml).digest('hex'),
-  omittedHtmlSha256:createHash('sha256').update(startupControl(fixtureHtml,'omit')).digest('hex'),
+  omittedHtmlSha256:createHash('sha256').update(startupControl(fixtureHtml,omittedStartupMode)).digest('hex'),
   transport:'matched real HTTP fixture copies; no navigation interception',staticMathInputs,staticMathInputIds,
-  omittedManifest,scriptInventory};
+  omittedManifest:selectedOmittedManifest,headers:{coop:'same-origin',coep:'require-corp'},
+  omittedStartupMode,scriptInventory};
 let browser;
 try {
   browser=await playwright[engine].launch({headless:true});
   report.browserVersion=browser.version();
   report.mathSourceBlob=mathSourceBlob;
-  const cases=process.env.CTM_RESIZE_STARTUP_ONLY==='1'?[
+  const cases=process.env.CTM_RESIZE_FONT_AWESOME_ONLY==='1'?[
+    {label:'font-awesome-native-http',root:'fixture',mode:'native',startupMode:'native',coep:'require-corp',repeats:12},
+    {label:'font-awesome-omitted',root:'fixture',mode:'native',startupMode:'font-awesome',coep:'require-corp',repeats:12}
+  ]:process.env.CTM_RESIZE_STARTUP_ONLY==='1'?[
     {label:'startup-native-http',root:'fixture',mode:'native',startupMode:'native',coep:'require-corp',repeats:12},
     {label:'startup-omitted',root:'fixture',mode:'native',startupMode:'omit',coep:'require-corp',repeats:12}
   ]:process.env.CTM_RESIZE_MATH_FRAME_ONLY==='1'?[
@@ -278,6 +288,9 @@ try {
         coi:{outcome:window.qpyodideCoiOutcome,inputState:window.qpyodideInputState,
           controlled:!!navigator.serviceWorker?.controller,
           navigation:performance.getEntriesByType('navigation')[0]?.type},
+        fontAwesome:{present:!!window.FontAwesome,svgCount:document.querySelectorAll('svg.svg-inline--fa').length,
+          placeholders:document.querySelectorAll('i[class*="fa-"]').length},
+        inlineStyles:[...document.querySelectorAll('style')].map(style=>({id:style.id,text:style.textContent})),
         storeReady:!!window.CTMStore,startupGlobals:{nav:!!window.CTMNav,reveal:!!window.CTMReveal,assets:!!window.CTMAssets},mathInputs:document.querySelectorAll('input.math-input').length,
         mathInputIds:[...document.querySelectorAll('input.math-input')].map(input=>input.id),
         mathSavedAnswers:document.querySelectorAll('.math-exercise-cell > .math-saved-answer').length,
@@ -290,10 +303,13 @@ try {
         quarto:document.querySelector('meta[name="generator"]')?.content,
         scripts:[...document.scripts].map(s=>s.src).filter(Boolean)}));
       await page.waitForTimeout(100);
+      snapshot.inlineStyles=snapshot.inlineStyles.map(style=>({id:style.id,bytes:Buffer.byteLength(style.text),
+        sha256:createHash('sha256').update(style.text).digest('hex')}));
       report.samples.push({label:control.label,sample,navigation,coep,origin,quartoSubstitutions:substitutions,mathSubstitutions,navigationInterceptions:0,startupMode:control.startupMode,errors,failedRequests,consoleMessages,droppedConsole,...snapshot});
       console.log(JSON.stringify({label:control.label,sample,navigation,coep,errors,failedRequests,coi:snapshot.coi,consoleMessages,
         quartoSubstitutions:substitutions,mathSubstitutions,navigationInterceptions:0,startupMode:control.startupMode,mathSetup:snapshot.mathSetup,
-        callbackCount:snapshot.trace.callbacks.length,body:snapshot.body,isolated:snapshot.isolated,marginCount:snapshot.marginCount}));
+        callbackCount:snapshot.trace.callbacks.length,body:snapshot.body,isolated:snapshot.isolated,marginCount:snapshot.marginCount,
+        fontAwesome:snapshot.fontAwesome,inlineStyles:snapshot.inlineStyles}));
       if(control.mode==='no-body-observer' && control.root==='stock')assert.equal(snapshot.controlHeight,'1200px');
       else if(control.startupMode==='omit'){assert.equal(snapshot.body?.width,1280);assert.ok(snapshot.body.height>0);}
       else if(control.mode!=='no-body-observer')assert.ok(snapshot.body?.height>900,'native BODY entries retain a page taller than the viewport');
@@ -303,8 +319,14 @@ try {
         assert.ok(errors.every(error=>error.message==='ResizeObserver loop completed with undelivered notifications.'),
           'startup omission must not introduce unrelated script/dependency errors');
         assert.equal(snapshot.ctmNodes,8,'actual build-time CTM content remains');
-        if(control.startupMode==='native'){
+        if(control.startupMode!=='omit'){
           assert.equal(snapshot.mathInputs,7);assert.equal(snapshot.mathSavedAnswers,7);assert.equal(snapshot.mathSavedResults,7);
+          assert.deepEqual(snapshot.startupGlobals,{nav:true,reveal:true,assets:true});
+        }
+        if(process.env.CTM_RESIZE_FONT_AWESOME_ONLY==='1'){
+          assert.equal(snapshot.fontAwesome.present,control.startupMode==='native');
+          if(control.startupMode==='native')assert.ok(snapshot.fontAwesome.svgCount>0);
+          else {assert.equal(snapshot.fontAwesome.svgCount,0);assert.ok(snapshot.fontAwesome.placeholders>0);}
         }
         if(control.startupMode==='omit'){
           assert.equal(snapshot.storeReady,false);assert.equal(snapshot.mathInputs,staticMathInputs);assert.equal(snapshot.mathSetup,null);
@@ -350,7 +372,7 @@ try {
     }
   }
   for(const sample of report.samples.filter(s=>s.errors.length))console.log(JSON.stringify({failedSample:sample}));
-  assert.ok(report.samples.some(s=>['actual-store-positive-control','actual-native','math-native-routed','startup-native-http'].includes(s.label) && s.errors.length),
+  assert.ok(report.samples.some(s=>['actual-store-positive-control','actual-native','math-native-routed','startup-native-http','font-awesome-native-http'].includes(s.label) && s.errors.length),
     'positive control must reproduce raw errors; otherwise stock negatives cannot establish causality');
 } finally {
   fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));
