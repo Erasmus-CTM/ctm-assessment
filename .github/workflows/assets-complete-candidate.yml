@@ -58,3 +58,13 @@ jobs:
       - name: Compose independently reviewed selections and verify complete carried bytes
         run: |
           python scripts/ctm_complete_assets_candidate.py --composer-root .asset-sources/composer --board-root .asset-sources/board --library .asset-sources/libs/_extensions/ctm-libs --pins .asset-sources/board/_extensions/ctm-assessment/jsxgraph-pins.yml --cache .asset-cache/complete --python-lock .private-extensions/complete-candidate/python-lock.json --npm-lock .private-extensions/complete-candidate/npm-lock.json --board-lock .private-extensions/complete-candidate/board-lock.json --private-index .private-extensions/complete-candidate/assets-imports.json --availability .private-extensions/complete-candidate/availability.json --output .private-extensions/complete-candidate/inspection --reviewed-digests integration/assets-complete-reviewed-digests.json
+      - name: Preserve the verified prebuilt asset bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuilt-offline-assets
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .private-extensions/complete-candidate/inspection/complete-built/
+            .private-extensions/complete-candidate/inspection/complete-lock.json
+            .private-extensions/complete-candidate/assets-imports.json

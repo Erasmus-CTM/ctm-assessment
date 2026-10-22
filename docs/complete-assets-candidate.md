@@ -17,10 +17,13 @@ record. Only then does the canonical `compose_asset_lock` API combine raw
 selections and derive the complete inventory. Canonical build, verification
 and carried installation check actual bytes with network calls forbidden.
 
-Full partial/complete locks, availability data and the scanner index remain
-private in the runner. The workflow emits no public asset set and performs no
-course installation. Complete composition does not establish runtime/fork
-generic-option acceptance or full offline course/browser acceptance.
+Download `prebuilt-offline-assets` from the [workflow run page](https://github.com/Erasmus-CTM/ctm-assessment/actions/workflows/assets-complete-candidate.yml).
+It contains the verified `inspection/complete-built/` asset folder,
+`inspection/complete-lock.json` and the `assets-imports.json` scanner sidecar.
+The lock and index are build metadata outside the asset folder; keep them
+outside `_ctm-assets` and generated sites. Discovery partials and availability
+data stay in the runner. This workflow performs no course installation and
+does not establish runtime/fork or full offline course/browser acceptance.
 
 The fixed record in `integration/assets-complete-reviewed-digests.json` was
 reviewed independently from successful discovery jobs 119872057770 and
