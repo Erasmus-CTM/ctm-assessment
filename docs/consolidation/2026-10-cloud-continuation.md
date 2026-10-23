@@ -153,6 +153,13 @@ than weakening required publishing. Complete rendered multilingual review/TryIt,
 trusted workflow glue, course/example migration and final installed integration
 remain in progress. No full variants, course or first-visit clearance is claimed.
 
+The course template now has separate draft
+[PR1](https://github.com/aacchhee/quarto-course-template/pull/1) at
+`5305790a1d48adb18e854197b158ec5cf8b141c2`: active-file local review and read-only
+validation tasks, guidance and `_variants/` CODEOWNERS without adding a required
+code-owner gate. It documents that the existing template installer is still the
+legacy route; no default source pins, workflow deployment or student main changed.
+
 ## Retained cloud evidence
 
 [Incremental evidence ZIP](evidence/2026-10-23-cloud-continuation.zip), SHA256
@@ -171,3 +178,12 @@ retains that exact earlier native-only stage separately from later AST/bridge wo
 contains the exact source tuple, canonical native inventory, raw requests/results,
 single synthetic approval and preserved history, expected no-write failures,
 driver and per-file hashes. This is a native CLI proof, not a student browser run.
+
+[Focused student/module/board seams](evidence/2026-10-23-variants-student-seams.zip),
+SHA256 `5840ef4dae6b1c65a1f53c578a658e7adb84744692cc879c0e7511489b7340d7`,
+preserves the separate source-hash browser reports, custom native packet proof,
+module/privacy checks, board transport (including the initial failed favicon
+fixture), ordinary handwritten pool proof and linked feedback cancellation.
+Its connected helper report is explicitly a working-copy installed tuple;
+final immutable installed verification follows separately. Stubs, expected
+faults and stage boundaries are stated in the archive README and each report.
