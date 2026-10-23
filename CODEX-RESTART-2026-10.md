@@ -69,6 +69,16 @@ It is the actual python-offline-website.zip, index.html at root, README-IT.txt i
 
 5. Finish remaining pure CTM H1 work, language catalogs/content validation (including Nynorsk), and approved optional grading work. STACK adapters/consolidation and final Pyodide upstream/main handoff follow later; maintainer agreement is needed for the latter.
 
+## Additional authorized page-weight work (AC, 23 October)
+
+Separate PR in Erasmus-CTM/stack-wasm-maxima; no merge or deployment. This bounded native CTM page optimization is explicitly authorized despite the general Maxima-runtime deferral. Keep Wasm/Maxima/ECL runtime work unchanged.
+
+Read audit reports/2026-10-22-system-design-audit.md F-10/L6 and inspect rendering before edits (done at main eb8f16767e548c2596ba44e61e3183967bc8dadb). Current scripts/milestone-three/build-site.mjs renders each board once per variant using embedded local JSXGraph; render-cards.py repeats full iframe HTML inside each variant question_html. Required result: one reusable board template per question, separately supplied variant values, JSXGraph core as one shared cacheable asset; preserve board behavior, graphical inputs, variant switching and offline operation, including MathJax closure. Meaningful browser checks cover affected questions/variants. Measure HTML and actual transferred bytes before/after; report remaining duplicated assets. Roughly2MB is an estimate, not acceptance evidence.
+
+Independent frozen published baseline: gh-pages8f4c3585e5b230084e997c7a86ab1c5d9ac219b4, maxima/native.html16,861,138bytes, SHA256ed2e1f2fdcfb0de9e999eed856cd5c37dfcd58cdd2c1dd57bfc64adbcf630d7b. Four renderedframes plus five per-variant payload copies: nine embedded board URLs totaling16,716,250encodedbytes, five distinct documents. All nine embed identical995,055byte JSXGraph core (SHA256b6ebd07421e560431b888efeb472cfb7f2cfc495a853200963f97d2c28e6e474) and request MathJax@4/tex-mml-svg.js from jsDelivr. Baseline gzip6=5,977,511bytes and gzip9=5,967,284bytes are compression measurements, not measured network transfer. Work source: work/board-templates; baseline HTML/audit JSON: work/board-baseline.
+
+Use a consolidation/... feature branch. Existing site workflow publishes pushes to main and research/**; do not push this work under research/** or trigger deployment. PR events test but do not publish. Do not take over AC/Claude's JSXGraph PR2. Native build packaging owns its question-template/variant-data integration; preserve canonical renderer/protocol semantics, explicit asset provenance and license notices. No duplicated vendor implementation or unrestricted string eval for separately supplied variant data.
+
 ## Read only what the next task needs
 
 All design paths are in Erasmus-CTM/ctm-assessment:
