@@ -48,8 +48,13 @@ function openPage(file, url, mainPyodide) {
   const w = dom.window;
   w.__mathExerciseTestMode = true;
   w.AbortController = AbortController;
+  w.TextEncoder = TextEncoder;
+  w.TextDecoder = TextDecoder;
   if (mainPyodide) w.mainPyodide = mainPyodide;
-  w.document.addEventListener = () => {};   // no DOMContentLoaded set-up, no preload
+  // The harness already has the complete rendered document. Make parsed-content
+  // initialization synchronous, so a queued layout callback cannot outlive close().
+  Object.defineProperty(w.document, 'readyState', {value: 'interactive', configurable: true});
+  w.document.addEventListener = () => {};   // no automatic cell set-up or preload
   w.console.warn = () => {};
   scripts.run(w, file, scripts.MATH);
   if (!w.__mathExerciseTestApi) throw new Error(file + ': math-exercise.js did not load');
@@ -77,7 +82,19 @@ function prepare(w, api, slot, pristine, label, variant) {
   template.innerHTML = pristine;
   const cell = template.content.firstElementChild;
   slot.replaceWith(cell);
+  // New ordinary pools use the canonical numbered deep link instead of the
+  // retired positional session key. Older builds keep the session path above.
+  const descriptors = JSON.parse(cell.dataset.storageVariants || '[]');
+  const choice = variant.kind === 'pool' && descriptors[variant.index];
+  const url = new URL(w.location.href);
+  url.searchParams.delete('variant');
+  if (choice && Number.isSafeInteger(choice.n) && choice.n > 0) url.searchParams.set('variant', label + ':' + choice.n);
+  w.history.replaceState(null, '', url);
   api.setupCell(cell);
+  if (variant.kind === 'generated' && cell.mathExercise && typeof cell.mathExercise.selectVariant === 'function') {
+    cell.mathExercise.selectVariant(variant.id);
+    if (cell.dataset.variantId !== variant.id) throw new Error('Parity did not select the exact generated variant: ' + variant.id);
+  }
   return cell;
 }
 
