@@ -1,0 +1,53 @@
+name: Exact JSXGraph renderer comparison contracts
+on:
+  pull_request:
+    paths:
+      - tools/compare-rendered/**
+      - tools/compare-rendered.mjs
+      - tests/compare-rendered-jsxgraph.cjs
+      - .github/workflows/jsxgraph-renderer-calibration.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: renderer-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: jsxgraph/jsxgraph-quarto
+          ref: 17de83e006cf8907a146cc6a2366f42a35463c6e
+          path: _ci/jsxgraph-before
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: jsxgraph/jsxgraph-quarto
+          ref: e4ad81d82e1b56f86765026a3dd26f6975d29d57
+          path: _ci/jsxgraph-after
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - name: Actual Quarto pixel/relative frames and rejection mutations
+        env:
+          JSXGRAPH_BEFORE_SOURCE: ${{ github.workspace }}/_ci/jsxgraph-before
+          JSXGRAPH_AFTER_SOURCE: ${{ github.workspace }}/_ci/jsxgraph-after
+        run: |
+          set -o pipefail
+          node --check tools/compare-rendered/jsxgraph-renderer.mjs
+          node tests/compare-rendered-jsxgraph.cjs 2>&1 | tee "$RUNNER_TEMP/renderer-contract.log"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: jsxgraph-renderer-contract
+          path: ${{ runner.temp }}/renderer-contract.log

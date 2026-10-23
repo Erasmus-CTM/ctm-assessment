@@ -39,6 +39,8 @@ function options(argv) {
     else if (flag === '--pages') o.pages = value.split(',').filter(Boolean);
     else if (flag === '--asset-sources') o.assetSources = value;
     else if (flag === '--asset-pins') o.assetPins = value;
+    else if (flag === '--renderer-before-sources') o.rendererBeforeSources = value;
+    else if (flag === '--renderer-before-pins') o.rendererBeforePins = value;
     else if (flag === '--reveal-ends') o.revealEnds = value;
     else if (['--before', '--after', '--name', '--report', '--summary'].includes(flag)) o[flag.slice(2)] = value;
     else throw new Error('Unknown option ' + flag);
@@ -812,7 +814,7 @@ function main() {
   const o = options(process.argv.slice(2));
   const categories = loadExpectations(o.expect);
   const ends = loadRevealEnds(o.revealEnds);
-  const assets = loadAssetSources(o.assetSources, o.assetPins);
+  const assets = loadAssetSources(o.assetSources, o.assetPins, o.rendererBeforeSources, o.rendererBeforePins);
   const pagesBefore = htmlPages(o.before), pagesAfter = htmlPages(o.after);
   const pages = o.pages || [...new Set([...pagesBefore, ...pagesAfter])].sort();
   const items = [], linked = linkTargets(o.before, pagesBefore);

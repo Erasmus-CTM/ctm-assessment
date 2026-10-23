@@ -103,8 +103,9 @@ test('umbrella PR defaults still use the package PR base and head', () => {
   assert.equal(value(workflow.jobs.compare.env.PR_BASE, context), SHA.packageBase);
 });
 
-test('every job checks out the umbrella tools and retains first-visit and reveal checks', () => {
-  for (const job of Object.values(workflow.jobs)) {
+test('every comparison job checks out the umbrella tools and retains first-visit and reveal checks', () => {
+  for (const name of ['courses', 'compare', 'browser']) {
+    const job = workflow.jobs[name];
     const checkout = job.steps.find(step => step.uses?.startsWith('actions/checkout@'));
     assert.equal(checkout.with.repository, 'Erasmus-CTM/ctm-assessment');
     assert.equal(value(checkout.with.ref, {inputs}), SHA.tools);

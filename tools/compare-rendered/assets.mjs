@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
+import {loadRendererSources,proveRendererPair} from './jsxgraph-renderer.mjs';
 const require=createRequire(import.meta.url), yaml=require('js-yaml');
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const insist=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -15,8 +16,10 @@ const resources=doc=>[...doc.querySelectorAll('script[src],link[rel="stylesheet"
 const normalize=u=>u.split('?')[0].replace(/(?:^|.*\/)(?:site_libs\/|[^/]*_files\/libs\/)/,'').replace(/quarto-contrib\/([\w-]+?)-\d+\.\d+\.\d+[^/]*\//,'$1/');
 const monacoCode=(s,expression)=>new RegExp('^// Configure the Monaco Editor\'s loader\\s+require\\.config\\(\\{\\s*paths\\s*:\\s*\\{\\s*[\'"]vs[\'"]\\s*:\\s*'+expression+'\\s*\\}\\s*\\}\\);$').test(s.trim());
 const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-export function loadAssetSources(project,pinsFile) {
+export function loadAssetSources(project,pinsFile,rendererBeforeProject,rendererBeforePinsFile) {
   insist(Boolean(project)===Boolean(pinsFile),'--asset-sources and --asset-pins must be supplied together');
+  insist(Boolean(rendererBeforeProject)===Boolean(rendererBeforePinsFile),'--renderer-before-sources and --renderer-before-pins must be supplied together');
+  insist(!rendererBeforeProject||project,'Renderer calibration requires canonical after asset sources');
   if(!project)return null;
   const pins=JSON.parse(fs.readFileSync(pinsFile,'utf8'));
   const candidates=['resolved-repos.json','_extensions/ctm-assessment/resolved-repos.json'].map(p=>path.join(project,p)).filter(p=>fs.existsSync(p));
@@ -68,10 +71,11 @@ export function loadAssetSources(project,pinsFile) {
   const template=read('pyodide-interaktiv','qpyodide-monaco-editor-init.html').toString('utf8');
   const body=/<script type="module" id="qpyodide-monaco-editor-init">([\s\S]*?)<\/script>/.exec(template);
   insist(body&&monacoCode(body[1],"CTMAssets\\.url\\('monaco-editor', 'min/vs'\\)"),'Unexpected canonical Monaco initializer');
-  return {config:{v:1,mode:'cdn',bases},helperHash:hash(helper),table,board};
+  return {config:{v:1,mode:'cdn',bases},helperHash:hash(helper),table,board,
+    renderer:loadRendererSources(rendererBeforeProject,rendererBeforePinsFile,project,pinsFile)};
 }
 export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
-  markBoardChanges(items,context,page);
+  markBoardChanges(A,items,context,page);
   markPreloadDefault(A,B,items,context);
   const configScripts=doc=>[...doc.querySelectorAll('script:not([src])')].filter(s=>s.textContent.includes('CTM_ASSETS'));
   const helperScripts=doc=>resources(doc).filter(e=>normalize(raw(e))==='ctm-assets/assets.js');
@@ -182,13 +186,19 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
 // Only the three default resource URLs may differ inside a generated board.
 // Full decoded bytes (after the comparator's existing UUID/space normalization)
 // must otherwise agree, including every authored board statement and element.
-function markBoardChanges(items,context,page){
+function markBoardChanges(A,items,context,page){
   const {JSDOM}=require('jsdom');
   for(const item of items){
     if(item.area!=='dom'||item.change!=='attribute changed'||item.tag!=='iframe'||item.attribute!=='src'||
        !String(item.before).startsWith('data:text/html;decoded,'))continue;
     try{
       insist(context,'Canonical installed board sources are required');
+      if(context.renderer){
+        const evidence=proveRendererPair(item,context.renderer,A.doc);
+        console.error('Canonical JSXGraph renderer evidence: '+JSON.stringify({page,element:item.element,...evidence}));
+        item.assets='jsxgraph-renderer-1.2';
+        continue;
+      }
       const prefix='data:text/html;decoded,';
       insist(String(item.after).startsWith(prefix),'Board delivery encoding changed');
       let before=item.before.slice(prefix.length),after=item.after.slice(prefix.length);
