@@ -1,4 +1,30 @@
-# CTM restart state — 23 October 2026
+# CTM restart — cloud handoff, 23 October 2026
+
+**Read [the cloud restart checkpoint](docs/consolidation/2026-10-cloud-restart.md) first.**
+It supersedes the next-action/status portions of the earlier checkpoint below.
+The local computer is becoming unavailable; all started processes finished.
+No corrected-source render or browser acceptance ran before stop.
+
+Code is saved in draft PRs: ctm-libs42 at dfe7bf8f, py-exercise13 at4e6bc07e,
+math-exercise31 ate1245d77, pyodide-interaktiv11 at9a5920af, ctm-checkers25 at53c16f47.
+Final source/module/renderer follow-ups are explicitly untested; no new merge
+clearance is given. AC alone merges; no main/deploy/tag changes.
+
+Immediate sequence: finish first-visit loading/failure-containment fixes and
+focused checks, maintain the exact loading map across the CTM pack (xhigh audit
+authorized), then finish variants authoring. Missing JSXGraph must not break
+Python exercises; missing speech must not disable ordinary Check. Future Maxima
+is an independent backend, not a dependency of Python/UI readiness.
+
+The cloud checkpoint links exact source refs, tested-versus-untested stages,
+remaining audit findings and the full retained GitHub evidence ZIP. No local
+filesystem is required. Read only the next needed approved designs. Keep checks
+focused; broad campaigns require AC's request. Ingmat3a student-facing main stays
+protected. Do not mark the WIP ready based on the older headered demo CI.
+
+---
+
+# Earlier frozen demo acceptance checkpoint — retained
 
 Current-state checkpoint after the authorized combined demo acceptance campaign.
 

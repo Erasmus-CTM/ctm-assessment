@@ -1,0 +1,1140 @@
+{
+  "sourceSha256": "deb570b5615aafdacac35b7d68642489b49bac5b00e85ba2ca07a0fb1355edd9",
+  "functionalPassed": true,
+  "functionalBaselinePassed": false,
+  "rawPassed": true,
+  "cdpCommandsFailed": [],
+  "navigationLoaders": [
+    {
+      "at": 1792768946719,
+      "frameId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "parentId": null,
+      "loaderId": "C0A116BDB6F111B85A4C58ECC4F8E10C",
+      "url": "http://127.0.0.1:63989/candidate/pages/step4-ui.html"
+    },
+    {
+      "at": 1792768949360,
+      "frameId": "69DD824BD18B99E00973737AB0FB4814",
+      "parentId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "loaderId": "D0A75DF32E83DBB49331FC062BB2BA42",
+      "url": "data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHNjcmlwdCBzcmM9ImRhdGE6dGV4dC9qYXZhc2NyaXB0"
+    },
+    {
+      "at": 1792768949576,
+      "frameId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "parentId": null,
+      "loaderId": "14F6A5833A5C8B271B7EC89715CC7423",
+      "url": "http://127.0.0.1:63989/candidate/pages/step4-ui.html"
+    },
+    {
+      "at": 1792768949916,
+      "frameId": "C504FEA0E74B6F2056EA05ECD23B7B1B",
+      "parentId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "loaderId": "758548722B32FF70D3B83F871CC2D644",
+      "url": "data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHNjcmlwdCBzcmM9ImRhdGE6dGV4dC9qYXZhc2NyaXB0"
+    }
+  ],
+  "pendingRequestProvenance": [
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.150",
+      "targetType": "service_worker",
+      "at": 1792768949273,
+      "phase": "initial-document",
+      "url": "https://fonts.gstatic.com/s/sourcesanspro/v24/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2",
+      "range": null,
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768949390,
+          "requestId": "39572.150",
+          "timestamp": 147159.959674,
+          "encodedDataLength": 14930
+        }
+      ]
+    },
+    {
+      "targetId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "requestId": "39572.138",
+      "targetType": "page",
+      "at": 1792768949359,
+      "phase": "initial-document",
+      "url": "https://fonts.gstatic.com/s/sourcesanspro/v24/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2",
+      "range": null,
+      "frameId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "loaderId": "C0A116BDB6F111B85A4C58ECC4F8E10C",
+      "initiatorType": "parser",
+      "initiatorURL": "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;700&display=swap",
+      "stack": [],
+      "terminals": []
+    },
+    {
+      "targetId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "requestId": "39572.153",
+      "targetType": "page",
+      "at": 1792768949368,
+      "phase": "initial-document",
+      "url": "https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js",
+      "range": null,
+      "frameId": "69DD824BD18B99E00973737AB0FB4814",
+      "loaderId": "D0A75DF32E83DBB49331FC062BB2BA42",
+      "initiatorType": "parser",
+      "initiatorURL": "data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHNjcmlwdCBzcmM9ImRhdGE6dGV4dC9qYXZhc2NyaXB0O2Jhc2U2NCxMeThnVEc5aFpDQmlaV1p2Y21VZ2RHaGxJRzl5YV",
+      "stack": [],
+      "terminals": []
+    },
+    {
+      "targetId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "requestId": "39572.154",
+      "targetType": "page",
+      "at": 1792768949369,
+      "phase": "initial-document",
+      "url": "https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraphcore.js",
+      "range": null,
+      "frameId": "69DD824BD18B99E00973737AB0FB4814",
+      "loaderId": "D0A75DF32E83DBB49331FC062BB2BA42",
+      "initiatorType": "parser",
+      "initiatorURL": "data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHNjcmlwdCBzcmM9ImRhdGE6dGV4dC9qYXZhc2NyaXB0O2Jhc2U2NCxMeThnVEc5aFpDQmlaV1p2Y21VZ2RHaGxJRzl5YV",
+      "stack": [],
+      "terminals": []
+    },
+    {
+      "targetId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "requestId": "39572.155",
+      "targetType": "page",
+      "at": 1792768949375,
+      "phase": "service-worker-reload",
+      "url": "https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraph.css",
+      "range": null,
+      "frameId": "69DD824BD18B99E00973737AB0FB4814",
+      "loaderId": "D0A75DF32E83DBB49331FC062BB2BA42",
+      "initiatorType": "parser",
+      "initiatorURL": "data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHNjcmlwdCBzcmM9ImRhdGE6dGV4dC9qYXZhc2NyaXB0O2Jhc2U2NCxMeThnVEc5aFpDQmlaV1p2Y21VZ2RHaGxJRzl5YV",
+      "stack": [],
+      "terminals": []
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.236",
+      "targetType": "service_worker",
+      "at": 1792768949826,
+      "phase": "service-worker-reload",
+      "url": "https://fonts.gstatic.com/s/sourcesanspro/v24/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2",
+      "range": null,
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768949829,
+          "requestId": "39572.236",
+          "timestamp": 147160.400866,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "requestId": "28252.137",
+      "targetType": "page",
+      "at": 1792768949914,
+      "phase": "service-worker-reload",
+      "url": "https://fonts.gstatic.com/s/sourcesanspro/v24/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2",
+      "range": null,
+      "frameId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "loaderId": "14F6A5833A5C8B271B7EC89715CC7423",
+      "initiatorType": "parser",
+      "initiatorURL": "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;700&display=swap",
+      "stack": [],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768949915,
+          "requestId": "28252.137",
+          "timestamp": 147160.403257,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "requestId": "28252.150",
+      "targetType": "page",
+      "at": 1792768949920,
+      "phase": "service-worker-reload",
+      "url": "https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js",
+      "range": null,
+      "frameId": "C504FEA0E74B6F2056EA05ECD23B7B1B",
+      "loaderId": "758548722B32FF70D3B83F871CC2D644",
+      "initiatorType": "parser",
+      "initiatorURL": "data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHNjcmlwdCBzcmM9ImRhdGE6dGV4dC9qYXZhc2NyaXB0O2Jhc2U2NCxMeThnVEc5aFpDQmlaV1p2Y21VZ2RHaGxJRzl5YV",
+      "stack": [],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768950114,
+          "requestId": "28252.150",
+          "timestamp": 147160.601817,
+          "encodedDataLength": 588752
+        }
+      ]
+    },
+    {
+      "targetId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "requestId": "28252.151",
+      "targetType": "page",
+      "at": 1792768949922,
+      "phase": "service-worker-reload",
+      "url": "https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraphcore.js",
+      "range": null,
+      "frameId": "C504FEA0E74B6F2056EA05ECD23B7B1B",
+      "loaderId": "758548722B32FF70D3B83F871CC2D644",
+      "initiatorType": "parser",
+      "initiatorURL": "data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHNjcmlwdCBzcmM9ImRhdGE6dGV4dC9qYXZhc2NyaXB0O2Jhc2U2NCxMeThnVEc5aFpDQmlaV1p2Y21VZ2RHaGxJRzl5YV",
+      "stack": [],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768950082,
+          "requestId": "28252.151",
+          "timestamp": 147160.573275,
+          "encodedDataLength": 204054
+        }
+      ]
+    },
+    {
+      "targetId": "134C088D0BDBC7B0941F5840CCAB2953",
+      "requestId": "28252.152",
+      "targetType": "page",
+      "at": 1792768949923,
+      "phase": "service-worker-reload",
+      "url": "https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraph.css",
+      "range": null,
+      "frameId": "C504FEA0E74B6F2056EA05ECD23B7B1B",
+      "loaderId": "758548722B32FF70D3B83F871CC2D644",
+      "initiatorType": "parser",
+      "initiatorURL": "data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHNjcmlwdCBzcmM9ImRhdGE6dGV4dC9qYXZhc2NyaXB0O2Jhc2U2NCxMeThnVEc5aFpDQmlaV1p2Y21VZ2RHaGxJRzl5YV",
+      "stack": [],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768950034,
+          "requestId": "28252.152",
+          "timestamp": 147160.539955,
+          "encodedDataLength": 1940
+        }
+      ]
+    }
+  ],
+  "matplotlibRequests": [
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.282",
+      "targetType": "worker",
+      "at": 1792768953437,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=0-524287",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953475,
+          "requestId": "28252.282",
+          "timestamp": 147164.046886,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.270",
+      "targetType": "service_worker",
+      "at": 1792768953437,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=0-524287",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953475,
+          "requestId": "39572.270",
+          "timestamp": 147164.046291,
+          "encodedDataLength": 524668
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.292",
+      "targetType": "worker",
+      "at": 1792768953820,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=524288-1048575",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953856,
+          "requestId": "28252.292",
+          "timestamp": 147164.429647,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.280",
+      "targetType": "service_worker",
+      "at": 1792768953820,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=524288-1048575",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953856,
+          "requestId": "39572.280",
+          "timestamp": 147164.429022,
+          "encodedDataLength": 524659
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.293",
+      "targetType": "worker",
+      "at": 1792768953857,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=1048576-1572863",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953894,
+          "requestId": "28252.293",
+          "timestamp": 147164.466812,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.281",
+      "targetType": "service_worker",
+      "at": 1792768953857,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=1048576-1572863",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953894,
+          "requestId": "39572.281",
+          "timestamp": 147164.46625,
+          "encodedDataLength": 524655
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.294",
+      "targetType": "worker",
+      "at": 1792768953894,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=1572864-2097151",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953931,
+          "requestId": "28252.294",
+          "timestamp": 147164.504669,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.282",
+      "targetType": "service_worker",
+      "at": 1792768953894,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=1572864-2097151",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953931,
+          "requestId": "39572.282",
+          "timestamp": 147164.503965,
+          "encodedDataLength": 524655
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.295",
+      "targetType": "worker",
+      "at": 1792768953931,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=2097152-2621439",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953967,
+          "requestId": "28252.295",
+          "timestamp": 147164.540365,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.283",
+      "targetType": "service_worker",
+      "at": 1792768953932,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=2097152-2621439",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953966,
+          "requestId": "39572.283",
+          "timestamp": 147164.539072,
+          "encodedDataLength": 524671
+        },
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768953967,
+          "requestId": "39572.283",
+          "timestamp": 147164.539072,
+          "encodedDataLength": 524671
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.296",
+      "targetType": "worker",
+      "at": 1792768953968,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=2621440-3145727",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954004,
+          "requestId": "28252.296",
+          "timestamp": 147164.576963,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.284",
+      "targetType": "service_worker",
+      "at": 1792768953968,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=2621440-3145727",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954004,
+          "requestId": "39572.284",
+          "timestamp": 147164.576271,
+          "encodedDataLength": 524660
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.297",
+      "targetType": "worker",
+      "at": 1792768954004,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=3145728-3670015",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954041,
+          "requestId": "28252.297",
+          "timestamp": 147164.614877,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.285",
+      "targetType": "service_worker",
+      "at": 1792768954004,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=3145728-3670015",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954041,
+          "requestId": "39572.285",
+          "timestamp": 147164.614297,
+          "encodedDataLength": 524660
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.298",
+      "targetType": "worker",
+      "at": 1792768954042,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=3670016-4194303",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954080,
+          "requestId": "28252.298",
+          "timestamp": 147164.652616,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.286",
+      "targetType": "service_worker",
+      "at": 1792768954042,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=3670016-4194303",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954078,
+          "requestId": "39572.286",
+          "timestamp": 147164.651752,
+          "encodedDataLength": 524660
+        },
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954079,
+          "requestId": "39572.286",
+          "timestamp": 147164.651752,
+          "encodedDataLength": 524660
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.299",
+      "targetType": "worker",
+      "at": 1792768954080,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=4194304-4718591",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954117,
+          "requestId": "28252.299",
+          "timestamp": 147164.690065,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.287",
+      "targetType": "service_worker",
+      "at": 1792768954080,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=4194304-4718591",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954116,
+          "requestId": "39572.287",
+          "timestamp": 147164.689496,
+          "encodedDataLength": 524655
+        },
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954117,
+          "requestId": "39572.287",
+          "timestamp": 147164.689496,
+          "encodedDataLength": 524655
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.300",
+      "targetType": "worker",
+      "at": 1792768954117,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=4718592-5242879",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954154,
+          "requestId": "28252.300",
+          "timestamp": 147164.725604,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.288",
+      "targetType": "service_worker",
+      "at": 1792768954117,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=4718592-5242879",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954154,
+          "requestId": "39572.288",
+          "timestamp": 147164.724899,
+          "encodedDataLength": 524670
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.301",
+      "targetType": "worker",
+      "at": 1792768954154,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=5242880-5767167",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954202,
+          "requestId": "28252.301",
+          "timestamp": 147164.775771,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.289",
+      "targetType": "service_worker",
+      "at": 1792768954154,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=5242880-5767167",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954202,
+          "requestId": "39572.289",
+          "timestamp": 147164.774923,
+          "encodedDataLength": 524724
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.302",
+      "targetType": "worker",
+      "at": 1792768954202,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=5767168-6291455",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954242,
+          "requestId": "28252.302",
+          "timestamp": 147164.812128,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.290",
+      "targetType": "service_worker",
+      "at": 1792768954203,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=5767168-6291455",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954242,
+          "requestId": "39572.290",
+          "timestamp": 147164.811237,
+          "encodedDataLength": 524665
+        }
+      ]
+    },
+    {
+      "targetId": "15A2ADB0860296D0560844D5FCD24A86",
+      "requestId": "28252.303",
+      "targetType": "worker",
+      "at": 1792768954242,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=6291456-6815743",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "fetchRange",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 316,
+          "columnNumber": 27
+        },
+        {
+          "functionName": "fetchRangeWithRetries",
+          "url": "blob:http://127.0.0.1:63989/1ea228e6-6632-40c1-83d4-14a4d14e7b20",
+          "lineNumber": 344,
+          "columnNumber": 19
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954282,
+          "requestId": "28252.303",
+          "timestamp": 147164.847941,
+          "encodedDataLength": 0
+        }
+      ]
+    },
+    {
+      "targetId": "3D0BD7524CBBFD807B0FADBC22E88FDF",
+      "requestId": "39572.291",
+      "targetType": "service_worker",
+      "at": 1792768954242,
+      "phase": "setup-before-run",
+      "url": "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/matplotlib-3.8.4-cp313-cp313-pyodide_2025_0_wasm32.whl",
+      "range": "bytes=6291456-6815743",
+      "frameId": null,
+      "loaderId": "",
+      "initiatorType": "script",
+      "initiatorURL": "",
+      "stack": [
+        {
+          "functionName": "",
+          "url": "http://127.0.0.1:63989/candidate/coi-serviceworker.js",
+          "lineNumber": 55,
+          "columnNumber": 6
+        }
+      ],
+      "terminals": [
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954273,
+          "requestId": "39572.291",
+          "timestamp": 147164.847263,
+          "encodedDataLength": 430927
+        },
+        {
+          "method": "Network.loadingFinished",
+          "at": 1792768954274,
+          "requestId": "39572.291",
+          "timestamp": 147164.847263,
+          "encodedDataLength": 430927
+        }
+      ]
+    }
+  ],
+  "loadingFailed": []
+}
