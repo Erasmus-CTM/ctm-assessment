@@ -1,0 +1,26 @@
+--- a/src/resources/formats/html/quarto.js
++++ b/src/resources/formats/html/quarto.js
+@@ -38,13 +38,16 @@
+   if (window.ResizeObserver) {
+     const resizeObserver = new window.ResizeObserver(
+       throttle(() => {
+-        layoutMarginEls();
+-        if (
+-          window.document.body.getBoundingClientRect().width < 990 &&
+-          isReaderMode()
+-        ) {
+-          quartoToggleReader();
+-        }
++        // Layout reads and writes must run outside ResizeObserver delivery.
++        window.requestAnimationFrame(() => {
++          layoutMarginEls();
++          if (
++            window.document.body.getBoundingClientRect().width < 990 &&
++            isReaderMode()
++          ) {
++            quartoToggleReader();
++          }
++        });
+       }, 50)
+     );
+     resizeObserver.observe(window.document.body);

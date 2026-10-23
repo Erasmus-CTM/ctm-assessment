@@ -1,0 +1,51 @@
+--- a/src/vs/editor/browser/config/elementSizeObserver.ts
++++ b/src/vs/editor/browser/config/elementSizeObserver.ts
+@@ -43,8 +43,8 @@
+ 	public startObserving(): void {
+ 		if (!this._resizeObserver && this._referenceDomElement) {
+ 			// We want to react to the resize observer only once per animation frame
+-			// The first time the resize observer fires, we will react to it immediately.
+-			// Otherwise we will postpone to the next animation frame.
++			// Always react in the next animation frame, outside observer delivery.
++			// Coalesce notifications and retain the latest reported dimensions.
+ 			// We'll use `observeContentRect` to store the content rect we received.
+ 
+ 			let observedDimenstion: IDimension | null = null;
+@@ -56,21 +56,16 @@
+ 				}
+ 			};
+ 
+-			let shouldObserve = false;
+-			let alreadyObservedThisAnimationFrame = false;
++			let scheduled = false;
+ 
+ 			const update = () => {
+-				if (shouldObserve && !alreadyObservedThisAnimationFrame) {
+-					try {
+-						shouldObserve = false;
+-						alreadyObservedThisAnimationFrame = true;
+-						observeNow();
+-					} finally {
+-						scheduleAtNextAnimationFrame(getWindow(this._referenceDomElement), () => {
+-							alreadyObservedThisAnimationFrame = false;
+-							update();
+-						});
+-					}
++				if (!scheduled) {
++					scheduled = true;
++					const observer = this._resizeObserver;
++					scheduleAtNextAnimationFrame(getWindow(this._referenceDomElement), () => {
++						scheduled = false;
++						if (observer === this._resizeObserver) observeNow();
++					});
+ 				}
+ 			};
+ 
+@@ -80,7 +75,6 @@
+ 				} else {
+ 					observedDimenstion = null;
+ 				}
+-				shouldObserve = true;
+ 				update();
+ 			});
+ 			this._resizeObserver.observe(this._referenceDomElement);

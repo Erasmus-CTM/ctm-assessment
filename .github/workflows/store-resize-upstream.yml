@@ -1,4 +1,4 @@
-name: Resize lifecycle upstream controls
+name: Resize source phase upstream candidate
 on:
   push:
     branches: [consolidation/2026-10-resize-upstream-controls]
@@ -7,43 +7,14 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: resize-upstream-${{ github.sha }}
+  group: resize-source-phase-${{ github.sha }}
   cancel-in-progress: false
 jobs:
-  render:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: quarto-dev/quarto-actions/setup@v2
-        with:
-          version: '1.8.27'
-      - name: Render stock Quarto outside the CTM project
-        shell: bash
-        run: |
-          mkdir -p "$RUNNER_TEMP/resize-stock"
-          cp integration/resize-probe/index.qmd "$RUNNER_TEMP/resize-stock/index.qmd"
-          cat > "$RUNNER_TEMP/resize-stock/_quarto.yml" <<'YAML'
-          project:
-            type: website
-            render: [index.qmd]
-          website:
-            title: Resize lifecycle control
-          format:
-            html:
-              toc: false
-          YAML
-          cd "$RUNNER_TEMP/resize-stock"
-          quarto render
-      - uses: actions/upload-artifact@v7
-        with:
-          name: resize-stock-quarto
-          path: ${{ runner.temp }}/resize-stock/_site
-          retention-days: 7
   controls:
-    needs: render
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.55.1-noble
@@ -70,66 +41,34 @@ jobs:
                 artifact.digest !== 'sha256:41ec55a17c2619ba9fba12fbdde19dbc84d2eb383fffd263f0cbdacc8b94d5f9') {
               throw new Error('Actual fixture artifact changed or expired');
             }
-            core.info(JSON.stringify({artifact: artifact.id, digest: artifact.digest,
-              head: artifact.workflow_run.head_sha, producerRun: 39841421065}));
       - uses: actions/download-artifact@v7
         with:
           name: store-rendered-fixtures
           run-id: 39841421065
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/resize-fixture
-      - uses: actions/download-artifact@v7
-        with:
-          name: resize-stock-quarto
-          path: ${{ runner.temp }}/resize-stock
-      - name: Recover the preceding exact diagnostic report
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const artifact = (await github.rest.actions.getArtifact({
-              owner: context.repo.owner, repo: context.repo.repo, artifact_id: 12460036949
-            })).data;
-            if (artifact.expired || artifact.name !== 'resize-upstream-webkit' ||
-                artifact.workflow_run.head_sha !== 'c14f03f0d1bd2637553effb52cb517de9243f3f4' ||
-                artifact.digest !== 'sha256:a8ca489e0063ba5a9b4959dcba840787075b61bf6878c45bbe8adbf11d9de2cd') {
-              throw new Error('Preceding diagnostic artifact changed or expired');
-            }
-      - uses: actions/download-artifact@v7
-        with:
-          name: resize-upstream-webkit
-          run-id: 39857598359
-          github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/resize-previous-report
-      - name: Print preceding failed-sample observer traces
+      - name: Materialize the exact published Monaco package as a matched HTTP input
         shell: bash
-        env:
-          CTM_PREVIOUS_REPORT: ${{ runner.temp }}/resize-previous-report
         run: |
-          node --input-type=module - "$CTM_PREVIOUS_REPORT" <<'JS'
-          import fs from 'node:fs';
-          import path from 'node:path';
-          const root=process.argv[2];
-          const entries=fs.readdirSync(root,{recursive:true}).filter(name=>name==='report.json'||name.endsWith('/report.json'));
-          if(entries.length!==1)throw Error('Expected one exact report');
-          const report=JSON.parse(fs.readFileSync(path.join(root,entries[0]),'utf8'));
-          console.log(JSON.stringify({precedingSource:report.sourceSha256,summary:report.summary,
-            failures:report.samples.filter(sample=>sample.errors.length)},null,2));
-          JS
-      - name: Probe unchanged upstream and explicit counterfactual controls
+          mkdir -p "$RUNNER_TEMP/resize-monaco"
+          npm pack monaco-editor@0.46.0 --pack-destination "$RUNNER_TEMP/resize-monaco"
+          tar -xzf "$RUNNER_TEMP/resize-monaco/monaco-editor-0.46.0.tgz" -C "$RUNNER_TEMP/resize-monaco"
+      - name: Verify source semantics and actual browser behavior
         shell: bash
         env:
-          CTM_BROWSER: webkit
-          CTM_RESIZE_STOCK: ${{ runner.temp }}/resize-stock
+          CTM_BROWSER: ${{ matrix.browser }}
           CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-fixture/before/_site
-          CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-report
+          CTM_RESIZE_MONACO: ${{ runner.temp }}/resize-monaco/package
+          CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-source-phase
         run: |
           set -o pipefail
           mkdir -p "$CTM_RESIZE_REPORT"
-          node --check integration/resize-probe/reader-first.mjs
-          node integration/resize-probe/reader-first.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
+          node --test integration/resize-probe/source-phase.test.mjs
+          node --check integration/resize-probe/source-phase-browser.mjs
+          node integration/resize-probe/source-phase-browser.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: resize-upstream-webkit
-          path: ${{ runner.temp }}/resize-report
+          name: resize-source-phase-${{ matrix.browser }}
+          path: ${{ runner.temp }}/resize-source-phase
           retention-days: 7
