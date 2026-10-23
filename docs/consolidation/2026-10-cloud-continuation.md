@@ -81,28 +81,58 @@ runtime timeout redesign or offline acceptance is claimed.
 
 ## Variants authoring in progress
 
-The native-only checker25 foundation is now at
-`1a42281c3d7332df94e9b6e9df250ba7610369c7`: tested lazy reconciliation,
-Generate25more, atomic bulk decisions, disconnected review/undo, data-only
-checklist planner and an **inactive** trusted-base GitHub adapter. The adapter
-uses atomic expectedHeadOid, verifies exact-head producer/artifact provenance,
-rechecks comment intent, and accepts the explicitly dispatched next-head run.
-It was tested with fake API transports only; no live comment or dispatch ran.
-Actual trusted producer/sticky-comment/rejection integration and live check
-attachment proof remain unfinished. Native browser wheels were not changed.
+The native-only checker25 foundation at
+`f5c4e63b42d4eff2eabcb0e7e2ddb946cdeb2010` includes tested lazy reconciliation,
+Generate25more, atomic bulk decisions, review/undo, sticky checklist rendering,
+a data-only planner and an **inactive** trusted-base GitHub adapter. Passing
+bulk ticks cannot consent to candidates introduced by a later refresh. The
+adapter uses atomic expectedHeadOid, verifies exact-head producer/artifact
+provenance, rechecks comment intent, and accepts explicitly dispatched next-head
+runs. Fake API tests do not establish a live bot or check-status attachment.
+The real producer/template/card glue is a following slice, not claimed here.
+Browser checker wheels are unchanged.
 
 Authoring component branches are separate and stacked on loading leaves:
 
 | Draft | Exact source head | Boundary |
 | --- | --- | --- |
-| libs43 | d71a9a5f9726db75da718fcd1e20dc1d72902796 | Shared chooser/P17 session+saved identities, explicit optional proposals, leaf-wise approval setting.18 focused checks including two real Quarto renders; independent review. |
-| math32 | f1b43323fa9f4d63f96ab2dc3067a4dcbffa5929 | Native resolver/wrapper only, no Lua/student activation yet. Canonical source-file AST extraction prevents approving stale/documentation examples. Nine wrapper tests and independent focused controls pass; POSIX supervisor exercised, Windows path unexecuted. |
-| assessment56 | dc1388d1f15e39b5ade8fb9d51621033359561f7 | Canonical native producer installed alongside checker wheels; exact math wrapper/resolver allowlist; checker ownership preserved.12 portable contracts pass. |
+| libs43 | 5a067c93870a3719bc97a5f6198bb7cd21de138e | Shared chooser/P17, optional proposals, approval setting, equal-hash identity disambiguation and corrected rendezvous distribution. Linked explanations reset only on an accepted variant change; cancelled asynchronous collection cannot submit obsolete AI context. Four focused reset checks pass including actual Quarto, independently repeated. |
+| math32 | 9f80a119473869d63f7fe54e8db3eae04ae1bd1c | Canonical native resolver/wrapper, Lua build bridge, file CLI, shared chooser/P17 student consumer, exact native custom context, isolated boards, accepted-only events and stable question context IDs. Connected local helper source is included; its shared UI dependency and final installed tuple are following work. |
+| assessment56 | 9504873c236e838f644c1a2807720ad419734554 | Canonical native producer beside browser wheels. Exact component adapter/review-server allowlist; arbitrary Python, nested copies, checker definitions and foreign wheels remain rejected. Original12 portable checks and affected8 one-home checks pass; independent review/repetition. |
 
-These preserve rejected history, stable decisions, changed snapshots, actually
-tested distinct notes and failure-stop semantics, never unchecked pools.
-Required remains default; OPEN maps to existing approval:optional with warning.
-Unnumbered optional proposals use a sidecar with context.variant:null, never n0.
+The actual component CLI50 workflow used math9bf8a2f/checker1a42281, retained
+separately from later student/UI changes: Generate25 → explicitly approve one
+synthetic candidate → Generate25more passed. Fifty distinct tested notes retained
+the first batch and its single approval/history unchanged. Attempt-budget,
+authored-test and invalid-output faults stopped without partial manifests.
+See the [author guide](2026-10-variants-authoring-guide.md) and exact evidence below.
+No real teaching notes were automatically approved.
+
+The student consumer passes35 focused source/module checks at its privacy
+followup. Actual JS-produced **custom scalar/vector** packets grade correctly
+through the installed native checker wheel; this is not Pyodide bootstrap or
+named matrix input support. Five actual Chromium scenarios use canonical local
+modules/KaTeX and an explicit runtime/grader stub: keyboard cancel/accept/focus,
+saved and withdrawn answers, review proposal nulls and sibling containment.
+Intentional missing-helper errors remain reported. The later privacy-only module
+followup is separate from that browser report's recorded source hashes.
+
+The optional figure transport has focused source and actual local Chromium
+proof: direct explicit iframe IDs, event.source/label validation, null proposals,
+structured-clone values, load/ready/layout resend and disposal. It does not wait
+for JSXGraph, Python or Check. This is transport evidence, not a real missing-CDN
+or speech negative. The canonical JSXGraph assessment_id/iframe_id is the target;
+a surrounding heading ID is not silently treated as the iframe ID.
+
+The Lua/native bridge passed bounded actual Quarto checks: required zero fails;
+OPEN/review proposals preserve exact null context; an explicit synthetic approval
+allows required publishing; changed approvals fail; ordinary questions skip
+native generation; legacy parameters fails with a migration message. Question
+Markdown and raw-HTML-free solutions follow approved design §3.6.i. The wrapper
+reads the actual canonical Pandoc AST, rejects stale/comment/example sources,
+and performs one leased write after validation. POSIX supervision is exercised;
+Windows teardown remains untested. A timeout after a possible write is uncertain:
+reload the manifest before retrying.
 
 An isolated canonical installed **native-only** baseline with clean exact sources
 (assessment dc1388d, libs d71a9a5, math fca53b8 before the AST refinement,
@@ -118,9 +148,10 @@ It still does not activate the Lua/JS component bridge.
 
 Ordinary Quarto preview versus render has no verified public Lua detection
 signal in1.8.27. Bounded actual preview/render probes agreed. Explicit review/
-preview settings exist; automatic ordinary-preview behavior from the design
-remains open rather than weakening the required publish gate. Full component
-rendered review/student storage and actual bot workflow remain required.
+preview settings exist; automatic ordinary-preview behavior remains open rather
+than weakening required publishing. Complete rendered multilingual review/TryIt,
+trusted workflow glue, course/example migration and final installed integration
+remain in progress. No full variants, course or first-visit clearance is claimed.
 
 ## Retained cloud evidence
 
@@ -134,3 +165,9 @@ restart ZIP and its earlier failures remain unchanged. No old failure is waived.
 [Installed native baseline and preview probes](evidence/2026-10-23-authoring-native-baseline.zip),
 SHA256 `07d720a00eef6aa2fc4c862bd2af7a32a05dd8b7efb6c86ef886dcdcff026061`,
 retains that exact earlier native-only stage separately from later AST/bridge work.
+
+[Focused installed CLI50 proof](evidence/2026-10-23-variants-cli50.zip), SHA256
+`16ff08506d33da4bed17e1b48eb785f5fd0118e5bb8d2d782792d02cfd06684e`,
+contains the exact source tuple, canonical native inventory, raw requests/results,
+single synthetic approval and preserved history, expected no-write failures,
+driver and per-file hashes. This is a native CLI proof, not a student browser run.
