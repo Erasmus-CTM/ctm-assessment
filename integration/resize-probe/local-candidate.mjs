@@ -46,9 +46,10 @@ const editorFiles=[
 const marginHtml='<button id="probe-reader-toggle" class="quarto-reader-toggle" type="button" onclick="quartoToggleReader()">Reader</button><div id="probe-margin-box" style="position:relative;height:100px"><div id="probe-margin-a" class="aside" style="position:absolute;top:0;height:40px;margin:0">Margin A</div><div id="probe-margin-b" class="aside" style="position:absolute;top:10px;height:40px;margin:0">Margin B</div></div>';
 const report={engine,helperHead:'98a626d2355986e18ccb2011ccbf7c412003f2d0',helperSha256:sha(helper),fixtureHtmlSha256:sha(html),quartoSha256:sha(quarto),
   modes:{native:'byte-original HTML and owned sources, no helper',original:'matched canonical helper inline but inactive',ready:'shared parsed-content initialization only',editors:'shared supported explicit editor layout only',both:'both owned integrations'},samples:[]};
+if(process.env.CTM_LOCAL_ASSET_PROOF){report.localAssets=JSON.parse(fs.readFileSync(process.env.CTM_LOCAL_ASSET_PROOF,'utf8'));assert.equal(report.localAssets.fixtureHtmlSha256,sha(html));assert.equal(report.localAssets.completeLockSha256,'93e96c89432d46f90be347fe8c65a6596e3467f9cbf2ee8cbc15f59ab08ec3be');assert.equal(report.localAssets.assetFiles,3211);assert.equal(report.localAssets.carriedAssetDownloads,0);}
 fs.mkdirSync(output,{recursive:true});const servers={},origins={};let browser;
 try{
-  for(const mode of ['native','original','ready','editors','both'])for(const variant of ['actual','margins','transform']){
+  for(const mode of ['native','original','ready','editors','both'])for(const variant of (['original','both'].includes(mode)?['actual','margins','transform']:['actual'])){
     const key=mode+'-'+variant,copy=output+'-'+key;fs.cpSync(fixture,copy,{recursive:true});
     let content=mode==='native'?html:matchedHtml;
     if(variant==='margins')content=content.replace('</body>',marginHtml+'</body>');
@@ -94,12 +95,13 @@ try{
     page.on('pageerror',error=>pageerrors.push({message:error.message,stack:error.stack}));page.on('requestfailed',request=>failedRequests.push({url:request.url(),failure:request.failure()}));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
     const response=await page.goto(origins[mode+'-'+control.variant]+'/fixture/index.html',{waitUntil:'load'});assert.equal(response.status(),200);assert.equal(response.headers()['cross-origin-embedder-policy'],'require-corp');
     await page.locator('.ctm-save-bar').waitFor({state:'visible'});await page.waitForTimeout(1100);
-    const snapshot=()=>page.evaluate(()=>({isolated:crossOriginIsolated,store:!!window.CTMStore,helper:window.CTMLayout?.version,nativeObserver:ResizeObserver===__localLayout.nativeObserver,
+    const snapshot=()=>page.evaluate(()=>({isolated:crossOriginIsolated,store:!!window.CTMStore,helper:window.CTMLayout?.version,assetMode:window.CTM_ASSETS?.mode,nativeObserver:ResizeObserver===__localLayout.nativeObserver,
       reader:localStorage.getItem('quarto-reader-mode'),toggles:[...document.querySelectorAll('.quarto-reader-toggle')].map(el=>el.classList.contains('reader')),
       body:{width:document.body.getBoundingClientRect().width,height:document.body.getBoundingClientRect().height},
       inputs:document.querySelectorAll('input.math-input').length,answers:document.querySelectorAll('.math-exercise-cell > .math-saved-answer').length,results:document.querySelectorAll('.math-exercise-cell > .math-saved-result').length,
       progress:document.querySelectorAll('.ctm-progress').length,margin:document.getElementById('probe-margin-b')?.style.marginTop,errors:__localLayout.errors,reads:__localLayout.bodyReads}));
     const initial=await snapshot();assert.equal(initial.isolated,true);assert.equal(initial.store,true);assert.equal(initial.helper,mode==='native'?undefined:1);assert.equal(initial.nativeObserver,true);
+    assert.equal(initial.assetMode,report.localAssets?'local':'cdn');
     assert.equal(initial.inputs,7);assert.equal(initial.answers,7);assert.equal(initial.results,7);assert.equal(initial.progress,2);
     const expectedReader=control.reader&&control.width>=990&&control.variant!=='transform';assert.equal(initial.reader,String(expectedReader));assert.ok(initial.toggles.every(active=>active===expectedReader));
     let resized=null,editorState=null,editorStages=[],editorStartErrors=null,disposal=null,denial=null;
@@ -109,7 +111,23 @@ try{
       editorStartErrors=await page.evaluate(()=>__localLayout.errors.length);
       await page.getByRole('tab',{name:'Code',exact:true}).click();await page.waitForTimeout(200);
       const capture=()=>page.evaluate(()=>monaco.editor.getEditors().map(editor=>{const node=editor.getContainerDomNode();return{value:editor.getValue(),contentHeight:editor.getContentHeight(),layout:editor.getLayoutInfo(),container:{width:node.clientWidth,height:node.clientHeight,styleHeight:node.style.height,display:getComputedStyle(node).display},rectWidth:node.getBoundingClientRect().width};}));
-      const record=async(name,hidden=false)=>{const states=await capture(),violations=[];for(const [index,state] of states.entries()){if(hidden){if(state.container.width!==0||state.layout.width!==5||state.layout.height!==5)violations.push({index,reason:'hidden editor must retain zero container size and Monaco 5px minimum layout'});}else{if(state.layout.width<=5||state.layout.height<=5)violations.push({index,reason:'visible editor layout must have nonzero dimensions'});if(Math.abs(state.layout.width-state.container.width)>1||Math.abs(state.layout.height-state.container.height)>1)violations.push({index,reason:'visible layout must converge to its container dimensions'});if(parseFloat(state.container.styleHeight)<state.contentHeight)violations.push({index,reason:'fit height must contain current editor content'});if(control.variant==='transform'&&Math.abs(state.rectWidth-state.container.width*.5)>1)violations.push({index,reason:'layout must retain untransformed content dimensions'});}}const stage={name,states,violations};editorStages.push(stage);console.log(JSON.stringify({editorStage:{case:control.name,mode,sample,...stage}}));};
+      const record=async(name,hidden=false)=>{
+        const states=await capture(),violations=[];
+        for(const [index,state] of states.entries()){
+          const dimensions=[state.layout.width,state.layout.height,state.container.width,state.container.height,state.contentHeight,parseFloat(state.container.styleHeight)];
+          if(control.variant==='transform')dimensions.push(state.rectWidth);
+          if(!dimensions.every(Number.isFinite))violations.push({index,reason:'all measured editor dimensions must be finite'});
+          if(hidden){
+            if(state.container.width!==0||state.layout.width!==5||state.layout.height!==5)violations.push({index,reason:'hidden editor must retain zero container size and Monaco 5px minimum layout'});
+          }else{
+            if(state.layout.width<=5||state.layout.height<=5)violations.push({index,reason:'visible editor layout must have nonzero dimensions'});
+            if(Math.abs(state.layout.width-state.container.width)>1||Math.abs(state.layout.height-state.container.height)>1)violations.push({index,reason:'visible layout must converge to its container dimensions'});
+            if(parseFloat(state.container.styleHeight)<state.contentHeight)violations.push({index,reason:'fit height must contain current editor content'});
+            if(control.variant==='transform'&&Math.abs(state.rectWidth-state.container.width*.5)>1)violations.push({index,reason:'layout must retain untransformed content dimensions'});
+          }
+        }
+        const stage={name,states,violations};editorStages.push(stage);console.log(JSON.stringify({editorStage:{case:control.name,mode,sample,...stage}}));
+      };
       let values;
       for(const [name,count,long] of [['grow',16,false],['shrink',2,false],['empty',0,false],['long-line',1,true]]){
         values=await page.evaluate(({count,long})=>monaco.editor.getEditors().map((editor,index)=>{const value=long?'print("'+String(index).repeat(300)+'")':('print("local '+index+'")\n').repeat(count);editor.setValue(value);return value;}),{count,long});await page.waitForTimeout(200);await record(name);

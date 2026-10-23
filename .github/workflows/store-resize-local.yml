@@ -7,7 +7,72 @@ permissions:
   contents: read
   actions: read
 jobs:
+  render-local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 7fa0b25bed9f459c5f18f700f327ad3e804b55cf
+          path: _ci/fixture-producer
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'
+      - name: Verify frozen fixture provenance and immutable complete asset artifact
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const get = async id => (await github.rest.actions.getArtifact({
+              owner: context.repo.owner, repo: context.repo.repo, artifact_id: id
+            })).data;
+            const [fixture, assets] = await Promise.all([get(12452174136), get(12442968305)]);
+            if (fixture.expired || fixture.name !== 'store-rendered-fixtures' ||
+                fixture.workflow_run.head_sha !== '7fa0b25bed9f459c5f18f700f327ad3e804b55cf' ||
+                fixture.digest !== 'sha256:41ec55a17c2619ba9fba12fbdde19dbc84d2eb383fffd263f0cbdacc8b94d5f9') {
+              throw new Error('Actual fixture artifact changed or expired');
+            }
+            if (assets.expired || assets.name !== 'prebuilt-offline-assets' ||
+                assets.workflow_run.head_sha !== '94013514350ba6c8f29a61ea2875cf65396b15e5' ||
+                assets.digest !== 'sha256:44892a23abc87005579ce34c1fcbfff3a24824f029ce6639e5a0bc4ff0e33571') {
+              throw new Error('Reviewed complete asset artifact changed or expired');
+            }
+      - uses: actions/download-artifact@v7
+        with:
+          name: store-rendered-fixtures
+          run-id: 39841421065
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/frozen-fixture
+      - uses: actions/download-artifact@v7
+        with:
+          name: prebuilt-offline-assets
+          run-id: 39818419447
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/prebuilt-assets
+      - name: Canonical install, carried verification and fresh local-profile render
+        run: |
+          python -m py_compile integration/resize-probe/build-local.py
+          python integration/resize-probe/build-local.py --producer _ci/fixture-producer --baseline-record "$RUNNER_TEMP/frozen-fixture/resolved-repos.json" --prebuilt "$RUNNER_TEMP/prebuilt-assets" --dest "$RUNNER_TEMP/resize-local-build"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: resize-local-assets-fixture
+          path: |
+            ${{ runner.temp }}/resize-local-build/course/_site
+            ${{ runner.temp }}/resize-local-build/local-asset-proof.json
+          retention-days: 7
   integration:
+    needs: render-local
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.55.1-noble
@@ -32,31 +97,18 @@ jobs:
           ref: 98a626d2355986e18ccb2011ccbf7c412003f2d0
           path: _ci/layout-source
           persist-credentials: false
-      - name: Verify exact frozen original fixture
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const artifact = (await github.rest.actions.getArtifact({
-              owner: context.repo.owner, repo: context.repo.repo, artifact_id: 12452174136
-            })).data;
-            if (artifact.expired || artifact.name !== 'store-rendered-fixtures' ||
-                artifact.workflow_run.head_sha !== '7fa0b25bed9f459c5f18f700f327ad3e804b55cf' ||
-                artifact.digest !== 'sha256:41ec55a17c2619ba9fba12fbdde19dbc84d2eb383fffd263f0cbdacc8b94d5f9') {
-              throw new Error('Actual fixture artifact changed or expired');
-            }
       - uses: actions/download-artifact@v7
         with:
-          name: store-rendered-fixtures
-          run-id: 39841421065
-          github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/resize-fixture
+          name: resize-local-assets-fixture
+          path: ${{ runner.temp }}/resize-local-fixture
       - name: Test the canonical local helper through matched owned-source consumers
         shell: bash
         env:
-          CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-fixture/before/_site
+          CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-local-fixture/course/_site
           CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-local-candidate
           CTM_LAYOUT_SOURCE: ${{ github.workspace }}/_ci/layout-source/_extensions/ctm-libs/ui/ctm-layout.js
           CTM_BROWSER: ${{ matrix.browser }}
+          CTM_LOCAL_ASSET_PROOF: ${{ runner.temp }}/resize-local-fixture/local-asset-proof.json
         run: |
           set -o pipefail
           mkdir -p "$CTM_RESIZE_REPORT"
