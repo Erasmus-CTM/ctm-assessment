@@ -1,0 +1,21 @@
+{
+  "filename": "final19-firststart-complete-lossless.zip",
+  "bytes": 215305,
+  "sha256": "ac808d1878f1a6bf7980a452b3665f8cd5b0c3dc860c5352a9f8c2b48f8044a6",
+  "parts": [
+    {
+      "filename": "final19-firststart-complete.zip.part01",
+      "bytes": 180000,
+      "sha256": "c9fa45df65f0f609af955362a48051a5d2297a8481a19d653ee331d725d1d81c"
+    },
+    {
+      "filename": "final19-firststart-complete.zip.part02",
+      "bytes": 35305,
+      "sha256": "ccef9355755e2ad634913207be19bf52f4ad882d29f227fa365a08714595c483"
+    }
+  ],
+  "exactRawEntries": 20,
+  "encoding": "ZIP containingstandardtar.xz, exactrawbytesSHAverified",
+  "sourceHead": "58fe28bb16723e158d7430de04ccb1c9b142fb7b",
+  "receiptSHA256": "959e6afea41440300258de64ef7510b72cdc1a8e4550cc1bdc2abccb4b6e5bff"
+}

@@ -1,0 +1,85 @@
+{
+  "status": "ELEVEN_READY_TEMPLATE_PUBLICATION_CLOSURE_REOPENED",
+  "files": {
+    "final20-firststart-complete.zip.part01": {
+      "bytes": 180000,
+      "sha256": "990bdbd758fda05bb7111835b78cbe5af383df2b7b899f2410c12687bab85f07"
+    },
+    "windows-timeout-evidence.zip": {
+      "bytes": 6323,
+      "sha256": "e7af07c3478c55b677a39737b847a7e423cc72a449c4e248a088f44b73cccc8f"
+    },
+    "math32-parity-final-74946.zip": {
+      "bytes": 117837,
+      "sha256": "cc570ac814fe8f3b612eaa0ecbcff829b80018aea7e4febcfcb510f702338179"
+    },
+    "checkpoint-current-state.json": {
+      "bytes": 842,
+      "sha256": "15abf359215d69dcaf07ca1f3fb0177bd2cebed4c3429897fea51a5f7711c90a"
+    },
+    "remaining-inventory.zip": {
+      "bytes": 18267,
+      "sha256": "0135733488fa358b7aa01849a6b02b44c36adc7a71d027070306f19d0c95e758"
+    },
+    "pyo-final-canonical-sync.zip": {
+      "bytes": 7001,
+      "sha256": "343a1ee79b8eea1b1f8a719514bc5cfd2f8f06f4de32570ddfbe997a785cb5c1"
+    },
+    "active-route-snapshot.zip": {
+      "bytes": 14137,
+      "sha256": "196a3478daa8a01479fa649a505155bcd656d5ef879a9fcd197909e9d841f4b8"
+    },
+    "default-readiness-8b46.zip": {
+      "bytes": 45012,
+      "sha256": "66fd18b3a7fca31df72e17a592c57f2ce5b9dc0b1175f890377e57bfdde4348b"
+    },
+    "final19-firststart-archive.json": {
+      "bytes": 778,
+      "sha256": "e18721c6a47f87abbe9f62ca6b211f49bae5f07ea459b4da3dc7e6dad5387361"
+    },
+    "actual-worker-head-ab.zip": {
+      "bytes": 161668,
+      "sha256": "eb72a92906ceb62ce057b4c12054576441ae766b2eb961262a4e746a6abc791e"
+    },
+    "final20-firststart-archive.json": {
+      "bytes": 834,
+      "sha256": "0a4439b009c6c945315a8e5862a11adaaeeb1104db02b4a5f94c902b00ac1f26"
+    },
+    "final19-firststart-complete.zip.part02": {
+      "bytes": 35305,
+      "sha256": "ccef9355755e2ad634913207be19bf52f4ad882d29f227fa365a08714595c483"
+    },
+    "active-route-final.zip": {
+      "bytes": 28025,
+      "sha256": "c3e476a00eaca40c9895624dedaf91bf10f03d862a026b8ef5df8fc33bc6ad0e"
+    },
+    "README.md": {
+      "bytes": 6464,
+      "sha256": "b257258395ae3149c5d699f81bd520b7653f9373b516bb2a85a7a8c0be0ee68f"
+    },
+    "math74946-parity-receipt.json": {
+      "bytes": 2452,
+      "sha256": "91c433e7f6ae40daaab291c5c393010dbc3f709d380cff63240877c9be817b71"
+    },
+    "demo20-authoring-current.zip": {
+      "bytes": 126737,
+      "sha256": "1b5f53592bb84644dd9638b2b3eef48ac8ebe01ced78123c5227aef6f8b129bd"
+    },
+    "opaque-sre-focused.zip": {
+      "bytes": 24858,
+      "sha256": "4f32722cc7f05a4e95864a40f6c50b1a467ac6bccf74bfd948178d2a8dcb09fe"
+    },
+    "final20-firststart-complete.zip.part02": {
+      "bytes": 119385,
+      "sha256": "4add9fb08d56a4d8bce8a71713bb2200deff0b270e1084040a4bc8c29b9d49a8"
+    },
+    "final19-firststart-complete.zip.part01": {
+      "bytes": 180000,
+      "sha256": "c9fa45df65f0f609af955362a48051a5d2297a8481a19d653ee331d725d1d81c"
+    },
+    "monaco-actual-amd.zip": {
+      "bytes": 27563,
+      "sha256": "6e6f37f27e006de65c1b63afdc405e56fbfa6b70ec5f43f4f910d441b5270d72"
+    }
+  }
+}

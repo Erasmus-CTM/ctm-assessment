@@ -1,0 +1,21 @@
+{
+  "filename": "final20-firststart-complete-lossless.zip",
+  "bytes": 299385,
+  "sha256": "d10217f30736a13e6e076139b94691e0967a3a1c584f7ed1e3ae5ed21049007c",
+  "parts": [
+    {
+      "filename": "final20-firststart-complete.zip.part01",
+      "bytes": 180000,
+      "sha256": "990bdbd758fda05bb7111835b78cbe5af383df2b7b899f2410c12687bab85f07"
+    },
+    {
+      "filename": "final20-firststart-complete.zip.part02",
+      "bytes": 119385,
+      "sha256": "4add9fb08d56a4d8bce8a71713bb2200deff0b270e1084040a4bc8c29b9d49a8"
+    }
+  ],
+  "exactRawEntries": 31,
+  "encoding": "ZIP containing standard tar.xz;31rawfiles verifiedbyte-for-byte against originalunmodifiedreports/logs/source",
+  "sourceHead": "3f6336a4d5ee77f7f2ff4f1c244b08440aae5128",
+  "receiptSHA256": "3ee0ab06e921ce1eeca22338d78f12e5737758f3e8678337ae5dfee6db76ff2b"
+}

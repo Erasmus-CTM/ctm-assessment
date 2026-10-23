@@ -1,0 +1,32 @@
+# Final loading evidence — 23 October 2026
+
+Eleven designated current routes are ready for scoped AC review, with green relevant exact-head checks and actual first-visit gates at the two recorded tuples. Template1 was reopened to draft after the21:11 twelve-ready snapshot because its actual publisher/default-filter/native-render path remained incomplete; its installation-only check is not full authoring acceptance. They remain open/unmerged. This is not a statement that all historical drafts or all prerequisite stacks are ready. AC alone merges; no merges, deployments, tags or protected-main writes occurred.
+
+- `actual-worker-head-ab.zip`: causal original canonical Blob-worker/CDN A/B at9c724f. One HEAD cancellation versus zero, identical9796-byte GET/hash, pending0. Request id10 is an identifier, not ten failures.
+- `monaco-actual-amd.zip`: corrected actual Monaco0.46 vendor loader eight-test fixture, immutable provenance/license and fix. The original global-require fixture was overbroad and remains superseded evidence, not final compatibility proof.
+- `opaque-sre-focused.zip`: actual MathJax4.1.3/SRE retained/retired controlled browser cases, canonical source, npm integrity, all raw failed attempts and four actual render contracts. No global Worker patch; optional speech does not gate ordinary Check/Python/Maxima. Large redundant public vendor/rendered HTML bytes are omitted; source/asset digests and reproduction drivers remain.
+- `default-readiness-8b46.zip`: canonical no-override minimal readiness installer, actual mixed math/Python/IDE/opaque-board render and133 verified inventory hashes. The production Meta and default pins changed from950; no obsolete runtime-identity claim.
+- `pyo-final-canonical-sync.zip`: producer-generated sync from libs42 626b into pyo507, source/report checks.
+- `math32-parity-final-74946.zip`: exact final GitHub grading-parity artifact12531570960, SHA-verified;1633responses/38source tests/267directional expectations/0unexpected/0stale. Its16teachers/56authored cases and candidate/source identities exactly match the earlier raw-context archive, which also retains the inherited false-exit0 failure and actual negative controls.
+- `windows-timeout-evidence.zip`: genuine Windows Python3.12 process-tree timeout proof, two actual passing cases, diagnostic ac3e7d parent74946. Does not claim successful-leader orphan cleanup.
+- `demo20-authoring-current.zip`: currentrun40022305047/artifact12530524898 rawfourreviewJSONs/log/verifiedreceipt;99teacher vectors/349fields/0decisions/events and manifestbyteimmutability. This is a separate build, not assumed byte-identical to first-start/network site artifacts.
+- `active-route-final.zip`: current twelve exact heads/Git base refs, eleven-ready/template-draft status plus the explicitly historical21:11 twelve-ready snapshot, root-authorized scoped readiness and individual prerequisite metadata receipts. Original timestamps preserved.
+- `active-route-snapshot.zip`: explicitly older pending-state snapshot, retained as history.
+- `remaining-inventory.zip`: saved59-PR inventory at21:08:41UTC,28draft/31non-draft;46green/8red/4cancelled-or-incomplete/1running. Later metadata transitions may postdate this snapshot; no new global status is invented. Original saved scope was57draft+2non-draft, not57+3. Assessment28 and35 remain real prerequisite blockers; historical diagnostics, duplicates and protected/other-campaign entries are not blanket-ready.
+
+## Full first-visit raw reports
+
+`final19-firststart-archive.json` and `final20-firststart-archive.json` list raw part sizes/hashes and full archive hashes. Reassemble each pair in filename order:
+
+```sh
+cat final19-firststart-complete.zip.part01 final19-firststart-complete.zip.part02 > final19-firststart-complete-lossless.zip
+cat final20-firststart-complete.zip.part01 final20-firststart-complete.zip.part02 > final20-firststart-complete-lossless.zip
+```
+
+Each ZIP contains a standard `raw-files.tar.xz` and `RAW-SHA256.json`. Whole-stream compression avoids repeating embedded data-URL strings across reports. Every JSON/log/source byte is unchanged and SHA-verified against the original reports; no requests/errors are removed or normalized. Python's standard `zipfile`, `lzma` and `tarfile` modules read both containers. Only redundant site/vendor files and screenshots are omitted; both site records retain all67 file digests, exact refs and original artifact identities/digests. Full raw data-URL strings remain in the reports.
+
+Parent19: exact58fe/run40022120561, readiness libs42 626b/math31 97a7; all4 downloaded artifact ZIPs match API SHA256/size. Child20: exact3f6336/run40022304981, authoring libs43d989/math74946; all5 downloaded artifact ZIPs match API digests. Both cover three browser baselines plus six actual missing-JSXGraph/speech fault controls. Baseline seven runtime-error arrays are empty, all observed active/retired request lifecycles finish, and fault cases retain their intentional errors while real Python two-test exercises and math Check succeed. Firefox navigation-poll execution-context-destroyed automation diagnostics remain separately recorded; do not claim every diagnostic array is empty. WebKit reports its supported unavailable/non-isolated fallback, not SAB. No interactive Input/Stop, offline, universal/deployed-course or fresh current-tuple five-page acceptance is claimed. Final network repeat0/0 is noncausal; the original9c1/0 causal proof is separate.
+
+The older headered five-page proof at5bd/87c retains its exact tuple and late WebKit request limitations. All library UI/feedback/Lua bytes are unchanged from3277 to626; current runtime lifecycle changes are covered by the new scoped gate. Historical failures are not relabelled. Previous first-visit HOLD is superseded only for the exact validated tuples.
+
+Next work includes the real template publisher/umbrella/native-render closure and assessment28's genuine store WebKit ResizeObserver and measure D2 failure; the owner is developing a minimal focused proposal at current8b46/default readiness tuple, with unchanged fixtures and original credentialless/two-second gates, not a broad campaign. Superseded assessment41 has no unique source; historical31/32 diagnostics and libs33/34 duplicate alternatives do not need merging just to empty the draft list. Future STACK/native constraints and protected Ingmat3a main remain separate. No student approvals or source decisions were fabricated.

@@ -1,0 +1,9 @@
+{
+  "fetchedTimestamp": "2026-10-23T21:18:05.580Z",
+  "readyActiveRoutes": 11,
+  "draftActiveRoutes": 1,
+  "templateHead": "4e8c25b6575dea662e21d1408169894a8d8abfcc",
+  "finding": "Template1 at4e8c25b was reopened to draft after the21:11 twelve-ready snapshot: its main publisher still ran legacysetup.py over the native pack, individual filters omitted the umbrella, and ordinary mathmain understood only legacy parameters. The prior install/task-only proof did not establish the actual authoring/publishing path. Owner is correcting canonical helper/pinned dependencies/umbrella and a small actual variables render; no deployment or fresh acceptance is claimed.",
+  "nextAssessment28": "Genuine unchanged-fixture storeWKRO/measureD2; diagnostic40025544640 renderfailedbeforebrowser; no acceptance",
+  "noMergesDeployTagsMainWrites": true
+}

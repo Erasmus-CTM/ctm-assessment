@@ -1,11 +1,10 @@
 # Active cloud continuation — 23 October 2026
 
-Read [the incremental cloud continuation](docs/consolidation/2026-10-cloud-continuation.md)
-for newer loading draft heads, focused checks and retained environment failures.
-Supported native authoring source, G1 student previews and legacy migration are
-implemented, with exact focused evidence linked there. First-visit/course and live
-workflow clearance remain HOLD. No merges, deployments or tags were performed.
-The restart checkpoint below preserves the original saved state and constraints.
+Read [the latest durable continuation](docs/consolidation/2026-10-cloud-continuation.md) first. Actual final first-visit gates passed for demo19's minimal readiness tuple and demo20's authoring tuple, with original CDN/data-URL/service-worker/Pyodide behavior, clean baseline runtime collectors and terminal active/retired requests. Historical failures and five-page scope limits remain retained.
+
+Eleven active routes are ready for scoped AC review, not merged. Template1 was reopened to draft after a real native publishing/default-filter closure gap was found; its earlier installation-only success is not complete authoring acceptance. Assessment28 still has genuine store WebKit ResizeObserver/measureD2 blockers; the owner is pursuing a minimal current-tuple diagnostic with unchanged original gates. Its latest render-stage failure is not acceptance. Other historical/duplicate/protected-course and future STACK scopes remain separate. This is not all57historical drafts ready.
+
+No merges, deployments, tags or protected Ingmat3a/main writes occurred. AC alone merges. Native approvals were not fabricated; bot/hosting templates remain inactive. Course/offline/live-workflow rollout is unclaimed. The saved restart state below is historical and does not override this current checkpoint.
 
 ---
 

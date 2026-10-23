@@ -1,0 +1,106 @@
+{
+  "repository": "Erasmus-CTM/math-exercise",
+  "head": "74946e504bd2a4302d34b711bcd67f43c7376026",
+  "run": 40022080785,
+  "artifact": 12531570960,
+  "artifactSHA256": "cc570ac814fe8f3b612eaa0ecbcff829b80018aea7e4febcfcb510f702338179",
+  "actualRawSummary": {
+    "mode": "builds",
+    "runs": [
+      {
+        "name": "base",
+        "version": "0.28.3",
+        "runtime": "Pyodide 0.28.3 (Python 3.13.2, SymPy 1.13.3, PYTHONHASHSEED 0)"
+      },
+      {
+        "name": "head",
+        "version": "0.28.3",
+        "runtime": "Pyodide 0.28.3 (Python 3.13.2, SymPy 1.13.3, PYTHONHASHSEED 0)"
+      }
+    ],
+    "pythonHashSeed": 0,
+    "minutes": 1.12,
+    "sites": [
+      "math-exercise"
+    ],
+    "sources": [
+      "math-exercise"
+    ],
+    "pages": 10,
+    "duplicatePages": 0,
+    "cells": 101,
+    "variants": 115,
+    "responses": 1633,
+    "responsesBySource": {
+      "keys": 82,
+      "perturbation": 559,
+      "boundary": 48,
+      "challenge": 111,
+      "probe": 645,
+      "authored": 186,
+      "answer": 2
+    },
+    "fixtures": 0,
+    "customCells": 33,
+    "customCoverage": {
+      "math-exercise": {
+        "cells": 33,
+        "labels": 30,
+        "graded": 33,
+        "correct": 33,
+        "partial": 27,
+        "wrong": 32
+      }
+    },
+    "customWithoutCorrect": 0,
+    "authoredResponsesNotPageShaped": 2,
+    "teacherAnswers": 2,
+    "teacherAnswersUnexpected": 0,
+    "teacherAnswersUnused": 0,
+    "teacherAnswersMisfit": 0,
+    "teacherAnswerNotes": 0,
+    "courseCommits": null,
+    "authoredTests": 38,
+    "authoredNotPassing": 0,
+    "variantRecipes": 0,
+    "pythonPrograms": 0,
+    "pythonUnexpected": 0,
+    "skipped": 0,
+    "timeouts": {
+      "base": 0,
+      "head": 0
+    },
+    "incomplete": 0,
+    "statuses": {
+      "authored tests": {
+        "pass": 38
+      },
+      "responses": {
+        "correct": 217,
+        "wrong": 202,
+        "correct+wrong": 283,
+        "not_exact": 3,
+        "error": 9,
+        "partial": 2,
+        "not_form": 5
+      },
+      "cells without keys": {
+        "correct": 149,
+        "wrong": 482,
+        "error": 117,
+        "raised": 51,
+        "partial": 113
+      }
+    },
+    "keysNotCorrect": 0,
+    "fixturesUnexpected": 0,
+    "differences": 0,
+    "expectedDifferences": 267,
+    "staleExpectations": 0,
+    "notes": 0
+  },
+  "nativeContextExactOriginalReceiptMatch": true,
+  "contexts": 16,
+  "mandatoryTeachers": 16,
+  "authoredCases": 56
+}
