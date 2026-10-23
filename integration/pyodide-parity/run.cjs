@@ -248,15 +248,16 @@ function readExpected(file) {
   const entries = data.differences;
   if (!Array.isArray(entries)) throw new Error(file + ': {"differences": [...]} expected');
   return entries.map((entry, i) => {
-    const unknown = Object.keys(entry).filter(key => !['path', 'case', 'reason', 'required'].includes(key));
+    const unknown = Object.keys(entry).filter(key => !['path', 'case', 'reason', 'required', 'onlyIn'].includes(key));
     if (unknown.length || typeof entry.reason !== 'string' || !entry.reason.trim() || !(entry.path || entry.case))
       throw new Error(`${file}: entry ${i + 1} needs a reason and a path or case (path, case, reason, required)`);
+    if (entry.onlyIn !== undefined && !['base', 'head'].includes(entry.onlyIn)) throw new Error(file + ': onlyIn must be base or head');
     const pattern = typeof entry.case === 'string' && /^\/.*\/$/.test(entry.case) ? new RegExp(entry.case.slice(1, -1)) : null;
     // The narrower entry wins a difference: an exact case id, then a case pattern, then a path alone; the longer path, then the
     // longer pattern, then the earlier entry.
     const rank = [entry.case ? (pattern ? 2 : 3) : 1, (entry.path || '').length, (entry.case || '').length];
     return {...entry, required: entry.required !== false, index: i, rank,
-      matches: d => (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
+      matches: d => (!entry.onlyIn || d.why === 'only in ' + entry.onlyIn) && (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
         && (!entry.case || (pattern ? pattern.test(d.id) : d.id === entry.case))};
   });
 }
@@ -582,7 +583,7 @@ async function main() {
   fs.writeFileSync(path.join(out, 'report.md'), md.join('\n') + '\n');
   console.log(md.join('\n'));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join('\n') + '\n');
-  const failed = differences.length || stale.length || incomplete.length || answersUnexpected.length || answersUnused.length || answersMisfit.length || fixtureMismatch.length
+  const failed = differences.length || stale.length || incomplete.length || answersUnexpected.length || answersUnused.length || answersMisfit.length || fixtureMismatch.length || authoredFailing.length
     || (summary.captureConflicts && !strict);
   process.exit(failed ? 1 : 0);
 }

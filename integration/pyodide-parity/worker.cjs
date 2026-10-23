@@ -140,7 +140,7 @@ async function authoredCases(py) {
   });
   for (const {text, record, tree} of found) {
     write({id: `authored:${tree}:${record.file}#${record.label}`, results: [{status: record.outcome}, ...(record.calls || []).map(outcome)], feedback: [],
-      responses: record.responses, ...(job.capture ? {authored: text} : {})});
+      responses: record.responses, ...(record.nativeCandidates ? {nativeCandidates: record.nativeCandidates, sourceSHA256: record.sourceSHA256} : {}), ...(job.capture ? {authored: text} : {})});
   }
   write({id: 'authored:all', results: [{status: 'done', score: found.length}], feedback: []});
 }

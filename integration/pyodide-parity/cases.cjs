@@ -358,11 +358,11 @@ function pagesUnder(root) {
     .sort();
 }
 
-// Source files with authored question tests (`#| tests:` in a math-exercise block).
+// Authored tests and native recipes (whose mandatory teacher vectors also run).
 function authoredSources(root) {
   return fs.readdirSync(root, {recursive: true}).map(String)
-    .filter(name => name.endsWith('.qmd') && !name.split(/[\\/]/).some(part => part.startsWith('.') || ['_site', '_extensions', 'node_modules'].includes(part)))
-    .filter(name => /^#\|\s*tests:\s*\S/m.test(fs.readFileSync(path.join(root, name), 'utf8')))
+    .filter(name => name.endsWith('.qmd') && !name.split(/[\\/]/).some(part => part.startsWith('.') || ['_site', '_extensions', 'node_modules', '_review-examples', 'work'].includes(part)))
+    .filter(name => /^#\|\s*(?:tests:\s*\S|variables:)/m.test(fs.readFileSync(path.join(root, name), 'utf8')))
     .sort();
 }
 
