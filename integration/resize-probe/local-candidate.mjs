@@ -61,17 +61,27 @@ try{
     servers[key]=await serve({fixture:copy},true,'require-corp');origins[key]='http://127.0.0.1:'+servers[key].address().port;
   }
   browser=await playwright[engine].launch({headless:true});report.browserVersion=browser.version();
-  // Hold an actual HTTP parser inside an inert script, then append to its
-  // existing text node. No timer controls product initialization.
-  let streamResponse;
-  const parserServer=http.createServer((request,response)=>{streamResponse=response;response.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store'});response.write('<!doctype html><script>'+helper+'</script><script>window.parserReady=[];CTMLayout.ready(()=>parserReady.push({state:document.readyState,text:document.getElementById("ctm-store-manifest").textContent}));</script><main id="parsed-content">complete CTM content</main><script type="application/json" id="ctm-store-manifest">{"v":');});
+  // Stream a complete inert manifest and a following tree token while holding
+  // response completion. This checks parsed-content readiness before DCL;
+  // parser buffering means it is not a characterData-only regression test.
+  let streamResponse;const parserRequests=[];
+  const parserServer=http.createServer((request,response)=>{
+    parserRequests.push(request.url);
+    // An incidental favicon request must not replace the held HTML response.
+    if(request.url!=='/stream'){response.writeHead(request.url==='/favicon.ico'?204:404);response.end();return;}
+    assert.equal(streamResponse,undefined,'one parser stream request');streamResponse=response;
+    response.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store'});response.write('<!doctype html><script>'+helper+'</script><script>window.parserReady=[];CTMLayout.ready(()=>parserReady.push({state:document.readyState,text:document.getElementById("ctm-store-manifest").textContent}));</script><main id="parsed-content">complete CTM content</main><script type="application/json" id="ctm-store-manifest">{"v":');
+  });
   await new Promise(resolve=>parserServer.listen(0,'127.0.0.1',resolve));servers.parser=parserServer;
-  const parserPage=await browser.newPage();await parserPage.goto('http://127.0.0.1:'+parserServer.address().port,{waitUntil:'commit'});
+  const parserPage=await browser.newPage();await parserPage.goto('http://127.0.0.1:'+parserServer.address().port+'/stream',{waitUntil:'commit'});
   await parserPage.waitForFunction(()=>document.getElementById('ctm-store-manifest'));
   const partialText=await parserPage.evaluate(()=>document.getElementById('ctm-store-manifest').textContent);
-  assert.deepEqual(await parserPage.evaluate(()=>parserReady),[]);streamResponse.write('1}</script>');
-  await parserPage.waitForFunction(()=>parserReady.length===1);
-  report.incrementalParser={partialText,...await parserPage.evaluate(()=>({state:document.readyState,ready:parserReady,content:document.getElementById('parsed-content').textContent}))};
+  assert.deepEqual(await parserPage.evaluate(()=>parserReady),[]);
+  const incidental=await fetch('http://127.0.0.1:'+parserServer.address().port+'/favicon.ico');assert.equal(incidental.status,204);
+  streamResponse.write('1}</script><p id="parser-tail">Response remains open</p>');
+  const parserState=async()=>({partialText,requestPaths:parserRequests.slice(),...await parserPage.evaluate(()=>({state:document.readyState,ready:parserReady,manifestText:document.getElementById('ctm-store-manifest')?.textContent,marker:!!document.getElementById('ctm-layout-ready'),tail:!!document.getElementById('parser-tail'),content:document.getElementById('parsed-content')?.textContent}))});
+  try{await parserPage.waitForFunction(()=>parserReady.length===1);}catch(error){report.incrementalParser={...await parserState(),failure:error.message};console.log(JSON.stringify({incrementalParser:report.incrementalParser}));throw error;}
+  report.incrementalParser=await parserState();
   assert.equal(report.incrementalParser.state,'loading');assert.equal(report.incrementalParser.ready[0].state,'loading');assert.equal(report.incrementalParser.ready[0].text,'{"v":1}');
   streamResponse.end('</body>');await parserPage.waitForLoadState('load');assert.equal(await parserPage.evaluate(()=>parserReady.length),1);await parserPage.close();
   console.log(JSON.stringify({incrementalParser:report.incrementalParser}));
