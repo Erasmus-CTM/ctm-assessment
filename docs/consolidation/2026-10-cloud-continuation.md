@@ -81,22 +81,46 @@ runtime timeout redesign or offline acceptance is claimed.
 
 ## Variants authoring in progress
 
-The native-only checker25 foundation has a reviewed/published atomic bulk
-request slice atc730177. Native tested lazy reconciliation, trusted checklist
-planning and disconnected bulk review/undo are further WIP slices; see its PR
-for exact later heads. They preserve rejected history, stable decisions, changed
-snapshots, tested distinct notes and failure-stop semantics, never unchecked pools.
+The native-only checker25 foundation is now at
+`1a42281c3d7332df94e9b6e9df250ba7610369c7`: tested lazy reconciliation,
+Generate25more, atomic bulk decisions, disconnected review/undo, data-only
+checklist planner and an **inactive** trusted-base GitHub adapter. The adapter
+uses atomic expectedHeadOid, verifies exact-head producer/artifact provenance,
+rechecks comment intent, and accepts the explicitly dispatched next-head run.
+It was tested with fake API transports only; no live comment or dispatch ran.
+Actual trusted producer/sticky-comment/rejection integration and live check
+attachment proof remain unfinished. Native browser wheels were not changed.
 
-Shared chooser/storage and math native resolver/wrapper have separate stacked
-authoring branches so loading review stays scoped. Required remains default;
-OPEN maps to existing approval:optional with a warning, never a new setting.
+Authoring component branches are separate and stacked on loading leaves:
+
+| Draft | Exact source head | Boundary |
+| --- | --- | --- |
+| libs43 | d71a9a5f9726db75da718fcd1e20dc1d72902796 | Shared chooser/P17 session+saved identities, explicit optional proposals, leaf-wise approval setting.18 focused checks including two real Quarto renders; independent review. |
+| math32 | f1b43323fa9f4d63f96ab2dc3067a4dcbffa5929 | Native resolver/wrapper only, no Lua/student activation yet. Canonical source-file AST extraction prevents approving stale/documentation examples. Nine wrapper tests and independent focused controls pass; POSIX supervisor exercised, Windows path unexecuted. |
+| assessment56 | dc1388d1f15e39b5ade8fb9d51621033359561f7 | Canonical native producer installed alongside checker wheels; exact math wrapper/resolver allowlist; checker ownership preserved.12 portable contracts pass. |
+
+These preserve rejected history, stable decisions, changed snapshots, actually
+tested distinct notes and failure-stop semantics, never unchecked pools.
+Required remains default; OPEN maps to existing approval:optional with warning.
 Unnumbered optional proposals use a sidecar with context.variant:null, never n0.
-Assessment56 packages canonical native tools alongside checker wheels and extends
-only exact approved math wrapper/resolver paths, preserving checker ownership.
-It remains draft/HOLD pending real installed math/Lua/component integration.
-Native code stays outside browser wheels. The trusted bot adapter and workflow
-must not execute PR source in a privileged context; live check attachment proof,
-component rendered review and student wiring remain required before completion.
+
+An isolated canonical installed **native-only** baseline with clean exact sources
+(assessment dc1388d, libs d71a9a5, math fca53b8 before the AST refinement,
+checker e1b5bb4, py18e6f1e, pyo0617c97, upstream e4ad81d) passed: installed wheel
+and native provenance/hash inventory, required-zero publishing refusal,
+optional two tested proposals with warning and no write, Generate2 → approve1
+→ required publish with exact positive n1 context, and stale-decision no-write.
+Hostile lesson imports were ignored. This proves the installed native seam,
+not Lua/JS authoring activation or final later-head acceptance. A separate exact native package refresh at math f1b43323/checker1a42281
+passes:18 native files/hash provenance and three affected installed-source
+controls for changed teacher, outer literal fence and HTML/comment examples.
+It still does not activate the Lua/JS component bridge.
+
+Ordinary Quarto preview versus render has no verified public Lua detection
+signal in1.8.27. Bounded actual preview/render probes agreed. Explicit review/
+preview settings exist; automatic ordinary-preview behavior from the design
+remains open rather than weakening the required publish gate. Full component
+rendered review/student storage and actual bot workflow remain required.
 
 ## Retained cloud evidence
 
@@ -106,3 +130,7 @@ contains per-file hashes, exact clean loading tuple/render record, both raw
 Chromium environment failures, bounded module/UI evidence and trust diagnosis.
 The prepared real-runtime fault harness is clearly marked unexecuted. Original
 restart ZIP and its earlier failures remain unchanged. No old failure is waived.
+
+[Installed native baseline and preview probes](evidence/2026-10-23-authoring-native-baseline.zip),
+SHA256 `07d720a00eef6aa2fc4c862bd2af7a32a05dd8b7efb6c86ef886dcdcff026061`,
+retains that exact earlier native-only stage separately from later AST/bridge work.
