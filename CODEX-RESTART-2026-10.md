@@ -1,3 +1,12 @@
+# Active cloud continuation — 23 October 2026
+
+Read [the incremental cloud continuation](docs/consolidation/2026-10-cloud-continuation.md)
+for newer loading draft heads, focused checks and retained environment failures.
+First-visit/course clearance remains HOLD; authoring integration is in progress.
+The restart checkpoint below preserves the original saved state and constraints.
+
+---
+
 # CTM restart — cloud handoff, 23 October 2026
 
 **Read [the cloud restart checkpoint](docs/consolidation/2026-10-cloud-restart.md) first.**
