@@ -241,3 +241,24 @@ retains its separate exact tuple,19 checks and installed preview, plus scoped so
 and HTTP iframe engineering evidence with stubs and raw failures. Initial harness
 assumptions/environment failures are retained and explained; no product failure
 or first-visit blocker is waived.
+
+
+### Final installed native authoring delta
+
+A fresh canonical installation at mathd1fea56, checker7074abf, libs39f9b24 and
+assessment9504873 passes the final small native delta. All24 recorded native
+files match (23 payload entries plus native.json); project_report.py is the new
+entry since the preceding stage. The browser checker wheel remains SHA256
+`2c9935c6aa60041bbcb13d751db98c613feb69fd7077ebd3d4d296f8ac376f54`.
+A three-choice fixture retained one proposal, then read-only resolve-more
+returned all three without changing source or manifest; publishing mode refused
+that action. Actual installed CLI review emitted validated fraction MathML with
+canonical input1/3. Four malformed display shapes were rejected without changing
+the six-key neutral record contract. The independent seven-check Chromium
+presentation report's three source hashes match this installed tuple.
+
+[Final installed delta evidence](evidence/2026-10-23-variants-installed-final-delta.zip),
+SHA256 `697e22ee2cf5fea753ed4b118a20ddbe16fb23a5c289dd56f4292a0e6aa5740d`,
+contains the exact refs, native inventory/provenance, raw focused logs, summary
+and separate MathML browser driver/fixture/report. It does not repeat earlier15,
+19 or99 checks, and does not establish later G1 export or first-visit acceptance.
