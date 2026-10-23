@@ -42,7 +42,7 @@ All links below are on github.com.
 | Erasmus-CTM/ctm-checkers #21 | 0f58fadebfa6c662829062b2bc1d1d61eaae4358 | Bounded native placeholder/display primitive; all gates and independent final review pass. Stacked on #19. |
 | Erasmus-CTM/ctm-checkers #22 | 3732819b5c469e0e573f7c8d5d920afea9638fc0 | Lazy collector of 25 supplied, resolved, real-grader-tested records. Independent source/focused review and Pyodide pass; broad native gates pending. Stacked on #20. |
 | Erasmus-CTM/ctm-libs #38 | d39ef314ba05550d9efe8fb78919ab8962aaf4d3 | Inactive local shared layout/readiness candidate, stacked on #35. Six focused tests pass; review and actual-fixture proof in progress. |
-| Erasmus-CTM/ctm-assessment #51 | cb1705b9 (resolve full head before use) | Local lifecycle trace and canonical-helper consumer proof, stacked on frozen #50. Initial trace preserves startup/editor signals; local candidate proof is running. |
+| Erasmus-CTM/ctm-assessment #51 | cb1705b9e666db6d370e9be8a88bc9a15f4ff19c | Local lifecycle trace and canonical-helper consumer proof, stacked on frozen #50. Initial trace preserves startup/editor signals; local candidate proof is running. |
 
 #34's all-nine comparison run 39857803985 passes, including actual Chromium/Firefox/WebKit old/new comparisons. Comparison equivalence does not clear strict raw-error acceptance. The complete asset materializer/lock is implemented: 3,211 files, nine families, carried installation with zero downloads. Numerous stacked component/asset PRs remain: inspect #34's pins and current PR bases to establish the exact merge set. Do not blindly merge diagnostics or changes already incorporated into #34.
 
