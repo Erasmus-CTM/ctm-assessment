@@ -36,6 +36,7 @@ name: Compare rendered courses
 # migration of an unmigrated branch, `expect` adds expect files, `browser`
 # adds the browser comparison, `review-refs` builds the after side with
 # unmerged component commits (a preview of a fix, never a pin).
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
   workflow_call:
     inputs:
@@ -94,6 +95,10 @@ on:
         default: ''
   workflow_dispatch:
     inputs:
+      confirmation:
+        description: Type broad testing campaign to authorize the broad jobs
+        type: string
+        required: true
       course:
         description: 'Course repository (owner/name), "examples" (the umbrella example site) or "step4-course" (the step-4 fixture)'
         default: 'aacchhee/ctm-demo'
@@ -140,24 +145,6 @@ on:
       review-refs:
         description: 'Component commits for the after side only, NAME=SHA[,NAME=SHA] (install-project.py --review-refs): a preview of an unmerged component fix, never a pin'
         default: ''
-  pull_request:
-    paths:
-      - integration/feedback/repos.json
-      - _extensions/**
-      - _filters/**
-      - examples/**
-      - example.qmd
-      - feedback/**
-      - scripts/install-project.py
-      - scripts/setup-feedback-integration.py
-      - scripts/build-course.py
-      - tools/**
-      - integration/step4-course/**
-      - integration/pyodide-parity/corpora.json
-      - integration/pyodide-parity/build-corpora.py
-      - package.json
-      - package-lock.json
-      - .github/workflows/compare-courses.yml
 
 permissions:
   contents: read
@@ -171,7 +158,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  campaign:
+    if: github.event_name == 'workflow_dispatch' && !inputs['tooling-ref']
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
+
   courses:
+    if: ${{ !cancelled() && (inputs['tooling-ref'] || needs.campaign.result == 'success') }}
+    needs: [campaign]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:

@@ -24,66 +24,21 @@ name: Pyodide parity and goldens
 # Runs when the harness, the pins, the package or the example site change; in
 # full every Monday; on demand (also with other course commits) once on the
 # default branch.
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
-  pull_request:
-    paths:
-      - integration/pyodide-parity/**
-      - integration/feedback/repos.json
-      - integration/feedback/page-scripts.cjs
-      - tests/python-examples.cases.cjs
-      - tests/parity-*.test.cjs
-      - scripts/setup-feedback-integration.py
-      - scripts/install-project.py
-      - scripts/build-course.py
-      - tools/ci/review-dependencies.py
-      - _extensions/**
-      - _filters/**
-      - examples/**
-      - example.qmd
-      - examples.qmd
-      - index.qmd
-      - _quarto.yml
-      - feedback.yml
-      - feedback/**
-      - assets/**
-      - package.json
-      - package-lock.json
-      - .github/workflows/pyodide-parity.yml
-  push:
-    branches: [main]
-    paths:
-      - integration/pyodide-parity/**
-      - integration/feedback/repos.json
-      - integration/feedback/page-scripts.cjs
-      - tests/python-examples.cases.cjs
-      - tests/parity-*.test.cjs
-      - scripts/setup-feedback-integration.py
-      - scripts/install-project.py
-      - scripts/build-course.py
-      - tools/ci/review-dependencies.py
-      - _extensions/**
-      - _filters/**
-      - examples/**
-      - example.qmd
-      - examples.qmd
-      - index.qmd
-      - _quarto.yml
-      - feedback.yml
-      - feedback/**
-      - assets/**
-      - package.json
-      - package-lock.json
-      - .github/workflows/pyodide-parity.yml
-  schedule:
-    - cron: '23 3 * * 1'
   workflow_dispatch:
     inputs:
+      confirmation:
+        description: Type broad testing campaign to authorize the broad jobs
+        type: string
+        required: true
       courses:
         description: 'Other course commits, as NAME=COMMIT separated by spaces (names from corpora.json, e.g. ingmat3a=d7ddfc6); empty: as corpora.json says'
         default: ''
       base:
         description: 'Umbrella commit, tag or branch built as the base of the build comparison (a branch means origin/<branch>; empty: no comparison)'
         default: ''
+
 
 permissions:
   contents: read
@@ -99,7 +54,21 @@ env:
   COURSES: ${{ github.event.inputs.courses }}
 
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
+
   parity:
+    needs: [campaign]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -197,6 +166,7 @@ jobs:
             ${{ runner.temp }}/goldens/PROVENANCE.md
 
   builds:
+    needs: [campaign]
     if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.base != '')
     runs-on: ubuntu-latest
     timeout-minutes: 150
@@ -279,6 +249,7 @@ jobs:
             ${{ runner.temp }}/builds-report/results-*.jsonl
 
   following:
+    needs: [campaign]
     name: following (courses that follow a branch; informational)
     runs-on: ubuntu-latest
     timeout-minutes: 150
