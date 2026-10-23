@@ -1,116 +1,250 @@
-# CTM restart — 23 October 2026
+# CTM restart state — 23 October 2026
 
-Use this as the current entry point. It supersedes status summaries in CODEX-PROMPT-2026-10.md; that file is historical detail, not required startup reading.
+Current-state checkpoint after the authorized combined demo acceptance campaign.
 
-## Goal and boundaries
+## Immediate state and authorization
 
-Continue development towards a clean, fast pure CTM Pyodide IDE, quiz/progress support, and a rendered static website ZIP. Local IT extracts the ZIP onto an existing webserver, preferably with no setup. No installer framework, transaction/CAS/journal infrastructure, or new server.
+Local **headered core** saving/quiz/IDE, grading/board and selected navigation
+checks passed in all3 browsers. The coherent primary CI build and all3 browser
+jobs passed on the same artifact. All3
+first-visit diagnostic baselines remain **FAILED; course/static go-ahead HOLD**.
+Component merge-readiness is separate: exact-head scoped primary CI plus
+independent review can establish it, without waiving first-visit/course gates.
 
-Finish pure CTM first. New STACK integration and bundled Maxima deployment remain deferred (“stage 55+”). Existing bounded STACK cleanup is allowed only when useful spare capacity exists; it must not delay CTM. Preserve the neutral question/manifest boundaries for future backend-specific generation; the current variants design has a binding Maxima amendment. Do not implement that backend now.
+AC alone merges PRs/main. No agent PR merges, force pushes, tags, deploys or direct
+main writes. Publish through the GitHub connector, authored Andrey Chesnokov,
+with expected-head leases and exact reviewed refs.
 
-Work autonomously within the approved designs. AC alone merges. Never merge PRs, write main, force-push, or create release tags. Use the GitHub connector and its supplied identity for publishing. Preserve authored content and existing grading behavior; one canonical home per implementation, generated copies only through their canonical producer.
+Priority: saving, quiz, variants/tests, ingmat3a migration, offline, then
+STACK/Python parity. Use demo acceptance before the live course. **ctm-demo is the no-user testbox. Ingmat3a has live
+students.** Isolated ingmat preparation/test branches are allowed; main/deployment
+stay protected. After the coherent demo's large acceptance passes AND AC merges
+all its components, **ask AC before starting ingmat3a**.
 
-AC authorized parallel workers. Engineering agents: 6.1 Sol, medium, up to xhigh for difficult work. Independent reviewers: Astra, xhigh; never the author. Pin dependencies at reviewed PR heads, keep branches current with their bases, and test the combined set before presenting its merge order. Preserve license notices; public STACK text describes only our engine. Get substantive changes independently reviewed and run appropriate actual-runtime tests before declaring a PR ready. Keep tasks bounded and updates concise. Use workers for bounded work on the current priority, with independent review; do not create unrelated side work to fill slots.
+Small focused checks are allowed while wiring. The one full coherent demo pass
+is already authorized; do not ask again. Repeated broad campaigns require AC's
+explicit request (`broad testing campaign`). Avoid PR sprawl and full matrices
+for one-line fixes.
 
-## Delivery priorities and CI policy (AC, 23 October)
+## Exact source tuple
 
-AC reset the order: **saving → quizzes → question variants and tests → ingmat3a migration → offline → STACK compliance for the Python port**. Saving/quizzes and the already-authored migration share one integration candidate. **Use ctm-demo as the integration testbox: it has no users. ingmat3a has live students and must stay on its current working version while features are wired.** Run small focused checks during wiring, then one full acceptance pass when the coherent demo candidate looks ready (AC authorized that final pass). After ctm-demo passes the full acceptance test AND all its components are merged by AC, ask AC to start ingmat3a. Special ingmat3a branches may be prepared and tested autonomously before then; main stays protected. Never merge or deploy autonomously. Stop expanding STACK reconciliation and diagnostic campaigns while that delivery is unfinished. Preserve existing work and failures.
+| Source / review | Frozen commit |
+| --- | --- |
+| Demo #19, current primary CI | `5bd385fbafbb6002216eb4c979426d3883358980` |
+| Demo product fixture before test/docs overlay | `f33150e2da944bf202d187cf384031ef362fd0fb` |
+| Umbrella activation #55, current | `87c3398d293f81b1eec28aedbc933986ac9bb2e0` |
+| ctm-libs composition #41 | `3277d66b7c1c108f6b073a75b38d669d17b73283` |
+| py-exercise #12 | `fda82aa916b2abb564b909ec3021b6cad59fd49f` |
+| pyodide-interaktiv #10 | `035e7307f53207d8f4b90c6692ec926ee802ab38` |
+| math-exercise, preserved | `b282111da4bb208effd8bad8d7e6df7020d0db0a` |
+| ctm-checkers, preserved | `a1637dc95b9e11d8a0c838c801cd53e20997eceb` |
+| upstream jsxgraph-quarto #2 head | `e4ad81d82e1b56f86765026a3dd26f6975d29d57` |
 
-AC authorizes well-defined expensive CI campaigns to stay manual. Keep meaningful fast source/payload/build/HTTP/asset contracts automatic. Run five-version matrices, full golden/mutation replays, native STACK, full-course/browser/offline and network-asset campaigns only after AC explicitly requests **“broad testing campaign”**, on recorded reviewed refs. Focused checks appropriate to a product change remain required; do not rerun everything on every small commit. Existing old pinned reusable callers are unaffected until separately updated; do not report skipped campaigns as passed. Main publication behavior remains separately controlled. AC alone merges.
+Primary demo tree: `08d5140d0e5de0f65a11357dc7773c6c6d76f189`.
+Product fixture tree: `be8ec3de73b5413f2b5aef5b08a25622a2ef951d`.
+The independently reviewed overlay changes only twelve test/workflow/doc/evidence files.
 
-Umbrella CI policy is published in existing [assessment#54](https://github.com/Erasmus-CTM/ctm-assessment/pull/54), headfe41047b1131ab4775eebfaa25dbe31ca6afe26e, treee038a9cca619e5396ca3e4d10aec673a24b02f80. Keep automatic source/fixture/HTTP/scoped-renderer contracts; full course/browser/runtime/network-asset campaigns are manual with cheap invalid-confirmation failure. Main publication and reusable APIs are preserved. Focused checks20/20 plus final policy/API13/13 pass; independent exact-source/tree review is clear. Existing52 is forward-stacked on54, head6c7aa950e17fee6ab5885c2625f91b60a498cadc/tree675b0d66212edefbcabbde5261986fd90b3141c1: exactly54 plus existing pin/document and guarded manual wrapper. Its two immutable tooling refs select54fe410. Retargeted before publication; parentsold52fd17+54fe410 verified. No new broad launch. Keep current fast checks; AC may cancel queued/running old41c/fd17 campaigns without deleting completed evidence.
+Activation87c tree `a981974b4e3b48e36d5239fbd522f0f39dc0de0c` is EXACTLY the
+tree of locally installed95b6a6a5c16b0f96c1dc0e13dd1e3af308475e31. This is
+ancestry closure, not installed source change. Use **87c / overrides `{}`**;
+the umbrella pins the full tuple. Do not repin unrelated dependencies.
 
-Checker CI policy is published in [ctm-checkers#24](https://github.com/Erasmus-CTM/ctm-checkers/pull/24), head6bbdc36c08a317078bec39db737cf9cda1caf2fd. One automatic Python3.12 source/wheel/build/release/changelog/pip gate remains; broad/version/golden/mutation/Pyodide/native campaigns retain assertions behind manual confirmation. Five policy checks and independent source review pass; no broad campaign launched. Published full tree matches local index. Existing reusable native report callers remain compatible and older pins are unaffected. Rulesets returned none; legacy protection cannot be read (403), so AC may need to update required check names. No settings were changed.
+Library #41 contains the local ready/layout helper AND original #37 opaque-worker
+adaptor; helper-only #39 does not contain #37. Separate #40 CORS/native-page
+options are outside this activation. Original adaptor SHA-256:
+`81642e45028f35eab27b7be2cbce427efb9395799b9e335e834c667315fd5b61`.
+Activation is the existing absent-only Lua metadata default; asset-pin bytes and
+lock fingerprint remain unchanged. Use canonical producers, never generated or
+vendor/runtime patches, observer-constructor wrappers or raw-error filters.
 
-## Verified merged state
+JSXGraph stays in **jsxgraph/jsxgraph-quarto**, branch `main`, at exacte4ad above;
+the real builder fetched that upstream SHA. AC authorized its outside-branch pin
+before merge; keep the note naming that head and `src_mjx_preload`1.2.0. Never
+substitute a fork/moving audit branch. Core/CSS is1.14.1. After upstream merges,
+compare trees, pin its merge commit, drop the note and rerun relevant gates.
+Original MathJax script id/async/native load/startup lifecycle must stay intact.
 
-Shared libraries/runtime consolidation, earlier HTML migration tooling, reveal/mode/tab-link work, alias cleanup, and shared question-test foundations are merged. The current ingmat3a quiz/progress migration remains an unmerged course PR. Do not redo them.
+## Completed primary CI
 
-AC merged checker #15 (neutral variant model/exact codec), #16 (native variable execution), #17 (shared custom executor), and now #18 (exact rounding), #19 (finite enumeration), #20 (real candidate validation), #22 (lazy tested batches). Current checker main is 35e8ff2b627891cdbe5a99c474ed22eeace1616a, the #22 merge; preceding merges are #20 16244dc127a8a4937664c114741982489ad30994, #19 913fcdc664d84c6a252d6cab130fc35e8ebccca4 and #18 1e84b710c6e0540fed570535d5fe8e086b082b7f. Reviewed head/merge complete-tree equality was checked before each merge. These native foundations do not complete author-facing variants or full H1 scoring integration.
+Workflow `.github/workflows/combined-demo-acceptance.yml` runs only on the
+candidate branch's workflow-file change or manual exact-phrase dispatch. It is
+read-only/artifact-only. Automatic cheap source checks remain; shared heavy
+campaigns are manual, with explicit reusable APIs/main publication preserved.
 
-## Current checker reconciliation (AC, 23 October)
+The build uses Quarto1.8.27, Python3.12/SymPy1.13.3 and canonical87c/`{}` setup;
+renders the five-page profile once; `set -o pipefail` and a zero-warning guard
+retain/fail the actual render result. It uploads raw log, resolved record and
+source/HTML hashes. Three browser jobs consume that ONE artifact using
+Playwright1.62.1/jsdom26.1.0/js-yaml4.3.2; transitive npm is not lock-frozen.
 
-AC explicitly requested reconciliation of older STACK PRs #10–13 here, preserving recorded decisions and running checks. The reconciliation work is preserved, but the later priority reset parks further STACK work until saving/quiz/course/variants/offline delivery. All four remain Draft; existing CI results do not close every runtime finding. No PR/main merge, force push, tag or deployment was performed.
+| Primary field | Verified state |
+| --- | --- |
+| Run | [39973870063](https://github.com/aacchhee/ctm-demo/actions/runs/39973870063) |
+| Course commit/tree | `5bd385fb…` / `08d5140d…`, verified against overlay |
+| Build job | `120483288797` — PASS |
+| Build artifact | `12511045077` |
+| Artifact SHA-256 | `41804fc42857ebce5620394d63beb053494e26915f18567a2995109a57369faa` |
+| Chromium / Firefox / WebKit jobs | `120483662282` / `120483662162` / `120483662096`; all steps PASS |
+| Installed-record comparison | Artifact record independently reviewed: 107 entries, 97 identical, ten ctm-assessment files CRLF-to-LF only; sources themselves are not carried in ZIP |
+| Three-browser final primary results | **PASS**: grading/quiz/board at1280/390, store/export/reset/races, navigation/languages/print at1280/390; observed raw error/failure arrays all0 |
+| Exact-head independent review | **CLEAR for four leaves into existing bases only; AC merges** |
+| First-visit course/static clearance | **HOLD — separate failures below** |
 
-| PR | Current head | Base / state |
-|---|---|---|
-| [ctm-checkers#10](https://github.com/Erasmus-CTM/ctm-checkers/pull/10) | 951ef12129e57201ffa5b0fa9a2c44d3c0e21409 | main35e8; S-07 source/release ledger identical to old reviewed head; canonical 0.7.1.dev0 payload. Independent source review5627789196. Both Pyodides pass9248/3307/9248 rows, zero differences; all five native jobs passed source/wheel, goldens,98 mutations and pip/build checks; native STACK final clearance remains outstanding and work is parked. |
-| [ctm-checkers#11](https://github.com/Erasmus-CTM/ctm-checkers/pull/11) | 0e63965b7664e3ab9b44794b15cb83c75704eb09 | #10 branch; S-05 unchanged, 0.8.1.dev0; independent172 focused tests pass; fresh correct-base CI pending. Complete treefd386ba0ae245270026126dfd6a293d8fefe2063 equals independently reviewed48695b0 source. |
-| [ctm-checkers#12](https://github.com/Erasmus-CTM/ctm-checkers/pull/12) | 74fa8e8e2b72620b7cdf1000fc70a81aca0f90a4 | #11 branch; S-10 unchanged, 0.9.1.dev0; independent154 focused tests pass; fresh correct-base CI pending. Complete tree536014122431237ae3ef43868b0920ee0b6312de equals independently reviewedc3fef83 source. |
-| [ctm-checkers#13](https://github.com/Erasmus-CTM/ctm-checkers/pull/13) | 1ddf3db1358db0387eab7af06502c632aeb279a3 | #12 branch; S-11 plus narrow author-overflow correction, 0.10.1.dev0. Independent238 focused tests pass; full CI pending. Complete treeea30497cd08c094e6174c6d6627f357dedbe54d2. |
+Verify original primary logs/artifact bytes, not only check metadata. Local or
+partial passes are not final CI results; preserve failed runs/artifacts.
 
-Historical releases0.7.0/0.8.0/0.9.0/0.10.0 retain their original hashes; never regenerate an existing release entry. New combined source uses patch development versions. Full published trees match local Git index trees; construct complete trees rather than relying on multiple sibling deletion entries, which left an obsolete wheel in an early publication. Restore exact Git source/licence bytes before canonical Python3.12 regeneration on Windows. Retain failed runs. Initial11/12 CI ran before retargeting and compared cumulative golden changes with main; new validation heads run after retargeting, without source/expectation changes. Always retarget before publishing a new dependent head.
+All3 browser artifact ZIPs were downloaded and their published SHA256 digests
+verified: Chromium12510213460 `d3aa639ee13f013ce2a930259d38f0c6bb3bc4a4b9a87a4d187c17e5484f67c9`;
+Firefox12511400610 `40f85103bc132059cbd0d0d0521b95dc492158ae22df3bb806447205dadf3a78`;
+WebKit12511995426 `cb8cbacf36c502283122dde44e26ef61d40680fc8209ee1adbe9caebeb785ab2`.
+Each contains four full JSON reports plus screenshots/logs. WebKit grading
+reports retain one late pending HTTP request each at teardown (1280:pyodide_http
+wheel;390:pyodide-lock.json). They are NOT failures or proven completed requests:
+do not claim every request settled or full startup completion. Store reports
+have pending[] in all3. Every reported raw failure array, including teardown,
+is0. Readiness is limited to the exercised component behaviors.
 
-AC decisions retained: presentation options none and matrix parenthesis remain accepted; four numerical-measurement generated rows score0.7 as native; nested-list feedback difference accepted; hyperbolic equivalence deferred to S-12; LowestTerms non-expression behavior unchanged pending AC discussion. The additional13 fix enforces the recorded author-error contract: teacher/tolerance evaluation, Decimal conversion/threshold/quantization overflow raises Unsupported rather than falsely grading a student wrong. Student overflow fallback, exact Rational path and previous nonnumeric-teacher/student-format feedback are regression-tested and preserved.
+## Local evidence and its bounds
 
-When this deferred work resumes, merge only after appropriate current checks and independent final runtime review, in order10→11→12→13; AC uses merge commits. After each AC merge, verify exact main/tree equivalence and next PR base. stack-sympy#28 still pins the old13 head and requires a separately reviewed consumer re-pin after this chain is cleared.
+Five pages (UI/links/nb/nn/de), Quarto1.8.27, zero warnings. Frozen site:
+`work/demo-integration-build/_saving-quiz-responsive-site`.
+ZIP SHA `59348168f08dcd98a3ec945f4b7f28b57fd436624189c83c0614cb3d9e890926`;
+UI SHA `e22988069c141f414b63f5e3493e2903c49f707ff3e28b9972dc5490afbb1869`.
+All107 installed files matched record
+`777d862bc5304fbe28dd59193a1cf1937c8e735dcb82c2d36e08b337bef56ac4`.
+87c record metadata may differ from95b: compare actual source bytes. Keep frozen
+sites intact; Quarto-generated `.gitignore` side effects are retained, not shipped.
 
-## Open delivery work
+- **Grading/quiz/board6/6 PASS:** all3 engines1280/390, real wrong→correct math
+  and Python, quiz2of2/tile focus, saved answers/reopen, opaque8-glyph SVG and exact
+  expression speech/Braille, unchanged async/id/src MathJax4.1.3. Board480×280
+  desktop,302px phone. Raw categories/pending0. Final driver `cb81bd46…` renamed
+  `scripts/acceptance/test-demo-grading.mjs`.
+- **Navigation6 selected PASS:**186 states/18 language cases; all20 authored
+  links, nested tabs/reveals, history/modes/keyboard/nb/nn/de/print. Five cases use
+  f331; Chromium1280 uses75e96, and local driver versions differ. Final CI must
+  run all6 current artifact/driver3129db81. The original never-BODY diagnostic
+  failure is retained: design requires correct landing/stable target/recovered
+  final focus, not an invented continuous-focus SLA.
+- **Store/IDE3/3 PASS:**1280 desktop, each1 context/4 page loads. Real Check and
+  IDE42→84; historical grades/passive code restoration; both Python resets and
+  reload/math independence; actual MD/HTML downloads; cross-tab recordless
+  pending reset/page clear/course clear, save-off/on and exact249+1ms autosave.
+  Passive reopen/reset each11 startup RPCs but ZERO learner/check RPCs/fresh
+  results; actual Check/Run positives before/after. Do not claim initialization
+  runs no internal Python. All raw categories0 through teardown.
 
-The checker reconciliation above supersedes older checker status; the following assembly snapshot remains a starting point for its separate release gates.
+Store WK/Chrome use5a1ee9df; FF finalb74c7d2b. FF's reviewed real-tab foreground
+and active-scoped-textarea/full-selection preconditions fixed a driver key routed
+to the previous editor (12 passing actions,1 native focus fallback). Content
+edits are real keyboard input, never model.setValue. CI usesb74 for all3. The
+separate250ms clock phase preserves original bound native UserTiming methods,
+not fake entries/durations, because Playwright's empty entry-query stubs break
+Monaco telemetry. Date/timers/RAF/now stay fake; real runtime proof precedes it.
+Prior failed capture/clock/focus attempts remain retained.
 
-All links below are on github.com.
+Compact records: `docs/evidence/2026-10/`; raw reports/screenshots/exports and
+previous failures: `work/hook-probe/`. Store bundle: `outputs/demo-saved-answers-evidence.zip`.
+Headered core checks do not establish offline/deployed Pages, OS print dialogs,
+native assistive-technology sessions, full input/Stop or pixel comparisons.
 
-| Repository / PR | Exact current head | State |
-|---|---|---|
-| Erasmus-CTM/ctm-assessment #34 | 68fe838ca76ce7dfc4297f8ed4db1ccf1dc29a8b | Draft assembly: saved answers, autosave, progress, quizzes, export and offline assets. 52 checks pass, 4 conditional skips, strict-store WebKit fails. |
-| aacchhee/ingmat3a_ntnu #17 | 23e47057806766ecb95f3cc86cf92eefa8102316 | Draft course: 26 quizzes, 176 graded exercises, 12 progress pages. Source/render and Chrome/Firefox navigation pass; WebKit blocked. |
-| Erasmus-CTM/ctm-assessment #40 | e96ff37cb5d1c2820c2497dfd17ca93c005da686 | Basic IDE ZIP complete and independently reviewed; still draft, stacked on #34. |
-| Erasmus-CTM/ctm-assessment #48 | 5ce8bd9b1fe00e3a50135f34a5a360a13f43228b | Canonical accessible-worker pre-loader proof passes all three browsers; activation gated. |
-| Erasmus-CTM/ctm-assessment #50 | 49f0c63d3fa691bd544df49cc5d905a69d37fc5e | Quarto/Monaco source-phase diagnostic passes bounded controls; production HOLD. AC requires a local integration fix unless a real upstream defect is established. |
-| Erasmus-CTM/ctm-libs #37 | 62235ae386da9ce591d956caae3b54aa7da9785d | Inactive canonical opaque-worker component; all gates and independent reviews pass, stacked on #35. |
-| Erasmus-CTM/ctm-checkers #21 | 0f58fadebfa6c662829062b2bc1d1d61eaae4358 | Original bounded placeholder/display gates/review pass; newer-main combined verification pending. |
-| Erasmus-CTM/ctm-libs #38 | 98a626d2355986e18ccb2011ccbf7c412003f2d0 | Inactive shared layout helper; production consumer/composition39/41 source and browser gates pass; combined course gates remain. |
-| Erasmus-CTM/ctm-assessment #51 | 4a8375f11f9d1c6118844cbb299aefa9aa9ce8e7 | Local helper proof preserves raw startup/editor controls. Local-assets run39934029987 has108loads; candidates clear editor/layout, but byte-original startup0/12 guard means no startup causal clearance. |
+## First-visit failures — retain FAIL
 
-#34's all-nine comparison run 39857803985 passes, including actual Chromium/Firefox/WebKit old/new comparisons. Comparison equivalence does not clear strict raw-error acceptance. The complete asset materializer/lock is implemented: 3,211 files, nine families, carried installation with zero downloads. Numerous stacked component/asset PRs remain: inspect #34's pins and current PR bases to establish the exact merge set. Do not blindly merge diagnostics or changes already incorporated into #34.
+Optional manual driver `scripts/diagnostics/test-demo-first-visit.mjs`, hash
+`9ac83804…`, serves exact bytes without isolation headers. All3 IDE42 and opaque
+accessible boards worked, but **passed/rawPassed/functionalBaselinePassed are
+false in EVERY engine**. It is outside automatic primary CI, not waived.
 
-#40 artifact:
-https://github.com/Erasmus-CTM/ctm-assessment/actions/runs/39825226656/artifacts/12446047963
+Chromium retains one aborted setup Matplotlib request plus two initial-font
+requests without terminal events, **NONDETACHED frames**: unresolved, not retired
+or proven downloaded. FF/WK retain request failures plus uncaught errors and
+rejections independently traced to old documents across SW reload. Provenance
+is not an error waiver; lifecycle completeness is separate from raw pass.
 
-It is the actual python-offline-website.zip, index.html at root, README-IT.txt included; no server-side Python/Node/Quarto install. SHA256 491e06d4819ef7328243f1b22faa28c58e57c6e4d07c0846bd7334efaaa1d81e. Twenty strict plus four plain-LAN browser cases pass at root and /dept/python/: editing, Run, Stop/restart, rerun and optional NumPy. Plain LAN needs no custom headers for this basic scope. Input prompts, full offline courses/boards, and real exam hosting are not cleared. Screenshots were generated but not visually inspected; do not claim general performance/visual improvement. AC handles NTNU exam IT questions.
+The bounded first-visit investigation is recorded in
+`work/resize-local/first-visit-findings.md`; no cross-component startup barrier
+or service-worker policy change has been adopted. Preserve raw errors, request origin/execution phases and
+unknowns. No suppression, route substitutions, fabricated transfers, blanket
+observer removal or arbitrary startup delays. Existing WebKit explicit static
+isolation-unavailable fallback is supported; never claim static SABall3.
+**Course/static go-ahead staysHOLD** pending fresh bounded proof and review.
 
-## Next plan, in order
+## Variants policy and deferred decisions
 
-1. Finish one integrated saving/quiz candidate in ctm-demo first, before touching the student-facing course release. Assembly34 still pins old libs41b2, py ea213 and pyo95af; course17's workflow still selects assessment65be5fa and asserts an older tuple. Component-local fixes39/41, py12 and pyo10 have source review and browser evidence, but those passes are not combined course acceptance. Select the reviewed coherent tuple, update demo candidate pins first, then update the course PR workflow assertions only after demo acceptance; preserve source quiz contracts (176 exercises/26 quizzes/12 progress pages), and verify actual reopen/save/navigation/score/reset flows with focused raw-error checks in the affected browsers. Strict-store/fake-clock and real-isolation acceptance remain outstanding. No upstream Quarto/Monaco port: shared local behavior belongs in ctm-libs. Worker pre-loader activation stays separately reviewed/gated; do not silently activate it while re-pinning.
+Variants approval/generation is separate from the fixed two-member quiz.
+**Generate25 more** counts actually tested, valid, distinct resolved notes,
+not raw draws or unchecked pools. Retain history including rejected notes;
+keep stable identities/locators/tapes and approved records when sources grow.
+Execution/grading/test errors fail, never resample them to success. Explicit
+resource budgets fail rather than silently sampling/truncating. Native kernel,
+enumeration/batch/stream helpers remain partial APIs, not complete teacher UI,
+publishing or student wiring.
 
-2. Complete variants author wiring: question/field context composition, resolved-note/hash/model integration, approval manifests/page, Generate25more, publishing gates, student selection/storage. Checker21 at0f58fadebfa6c662829062b2bc1d1d61eaae4358 and23 atb615e8b744ac98d520cde516b6667d8b5bd81abc have historical independent leaf evidence; newer-main integration remains. Binding AC policy: propose25 tested, valid, resolved-note-distinct candidates; Generate25more preserves approvals, numbers and proposal order. Constraints/duplicates do not count; grading/test errors stop rather than resample. Required publishing fails at zero approved; explicit optional warns; retain review previews. No normal unchecked20,000-candidate pool; raw enumeration20,000 is a diagnostic resource bound only, with finite attempt/time limits and useful exhaustion diagnostics.
+AC's exact gate: new variant questions **fail the build until tested/approved**,
+unless the author explicitly chooses the recorded **OPEN exception; still warn**.
+Existing approved required-zero-approved=fail and explicit optional=warn gates
+remain. Do not invent an OPEN schema: verify its concrete author-setting mapping
+against the variants design when that task starts. Preserve valid/distinct and
+approval gates, not merely25 rows.
 
-3. After the full coherent demo acceptance pass AND all demo component merges, ask AC to start ingmat3a migration. Special ingmat3a branches may be prepared/tested earlier. Close the course candidate through AC's course PR with zero warnings. Source/render work is implemented; it is not released. Present one exact reviewed component/assembly/course merge set; AC merges with merge commits.
+Offline follows saving/quiz. Reuse canonical materialization/carried-asset
+machinery and locks; no installer fork. Complete reviewed official closures do
+not establish every offline course path. STACK/Python parity stays last. Keep
+AC's LowestTerms/hyperbolic decisions and distinct source/actual-wheel/Pyodide/
+native-STACK gates. Do not resume broad checker13 chasing during release closure;
+refresh remote PR states before claims. The shipping checker pin above remains
+authoritative until a separately reviewed selective update.
 
-4. Deliver full-course offline acceptance after the functional release. Basic IDE ZIP40 is independently reviewed, but does not clear full course/boards/exam hosting. Separate board optimization remains preserved in stack-wasm-maxima11 and must not delay online saving/quiz release. No broad asset broker expansion.
+Preserve the concrete STACK decisions: presentation `none` and matrix
+parentheses accepted; four Num measurement rows scoring0.7 accepted; nested-list
+feedback difference accepted; hyperbolic checks deferred toS12; LowestTerms on
+non-expression input unchanged pending AC discussion. Checker10–13 stay draft/HOLD,
+including the unresolved FacForm authored-validation bypass in13. Do not resume
+that work ahead of the delivery priorities. Checkers24 and assessment54 are
+already AC-merged; do not recommend them again.
 
-5. Resume STACK/Python compliance last, including checker10–13 and stack-sympy consumer re-pin. Preserve recorded grading decisions and review evidence; no new full matrices or corrective STACK work now. Checker13 remains HOLD for the independently recorded FacForm author-validation bypass (non-expression student can bypass missing authored variable/teacher validation), beyond its reviewed numerical overflow fix. Do not describe that review as closed. Then finish later approved H1/catalog work in the appropriate priority.
+Board payload reduction is separate from Maxima/Wasm runtime work:
+stack-wasm-maxima11 at `c95ea460a63845c98645ee81981637846dfa75a5` has one question
+template, separate variant values, shared cacheable JSXGraph and a local MathJax
+closure. Engineering HTML fell16,861,138→147,661bytes and cold same-origin transfer
+was4,486,199bytes; these are engineering observations, not final-artifact acceptance
+or a proven2MB target. All4cards/5variants/3engines/desktop390 engineering checks
+were raw-clean; final artifact evidence/remaining MathJax duplication is still
+pending. No deploy/merge or Maxima/Wasm runtime edits.
 
-## JSXGraph re-pin authorization (AC, 23 October)
+Offline IDE ZIP assessment40 (`e96ff37cb5d1c2820c2497dfd17ca93c005da686`)
+has independently reviewed20strict+4plain-LAN root/subpath cases. It does not
+clear full-course boards, exam/input prompts or the current live course. Keep it
+separate from this headered component acceptance.
 
-AC explicitly authorizes exact reviewed PR2 head e4ad81d82e1b56f86765026a3dd26f6975d29d57 before upstream merges. This supersedes the wait-for-upstream-merge restriction in the worker requirement. First verify the actual umbrella builder can fetch that SHA from jsxgraph/jsxgraph-quarto (reachable through refs/pull/2/head); keep repository upstream and branch main with updated pin-outside-branch note. Never use a moving branch or the fork's CI branch. Pin-only PR stays separate from pre-loader activation. Inventory other pins, change only umbrella-controlled configuration; course main through its own AC-merged PR with zero warnings. Ensure JSXGraph major1 resolves >=1.14.1. Use selective --update-pins --only, never blanket update. Required rendered-course comparison and three-browser boards cover ctm-demo, ingmat3a main and example site; explain all differences. Independent review and one combined stacked-set CI run precede AC's merge commits. Later replace with upstream merge SHA only after tree comparison and rerun. Original MathJax async script/load ownership and separate offline gates remain.
+Read-only route audit: pyodide6→7→8→9→10 targets the DESIGNATED
+`feature/shared-feedback-integration` branch (Step3E1/§18), not main. Historical
+PR2/3 are not required; merged4/5 already contain their source. Never retarget
+this route to main based on an old closed-unmerged label. Leaf source-ready
+does not mean every old parent or final main release is ready. Main includes
+additional approved design commits that must be preserved at final merge.
 
-## Additional authorized page-weight work (AC, 23 October)
+## Next resume actions
 
-Separate PR in Erasmus-CTM/stack-wasm-maxima; no merge or deployment. This bounded native CTM page optimization is explicitly authorized despite the general Maxima-runtime deferral. Keep Wasm/Maxima/ECL runtime work unchanged.
+1. Completed independent artifact/source/behavior review clears only these four
+   leaves into their current feature bases: libs41/3277→39 branch,
+   py12/fda82→11 branch, pyo10/035→9 branch, assessment55/87c→52 branch.
+   Bodies are updated and these four are ready for review. This does not mark
+   their ancestors, main release or broader52 proof ready. Demo19 remains draft.
+2. AC merges, agents do not merge/tag/deploy or write main. Preserve full routes:
+   libs31→35 then37/38→39→41; math27→29→30; py10→11→12;
+   pyo6→7→8→9→10 into feature/shared-feedback-integration;
+   assessment28/29→33→34→52→55. These are prerequisites, not blanket readiness.
+   Do not blindly merge old divergent libs33/34 or assessment35/36/39 branches.
+3. Review the bounded first-visit findings before any hardening implementation.
+   Retain failures and get fresh proof/review before course/static go-ahead;
+   do not expand the primary candidate into a new startup framework.
+4. The final run and evidence are recorded in PR bodies and this handoff with
+   docs-only `[skip ci]`; do not launch another broad campaign for documentation.
+5. After coherent demo acceptance AND component merges, ask AC before ingmat3a.
+   Resume variants under its gate, then offline; unrelated STACK work stays last.
 
-Read audit reports/2026-10-22-system-design-audit.md F-10/L6 and inspect rendering before edits (done at main eb8f16767e548c2596ba44e61e3183967bc8dadb). Current scripts/milestone-three/build-site.mjs renders each board once per variant using embedded local JSXGraph; render-cards.py repeats full iframe HTML inside each variant question_html. Required result: one reusable board template per question, separately supplied variant values, JSXGraph core as one shared cacheable asset; preserve board behavior, graphical inputs, variant switching and offline operation, including MathJax closure. Meaningful browser checks cover affected questions/variants. Measure HTML and actual transferred bytes before/after; report remaining duplicated assets. Roughly2MB is an estimate, not acceptance evidence.
-
-Independent frozen published baseline: gh-pages8f4c3585e5b230084e997c7a86ab1c5d9ac219b4, maxima/native.html16,861,138bytes, SHA256ed2e1f2fdcfb0de9e999eed856cd5c37dfcd58cdd2c1dd57bfc64adbcf630d7b. Four renderedframes plus five per-variant payload copies: nine embedded board URLs totaling16,716,250encodedbytes, five distinct documents. All nine embed identical995,055byte JSXGraph core (SHA256b6ebd07421e560431b888efeb472cfb7f2cfc495a853200963f97d2c28e6e474) and request MathJax@4/tex-mml-svg.js from jsDelivr. Baseline gzip6=5,977,511bytes and gzip9=5,967,284bytes are compression measurements, not measured network transfer. Work source: work/board-templates; baseline HTML/audit JSON: work/board-baseline.
-
-Use a consolidation/... feature branch. Existing site workflow publishes pushes to main and research/**; do not push this work under research/** or trigger deployment. PR events test but do not publish. Do not take over AC/Claude's JSXGraph PR2. Native build packaging owns its question-template/variant-data integration; preserve canonical renderer/protocol semantics, explicit asset provenance and license notices. No duplicated vendor implementation or unrestricted string eval for separately supplied variant data.
-
-Current separate draft is [stack-wasm-maxima#11](https://github.com/Erasmus-CTM/stack-wasm-maxima/pull/11), source c95ea460a63845c98645ee81981637846dfa75a5. It has reusable templates/numeric values, hash-verified parent JSXGraph core cache, explicit-base/URL mounting, local canonical parentMathJax3 and SourceSansPro assets, scoped headers and guarded about:blank retirement before repeated srcdoc mounts. Source reviews5627550558/5627688245 clear parent closure and reset/harness changes. Engineering static-host proof passes all4cards/5variants at1280/390 in all3 engines with zero raw/console/request failures. Native CI39947063995 passes; final rebuilt artifact CI39947063836 acceptance remains outstanding. Engineering overlays are not final artifact acceptance.
-
-Frozen baseline concrete transfer report SHA73bd46516edabeef6b3d0564ee7b633c488648591512ffe292fbbfda0b32b171 uses Chrome155/no routing/all5variants. Baseline same-origin cold6,482,566 encoded bytes plus observed externalCDN2,864,701; whole browser wire is unknown because worker requests may be omitted. Engineering current candidate cold4,486,199 same-origin bytes, later14-remount interactions11,436,082; JSXGraph transfers once260,292gzipbytes and zero again. Remaining repeated wire is primarily MathJax in opaque frames; report honestly, do not expand a broad asset broker. Full offline bundle is roughly119.6MB raw/2328files, distinct from147,661byte engineeringHTML and cold wire. Final artifact measurements/inventory are still required.
-
-Actual Pages-style ACAO-only dependency checks pass all3 at desktop/390 with original SRE/maps, SVG/dynamic fonts, speech/braille and zero raw/failed/external requests. Canonical optional native transport is separate ctm-libs#40 at2cdd3b47bb4722f65f168a0baf4dbd6a18bff384, stacked37; independent review5626668317 clean and306 library tests pass. Default37 and umbrella activation are unchanged.
-
-Pin-only assessment#52 now uses the exact reviewed e4ad extension and is forward-stacked on tooling/CI54, as recorded above. Historical all3 course renders had zero unexplained differences and exact typed17/e4ad bridge evidence. Corrected modern-before controls pass locally; original raw RO/opaque-worker findings remain failures, not acceptance. Supplemental representative proof23boards×before/after×desktop390×3engines=276SVG snapshots passes geometry/readiness only. Frozen outputs/pin52-board-proof-56ae103e retains failed raw evidence. No pre-loader activation or additional broad launch; final coherent demo acceptance remains required.
-
-Local root actual-hook probe work/hook-probe/test-hook-integration.mjs passes6 actual Quarto/e4ad+original37 cases (3browsers x1280/390, SVG/speech/braille/native async load/opaque isolation). Unchanged upstream browser suite passes14 with1 documented native-WebKit-speech control skip; actual CTM adaptor cases allclean. No new probe PR or default activation yet. Canonical resize production39 head2b7bf254ff2b03c3a677744680a1202f44093013 passes310tests and all browser/runtime workflows. Composition41 head9995c6f89058c996281e8cc18fff565d090ba73c passes315tests and all browser/runtime workflows, with original37 blobs unchanged; complete tested-tree equality proven. Its head contains corrected39 fixture source but is not descended from39's newer fixture commit: retain ancestry limitation, retarget/reverify after AC parents merge. Thin py12 headfda82aa916b2abb564b909ec3021b6cad59fd49f andpyo10 head7b7a36b9956d5a35f4326629539eea20556dfa5b are source-reviewed/green; pyo10 uses deterministic serial Quarto cache initialization before unchanged parallel tests (112pass/2existing legacyAI skips). Fresh combined assembly/course strict-store/fake-clock acceptance remains outstanding. Prioritize closing these deliveries rather than unrelated new PRs.
-
-## Read only what the next task needs
-
-All design paths are in Erasmus-CTM/ctm-assessment:
-- main: docs/consolidation/2026-10-step2.md (H1 §13), 2026-10-step3.md, 2026-10-step4.md.
-- handoff/2026-10: docs/consolidation/2026-10-step5-offline-exam.md, 2026-10-variants.md and 2026-10-variants-review.md.
-- main: docs/audit-2026-10/README.md for later stages.
-
-Binding AC decisions/amendments override earlier proposals. Read the relevant current PR body/reviews and source before changing it. Treat local old work folders as supplemental evidence, not unpublished work to adopt automatically. Keep future checkpoints short: current heads, blockers, next task and evidence links; avoid appending another chronological history.
+Local environment: portable Quarto1.8.27 in `work/runtime-tools/`, Python
+`work/checker-venv`/SymPy1.13.3, `work/demo-integration-env.ps1` for PATH/TMP;
+browsers in `work/board-browsers`. Reuse installed pinned dependencies. No tests,
+renders or browser runs were performed to prepare this draft.
