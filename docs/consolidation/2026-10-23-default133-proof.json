@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "scope": "Exact published default package installation and one existing mixed Quarto fixture render; no browser or grading acceptance claim.",
+  "head": "a7c300e99b061f6620c4f56bbd92438ebd8ddb0a",
+  "tree": "0f3064e27c9da85227e94b47b54ecfa2a8ba3cc6",
+  "manifestBlob": "3f23eeeaf0521238acc6f1e2ec9ddb22f9175814",
+  "resolvedCommits": {
+    "ctm-libs": "626b546604f51c9cb738210c56d054d421581e02",
+    "py-exercise": "18e6f1eb00713fdefbfc3d040c6a05eb88c6c314",
+    "math-exercise": "97a7dc5b1eb23adb398f789cb29e0266e1b256b0",
+    "ctm-checkers": "5976f1a97b78bd81d4d7a3a954ff2102df8c6e37",
+    "pyodide-interaktiv": "4be390838e6f137e32cfb15de82b3a26b1e317bc",
+    "jsxgraph": "e4ad81d82e1b56f86765026a3dd26f6975d29d57",
+    "ctm-assessment": "a7c300e99b061f6620c4f56bbd92438ebd8ddb0a"
+  },
+  "allRefOverridesFalse": true,
+  "allNonAssessmentSourcesPinnedAndNonLocal": true,
+  "assessmentUsesCleanExactInstallerCheckout": true,
+  "allSourcesClean": true,
+  "installedAndPackagedHashEntriesVerified": 133,
+  "baselineInventory": "/workspace/work/sre-default-proof/project/.private-extensions/resolved-repos.json",
+  "changedInventoryEntries": [
+    "pyodide-interaktiv/qpyodide-styling.css"
+  ],
+  "inventoryAddedRemoved": [],
+  "publishedCssBlob": "814d034a1cf03fd5057c63ea2c09e5df7ca09fde",
+  "servedCssMatchesInstalled": true,
+  "classicHeadCoordinatorAndCanonicalOpaqueChildPreserved": true,
+  "resolvedRecordSHA256": "319c1b0959b49e9bd6102a1fae72ef5a2331a96536e66d7cbca8f8b13cf64f02",
+  "htmlSHA256": "2af7bd699ab106b6399e86f87279fc0c2581f008f676d554f42ba1753edcecdc"
+}

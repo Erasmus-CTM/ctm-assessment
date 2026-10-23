@@ -1,5 +1,23 @@
 # Cloud continuation — 23 October 2026
 
+## Current state — fresh loading tuples accepted; bounded prerequisite/checker work advanced
+
+The [readable proof index](2026-10-23-proof-index.md) records exact source heads, actual CI run/artifact links, hashes and acceptance limits. Assessment56a7c300/pyo11 4be390 close the scoped spinner geometry issue; canonical no-override installation/render verifies133packaged+installed hashes. Fresh demo19f9eb947 (minimal42/31) and demo20b50630 (native43/32) pass actual three-browser first-start gates and retained missing-dependency controls;20network and99teacher/349field read-only authoring checks pass independently. Template0008395 passes installed task/ordinary-page proof. No new browser-native grading, teaching approvals, required student publication or protected-course rollout is inferred.
+
+All baseline seven runtime-error categories are empty and observed request lifecycles terminate. Intentional fault errors and Firefox navigation-poll automation notes remain raw and distinct. WebKit proves explicit non-isolated unavailable fallback, not interactive Input/Stop or shared memory. Separate site builds and old headered five-page tuples retain their exact evidence scopes.
+
+Assessment28f358 is ready after original strict18storeblocks, D2 and ordinary examples succeed. Assessment34 unchanged1e2df499 is ready as staged-foundation source only (11success/23skips), requiring52/56 successors. Optional/nondefault libs40 unchanged2cdd3b47 and checker13 966c3e are ready after scoped source/CI review; checker13 all7actual jobs succeed. Prior natural14e36 warning, instrumented failures, stale-wheel failure and mutation-anchor failures remain history rather than current failures.
+
+Native12 existing run39948509280 bounded restoration now succeeds without native producer reruns; focused S10d967aee3 independently validates208observations/235Maxima processes, not widget coverage. Ordinary PR11/12 CI recovery remains pending, so neither is declared ready. Unsupported/native-policy limits, scientific STACK/protected-course scopes and AC merge order remain explicit. Across-pack loading audit preserves missing-JSXGraph/Python, missing-speech/ordinaryCheck and independent Maxima boundaries; Maxima browser/WASM review remains source-only.
+
+**Publication limitation:** automatic approval review rejected raw archive republication. This checkpoint includes no raw logs, runtime payloads, archive parts or signed URLs. Local originals, inspected/redacted bundles and rejection records remain preserved; original workflow evidence remains on GitHub. The small readable index is an authorized alternative, not a retry or alternate encoding of the blocked archives.
+
+AC alone merges. No merges, deployments, tags, protected Ingmat3a/main writes, live bot activation or real teaching decisions occurred. Current scoped readiness does not declare all historical drafts/STACK/protected or future merged trees accepted.
+
+## Earlier checkpoint30226 — historical snapshots and retained failures
+
+Every pending, HOLD, in-flight and readiness statement below belongs to its earlier captured source/tuple/time and is superseded by the current status above; it does not govern current checkpoint publication.
+
 ## Latest verified checkpoint — current twelve remain ready; broader store prerequisite blocked
 
 The twelve designated current loading/authoring routes remain ready, open, unmerged and GitHub conflict-mergeable at the21:55:20UTC fetch, including template1's verified publisher closure583812c8. Their exact-tuple first-visit acceptance remains unchanged. This is not a new all-green claim and does not waive the broader historical shared-store prerequisite's new unavailable-storage failure.
