@@ -32,15 +32,15 @@ const readyFiles=[
 const editorFiles=[
   ['py-exercise-0.5.0/py-exercise.js','ab429398278e1fd364ec8ffafe4faf5a2838ada4911cd65ff56ef40c5826740b',[
     ['        automaticLayout: true,','        automaticLayout: false,'],
-    ['      var updateHeight = function () {\n        var h = Math.max(80, editor.getContentHeight());\n        editorContainer.style.height = h + \'px\';\n        editor.layout();\n      };','      var ctmEditorLayout = CTMLayout.fitEditor(editor, editorContainer, {minHeight: 80});'],
+    ['      var updateHeight = function () {\n        var h = Math.max(80, editor.getContentHeight());\n        editorContainer.style.height = h + \'px\';\n        editor.layout();\n      };','      // Shared ctm-libs owns fitting and resize observation.'],
     ['      editor.onDidContentSizeChange(updateHeight);','      // Shared ctm-libs owns the content-size subscription.'],
-    ['      updateHeight();','      ctmEditorLayout.request();']
+    ['      updateHeight();','      CTMLayout.fitEditor(editor, editorContainer, {minHeight: 80});']
   ]],
   ['pyodide-interaktiv-1.10.0/qpyodide-cell-classes.js','7f9308aa0e55cd76eb4d96ebc7dc19bfc0109346cf072be5995e8949c468f055',[
     ['        automaticLayout: true,           // Works wonderfully with RevealJS','        automaticLayout: false,          // Shared ctm-libs owns explicit layout.'],
-    ['      const updateHeight = () => {\n        const contentHeight = thiz.editor.getContentHeight();\n        thiz.editorDiv.style.height = `${contentHeight}px`;\n        thiz.editor.layout();\n      };','      const ctmEditorLayout = CTMLayout.fitEditor(thiz.editor, thiz.editorDiv);'],
+    ['      const updateHeight = () => {\n        const contentHeight = thiz.editor.getContentHeight();\n        thiz.editorDiv.style.height = `${contentHeight}px`;\n        thiz.editor.layout();\n      };','      // Shared ctm-libs owns fitting and resize observation.'],
     ['      thiz.editor.onDidContentSizeChange(updateHeight);','      // Shared ctm-libs owns the content-size subscription.'],
-    ['      updateHeight();','      ctmEditorLayout.request();']
+    ['      updateHeight();','      CTMLayout.fitEditor(thiz.editor, thiz.editorDiv);']
   ]]
 ];
 const marginHtml='<button id="probe-reader-toggle" class="quarto-reader-toggle" type="button" onclick="quartoToggleReader()">Reader</button><div id="probe-margin-box" style="position:relative;height:100px"><div id="probe-margin-a" class="aside" style="position:absolute;top:0;height:40px;margin:0">Margin A</div><div id="probe-margin-b" class="aside" style="position:absolute;top:10px;height:40px;margin:0">Margin B</div></div>';
