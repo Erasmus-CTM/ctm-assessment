@@ -32,6 +32,7 @@ function Meta(meta)
   meta["_ctm-assessment-pin-defaults"] = defaults
   local pins = pinnedJsxgraph()
   if pins then
+    pins.src_mjx_preload = pandoc.MetaString('_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js')
     local own = meta.jsxgraph
     -- A string or list value (`jsxgraph: plain`) is not a settings map.
     if pandoc.utils.type(own) ~= "table" then own = pandoc.MetaMap({}) end
