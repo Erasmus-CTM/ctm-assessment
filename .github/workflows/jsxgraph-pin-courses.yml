@@ -38,9 +38,9 @@ jobs:
           - course: examples
             course_ref: ''
             profile: ''
-    uses: Erasmus-CTM/ctm-assessment/.github/workflows/compare-courses.yml@fe41047b1131ab4775eebfaa25dbe31ca6afe26e
+    uses: Erasmus-CTM/ctm-assessment/.github/workflows/compare-courses.yml@72626ab657d9a197e6c965f09119ebc589eb423b
     with:
-      tooling-ref: fe41047b1131ab4775eebfaa25dbe31ca6afe26e
+      tooling-ref: 72626ab657d9a197e6c965f09119ebc589eb423b
       course: ${{ matrix.course }}
       course-ref: ${{ matrix.course_ref }}
       profile: ${{ matrix.profile }}
