@@ -1,0 +1,268 @@
+{
+  "fetched_at": "2026-10-23 22:09:54 UTC",
+  "publication_status": "PREPARED_FOR_ROOT_REVIEW",
+  "parent_handoff": "7a0a313bd57bbebc43c981e502a5ff27a715fb69",
+  "active12_snapshot": [
+    {
+      "repo": "Erasmus-CTM/ctm-assessment",
+      "pr": 52,
+      "head": "2c288f6ba2b8c020a234b35ab7dbdbd214607548",
+      "base": "consolidation/2026-10-offline-assembly",
+      "base_sha": "1e2df4999d1e51da78ea8687fdfcbcba8a3ead88",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "1e2df4999d1e51da78ea8687fdfcbcba8a3ead88"
+    },
+    {
+      "repo": "Erasmus-CTM/ctm-assessment",
+      "pr": 56,
+      "head": "8b46f20eed09e8b1e6a7d5faa45b6d0f0f859c8e",
+      "base": "consolidation/2026-10-jsxgraph-pin-1-2",
+      "base_sha": "2c288f6ba2b8c020a234b35ab7dbdbd214607548",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "2c288f6ba2b8c020a234b35ab7dbdbd214607548"
+    },
+    {
+      "repo": "Erasmus-CTM/ctm-libs",
+      "pr": 42,
+      "head": "626b546604f51c9cb738210c56d054d421581e02",
+      "base": "consolidation/2026-10-layout-integration",
+      "base_sha": "a6161c3ef6dfd161d8b2d6f39344c434efe5bf7e",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "a6161c3ef6dfd161d8b2d6f39344c434efe5bf7e"
+    },
+    {
+      "repo": "Erasmus-CTM/ctm-libs",
+      "pr": 43,
+      "head": "d989919c19482016923ed0f87e729c5d06521bd2",
+      "base": "consolidation/2026-10-first-visit-readiness",
+      "base_sha": "19b511631d58c2e8edb547643860a4f6739ef297",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "626b546604f51c9cb738210c56d054d421581e02"
+    },
+    {
+      "repo": "Erasmus-CTM/math-exercise",
+      "pr": 31,
+      "head": "97a7dc5b1eb23adb398f789cb29e0266e1b256b0",
+      "base": "consolidation/2026-10-stable-variant-html",
+      "base_sha": "b282111da4bb208effd8bad8d7e6df7020d0db0a",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "b282111da4bb208effd8bad8d7e6df7020d0db0a"
+    },
+    {
+      "repo": "Erasmus-CTM/math-exercise",
+      "pr": 32,
+      "head": "74946e504bd2a4302d34b711bcd67f43c7376026",
+      "base": "consolidation/2026-10-first-visit-readiness",
+      "base_sha": "6b6e4d35455a69da5fffad5b0b266257682494fa",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "97a7dc5b1eb23adb398f789cb29e0266e1b256b0"
+    },
+    {
+      "repo": "Erasmus-CTM/py-exercise",
+      "pr": 13,
+      "head": "18e6f1eb00713fdefbfc3d040c6a05eb88c6c314",
+      "base": "consolidation/2026-10-step5-assets",
+      "base_sha": "2096710d29e5fa06093d0f30e87e0ccaa6c31402",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "2096710d29e5fa06093d0f30e87e0ccaa6c31402"
+    },
+    {
+      "repo": "Erasmus-CTM/pyodide-interaktiv",
+      "pr": 11,
+      "head": "5079500992d75fbfa9f8508a8a7c37c246e4cce7",
+      "base": "feature/2026-10-preserve-runtime-order",
+      "base_sha": "a509540668104777a63474cbac212b03ce511341",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "a509540668104777a63474cbac212b03ce511341"
+    },
+    {
+      "repo": "Erasmus-CTM/ctm-checkers",
+      "pr": 25,
+      "head": "5976f1a97b78bd81d4d7a3a954ff2102df8c6e37",
+      "base": "main",
+      "base_sha": "76ec14ea89020bbfbf1cdabb9d273daccb79d204",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "76ec14ea89020bbfbf1cdabb9d273daccb79d204"
+    },
+    {
+      "repo": "aacchhee/ctm-demo",
+      "pr": 19,
+      "head": "58fe28bb16723e158d7430de04ccb1c9b142fb7b",
+      "base": "main",
+      "base_sha": "d65eea624e96bbfc7b65ebb78b7d3a43ebdb3458",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "d65eea624e96bbfc7b65ebb78b7d3a43ebdb3458"
+    },
+    {
+      "repo": "aacchhee/ctm-demo",
+      "pr": 20,
+      "head": "ee6974c3de13ec995713cb62a7d5218542314db1",
+      "base": "consolidation/2026-10-saving-quiz-candidate",
+      "base_sha": "5bd385fbafbb6002216eb4c979426d3883358980",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "58fe28bb16723e158d7430de04ccb1c9b142fb7b"
+    },
+    {
+      "repo": "aacchhee/quarto-course-template",
+      "pr": 1,
+      "head": "583812c8e37614b996201f617778d08c817a1605",
+      "base": "main",
+      "base_sha": "efa6afbd2ba5337bbaa50ce1a661ce809ccfdc1d",
+      "draft": false,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "fetched_at": "2026-10-23 21:55:20 UTC",
+      "actual_base_ref_sha": "efa6afbd2ba5337bbaa50ce1a661ce809ccfdc1d"
+    }
+  ],
+  "assessment28": {
+    "head": "14e36b041142dd9af823d11cc603517024244b47",
+    "tree": "2fdea9852bf313e037f77f44b2adbfc26cce6b5d",
+    "draft": true,
+    "open": true,
+    "merged": false,
+    "focused_run": 40029762705,
+    "focused_jobs": [
+      {
+        "name": "render",
+        "id": 120674825121,
+        "conclusion": "success"
+      },
+      {
+        "name": "store chromium",
+        "id": 120675141170,
+        "conclusion": "success"
+      },
+      {
+        "name": "store firefox",
+        "id": 120675141149,
+        "conclusion": "success"
+      },
+      {
+        "name": "store webkit",
+        "id": 120675141186,
+        "conclusion": "failure",
+        "raw_error": "ResizeObserver loop completed with undelivered notifications.",
+        "phase": 4
+      },
+      {
+        "name": "d2",
+        "id": 120675141125,
+        "conclusion": "success"
+      }
+    ],
+    "examples_run": 40029762747,
+    "examples_jobs": [
+      {
+        "id": 120674824931,
+        "name": "build",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 120680748811,
+        "name": "deploy",
+        "status": "completed",
+        "conclusion": "skipped"
+      }
+    ],
+    "initial6433_examples_failure_retained": true,
+    "production_default_and_historical_fixture_code_unchanged": true,
+    "phase_interpretation": "checks.length===4, recorded during unavailable-storage stage; raw lacks document/substep timestamp, no writer/action/observer cause established",
+    "mergeable": true,
+    "merge_state": "unstable due failed WebKit gate"
+  },
+  "assessment34": {
+    "head": "1e2df4999d1e51da78ea8687fdfcbcba8a3ead88",
+    "draft": true,
+    "recommendation": "HOLD due current prerequisite raw WebKit failure; earlier scoped successes do not waive it",
+    "checks": {
+      "success": 11,
+      "skipped": 23,
+      "all_terminal": true
+    }
+  },
+  "assessment39": {
+    "head": "94013514350ba6c8f29a61ea2875cf65396b15e5",
+    "draft": false,
+    "scope": "bounded frozen reproduction; source unchanged metadata only",
+    "checks": {
+      "success": 21,
+      "deploy": "skipped"
+    },
+    "new_tests_or_artifact_download": false
+  },
+  "diagnostic": {
+    "head": "422e1337aef9704a3c5719fcc8e34eb8b574b4db",
+    "run": 40030739817,
+    "job": 120678077924,
+    "conclusion": "success",
+    "three_isolated_cases": true,
+    "scope": "instrumented observer registration/temporal investigation only; timing perturbed, IPCcounts not reconciled, no cause/fix/naturalacceptance claim"
+  },
+  "limits": [
+    "Original19/20 exact firstvisit proofs remain accepted within original scope; broader unavailable-storage failure is separate.",
+    "Demo20docs ee6974 has177 unchanged non-document blobs/modes; no fresh docs-headbrowserCI.",
+    "No allhistoricaldrafts ready claim; no metadata action on34.",
+    "AC alone merges; no merges/deployments/tags/protectedmaincoursewrites/teachingapprovals."
+  ],
+  "next_diagnostic": {
+    "head": "a16303cccb2203dc47c350ebb4ae300cbb92e939",
+    "tree": "c70934fa81bb21ea03920fd2ff7b4aa9b2c20f36",
+    "parent": "14e36b041142dd9af823d11cc603517024244b47",
+    "run": 40031564830,
+    "job": 120680804898,
+    "status": "in_progress",
+    "scope": "full original six-block singleWebKit sameartifact local observer ring; investigation not resolution"
+  },
+  "checker13_followup": {
+    "status": "source implementation in progress, commit/ref publication held to preserve explicit broad NativeSTACK policy",
+    "source_claim": "none until published",
+    "acceptance_claim": "none"
+  }
+}

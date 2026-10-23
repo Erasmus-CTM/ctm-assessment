@@ -1,0 +1,46 @@
+{
+  "README.md": {
+    "size_bytes": 3911,
+    "sha256": "78852f231b960a3ca6b0ef47cd390504522667cf39b5a1faf2159be4bd010641"
+  },
+  "assessment34-staged-review.zip": {
+    "size_bytes": 6196,
+    "sha256": "a54c6a4d76ee2dadaa261a006ad839fccf6028dda6317d62df57ca06d12d7bff"
+  },
+  "assessment39-readiness.zip": {
+    "size_bytes": 4597,
+    "sha256": "ff019a132f578ca9abb12e6ae8082386e764a1556683ef89b711a7c34407cdc4"
+  },
+  "demo20-doc-identity.zip": {
+    "size_bytes": 2283,
+    "sha256": "cc6736c707ff972f7b4d1abad03a1d5a59a4ddc4b519d62dd4e3dc30a4230d9a"
+  },
+  "observer-diagnostic-results.zip": {
+    "size_bytes": 12167,
+    "sha256": "bf99684f5b0c78c2607de318d0c728aab679d38f638c7177c69d4d4245b98795"
+  },
+  "observer-diagnostic-source.zip": {
+    "size_bytes": 6168,
+    "sha256": "f55c596ac8d2d4faf5e0a42049c9dee355e4ef9a6229cbc9269b1d7d6b178413"
+  },
+  "pr28-14e36-d2.zip": {
+    "size_bytes": 55934,
+    "sha256": "633282d77530d3872663b304e039186da61a8167bf9653f44df276553fce1571"
+  },
+  "pr28-14e36-examples.zip": {
+    "size_bytes": 105122,
+    "sha256": "0a00ae15ca28f8a9085e44d057ca1b9a9918ba34f1fed7b718819d4a37535a1c"
+  },
+  "pr28-initial-failures.zip": {
+    "size_bytes": 59792,
+    "sha256": "cd18abaa68371fe113b00863896c0f8bbac4f8dadb9d357326440b3de10ec157"
+  },
+  "pr28-source-and-terminal-ci.zip": {
+    "size_bytes": 24295,
+    "sha256": "c5dd1408723761e745fccbf9461aa54132429f86411c120f3243966a14e2016c"
+  },
+  "state.json": {
+    "size_bytes": 9186,
+    "sha256": "446fc338361035b5a78e18b547c65d74bd8f068863eabc68ef189c20915b355a"
+  }
+}
