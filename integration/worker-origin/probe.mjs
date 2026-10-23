@@ -81,7 +81,7 @@ async function withinDeadline(promise, milliseconds, label) {
 }
 
 async function probe() {
-  const {chromium, firefox, webkit} = await import('playwright');
+  const {chromium, firefox, webkit} = await import(process.env.CTM_PLAYWRIGHT_MODULE || 'playwright');
   const engines = {chromium, firefox, webkit};
   const engineName = process.env.CTM_BROWSER || 'webkit';
   assert.ok(Object.hasOwn(engines, engineName), 'known real browser');
@@ -97,6 +97,20 @@ async function probe() {
   assert.equal(configuredText.replace(config, ''), fixtureText, 'served copy changes only pre-loader options');
   const configured = Buffer.from(configuredText, 'utf8');
   const configuredSHA256 = crypto.createHash('sha256').update(configured).digest('hex');
+  const vendorLoader = 'https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js';
+  assert.equal(fixtureText.split(vendorLoader).length, 2, 'one MathJax src_mjx URL');
+  function candidateFrame(settings) {
+    const bootstrap = '<script>window.MathJax = ' + JSON.stringify(settings || {}) + ';</script>\n';
+    return Buffer.from(fixtureText.replace(loader, bootstrap + loader)
+      .replace(vendorLoader, 'data:text/javascript;base64,' +
+        fs.readFileSync(path.join(here, 'data-adaptor.js')).toString('base64')));
+  }
+  const candidateSettings = [
+    {name: 'default', speech: true, braille: true},
+    {name: 'speech-only', speech: true, braille: false},
+    {name: 'braille-only', speech: false, braille: true},
+    {name: 'neither', speech: false, braille: false}
+  ];
   const cases = [
     {name: 'data-opaque', src: fixtureURL, sandbox: 'allow-scripts'},
     {name: 'http-opaque', src: '/exact-frame.html', sandbox: 'allow-scripts'},
@@ -104,19 +118,34 @@ async function probe() {
     {name: 'data-opaque-speech-disabled', src: 'data:text/html;base64,' + configured.toString('base64'),
       sandbox: 'allow-scripts', disableSpeech: true}
   ];
+  for (const settings of candidateSettings) {
+    cases.push({name: 'data-candidate-' + settings.name, sandbox: 'allow-scripts',
+      candidate: true, settings, source: candidateFrame(settings.name === 'default' ? {} : {
+        options: {enableSpeech: settings.speech, enableBraille: settings.braille,
+          menuOptions: {settings: {speech: settings.speech, braille: settings.braille}}}
+      })});
+  }
+  cases.push({name: 'http-candidate-same-origin', src: '/candidate-frame.html',
+    sandbox: 'allow-scripts allow-same-origin', candidate: true,
+    settings: candidateSettings[0]});
   const server = http.createServer((request, response) => {
-    response.writeHead(200, {'content-type': 'text/html; charset=utf-8',
+    response.writeHead(200, {'content-type': request.url === '/data-adaptor.js' ?
+        'text/javascript; charset=utf-8' : 'text/html; charset=utf-8',
       'cross-origin-opener-policy': 'same-origin',
       'cross-origin-embedder-policy': 'require-corp',
       // This diagnostic resource opts in so Firefox can load the intentionally
       // opaque HTTP control. Parent-page COEP and every sandbox stay strict.
       ...(request.url === '/exact-frame.html' ? {'cross-origin-resource-policy': 'cross-origin'} : {})});
     if (request.url === '/exact-frame.html') { response.end(fixture); return; }
+    if (request.url === '/data-adaptor.js') {
+      response.end(fs.readFileSync(path.join(here, 'data-adaptor.js'))); return;
+    }
+    if (request.url === '/candidate-frame.html') { response.end(candidateFrame()); return; }
     const item = cases.find(value => request.url === '/' + value.name);
     if (!item) { response.end('<!doctype html><title>Worker origin probe</title>'); return; }
     response.end('<!doctype html><meta charset="utf-8"><title>' + item.name + '</title>' +
       '<iframe id="board" width="760" height="400" sandbox="' + item.sandbox +
-      '" src="' + item.src + '"></iframe>');
+      '" src="' + (item.source ? 'data:text/html;base64,' + item.source.toString('base64') : item.src) + '"></iframe>');
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = 'http://127.0.0.1:' + server.address().port;
@@ -132,8 +161,9 @@ async function probe() {
       await context.addInitScript(installTrace);
       const page = await context.newPage();
       const result = {name: item.name, sandbox: item.sandbox,
-        sourceVariant: item.disableSpeech ? 'configured served copy' : 'immutable captured fixture',
-        sourceSHA256: item.disableSpeech ? configuredSHA256 : FIXTURE_SHA256,
+        sourceVariant: item.candidate ? 'candidate src_mjx bootstrap' : item.disableSpeech ? 'configured served copy' : 'immutable captured fixture',
+        sourceSHA256: item.candidate ? crypto.createHash('sha256')
+          .update(item.source || candidateFrame()).digest('hex') : item.disableSpeech ? configuredSHA256 : FIXTURE_SHA256,
         errors: [], console: [], failedRequests: [], responses: [], frames: [],
         testFrameResourceHeaders: null};
       report.cases.push(result);
@@ -176,7 +206,12 @@ async function probe() {
             const svg = node.querySelector('svg');
             return {expression: 'x^2+1', svg: !!svg,
               glyphs: svg?.querySelectorAll('path,use').length || 0,
-              characters: node.outerHTML.length};
+              characters: node.outerHTML.length,
+              speech: node.getAttribute('data-semantic-speech-none'),
+              braille: node.getAttribute('data-semantic-braille'),
+              speechAttached: node.getAttribute('data-speech-attached'),
+              brailleAttached: node.getAttribute('data-braille-attached'),
+              locale: node.getAttribute('data-semantic-locale')};
           }), 30000, 'MathJax SVG renderer');
         } catch (error) {
           result.renderer = {expression: 'x^2+1', svg: false, error: error.message};
@@ -220,7 +255,7 @@ async function probe() {
     fs.mkdirSync(path.dirname(output), {recursive: true});
     fs.writeFileSync(output, JSON.stringify(report, null, 2) + '\n');
   }
-  assert.equal(report.cases.length, 4);
+  assert.equal(report.cases.length, 9);
   assert.ok(report.cases.every(item => !item.probeError), 'all embedded cases must become ready');
   for (const item of report.cases.filter(value => value.name.startsWith('http-'))) {
     assert.deepEqual(item.testFrameResourceHeaders, {coep: 'require-corp', corp: 'cross-origin'},
@@ -241,9 +276,30 @@ async function probe() {
   assert.deepEqual(intervention.console.filter(item => item.type === 'error'), [],
     'configured copy has no raw console errors');
   assert.deepEqual(intervention.failedRequests, [], 'configured copy has no failed requests');
+  for (const item of cases.filter(value => value.candidate)) {
+    const result = report.cases.find(value => value.name === item.name);
+    const frame = result.frames.find(value => value.boards === 1);
+    assert.ok(frame, item.name + ': actual board initialized');
+    assert.equal(result.topIsolated, true, item.name + ': real parent isolation retained');
+    assert.equal(frame.effectiveOrigin, item.name.startsWith('data-') ? 'null' : origin);
+    assert.deepEqual(frame.speechOptions, {enableSpeech: item.settings.speech, enableBraille: item.settings.braille});
+    assert.deepEqual(frame.speechMenuOptions, {speech: item.settings.speech, braille: item.settings.braille});
+    assert.equal(result.renderer?.svg, true, item.name + ': actual SVG conversion completes');
+    assert.ok(result.renderer.glyphs > 0, item.name + ': mathematical glyphs');
+    if (item.settings.speech) assert.ok(result.renderer.speech?.length > 0, item.name + ': speech generated');
+    if (item.settings.braille) assert.match(result.renderer.braille || '', /[\u2800-\u28ff]/u, item.name + ': braille generated');
+    const workers = frame.trace.filter(value => value.kind === 'worker-create');
+    assert.equal(workers.length, item.settings.speech || item.settings.braille ? 1 : 0);
+    if (workers.length) assert.ok(workers[0].url.startsWith(item.name.startsWith('data-') ? 'data:' : 'blob:'),
+      item.name + ': data transport confined to opaque origin');
+    assert.deepEqual(result.errors, [], item.name + ': no uncaught errors');
+    assert.deepEqual(result.console.filter(value => value.type === 'error'), [], item.name + ': no raw console errors');
+    assert.deepEqual(result.failedRequests, [], item.name + ': no failed requests');
+  }
   // Policy errors are evidence here, never acceptance. Existing course/store
   // checks remain the strict release gates; this diagnostic cannot turn them green.
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   await probe();
 }
+
