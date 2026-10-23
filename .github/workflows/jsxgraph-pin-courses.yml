@@ -1,0 +1,33 @@
+name: JSXGraph pin course and board comparison
+on:
+  push:
+    branches: [consolidation/2026-10-jsxgraph-pin-1-2]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - course: aacchhee/ctm-demo
+            course_ref: d65eea624e96bbfc7b65ebb78b7d3a43ebdb3458
+            profile: review
+          - course: aacchhee/ingmat3a_ntnu
+            course_ref: e45851080f462e84cde281528f21d4f21292a6ba
+            profile: ''
+          - course: examples
+            course_ref: ''
+            profile: ''
+    uses: Erasmus-CTM/ctm-assessment/.github/workflows/compare-courses.yml@68fe838ca76ce7dfc4297f8ed4db1ccf1dc29a8b
+    with:
+      tooling-ref: 68fe838ca76ce7dfc4297f8ed4db1ccf1dc29a8b
+      course: ${{ matrix.course }}
+      course-ref: ${{ matrix.course_ref }}
+      profile: ${{ matrix.profile }}
+      base: 68fe838ca76ce7dfc4297f8ed4db1ccf1dc29a8b
+      head: ${{ github.sha }}
+      browser: true
+      browsers: chromium firefox webkit
