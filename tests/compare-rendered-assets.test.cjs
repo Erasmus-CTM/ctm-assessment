@@ -212,11 +212,15 @@ test('resource-order failures retain their full diagnostic evidence',()=>{
 
 test('historical asset replay fixes both package sides and course sources',()=>{
  const workflow=require('js-yaml').load(fs.readFileSync(path.join(root,'.github/workflows/compare-assets-baseline.yml'),'utf8'));
- assert.equal(Object.keys(workflow.jobs).length,3);
+ assert.deepEqual(Object.keys(workflow.jobs).sort(),['campaign','demo','examples','main-course']);
+ assert.equal(workflow.jobs.campaign.steps[0].env.CONFIRMATION,'${{ inputs.confirmation }}');
+ assert.match(workflow.jobs.campaign.steps[0].run,/exit 1/);
  const sides=new Set(),bases=new Set();
- for(const job of Object.values(workflow.jobs)){
+ for(const name of ['examples','main-course','demo']){
+   const job=workflow.jobs[name];
+   assert.deepEqual(job.needs,['campaign']);
    assert.equal(job.uses,'./.github/workflows/compare-courses.yml');
-   assert.equal(job.with['tooling-ref'],'${{ github.event.pull_request.head.sha }}');
+   assert.equal(job.with['tooling-ref'],'${{ github.event.pull_request.head.sha || github.sha }}');
    assert.match(job.with.base,/^[a-f0-9]{40}$/);
    assert.match(job.with.head,/^[a-f0-9]{40}$/);
    assert.notEqual(job.with.base,job.with.head);
