@@ -135,8 +135,8 @@ try{
   report.summary=cases.flatMap(control=>control.modes.map(mode=>{const s=report.samples.filter(s=>s.case===control.name&&s.mode===mode);return{case:control.name,mode,loads:s.length,pageerrorLoads:s.filter(s=>s.pageerrors.length).length,windowErrorLoads:s.filter(s=>s.final.errors.length).length};}));console.log(JSON.stringify({summary:report.summary},null,2));
   assert.ok(report.samples.filter(s=>s.mode==='editors').every(s=>s.interactionErrors===0),'explicit editor integration must retain zero new raw errors after the measured editor boundary');
   if(engine==='webkit'){
-    assert.ok(report.samples.some(s=>s.mode==='native'&&s.initial.errors.length),'byte-original early startup signal must reproduce before interactions');
-    assert.ok(report.samples.some(s=>s.mode==='original'&&s.initial.errors.length),'matched inline inactive early startup signal must reproduce before interactions');
+    assert.ok(report.samples.some(s=>s.case==='startup'&&s.mode==='native'&&s.initial.errors.length),'byte-original normal startup signal must reproduce before interactions');
+    assert.ok(report.samples.some(s=>s.case==='startup'&&s.mode==='original'&&s.initial.errors.length),'matched inline inactive normal startup signal must reproduce before interactions');
   }
   assert.ok(report.samples.filter(s=>s.mode==='both').every(s=>s.pageerrors.length===0&&s.final.errors.length===0),'shared local pair must retain zero raw errors in both collectors');
 }finally{fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));if(browser)await browser.close();for(const server of Object.values(servers))await new Promise(resolve=>server.close(resolve));}
