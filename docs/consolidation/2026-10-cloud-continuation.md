@@ -87,9 +87,9 @@ wheel changed and no real teaching proposals were automatically approved.
 
 | Draft | Exact source head | Implemented boundary |
 | --- | --- | --- |
-| [checker25](https://github.com/Erasmus-CTM/ctm-checkers/pull/25) | `7074abf19a61bf13ea9a8f7f700fe5d66066f3b7` | Tested lazy generation, leased decisions/history, lossless complete-file G1 export, read-only next-batch route, strict changed/gone approval checks, rejection-only retirement, safe hints, pool CI, trusted producer/bot and inactive Pages templates, validated teacher displays and project reporting. |
+| [checker25](https://github.com/Erasmus-CTM/ctm-checkers/pull/25) | `0581521595fc9eb775a818c2771faedb2052554e` | Tested lazy generation, leased decisions/history, lossless complete-file G1 export, read-only next-batch route, strict changed/gone approval checks, rejection-only retirement, safe hints, pool CI, trusted producer/bot and inactive Pages templates, validated teacher displays, project reporting and authenticated generated student-preview assets. |
 | [libs43](https://github.com/Erasmus-CTM/ctm-libs/pull/43) | `39f9b24c94c2c7c79b18d3dcb9b21d4042834691` | Shared stable chooser/P17, explicit optional/review proposals, corrected distribution, accepted-only linked explanation reset and opt-in numbered public result events with separate identity. |
-| [math32](https://github.com/Erasmus-CTM/math-exercise/pull/32) | `d1fea56a987e9e507b3f720494bd2ed2c2fb440d` | Canonical native resolver/wrapper, file CLI, connected local review with lazy actual multilingual Quarto student previews, pool checking, shared student chooser/exact custom context, single native payload, isolated board helper and late teacher presentation. |
+| [math32](https://github.com/Erasmus-CTM/math-exercise/pull/32) | `dc052637c42cfb98bf3e58df8d72ec4a9134e333` | Canonical native resolver/wrapper, file CLI, connected local review and static artifact export with actual multilingual Quarto student previews, pool checking, shared student chooser/exact custom context, single native payload, isolated board helper and late teacher presentation. |
 | [assessment56](https://github.com/Erasmus-CTM/ctm-assessment/pull/56) | `9504873c236e838f644c1a2807720ad419734554` | Canonical native producer beside unchanged browser wheels; exact component adapter/review-server allowlist. Arbitrary Python, nested copies, checker definitions and foreign wheels remain rejected. |
 
 The shared authoring UI has explicit decisions, undo, problems-only filtering,
@@ -107,9 +107,10 @@ latest comment intent and explicit next-head recheck dispatch. Its templates rem
 inactive outside `.github/workflows`: fake API tests do not establish live bot,
 required-check attachment or public hosting. G1 complete-file export preserves
 large integer lexemes and full history; humans inspect the branch/file and diff
-before committing. A stale artifact must be regenerated. G1's extra batch route
-opens GitHub's native Actions form with explicit expected-head inputs, never a
-browser generator or an automatic source write.
+before committing. A stale artifact must be regenerated. G1's extra batch link
+opens the workflow page and supplies separate copyable expected-head inputs. A
+human chooses the PR branch and submits GitHub's native form; the review page
+does not dispatch, generate in-browser or write source.
 
 Teacher display is late optional metadata from exact decoded teacher objects,
 validated by one strict shared MathML/LaTeX sanitizer. Canonical input remains
@@ -170,9 +171,9 @@ Ordinary Quarto preview versus render has no verified public Lua detection
 signal in1.8.27. Bounded actual preview/render probes agreed. Explicit review/
 preview settings exist; automatic ordinary-preview behavior remains open rather
 than weakening required publishing. Connected local multilingual student previews and trusted workflow source are
-implemented. The current G1 artifact still has text previews; actual component
-student views for that route and legacy example/test cleanup are the next focused
-source slices. Final installed deltas remain separate from earlier stage evidence.
+implemented. G1 source now exports actual isolated student views and generated assets;
+legacy example/test cleanup is complete at mathdc052637. Final installed
+deltas remain separate from earlier stage evidence.
 No full variants, course or first-visit clearance is claimed.
 
 The course template now has separate draft
@@ -202,6 +203,89 @@ ordinary authored AI context, sole native question serialization, numeric public
 variant events with separate identity/P17, CI pool teachers, and helper safeguards.
 The base15 and demo99 were not repeated for those small deltas. Later read-only
 GitHub batch, presentation and reporting slices have their own focused checks.
+
+### G1 student preview closure
+
+Checker0581521 and math77e27c4 implement the previously missing actual student
+view in GitHub artifact/Pages review. The unprivileged component exports one
+actual Quarto catalog per question/language from the tested transient manifest;
+original source/history is unchanged. Official row URLs select an exact id/hash
+key. Only explicit exported review catalogs accept these keys; bare, unknown or
+ambiguous selectors fail locally. Review cards bypass chooser/P17 and ordinary
+answer/session persistence. Ordinary student publishing and selection are unchanged.
+
+The trusted producer captures source bytes before resolution, verifies source and
+manifest again after export, and inventories the outer page plus every generated
+asset. Privileged export checks exact PR-head source, run/producer closure, archive
+and per-file digests, safe paths, case/prefix collisions and bounded file counts/
+bytes before copying; it never executes authored code or downloaded assets.
+Aggregate limits are64 MiB assets/32 MiB HTML,4096 files,16 MiB each. The templates
+remain inactive; no public URL, live dispatch or required status was established.
+
+The actual two-candidate/two-language export produced64 generated files,2,408,029
+bytes. Complete producer→artifact→fake GitHub→privileged export verified all 65
+files including the outer page byte-for-byte. Six Chromium checks on that actual
+catalog prove correct per-card teacher packets, blank second-card fields, no
+automatic grading/storage writes and bare/unknown selector failure. Runtime/grader
+transport was explicitly stubbed, KaTeX requests were blocked, raw console faults
+and an initial mistaken packet assertion are retained. This is not real-engine,
+CDN, first-visit or course acceptance. Module/source guards passed independently.
+
+### Legacy authoring migration completed
+
+Mathdc052637 (tree`0fa623699791bea8450dbdeb094dc75008a93975`) removes the dead generator/Lua bridge and obsolete generator-only
+tests. Five maintained examples now use native variables, teacher fields and
+authored tests. The matrix example has four scalar entries for a fixed2×2
+matrix; the circle example grades typed coordinates and keeps the board as an
+illustration. Neither claims native dynamic named-matrix or graphical response
+support. Ordinary matrix/graphical examples and tests remain in place. The
+coupled-answer example has a valid positive teacher vector, and the rounding
+contract has a real native authored test.
+
+Four integration fixtures now exercise the canonical native or ordinary-pool
+paths, with explicit supersession mapping. Focused actual teacher/authored checks
+pass for all five example types; required-zero refusal, review null contexts and
+no-history checks pass in actual Quarto. A dedicated nonstudent profile builds
+the one excluded native-example page into `_review-examples`. The ordinary
+website/publish path keeps required approval and does not contain that page.
+CI no longer invokes deleted tools and discovers all seven current native Python
+test files, including pool and read-only generation checks. No broad npm/site
+campaign was run. Initial fixture/configuration probes remain retained.
+
+## ctm-demo native authoring migration
+
+[Draft demo20](https://github.com/aacchhee/ctm-demo/pull/20) is stacked on unchanged
+demo19 (`5bd385fbafbb6002216eb4c979426d3883358980`). Its published head is
+`dee303707105a6c79aa10e45b1fe2f69b3100aea`, tree
+`6554d3039b144dde767e9b39182ffc2094642d05`, authored Andrey Chesnokov.
+The four angle/values/triangles/tangent sources use native variables, stable
+question context, generic board/solution hooks and accepted-change AI reset.
+Old course-specific generator/transport glue is removed. The branch has explicit
+deployment guards and an artifact-only native review workflow; no deployment ran.
+
+The immutable student/base tuple is assessment9504873/libs5a067c9/mathd0dfc46/
+checker38332f9 plus the loading py/pyo/upstream heads recorded above. Its canonical
+99 proposals passed349 real teacher fields, zero authored cases and zero approvals.
+Boilerplate assertions removed during migration are not counted as authored tests.
+The first review render unexpectedly covered13 pages because of profile list
+merging; that receipt is retained. The command now explicitly selects the one
+page; no99 repeat was done for the command correction. Required publishing with
+zero approvals refused without changing manifests. An affected tangent-only
+render and browser check fixed a solution target that had removed its board.
+
+All four real pinned JSXGraph boards have bounded controlled browser proof.
+The environment blocks the original data-URL frames and CDN trust. These checks
+served exact decoded frame bytes over test-only HTTP with the same opaque
+sandbox, used exact pinned local assets and an explicit grader stub. This is
+functional figure/transport evidence, not original-frame/CDN/static or full-engine
+acceptance. The older provisional mixed-native source receipt is retained and
+superseded by canonical installed closure, not silently relabelled.
+
+The demo's [evidence reconstruction instructions](https://github.com/aacchhee/ctm-demo/blob/dee303707105a6c79aa10e45b1fe2f69b3100aea/docs/consolidation/evidence/native-authoring-student-base.zip.README.md)
+restore the exact1,167,192-byte ZIP from five checksummed parts; SHA256
+`bcf9c313f6adf2578d34c15e4c4e53e90fb397f30b7916e3294473ee917978eb`.
+Its 68 entries preserve raw failures, drivers and controlled assets. Later authoring
+source/proof deltas remain separate from this older exact student/base tuple.
 
 ## Retained cloud evidence
 
@@ -246,7 +330,7 @@ or first-visit blocker is waived.
 ### Final installed native authoring delta
 
 A fresh canonical installation at mathd1fea56, checker7074abf, libs39f9b24 and
-assessment9504873 passes the final small native delta. All24 recorded native
+assessment9504873 passes the final small native delta. All 24 recorded native
 files match (23 payload entries plus native.json); project_report.py is the new
 entry since the preceding stage. The browser checker wheel remains SHA256
 `2c9935c6aa60041bbcb13d751db98c613feb69fd7077ebd3d4d296f8ac376f54`.
@@ -262,3 +346,40 @@ SHA256 `697e22ee2cf5fea753ed4b118a20ddbe16fb23a5c289dd56f4292a0e6aa5740d`,
 contains the exact refs, native inventory/provenance, raw focused logs, summary
 and separate MathML browser driver/fixture/report. It does not repeat earlier15,
 19 or99 checks, and does not establish later G1 export or first-visit acceptance.
+
+
+### Final G1 installed/source evidence
+
+[Final G1 evidence](evidence/2026-10-23-variants-g1-final.zip), SHA256
+`e49228d456c436b21dd70b7ccad57f07e0a6e4d8234b3188e31ae20fc86564b6`
+(134,472 bytes,44 entries), retains clean exact math77e27/checker058152/libs39f9/
+assessment950487 installation, full hash inventory, source/render witnesses,
+actual student/review HTML, complete65-file output inventory and focused
+module/browser/fake-API drivers and raw receipts. Native files increase24→25
+only by adding preview_assets.py; browser wheel is unchanged. All render-used
+component extension files at07cb214 match published77e27, and both generated
+runtime JS copies match the installed consumer. Successor mathdc052 changes only
+examples/obsolete tools/tests/docs/configuration; it leaves this runtime/native
+closure byte-identical. No render or generation was repeated for that source-only
+successor. This proof is separate from the earlier24-file installed delta.
+
+The final supported native authoring source is implemented and reviewed.
+The fresh 16-route GitHub audit confirms four earlier feature leaves merged and
+all 12 current open routes still draft/unmerged. The demo20 branch remains stacked
+on demo19, and authoring leaves remain stacked on their loading/feature bases. Actual
+trusted workflow installation/closure configuration, hosted Pages URL, live
+sticky/decision/recheck status attachment, ordinary Quarto preview detection,
+Windows teardown and real-engine/static first-visit acceptance remain separate
+limits. Native STACK authoring is explicitly unsupported by this producer; no
+silent discovery omission or step-6 adapter completion is claimed. AC alone merges.
+
+
+[Final migration and remote-audit evidence](evidence/2026-10-23-variants-migration-final.zip),
+SHA256 `6e61cb75da4585a1d15e4efcf40d816582d196af111cbfad755d508724a9bfe6`
+(16,547 bytes,16 entries), preserves the 16-route API snapshot, independent source
+reviews, exact published example drivers/coverage map and focused native/Quarto/
+profile logs with initial failures. The four integration-fixture receipt separates
+its saved importer raw log from tool-output-only results, individually checked
+without-AI cases and a pre-existing compatibility skip. It does not claim a new
+full-file/full-suite run. Source proof, installed proof and browser stubs retain
+their distinct tuples and limits; no older failure is waived.

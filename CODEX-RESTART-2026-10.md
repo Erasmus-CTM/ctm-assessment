@@ -2,7 +2,9 @@
 
 Read [the incremental cloud continuation](docs/consolidation/2026-10-cloud-continuation.md)
 for newer loading draft heads, focused checks and retained environment failures.
-First-visit/course clearance remains HOLD; authoring integration is in progress.
+Supported native authoring source, G1 student previews and legacy migration are
+implemented, with exact focused evidence linked there. First-visit/course and live
+workflow clearance remain HOLD. No merges, deployments or tags were performed.
 The restart checkpoint below preserves the original saved state and constraints.
 
 ---

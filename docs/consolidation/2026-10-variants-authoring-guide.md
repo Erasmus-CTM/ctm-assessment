@@ -113,9 +113,21 @@ commit. The complete file preserves large JSON numbers, proposal tapes, snapshot
 stable decision numbers and history. An old artifact is a snapshot: regenerate it
 if the source or manifest changed before pasting.
 
-On a same-repository PR, the GitHub batch link opens the native Actions form with
-explicit branch, PR number, expected head and question label. It requests one
-read-only tested batch; it does not write the source manifest or grant approval.
+The generated GitHub review can open each candidate in an actual isolated Quarto
+student view, with authored language choices, worked solution and Check controls.
+It uses the tested artifact snapshot and does not write learner answer or
+progress state. Diagrams
+and surrounding course material still need the course's separate review build.
+A downloaded artifact is readable directly; serve it over HTTP to use the student
+iframes and runtime. Check also needs its normal runtime/CDN dependencies. The
+hosted route is source-complete here but has not been deployed or exercised on a
+live GitHub workflow.
+
+On a same-repository PR, the GitHub batch link opens the workflow page. Choose
+Run workflow on the stated PR branch and enter the displayed/copied PR number,
+expected head and question label. Submitting that native form requests one
+read-only tested batch; the review page itself does not dispatch a workflow,
+write the source manifest or grant approval.
 Forks can use their own branch editor but do not get an unsupported privileged
 batch route. No workflow, dispatch, comment or preview deployment was activated
 by this campaign.
