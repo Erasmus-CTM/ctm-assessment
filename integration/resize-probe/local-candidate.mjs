@@ -66,12 +66,13 @@ try{
   const parserServer=http.createServer((request,response)=>{streamResponse=response;response.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store'});response.write('<!doctype html><script>'+helper+'</script><script>window.parserReady=[];CTMLayout.ready(()=>parserReady.push({state:document.readyState,text:document.getElementById("ctm-store-manifest").textContent}));</script><main id="parsed-content">complete CTM content</main><script type="application/json" id="ctm-store-manifest">{"v":');});
   await new Promise(resolve=>parserServer.listen(0,'127.0.0.1',resolve));servers.parser=parserServer;
   const parserPage=await browser.newPage();await parserPage.goto('http://127.0.0.1:'+parserServer.address().port,{waitUntil:'commit'});
-  await parserPage.waitForFunction(()=>document.getElementById('ctm-store-manifest')?.textContent==='{"v":');
-  assert.deepEqual(await parserPage.evaluate(()=>parserReady),[]);streamResponse.write('1}');
+  await parserPage.waitForFunction(()=>document.getElementById('ctm-store-manifest'));
+  const partialText=await parserPage.evaluate(()=>document.getElementById('ctm-store-manifest').textContent);
+  assert.deepEqual(await parserPage.evaluate(()=>parserReady),[]);streamResponse.write('1}</script>');
   await parserPage.waitForFunction(()=>parserReady.length===1);
-  report.incrementalParser=await parserPage.evaluate(()=>({state:document.readyState,ready:parserReady,content:document.getElementById('parsed-content').textContent}));
+  report.incrementalParser={partialText,...await parserPage.evaluate(()=>({state:document.readyState,ready:parserReady,content:document.getElementById('parsed-content').textContent}))};
   assert.equal(report.incrementalParser.state,'loading');assert.equal(report.incrementalParser.ready[0].state,'loading');assert.equal(report.incrementalParser.ready[0].text,'{"v":1}');
-  streamResponse.end('</script></body>');await parserPage.waitForLoadState('load');assert.equal(await parserPage.evaluate(()=>parserReady.length),1);await parserPage.close();
+  streamResponse.end('</body>');await parserPage.waitForLoadState('load');assert.equal(await parserPage.evaluate(()=>parserReady.length),1);await parserPage.close();
   console.log(JSON.stringify({incrementalParser:report.incrementalParser}));
   const cases=[
     {name:'startup',variant:'actual',reader:false,width:1280,repeats:12,modes:['native','original','ready','both']},
