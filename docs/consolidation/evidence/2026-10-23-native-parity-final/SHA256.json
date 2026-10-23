@@ -1,0 +1,34 @@
+{
+  "nativeArchive": {
+    "filename": "native-parity-proof-d56af5a1-full-db1f3c54.zip",
+    "bytes": 603660,
+    "sha256": "be9268067f0c049144a780f42c4407dc4e93e6df8d54299c7e3c2489a9d99d07",
+    "parts": [
+      {
+        "file": "native-parity-proof.zip.part01",
+        "bytes": 180000,
+        "sha256": "be7695a86563fc58ee416f01918da8f753489e22be1a813658ce474fc6d3b077"
+      },
+      {
+        "file": "native-parity-proof.zip.part02",
+        "bytes": 180000,
+        "sha256": "9aab063513fcfb3cfaabeec9c9a31693264120f58c78d0972b90cf6b5e64abcf"
+      },
+      {
+        "file": "native-parity-proof.zip.part03",
+        "bytes": 180000,
+        "sha256": "61f7cebc56ce72c3dc2c5322d8125288569a72798fc8d1a4a71e35fc1bb3ad6c"
+      },
+      {
+        "file": "native-parity-proof.zip.part04",
+        "bytes": 63660,
+        "sha256": "43e6c11c0c74c697890658df4bd6ca676c1416744a02ad45d345b939faa71148"
+      }
+    ]
+  },
+  "assessment51Archive": {
+    "filename": "assessment51-focused-evidence.zip",
+    "bytes": 179495,
+    "sha256": "d73938bb5409f809c6a33461f6278185f3a8949264da210f67906dc51a8c52a1"
+  }
+}

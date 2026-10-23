@@ -1,6 +1,20 @@
 # Cloud continuation — 23 October 2026
 
-## Latest first-visit investigation and CI checkpoint
+## Latest verified checkpoint — full native parity green; first-visit investigation remains open
+
+The goal remains green, genuinely mergeable drafts. This checkpoint grants no merge or release clearance. AC alone merges. No merges, deployments, tags or protected Ingmat3a/course-main writes occurred; ctm-demo remains the testbox.
+
+Math32 exact head `db1f3c54b911b858f7b27aae6eb198af58cadb6d` passed the full actual Pyodide0.28.3 grading parity [run40015897164](https://github.com/Erasmus-CTM/math-exercise/actions/runs/40015897164):1633 responses,38 authored source tests,267 exact directional expected migration differences,0 unexpected differences,0 stale expectations,0 missing results/timeouts/harness errors. Every one of16 materialized native contexts passed its mandatory teacher vector and all56 authored cases. The official result candidate IDs/hashes and five source hashes exactly match the archived raw-context sidecar. The exact expected inventory accounts for262 retired legacy-page cases only-in-base and five new native-source cases only-in-head; it cannot waive changed outcomes or authored failures.
+
+Assessment56 exact head `d56af5a1259d896a6e1dcf1e210b42c7c13725bc` has all five advertised source/render workflows green. It supplies the canonical read-only native context prepass, actual Pyodide grading, exact provenance checks and directional migration guards. A real wrong-teacher control caught the inherited report-failure/exit0 bug; the gate now exits1 on authored failure, even when the new case is expected. The original false-exit0 report, corrected negative, source/context/options tamper controls and published sources are retained. Packaging/runtime bytes remain unchanged from9504873c; source CI is distinct from browser first-visit acceptance.
+
+Shared loading source CI is green at libs42 `feba91b2d830f383427d257ee50e931f5c4a21d9` and libs43 `272d2cd38cda46b02433455bed13759b86c91eb4`; pyo11 `807119f945e8d1653754d728cc1b361f23657990` is also green on its advertised workflows. The composed math parity pins libs272d and checker5976f1a. These statuses do not silently clear the remaining real-browser gate.
+
+Fresh demo20 `edd61fa179ad3eac41d9c4c94de1b2194b37849c` and demo19 `b01c926a92ad568889e2a83cb8b51df0064bf2d4` demonstrate actual functional and missing-dependency fault controls, preserving Python/ordinary Check containment. Their strict baseline raw-error acceptance still FAILS. Monaco uses a global `require.toUrl` path that the first focused fixture did not model: that fixture was overbroad evidence and must not be cited as final vendor compatibility. The corrected actual-vendor eight-test fixture exists at local `c874` but was unpublished at this checkpoint. Chromium additionally records14 cancelled wheel HEAD requests. The bounded actual-CI causal A/B network-trace investigation remains pending; neither cancellation nor baseline errors are waived. Maxima readiness remains independent; missing JSXGraph must not disable Python, and missing speech must not disable ordinary Check.
+
+Durable scoped evidence is in [native parity/layout evidence](evidence/2026-10-23-native-parity-final/README.md). The native603660-byte ZIP is carried as four raw parts of at most180000 bytes with SHA256/reassembly instructions; the assessment51 focused ZIP is179495 bytes. Native archive SHA256 is `be9268067f0c049144a780f42c4407dc4e93e6df8d54299c7e3c2489a9d99d07`; assessment51 SHA256 is `d73938bb5409f809c6a33461f6278185f3a8949264da210f67906dc51a8c52a1`. No old loading archive with the overbroad fixture is added by this slice. Historical sections below retain the state and failures recorded at their own timestamps; this latest section supersedes their pending-parity and older-head statements.
+
+## Earlier first-visit investigation and CI checkpoint
 
 The active request is to continue until draft gates are green and mergeable;
 this checkpoint is not completion or merge clearance. AC alone merges. No
