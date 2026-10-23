@@ -39,9 +39,9 @@
     "jsxgraph": {
       "repository": "jsxgraph/jsxgraph-quarto",
       "branch": "main",
-      "commit": "17de83e006cf8907a146cc6a2366f42a35463c6e",
+      "commit": "e4ad81d82e1b56f86765026a3dd26f6975d29d57",
       "extension": "jsxgraph",
-      "pin-outside-branch": "the fork commit of upstream pull request #2, not on upstream main"
+      "pin-outside-branch": "AC-approved upstream pull request #2 head e4ad81d82e1b56f86765026a3dd26f6975d29d57 (jsxgraph-quarto 1.2.0, optional src_mjx_preload); not yet on upstream main"
     },
     "ctm-assessment": {
       "repository": "Erasmus-CTM/ctm-assessment",
