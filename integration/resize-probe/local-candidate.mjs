@@ -113,7 +113,9 @@ try{
       for(const [name,count,long] of [['grow',16,false],['shrink',2,false],['empty',0,false],['long-line',1,true]]){
         values=await page.evaluate(({count,long})=>monaco.editor.getEditors().map((editor,index)=>{const value=long?'print("'+String(index).repeat(300)+'")':('print("local '+index+'")\n').repeat(count);editor.setValue(value);return value;}),{count,long});await page.waitForTimeout(200);await record(name);
       }
-      for(const width of [390,1280]){await page.setViewportSize({width,height:900});await page.waitForTimeout(200);await record('width-'+width);}
+      await page.evaluate(()=>monaco.editor.getEditors().forEach(editor=>editor.updateOptions({wordWrap:'on'})));await page.waitForTimeout(200);await record('wrap-on-wide');
+      for(const width of [390,1280]){await page.setViewportSize({width,height:900});await page.waitForTimeout(200);await record('wrap-width-'+width);}
+      const narrow=editorStages.find(stage=>stage.name==='wrap-width-390').states,wide=editorStages.find(stage=>stage.name==='wrap-width-1280').states;for(let i=0;i<wide.length;i++)assert.ok(narrow[i].contentHeight>=wide[i].contentHeight,'narrow wrapping height converges to at least the wide wrapping height');
       await page.evaluate(()=>monaco.editor.getEditors().forEach(editor=>{const node=editor.getContainerDomNode();node.dataset.probeDisplay=node.style.display;node.style.display='none';}));await page.waitForTimeout(200);await record('both-hidden',true);
       await page.evaluate(()=>monaco.editor.getEditors().forEach(editor=>{const node=editor.getContainerDomNode();node.style.display=node.dataset.probeDisplay;delete node.dataset.probeDisplay;}));await page.waitForTimeout(200);await record('both-visible');
       await page.getByRole('tab',{name:'Scalar',exact:true}).click();await page.getByRole('tab',{name:'Code',exact:true}).click();await page.waitForTimeout(200);
