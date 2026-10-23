@@ -1,5 +1,6 @@
 // Local owned-source counterfactual. Quarto/Monaco source and constructors stay native.
 import assert from 'node:assert/strict';
+import {assertLocalControls} from './local-contract.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
@@ -114,11 +115,12 @@ try{
     assert.equal(initial.assetMode,report.localAssets?'local':'cdn');
     assert.equal(initial.inputs,7);assert.equal(initial.answers,7);assert.equal(initial.results,7);assert.equal(initial.progress,2);
     const expectedReader=control.reader&&control.width>=990&&control.variant!=='transform';assert.equal(initial.reader,String(expectedReader));assert.ok(initial.toggles.every(active=>active===expectedReader));
-    let resized=null,editorState=null,editorStages=[],editorStartErrors=null,disposal=null,denial=null;
+    let resized=null,editorState=null,editorStages=[],editorStartErrors=null,editorStartPageErrors=null,disposal=null,denial=null;
     if(control.resize){assert.deepEqual(initial.toggles,[true]);assert.equal(initial.margin,'30px');await page.setViewportSize({width:390,height:900});await page.waitForTimeout(250);resized=await snapshot();assert.equal(resized.reader,'false');assert.deepEqual(resized.toggles,[false]);assert.equal(resized.margin,'30px');}
     if(control.editors){
       await page.waitForFunction(()=>window.monaco?.editor?.getEditors?.().length===2&&window.qpyodideCellsReady&&window.qpyodideStartupPhaseDone);
       editorStartErrors=await page.evaluate(()=>__localLayout.errors.length);
+      editorStartPageErrors=pageerrors.length;
       await page.getByRole('tab',{name:'Code',exact:true}).click();await page.waitForTimeout(200);
       const capture=()=>page.evaluate(()=>monaco.editor.getEditors().map(editor=>{const node=editor.getContainerDomNode();return{value:editor.getValue(),contentHeight:editor.getContentHeight(),layout:editor.getLayoutInfo(),container:{width:node.clientWidth,height:node.clientHeight,styleHeight:node.style.height,display:getComputedStyle(node).display},rectWidth:node.getBoundingClientRect().width};}));
       const record=async(name,hidden=false)=>{
@@ -158,7 +160,7 @@ try{
     }
     const final=await snapshot();assert.ok(final.reads.some(read=>read.stack.includes('/quarto-html/quarto.js')),'unchanged native Quarto callback still reads BODY');
     assert.deepEqual(failedRequests,[]);assert.deepEqual(consoleErrors,[]);assert.ok([...pageerrors,...final.errors].every(error=>error.message==='ResizeObserver loop completed with undelivered notifications.'));
-    const result={case:control.name,mode,sample,pageerrors,failedRequests,consoleErrors,initial,resized,editorState,editorStages,editorStartErrors,interactionErrors:editorStartErrors===null?null:final.errors.length-editorStartErrors,disposal,denial,final};report.samples.push(result);console.log(JSON.stringify(result));
+    const result={case:control.name,mode,sample,pageerrors,failedRequests,consoleErrors,initial,resized,editorState,editorStages,editorStartErrors,interactionErrors:editorStartErrors===null?null:final.errors.length-editorStartErrors,interactionPageErrors:editorStartPageErrors===null?null:pageerrors.length-editorStartPageErrors,disposal,denial,final};report.samples.push(result);console.log(JSON.stringify(result));
     // Original native geometry defects are evidence, not expectations for the
     // replacement. Preserve those snapshots; active editor integration must
     // satisfy intended sizing in every recorded stage.
@@ -167,9 +169,7 @@ try{
   }
   report.summary=cases.flatMap(control=>control.modes.map(mode=>{const s=report.samples.filter(s=>s.case===control.name&&s.mode===mode);return{case:control.name,mode,loads:s.length,pageerrorLoads:s.filter(s=>s.pageerrors.length).length,windowErrorLoads:s.filter(s=>s.final.errors.length).length};}));console.log(JSON.stringify({summary:report.summary},null,2));
   assert.ok(report.samples.filter(s=>s.mode==='editors'&&s.editorStartErrors!==null).every(s=>s.interactionErrors===0),'explicit editor integration must retain zero new raw errors after the measured editor boundary');
-  if(engine==='webkit'){
-    assert.ok(report.samples.some(s=>s.case==='startup'&&s.mode==='native'&&s.initial.errors.length),'byte-original normal startup signal must reproduce before interactions');
-    assert.ok(report.samples.some(s=>s.case==='startup'&&s.mode==='original'&&s.initial.errors.length),'matched inline inactive normal startup signal must reproduce before interactions');
-  }
-  assert.ok(report.samples.filter(s=>s.mode==='both').every(s=>s.pageerrors.length===0&&s.final.errors.length===0),'shared local pair must retain zero raw errors in both collectors');
+  report.startupObservations=report.summary.filter(row=>row.case==='startup');
+  report.startupContract='Natural startup reproduction is observed, not required; explicit native editor controls must reproduce in both raw collectors.';
+  assertLocalControls(engine,report.samples);
 }finally{fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));if(browser)await browser.close();for(const server of Object.values(servers))await new Promise(resolve=>server.close(resolve));}

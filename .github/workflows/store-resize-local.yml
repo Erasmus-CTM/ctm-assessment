@@ -113,6 +113,7 @@ jobs:
           set -o pipefail
           mkdir -p "$CTM_RESIZE_REPORT"
           node --test _ci/layout-source/tests/layout.test.cjs
+          node --test tests/local-layout-contract.test.mjs
           node --check integration/resize-probe/local-candidate.mjs
           node integration/resize-probe/local-candidate.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
       - uses: actions/upload-artifact@v7
