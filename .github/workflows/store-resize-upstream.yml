@@ -119,17 +119,14 @@ jobs:
         shell: bash
         env:
           CTM_BROWSER: webkit
-          CTM_RESIZE_ACTUAL_ONLY: '1'
-          CTM_RESIZE_STARTUP_ONLY: '1'
-          CTM_RESIZE_FONT_AWESOME_ONLY: '1'
           CTM_RESIZE_STOCK: ${{ runner.temp }}/resize-stock
           CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-fixture/before/_site
           CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-report
         run: |
           set -o pipefail
           mkdir -p "$CTM_RESIZE_REPORT"
-          node --check integration/resize-probe/probe.mjs
-          node integration/resize-probe/probe.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
+          node --check integration/resize-probe/reader-first.mjs
+          node integration/resize-probe/reader-first.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
