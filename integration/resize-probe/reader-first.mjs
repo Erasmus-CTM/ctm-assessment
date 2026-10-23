@@ -21,7 +21,7 @@ assert.equal(source.split(before).length,2,'exact original reader predicate occu
 assert.ok(source.includes('return window.localStorage.getItem("quarto-reader-mode") === "true";'));
 const changed=source.replace(before,after);
 assert.equal(changed.replace(after,before),source,'all other source bytes stay unchanged');
-const marginHtml='<div id="probe-margin-box" style="position:relative;height:100px"><div id="probe-margin-a" class="aside" style="position:absolute;top:0;height:40px;margin:0">Margin A</div><div id="probe-margin-b" class="aside" style="position:absolute;top:10px;height:40px;margin:0">Margin B</div></div>';
+const marginHtml='<button id="probe-reader-toggle" class="quarto-reader-toggle" type="button" onclick="quartoToggleReader()">Reader</button><div id="probe-margin-box" style="position:relative;height:100px"><div id="probe-margin-a" class="aside" style="position:absolute;top:0;height:40px;margin:0">Margin A</div><div id="probe-margin-b" class="aside" style="position:absolute;top:10px;height:40px;margin:0">Margin B</div></div>';
 assert.equal(html.split('</body>').length,2);
 const report={browser:engine,fixtureHtmlSha256:sha(html),sourceSha256:sha(source),changedSha256:sha(changed),
   intervention:{before,after,transport:'native HTTP, matched copies, zero navigation interception'},samples:[]};
@@ -57,6 +57,7 @@ try {
       const Native=window.ResizeObserver;
       window.ResizeObserver=new Proxy(Native,{construct(Constructor,args,newTarget){
         const callback=args[0];
+        if(typeof callback!=='function')return Reflect.construct(Constructor,args,newTarget);
         return Reflect.construct(Constructor,[function(entries,observer){
           if([...entries].some(entry=>entry.target===document.body))window.__readerTrace.bodyCallbacks++;
           return Reflect.apply(callback,this,arguments);
@@ -96,12 +97,13 @@ try {
     let resized=null;
     if(control.resize){
       assert.equal(initial.reader,'true','reader mode is active before crossing the threshold');
+      assert.deepEqual(initial.readerToggles,[true],'synthetic reader control is present and visibly marked active by Quarto');
       assert.equal(initial.margins.find(el=>el.id==='probe-margin-b')?.marginTop,'30px','unchanged margin layout separates synthetic overlapping margins');
       await page.setViewportSize({width:control.resize,height:900});
       await page.waitForTimeout(250);
       resized=await snapshot();
       assert.equal(resized.reader,'false','native observer exits reader mode below the original threshold');
-      assert.ok(resized.readerToggles.every(active=>!active));
+      assert.deepEqual(resized.readerToggles,[false],'Quarto removes the active reader control mark');
       assert.equal(resized.margins.find(el=>el.id==='probe-margin-b')?.marginTop,'30px');
       assert.ok(resized.trace.bodyCallbacks>initial.trace.bodyCallbacks);
     }
