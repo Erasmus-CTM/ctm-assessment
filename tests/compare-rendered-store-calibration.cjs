@@ -13,6 +13,10 @@ function run(candidate,name) {
   const p=spawnSync(process.execPath,args,{cwd:root,encoding:'utf8'});
   assert.ok(p.status===0||p.status===1,p.stderr);
   const r=JSON.parse(fs.readFileSync(report,'utf8'));
+  if(process.env.CTM_COMPARE_CALIBRATION_REPORTS){
+    fs.mkdirSync(process.env.CTM_COMPARE_CALIBRATION_REPORTS,{recursive:true});
+    fs.copyFileSync(report,path.join(process.env.CTM_COMPARE_CALIBRATION_REPORTS,name+'.json'));
+  }
   console.log(name+': '+JSON.stringify(r.summary));
   return {status:p.status,report:r};
 }
