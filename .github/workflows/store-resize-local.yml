@@ -1,0 +1,58 @@
+name: Local CTM layout lifecycle trace
+on:
+  push:
+    branches: [consolidation/2026-10-local-layout-trace]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.1-noble
+      options: --user 1001
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Verify exact frozen original fixture
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const artifact = (await github.rest.actions.getArtifact({
+              owner: context.repo.owner, repo: context.repo.repo, artifact_id: 12452174136
+            })).data;
+            if (artifact.expired || artifact.name !== 'store-rendered-fixtures' ||
+                artifact.workflow_run.head_sha !== '7fa0b25bed9f459c5f18f700f327ad3e804b55cf' ||
+                artifact.digest !== 'sha256:41ec55a17c2619ba9fba12fbdde19dbc84d2eb383fffd263f0cbdacc8b94d5f9') {
+              throw new Error('Actual fixture artifact changed or expired');
+            }
+      - uses: actions/download-artifact@v7
+        with:
+          name: store-rendered-fixtures
+          run-id: 39841421065
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/resize-fixture
+      - name: Trace exact owned boundaries without changing vendor source or observer construction
+        shell: bash
+        env:
+          CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-fixture/before/_site
+          CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-local-report
+        run: |
+          set -o pipefail
+          mkdir -p "$CTM_RESIZE_REPORT"
+          node --check integration/resize-probe/local-lifecycle.mjs
+          node integration/resize-probe/local-lifecycle.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: resize-local-lifecycle
+          path: ${{ runner.temp }}/resize-local-report
+          retention-days: 7
