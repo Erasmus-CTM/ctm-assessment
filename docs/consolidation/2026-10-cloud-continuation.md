@@ -1,5 +1,62 @@
 # Cloud continuation — 23 October 2026
 
+## Latest first-visit investigation and CI checkpoint
+
+The active request is to continue until draft gates are green and mergeable;
+this checkpoint is not completion or merge clearance. AC alone merges. No
+merges, deployments, tags or protected course writes occurred.
+
+Actual artifact-only first-start CI ran on demo20 at
+`3b1df1b0da1606a2df8e220dfb20bf1b9a1b22bd`:
+[run40011470907](https://github.com/aacchhee/ctm-demo/actions/runs/40011470907).
+The workflow renders only step4-ui, preserves the original data frames, uses
+real CDN assets, Monaco, Pyodide, grading and JSXGraph, and retains every raw
+failure. This is separate from earlier substituted/stubbed proof. Its source
+tuple is committed in `.github/first-start-refs.json` on that exact demo head.
+
+Firefox baseline passed: real IDE result42, real board, speech and braille,
+controlled reload, isolation/shared memory, zero raw error arrays and every
+observed request terminal. Chromium and WebKit reached those functional checks
+but failed strict raw-error acceptance. WebKit started Monaco workerMain after
+the editor construction barrier; COI reload cancelled that request and produced
+Load failed. Chromium recorded a Monaco request failure and a Matplotlib range
+abort. These are retained failures, not harmless-reload waivers. Input/Stop
+interaction and course-wide acceptance are not claimed.
+
+A bounded real CDN probe explains the Matplotlib defect: browser-negotiated
+Brotli ranges address compressed bytes, while fetch returns decoded body bytes.
+The first524288-byte encoded range yielded524284 decoded bytes; advancing by
+that count requests the wrong next compressed range and eventually aborts the
+decoder. Identity encoding returned the full524288-byte ZIP range. Production
+fixes are in progress: retain range prefetch for identity representations and
+use hash-verified whole downloads for compressed representations. Do not
+disable integrity checks or filter failed requests.
+
+Monaco0.46 publicly accepts Promise<Worker> from MonacoEnvironment.getWorker.
+The focused proposed correction gates lazy worker construction on the existing
+qpyodideCoiSettled promise while allowing editor construction to finish. Gating
+editor construction itself would deadlock reload against initial-UI readiness.
+Custom worker factories/URLs and default AMD bootstrap must remain intact.
+Implementation and fresh browser proof are still pending at this checkpoint.
+
+All six missing-JSXGraph/missing-speech controls showed real Python and ordinary
+math success in their failure snapshots, but timed out waiting for a harness
+result event: CTMStore dispatches on document, while the harness listened on
+window. The local focused correction listens on document; syntax passes. It
+has not yet been published or rerun. Do not call these six controls passed yet.
+
+Current source CI: libs42/59f52e8 and43/be9e755, checker25/5976f1a,
+math31/97a7dc5 and assessment56/2bbb293 are green on their scoped workflows.
+Math32/6216153 has four green workflows; only parity remains red. Its actual
+full run has1633 responses,115 variants,38 authored cases and267 differences:
+262 cases from the intentionally retired legacy generated page plus five new
+native-authored cases failing the render-side PyYAML boundary. There are no
+ordinary grading differences or harness timeouts. A read-only canonical native
+context/options sidecar and exact legacy migration accounting are in progress;
+the five cases must still be graded by real Pyodide, not skipped or waived.
+Template1 now has a green focused public-source installation/CLI workflow.
+No draft is declared ready solely from these statuses.
+
 Work continues from checkpoint `28f4dcb12dbbe5df92b69a5746ce14618c685211`.
 This is an incremental checkpoint, not release or merge clearance. AC alone
 merges. No main writes, tags, deployments or ingmat3a rollout occurred.
