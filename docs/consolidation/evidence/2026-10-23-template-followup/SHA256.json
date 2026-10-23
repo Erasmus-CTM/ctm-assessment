@@ -1,0 +1,24 @@
+{
+  "files": {
+    "assessment28-current-store.zip": {
+      "bytes": 93693,
+      "sha256": "137e77c9678edc329fbb182d460efca78a8c505eb87ba9927c62b1017ed3674c"
+    },
+    "pack-loading-map.zip": {
+      "bytes": 10345,
+      "sha256": "f4abf61853b02b2a5fd012638e130bbf02c04a320b70b0ec283f41c3147a9517"
+    },
+    "README.md": {
+      "bytes": 4046,
+      "sha256": "12cff92ab7382c7998fd16c4c886608b9f94c1515cd65454c8c88f353b085637"
+    },
+    "template-publisher-closure.zip": {
+      "bytes": 65311,
+      "sha256": "24bd15e2e2a25941dccdfeb83ded81b73c8bc159ba53f2904de9430ba7f0978e"
+    },
+    "state.json": {
+      "bytes": 5674,
+      "sha256": "1187571358641d0e84e49409c673670d184a7e91ea6f49671efa9ad9c0db875f"
+    }
+  }
+}

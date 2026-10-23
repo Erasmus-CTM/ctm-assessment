@@ -1,0 +1,181 @@
+{
+  "fetchedTimestamp": "2026-10-23T21:27:02.905Z",
+  "activeRoutes": [
+    {
+      "repo": "Erasmus-CTM/ctm-assessment",
+      "pr": 52,
+      "head": "2c288f6ba2b8c020a234b35ab7dbdbd214607548",
+      "base": "consolidation/2026-10-offline-assembly",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.921Z"
+    },
+    {
+      "repo": "Erasmus-CTM/ctm-assessment",
+      "pr": 56,
+      "head": "8b46f20eed09e8b1e6a7d5faa45b6d0f0f859c8e",
+      "base": "consolidation/2026-10-jsxgraph-pin-1-2",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.695Z"
+    },
+    {
+      "repo": "Erasmus-CTM/ctm-libs",
+      "pr": 42,
+      "head": "626b546604f51c9cb738210c56d054d421581e02",
+      "base": "consolidation/2026-10-layout-integration",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.683Z"
+    },
+    {
+      "repo": "Erasmus-CTM/ctm-libs",
+      "pr": 43,
+      "head": "d989919c19482016923ed0f87e729c5d06521bd2",
+      "base": "consolidation/2026-10-first-visit-readiness",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.691Z"
+    },
+    {
+      "repo": "Erasmus-CTM/math-exercise",
+      "pr": 31,
+      "head": "97a7dc5b1eb23adb398f789cb29e0266e1b256b0",
+      "base": "consolidation/2026-10-stable-variant-html",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.775Z"
+    },
+    {
+      "repo": "Erasmus-CTM/math-exercise",
+      "pr": 32,
+      "head": "74946e504bd2a4302d34b711bcd67f43c7376026",
+      "base": "consolidation/2026-10-first-visit-readiness",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.955Z"
+    },
+    {
+      "repo": "Erasmus-CTM/py-exercise",
+      "pr": 13,
+      "head": "18e6f1eb00713fdefbfc3d040c6a05eb88c6c314",
+      "base": "consolidation/2026-10-step5-assets",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.999Z"
+    },
+    {
+      "repo": "Erasmus-CTM/pyodide-interaktiv",
+      "pr": 11,
+      "head": "5079500992d75fbfa9f8508a8a7c37c246e4cce7",
+      "base": "feature/2026-10-preserve-runtime-order",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.681Z"
+    },
+    {
+      "repo": "Erasmus-CTM/ctm-checkers",
+      "pr": 25,
+      "head": "5976f1a97b78bd81d4d7a3a954ff2102df8c6e37",
+      "base": "main",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.934Z"
+    },
+    {
+      "repo": "aacchhee/ctm-demo",
+      "pr": 19,
+      "head": "58fe28bb16723e158d7430de04ccb1c9b142fb7b",
+      "base": "main",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.713Z"
+    },
+    {
+      "repo": "aacchhee/ctm-demo",
+      "pr": 20,
+      "head": "3f6336a4d5ee77f7f2ff4f1c244b08440aae5128",
+      "base": "consolidation/2026-10-saving-quiz-candidate",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.772Z"
+    },
+    {
+      "repo": "aacchhee/quarto-course-template",
+      "pr": 1,
+      "head": "583812c8e37614b996201f617778d08c817a1605",
+      "base": "main",
+      "draft": false,
+      "mergeable": true,
+      "merged": false,
+      "state": "open",
+      "fetchedTimestamp": "2026-10-23T21:26:03.717Z"
+    }
+  ],
+  "template": {
+    "head": "583812c8e37614b996201f617778d08c817a1605",
+    "tree": "eea05e7c03c063b8e6e2fcdcfabbea9358d4c5f6",
+    "run": 40026427342,
+    "job": 120663668042,
+    "conclusion": "success",
+    "artifact": 12531624873,
+    "artifactBytes": 24362,
+    "artifactSHA256": "41c5ff779d9e74897ed0b7f047ad6788cad13a1eb0898cf713bd1fc370765552",
+    "downloadedDigestVerified": true,
+    "normalPublisherExecuted": false,
+    "scope": "Sharedcanonicalinstaller/pinneddependencies/umbrella sourceclosure plus actualordinarypage3positive bindings and finite native tasks, notdeployment."
+  },
+  "assessment28": {
+    "diagnosticHead": "27cb273ffcbb6eea37f9ef2774dd8883d59df360",
+    "run": 40026037317,
+    "productionSource": "8b46f20eed09e8b1e6a7d5faa45b6d0f0f859c8e",
+    "store": "All3engines originalcredentialless sixblocks pass withuncaughtpageerrors[]",
+    "sourceClosure": "29historicalfixturefiles/402installedhashes",
+    "D2": {
+      "status": "PASS",
+      "limit_s": 2,
+      "deltas_s": [
+        0.15,
+        0.34,
+        0.08,
+        0.09
+      ],
+      "completeContexts": 6,
+      "gradedOutcomes": 12,
+      "drops": 0,
+      "truncatedFields": 0,
+      "ONMatplotlib": {
+        "HEAD": 3,
+        "GET": 3
+      },
+      "OFFMatplotlibRequests": 0,
+      "actualRawSHA256": "4d70bca6afed0271a452dfa2dd91fc24f188ad90359778463b0f7b16e1fbcc1c",
+      "scope": "Real ON/OFF corroborated, not directregistry snapshot or causalexplanationold22.64s"
+    },
+    "oldProductHead": "2d2f002cd6255e3fa9472a07f6ae4947b865621d",
+    "scope": "Diagnostic successorclosure only, no rewrittenoldartifactacceptance or newseven-category networkproof."
+  },
+  "noMergesDeploymentsTagsMainWrites": true
+}
