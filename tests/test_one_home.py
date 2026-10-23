@@ -81,9 +81,13 @@ class OneHome(unittest.TestCase):
     def test_component_native_resolver_wrappers_pass_without_checker_definitions(self):
         self.write('math-exercise/variant_resolver.py', 'from ctm_checkers import run_question_tests\n')
         self.write('math-exercise/question-variants.py', 'import json\n')
+        self.write('math-exercise/variants-review.py', 'from http.server import HTTPServer\n')
         self.check()
         self.write('math-exercise/variant_resolver.py', CHECK)
         self.assertRejected('math-exercise/variant_resolver.py defines checker code')
+        self.write('math-exercise/variant_resolver.py', 'import json\n')
+        self.write('math-exercise/variants-review.py', CHECK)
+        self.assertRejected('math-exercise/variants-review.py defines checker code')
 
     def test_other_python_in_math_exercise_is_rejected(self):
         self.write('math-exercise/checkers.py', 'x = 1\n')

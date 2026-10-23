@@ -197,10 +197,10 @@ def check_shared_files(config, sources, extensions, hashes, pinned_libs=None):
 # Checker Python has one home, ctm-checkers (step-2 design §3.6): no other
 # packaged folder defines math-exercise's checks or the basis helper (in any
 # file: scripts, modules, JSON, also inside an escaped string) or ships a
-# wheel, and math-exercise's only Python files are its variant generator and
-# the question-test script that runs ctm-checkers.
+# wheel. Math-exercise's allowed Python files are its component adapters and
+# local review server; their grading calls still belong to ctm-checkers.
 CHECKER_DEFINITIONS = re.compile(rb'(?:(?<![\w\\])|(?<=\\[nrt]))def(?:\s|\\[nrt])+(_math_check|assess_basis)\b')
-MATH_EXERCISE_PYTHON = {'variants.py', 'question-tests.py', 'variant_resolver.py', 'question-variants.py'}
+MATH_EXERCISE_PYTHON = {'variants.py', 'question-tests.py', 'variant_resolver.py', 'question-variants.py', 'variants-review.py'}
 
 
 def produce_native_authoring(sources, extensions_root, hashes):
