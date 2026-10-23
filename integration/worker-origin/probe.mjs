@@ -99,9 +99,11 @@ async function probe() {
   const configuredSHA256 = crypto.createHash('sha256').update(configured).digest('hex');
   const vendorLoader = 'https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js';
   assert.equal(fixtureText.split(vendorLoader).length, 2, 'one MathJax src_mjx URL');
-  function candidateFrame(settings) {
+  function candidateFrame(settings, csp) {
     const bootstrap = '<script>window.MathJax = ' + JSON.stringify(settings || {}) + ';</script>\n';
-    return Buffer.from(fixtureText.replace(loader, bootstrap + loader)
+    return Buffer.from(fixtureText.replace('<head>', '<head>' + (csp ?
+      '<meta http-equiv="Content-Security-Policy" content="' + csp + '">' : ''))
+      .replace(loader, bootstrap + loader)
       .replace(vendorLoader, 'data:text/javascript;base64,' +
         fs.readFileSync(path.join(here, 'data-adaptor.js')).toString('base64')));
   }
@@ -125,6 +127,8 @@ async function probe() {
           menuOptions: {settings: {speech: settings.speech, braille: settings.braille}}}
       })});
   }
+  cases.push({name: 'data-candidate-csp', sandbox: 'allow-scripts', candidate: true,
+    settings: candidateSettings[0], source: candidateFrame({}, 'worker-src data:')});
   cases.push({name: 'http-candidate-same-origin', src: '/candidate-frame.html',
     sandbox: 'allow-scripts allow-same-origin', candidate: true,
     settings: candidateSettings[0]});
@@ -255,9 +259,9 @@ async function probe() {
     fs.mkdirSync(path.dirname(output), {recursive: true});
     fs.writeFileSync(output, JSON.stringify(report, null, 2) + '\n');
   }
-  assert.equal(report.cases.length, 9);
+  assert.equal(report.cases.length, 10);
   assert.ok(report.cases.every(item => !item.probeError), 'all embedded cases must become ready');
-  for (const item of report.cases.filter(value => value.name.startsWith('http-'))) {
+  for (const item of report.cases.filter(value => value.name === 'http-opaque' || value.name === 'http-same-origin')) {
     assert.deepEqual(item.testFrameResourceHeaders, {coep: 'require-corp', corp: 'cross-origin'},
       'HTTP test-frame opt-in is explicit and reported');
   }
@@ -295,6 +299,12 @@ async function probe() {
     assert.deepEqual(result.errors, [], item.name + ': no uncaught errors');
     assert.deepEqual(result.console.filter(value => value.type === 'error'), [], item.name + ': no raw console errors');
     assert.deepEqual(result.failedRequests, [], item.name + ': no failed requests');
+  }
+  const native = report.cases.find(value => value.name === 'http-same-origin').renderer;
+  for (const name of ['data-candidate-default', 'data-candidate-csp', 'http-candidate-same-origin']) {
+    const renderer = report.cases.find(value => value.name === name).renderer;
+    for (const key of ['speech', 'braille', 'locale']) assert.equal(renderer[key], native[key],
+      name + ': accessibility output matches native MathJax');
   }
   // Policy errors are evidence here, never acceptance. Existing course/store
   // checks remain the strict release gates; this diagnostic cannot turn them green.

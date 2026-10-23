@@ -8,8 +8,8 @@
   config.startup = Object.assign({}, startup, {
     ready() {
       const browserAdaptor = MathJax.startup.constructors.browserAdaptor;
-      MathJax.startup.registerConstructor('ctmDataWorkerAdaptor', function () {
-        const adaptor = browserAdaptor();
+      MathJax.startup.registerConstructor('ctmDataWorkerAdaptor', function (options) {
+        const adaptor = browserAdaptor(options);
         const nativeCreateWorker = adaptor.createWorker.bind(adaptor);
         adaptor.createWorker = async function (listener, options) {
           // Keep MathJax's native transport for ordinary origins.
@@ -24,7 +24,7 @@
         return adaptor;
       });
       MathJax.startup.useAdaptor('ctmDataWorkerAdaptor', true);
-      if (ready) ready();
+      if (ready) Reflect.apply(ready, this, []);
       else MathJax.startup.defaultReady();
     }
   });
