@@ -2,34 +2,51 @@ name: Replay reviewed asset baseline
 # Reproduce the asset migration and reviewed B6 order fix with current tools.
 # Exact package and course refs prevent upstream movement from changing evidence.
 on:
-  pull_request:
-    paths:
-      - tools/compare-rendered/assets.mjs
-      - tests/compare-rendered-assets.test.cjs
-      - .github/workflows/compare-assets-baseline.yml
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
+
 permissions:
   contents: read
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   examples:
+    needs: [campaign]
     uses: ./.github/workflows/compare-courses.yml
     with:
-      tooling-ref: ${{ github.event.pull_request.head.sha }}
+      tooling-ref: ${{ github.event.pull_request.head.sha || github.sha }}
       course: examples
       course-ref: main
       base: 294d5b86d06af5fecb5fcf50dc4562b17ee5c273
       head: 65be5facbf67f900533a71cd950aa82e5c4c1e95
   main-course:
+    needs: [campaign]
     uses: ./.github/workflows/compare-courses.yml
     with:
-      tooling-ref: ${{ github.event.pull_request.head.sha }}
+      tooling-ref: ${{ github.event.pull_request.head.sha || github.sha }}
       course: aacchhee/ingmat3a_ntnu
       course-ref: e45851080f462e84cde281528f21d4f21292a6ba
       base: 294d5b86d06af5fecb5fcf50dc4562b17ee5c273
       head: a628299e5ae719a4077c9c440d39f4e4914a547d
   demo:
+    needs: [campaign]
     uses: ./.github/workflows/compare-courses.yml
     with:
-      tooling-ref: ${{ github.event.pull_request.head.sha }}
+      tooling-ref: ${{ github.event.pull_request.head.sha || github.sha }}
       course: aacchhee/ctm-demo
       course-ref: d65eea624e96bbfc7b65ebb78b7d3a43ebdb3458
       profile: review

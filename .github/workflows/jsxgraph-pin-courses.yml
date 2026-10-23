@@ -1,13 +1,30 @@
 name: JSXGraph pin course and board comparison
 on:
-  push:
-    branches: [consolidation/2026-10-jsxgraph-pin-1-2]
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
+
 permissions:
   contents: read
   actions: read
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   compare:
+    needs: [campaign]
     strategy:
       fail-fast: false
       matrix:
@@ -21,9 +38,9 @@ jobs:
           - course: examples
             course_ref: ''
             profile: ''
-    uses: Erasmus-CTM/ctm-assessment/.github/workflows/compare-courses.yml@41c36c2657d2b8ca8038f57c180e527d72b2364d
+    uses: Erasmus-CTM/ctm-assessment/.github/workflows/compare-courses.yml@fe41047b1131ab4775eebfaa25dbe31ca6afe26e
     with:
-      tooling-ref: 41c36c2657d2b8ca8038f57c180e527d72b2364d
+      tooling-ref: fe41047b1131ab4775eebfaa25dbe31ca6afe26e
       course: ${{ matrix.course }}
       course-ref: ${{ matrix.course_ref }}
       profile: ${{ matrix.profile }}

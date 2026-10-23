@@ -50,3 +50,12 @@ categories:
     title: Explicit true preserves the historical automatic package preloads
     match:
       - {area: config, change: changed, object: '^qpyodideSettings$', path: '^/0/qpyodidePreloadPackages$', assets: '^preload-default$'}
+
+  # Only the exact installed17de83e -> e4ad81d renderer pair is eligible.
+  # The validator reconstructs canonical bridge scripts, checks original outer
+  # geometry, exact graph-editor bytes, the generated BOARDID prelude removal,
+  # and equality of every other frame byte (including loaders and authored code).
+  - id: jsxgraph-renderer-1.2
+    title: Reviewed JSXGraph 1.2.0 renderer with otherwise identical board content
+    match:
+      - {area: dom, change: attribute changed, tag: '^iframe$', attribute: '^src$', assets: '^jsxgraph-renderer-1\.2$'}

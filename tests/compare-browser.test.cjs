@@ -100,3 +100,31 @@ test('the HTTP server preserves the default and exposes an explicit standard iso
     fs.rmSync(root, {recursive: true, force: true});
   }
 });
+
+test('old inventory recognizes modern and mixed reveals while new keeps its modern requirement', async () => {
+  const {inventory} = await import(TOOL);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-browser-syntax-'));
+  try {
+    const modern = '<div class="ctm-modes"></div><details class="ctm-reveal hint"><summary>Hint</summary><p>Words.</p></details>';
+    const legacy = '<div data-learning-mode></div><details class="learning-hint"><summary>Hint</summary><p>Words.</p></details>';
+    fs.writeFileSync(path.join(root, 'modern.html'), page(modern));
+    fs.writeFileSync(path.join(root, 'legacy.html'), page(legacy));
+    fs.writeFileSync(path.join(root, 'mixed.html'), page(modern + '<details class="solution-block"><summary>Solution</summary></details>'));
+    for (const side of ['old', 'new']) {
+      const actual = inventory(root, 'modern.html', side, null);
+      assert.deepEqual(actual.reveals.map(r => r.kind), ['hint']);
+      assert.equal(actual.switch, true);
+      assert.equal(actual.switchSelector, '.ctm-modes');
+      assert.equal(actual.reveals[0].bySection, false);
+    }
+    const old = inventory(root, 'legacy.html', 'old', null);
+    assert.deepEqual(old.reveals.map(r => r.kind), ['hint']);
+    assert.equal(old.switchSelector, '[data-learning-mode]');
+    assert.equal(old.switch, true);
+    const strictNew = inventory(root, 'legacy.html', 'new', null);
+    assert.deepEqual(strictNew.reveals, []);
+    assert.equal(strictNew.switch, false);
+    assert.deepEqual(inventory(root, 'mixed.html', 'old', null).reveals.map(r => r.kind), ['hint', 'solution']);
+    assert.deepEqual(inventory(root, 'mixed.html', 'new', null).reveals.map(r => r.kind), ['hint']);
+  } finally { fs.rmSync(root, {recursive: true, force: true}); }
+});
