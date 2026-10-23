@@ -11,7 +11,7 @@ const fixture=path.resolve(process.env.CTM_RESIZE_FIXTURE);
 const output=path.resolve(process.env.CTM_RESIZE_REPORT);
 const helper=fs.readFileSync(path.resolve(process.env.CTM_LAYOUT_SOURCE),'utf8');
 const sha=text=>createHash('sha256').update(text).digest('hex');
-const helperHash='2eb6721c8e750a2214997af2f0447511255363e22f9160a0fadc2381c26a80bd';
+const helperHash='10cb056779c461ff0247994211f711d3da52ef9f39dbd1ddb7e6fd85047aeec2';
 assert.equal(sha(helper),helperHash,'exact canonical ctm-libs helper');
 const engine=process.env.CTM_BROWSER||'webkit';assert.ok(['chromium','firefox','webkit'].includes(engine));
 const html=fs.readFileSync(path.join(fixture,'index.html'),'utf8');
@@ -44,7 +44,7 @@ const editorFiles=[
   ]]
 ];
 const marginHtml='<button id="probe-reader-toggle" class="quarto-reader-toggle" type="button" onclick="quartoToggleReader()">Reader</button><div id="probe-margin-box" style="position:relative;height:100px"><div id="probe-margin-a" class="aside" style="position:absolute;top:0;height:40px;margin:0">Margin A</div><div id="probe-margin-b" class="aside" style="position:absolute;top:10px;height:40px;margin:0">Margin B</div></div>';
-const report={engine,helperHead:'670fee5431e743889bfcbc6e4c1ef1853482387d',helperSha256:sha(helper),fixtureHtmlSha256:sha(html),quartoSha256:sha(quarto),
+const report={engine,helperHead:'98a626d2355986e18ccb2011ccbf7c412003f2d0',helperSha256:sha(helper),fixtureHtmlSha256:sha(html),quartoSha256:sha(quarto),
   modes:{native:'byte-original HTML and owned sources, no helper',original:'matched canonical helper inline but inactive',ready:'shared parsed-content initialization only',editors:'shared supported explicit editor layout only',both:'both owned integrations'},samples:[]};
 fs.mkdirSync(output,{recursive:true});const servers={},origins={};let browser;
 try{
@@ -75,7 +75,7 @@ try{
   streamResponse.end('</body>');await parserPage.waitForLoadState('load');assert.equal(await parserPage.evaluate(()=>parserReady.length),1);await parserPage.close();
   console.log(JSON.stringify({incrementalParser:report.incrementalParser}));
   const cases=[
-    {name:'startup',variant:'actual',reader:false,width:1280,repeats:12,modes:['native','original','ready','both']},
+    {name:'startup',variant:'actual',reader:false,width:1280,repeats:12,modes:['native','original','ready','editors','both']},
     {name:'editors',variant:'actual',reader:false,width:1280,repeats:4,modes:['native','original','editors','both'],editors:true},
     {name:'reader-desktop',variant:'actual',reader:true,width:1280,repeats:4,modes:['original','both']},
     {name:'reader-mobile',variant:'actual',reader:true,width:390,repeats:4,modes:['original','both']},
@@ -109,14 +109,14 @@ try{
       editorStartErrors=await page.evaluate(()=>__localLayout.errors.length);
       await page.getByRole('tab',{name:'Code',exact:true}).click();await page.waitForTimeout(200);
       const capture=()=>page.evaluate(()=>monaco.editor.getEditors().map(editor=>{const node=editor.getContainerDomNode();return{value:editor.getValue(),contentHeight:editor.getContentHeight(),layout:editor.getLayoutInfo(),container:{width:node.clientWidth,height:node.clientHeight,styleHeight:node.style.height,display:getComputedStyle(node).display},rectWidth:node.getBoundingClientRect().width};}));
-      const record=async(name,hidden=false)=>{const states=await capture();for(const state of states){if(hidden){assert.equal(state.container.width,0);assert.equal(state.layout.width,5);assert.equal(state.layout.height,5);}else{assert.ok(state.layout.width>5&&state.layout.height>5);assert.ok(Math.abs(state.layout.width-state.container.width)<=1);assert.ok(Math.abs(state.layout.height-state.container.height)<=1);assert.ok(parseFloat(state.container.styleHeight)>=state.contentHeight);if(control.variant==='transform')assert.ok(Math.abs(state.rectWidth-state.container.width*.5)<=1,'editor layout retains untransformed content dimensions');}}editorStages.push({name,states});};
+      const record=async(name,hidden=false)=>{const states=await capture(),violations=[];for(const [index,state] of states.entries()){if(hidden){if(state.container.width!==0||state.layout.width!==5||state.layout.height!==5)violations.push({index,reason:'hidden editor must retain zero container size and Monaco 5px minimum layout'});}else{if(state.layout.width<=5||state.layout.height<=5)violations.push({index,reason:'visible editor layout must have nonzero dimensions'});if(Math.abs(state.layout.width-state.container.width)>1||Math.abs(state.layout.height-state.container.height)>1)violations.push({index,reason:'visible layout must converge to its container dimensions'});if(parseFloat(state.container.styleHeight)<state.contentHeight)violations.push({index,reason:'fit height must contain current editor content'});if(control.variant==='transform'&&Math.abs(state.rectWidth-state.container.width*.5)>1)violations.push({index,reason:'layout must retain untransformed content dimensions'});}}const stage={name,states,violations};editorStages.push(stage);console.log(JSON.stringify({editorStage:{case:control.name,mode,sample,...stage}}));};
       let values;
       for(const [name,count,long] of [['grow',16,false],['shrink',2,false],['empty',0,false],['long-line',1,true]]){
         values=await page.evaluate(({count,long})=>monaco.editor.getEditors().map((editor,index)=>{const value=long?'print("'+String(index).repeat(300)+'")':('print("local '+index+'")\n').repeat(count);editor.setValue(value);return value;}),{count,long});await page.waitForTimeout(200);await record(name);
       }
       await page.evaluate(()=>monaco.editor.getEditors().forEach(editor=>editor.updateOptions({wordWrap:'on'})));await page.waitForTimeout(200);await record('wrap-on-wide');
       for(const width of [390,1280]){await page.setViewportSize({width,height:900});await page.waitForTimeout(200);await record('wrap-width-'+width);}
-      const narrow=editorStages.find(stage=>stage.name==='wrap-width-390').states,wide=editorStages.find(stage=>stage.name==='wrap-width-1280').states;for(let i=0;i<wide.length;i++)assert.ok(narrow[i].contentHeight>=wide[i].contentHeight,'narrow wrapping height converges to at least the wide wrapping height');
+      const narrow=editorStages.find(stage=>stage.name==='wrap-width-390').states,wide=editorStages.find(stage=>stage.name==='wrap-width-1280').states;editorStages.push({name:'wrapping-height',states:wide,violations:wide.flatMap((state,index)=>narrow[index].contentHeight>=state.contentHeight?[]:[{index,reason:'narrow wrapping height must be at least the wide wrapping height'}])});
       await page.evaluate(()=>monaco.editor.getEditors().forEach(editor=>{const node=editor.getContainerDomNode();node.dataset.probeDisplay=node.style.display;node.style.display='none';}));await page.waitForTimeout(200);await record('both-hidden',true);
       await page.evaluate(()=>monaco.editor.getEditors().forEach(editor=>{const node=editor.getContainerDomNode();node.style.display=node.dataset.probeDisplay;delete node.dataset.probeDisplay;}));await page.waitForTimeout(200);await record('both-visible');
       await page.getByRole('tab',{name:'Scalar',exact:true}).click();await page.getByRole('tab',{name:'Code',exact:true}).click();await page.waitForTimeout(200);
@@ -130,10 +130,15 @@ try{
     }
     const final=await snapshot();assert.ok(final.reads.some(read=>read.stack.includes('/quarto-html/quarto.js')),'unchanged native Quarto callback still reads BODY');
     assert.deepEqual(failedRequests,[]);assert.deepEqual(consoleErrors,[]);assert.ok([...pageerrors,...final.errors].every(error=>error.message==='ResizeObserver loop completed with undelivered notifications.'));
-    const result={case:control.name,mode,sample,pageerrors,failedRequests,consoleErrors,initial,resized,editorState,editorStages,editorStartErrors,interactionErrors:editorStartErrors===null?null:final.errors.length-editorStartErrors,disposal,denial,final};report.samples.push(result);console.log(JSON.stringify(result));await context.close();
+    const result={case:control.name,mode,sample,pageerrors,failedRequests,consoleErrors,initial,resized,editorState,editorStages,editorStartErrors,interactionErrors:editorStartErrors===null?null:final.errors.length-editorStartErrors,disposal,denial,final};report.samples.push(result);console.log(JSON.stringify(result));
+    // Original native geometry defects are evidence, not expectations for the
+    // replacement. Preserve those snapshots; active editor integration must
+    // satisfy intended sizing in every recorded stage.
+    if(['editors','both'].includes(mode))assert.deepEqual(editorStages.flatMap(stage=>stage.violations),[],'shared editor integration must preserve all intended geometry');
+    await context.close();
   }
   report.summary=cases.flatMap(control=>control.modes.map(mode=>{const s=report.samples.filter(s=>s.case===control.name&&s.mode===mode);return{case:control.name,mode,loads:s.length,pageerrorLoads:s.filter(s=>s.pageerrors.length).length,windowErrorLoads:s.filter(s=>s.final.errors.length).length};}));console.log(JSON.stringify({summary:report.summary},null,2));
-  assert.ok(report.samples.filter(s=>s.mode==='editors').every(s=>s.interactionErrors===0),'explicit editor integration must retain zero new raw errors after the measured editor boundary');
+  assert.ok(report.samples.filter(s=>s.mode==='editors'&&s.editorStartErrors!==null).every(s=>s.interactionErrors===0),'explicit editor integration must retain zero new raw errors after the measured editor boundary');
   if(engine==='webkit'){
     assert.ok(report.samples.some(s=>s.case==='startup'&&s.mode==='native'&&s.initial.errors.length),'byte-original normal startup signal must reproduce before interactions');
     assert.ok(report.samples.some(s=>s.case==='startup'&&s.mode==='original'&&s.initial.errors.length),'matched inline inactive normal startup signal must reproduce before interactions');
