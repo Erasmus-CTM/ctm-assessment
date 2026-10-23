@@ -1,7 +1,5 @@
 name: Exact JSXGraph renderer comparison contracts
 on:
-  push:
-    branches: [consolidation/2026-10-jsxgraph-renderer-comparison]
   pull_request:
     paths:
       - tools/compare-rendered/**

@@ -1,25 +1,29 @@
 name: Offline browser checker and mechanism controls
 on:
-  pull_request:
-    paths:
-      - tools/board-check.mjs
-      - tools/offline-check.mjs
-      - tests/offline-check.test.mjs
-      - tests/offline-check/**
-      - .github/workflows/offline-browser.yml
-  push:
-    branches-ignore: [main]
-    paths:
-      - tools/board-check.mjs
-      - tools/offline-check.mjs
-      - tests/offline-check.test.mjs
-      - tests/offline-check/**
-      - .github/workflows/offline-browser.yml
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
+
 permissions:
   contents: read
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   controls:
+    needs: [campaign]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

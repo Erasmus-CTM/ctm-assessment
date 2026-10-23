@@ -1,13 +1,29 @@
 name: Board asset archive inspection
 on:
-  push:
-    branches: [consolidation/2026-10-step5-board-lock]
-  pull_request:
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
+
 permissions:
   contents: read
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   official-archives:
+    needs: [campaign]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

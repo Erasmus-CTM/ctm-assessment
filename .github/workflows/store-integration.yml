@@ -1,19 +1,12 @@
 name: Rendered store integration
 
 on:
-  pull_request:
-    paths:
-      - integration/store/**
-      - integration/feedback/repos.json
-      - scripts/install-project.py
-      - scripts/setup-feedback-integration.py
-      - tools/ci/review-dependencies.py
-      - tools/compare-browser.mjs
-      - _extensions/**
-      - package.json
-      - package-lock.json
-      - .github/workflows/store-integration.yml
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -23,7 +16,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   render:
+    needs: [campaign]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -60,7 +66,7 @@ jobs:
           retention-days: 7
 
   browser:
-    needs: render
+    needs: [render, campaign]
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.55.1-noble

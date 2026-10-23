@@ -6,9 +6,12 @@ name: Track component branches
 # its branch does not contain stays (the log says so): the JSXGraph pin is the
 # fork commit of upstream pull request #2, which upstream main lacks.
 on:
-  schedule:
-    - cron: '17 5 * * 1'
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -18,7 +21,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   follow-branches:
+    needs: [campaign]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

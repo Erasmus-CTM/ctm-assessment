@@ -8,23 +8,11 @@ name: Compare rendered courses
 # the course's own file and the files the comparison names); the report is
 # uploaded.
 #
-# On pull requests that change the package, its pins or the tools
-# (tools/ci/compare-matrix.py):
-# - the example site, before = the pull request's base, after = its head;
-# - every course of integration/pyodide-parity/corpora.json (the one course
-#   list) at its branch, on its own sources: before = the package the course
-#   pins in quarto-extensions.yml (a course that follows main: the base),
-#   after = the head. The courses stay pinned until their step-4 migration,
-#   so this shows what their next build would change once they follow main.
-#   A course that follows its branch (ingmat3a's linalg-branch; skipped with
-#   a notice once the branch is gone) is informational: a problem there is a
-#   warning, never a failure (round-2 review N1);
-# - the step-4 fixture course (integration/step4-course): before = as it is,
-#   with its pinned package; after = its migration (migrate-course-html.py
-#   --config and its migrated/ edits) with the head; compared with
-#   expect/step4-migration.yml, then old against new in Chromium, Firefox and
-#   WebKit (tools/compare-browser.mjs, design section 6.3), and the links once more
-#   on a first visit without isolation headers (coi-serviceworker).
+# Automatic umbrella PR campaigns are disabled by docs/development/ci-policy.md.
+# Explicit dispatch and reusable callers select the course and frozen refs.
+# The step4-course option retains the actual migration fixture, old against new
+# in Chromium, Firefox and WebKit, including first-visit links without isolation
+# headers (coi-serviceworker). Existing informational-branch handling is kept.
 # Reusable calls use explicit package refs and tooling-ref, checked out from
 # this repository even when the caller is a course PR. The caller's course
 # PR base/head are never package refs. Pin uses: and tooling-ref to the same
@@ -94,6 +82,10 @@ on:
         default: ''
   workflow_dispatch:
     inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
       course:
         description: 'Course repository (owner/name), "examples" (the umbrella example site) or "step4-course" (the step-4 fixture)'
         default: 'aacchhee/ctm-demo'
@@ -140,24 +132,6 @@ on:
       review-refs:
         description: 'Component commits for the after side only, NAME=SHA[,NAME=SHA] (install-project.py --review-refs): a preview of an unmerged component fix, never a pin'
         default: ''
-  pull_request:
-    paths:
-      - integration/feedback/repos.json
-      - _extensions/**
-      - _filters/**
-      - examples/**
-      - example.qmd
-      - feedback/**
-      - scripts/install-project.py
-      - scripts/setup-feedback-integration.py
-      - scripts/build-course.py
-      - tools/**
-      - integration/step4-course/**
-      - integration/pyodide-parity/corpora.json
-      - integration/pyodide-parity/build-corpora.py
-      - package.json
-      - package-lock.json
-      - .github/workflows/compare-courses.yml
 
 permissions:
   contents: read
@@ -171,7 +145,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  campaign:
+    if: github.event_name == 'workflow_dispatch' && !inputs['tooling-ref']
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   courses:
+    if: ${{ !cancelled() && (inputs['tooling-ref'] || needs.campaign.result == 'success') }}
+    needs: [campaign]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
