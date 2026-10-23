@@ -160,6 +160,27 @@ validation tasks, guidance and `_variants/` CODEOWNERS without adding a required
 code-owner gate. It documents that the existing template installer is still the
 legacy route; no default source pins, workflow deployment or student main changed.
 
+### Subsequent immutable installed stages
+
+A frozen student/base installation at assessment9504873, libs5a067c9,
+mathd0dfc46, checker38332f9, py18e6f1e, pyo0617c97 and upstream e4ad81d passes
+all recorded hashes/clean source checks:21 native files including native.json,
+unchanged browser wheel,15 installed consumer checks, six pure producer contracts,
+actual Quarto positive/negative gates, and a read-only installed helper GET with
+unrelated-origin POST refusal. This is a separate later stage from the earlier
+native-only baseline; it still does not prove Pyodide/CDN/bootstrap acceptance.
+
+The affected authoring installation at math1c3fa0c, libs39f9b24,
+checkerae0d405 and assessment9504873 passes19 focused installed checks, plus an
+actual installed helper student-preview GET with blank learner fields and matching
+teacher keys/context. The native package has22 listed entries plus native.json,
+23 recorded files. New pure authoring files are browser_manifest.py and
+rejection_hint.py; the checker browser wheel is unchanged. This stage covers
+ordinary authored AI context, sole native question serialization, numeric public
+variant events with separate identity/P17, CI pool teachers, and helper safeguards.
+The base15 and demo99 were not repeated for those small deltas. Later read-only
+GitHub batch, presentation and reporting slices have their own focused checks.
+
 ## Retained cloud evidence
 
 [Incremental evidence ZIP](evidence/2026-10-23-cloud-continuation.zip), SHA256
@@ -187,3 +208,14 @@ fixture), ordinary handwritten pool proof and linked feedback cancellation.
 Its connected helper report is explicitly a working-copy installed tuple;
 final immutable installed verification follows separately. Stubs, expected
 faults and stage boundaries are stated in the archive README and each report.
+
+[Immutable installed student/base stage](evidence/2026-10-23-variants-installed-student-base.zip),
+SHA256 `54875ca08d4774e12d91b6827c5f970480a4221d82fa8891bdfb7e173e5aed1a`,
+retains its exact refs, provenance/inventory, installed logs and harness metadata.
+
+[Affected installed authoring stage](evidence/2026-10-23-variants-installed-authoring-stage.zip),
+SHA256 `4aed7e551a502b622a9850ee5fc3098681e2f4e4b8dfc1a55a4aa997525643ac`,
+retains its separate exact tuple,19 checks and installed preview, plus scoped source
+and HTTP iframe engineering evidence with stubs and raw failures. Initial harness
+assumptions/environment failures are retained and explained; no product failure
+or first-visit blocker is waived.
