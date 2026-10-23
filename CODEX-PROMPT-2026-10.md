@@ -1,3 +1,11 @@
+CURRENT RESTART ENTRY POINT — 23 October 2026
+
+Read CODEX-RESTART-2026-10.md in this same directory for the compact, current work plan. It supersedes status summaries below; do not load this entire historical file at startup.
+
+AC merged checker16 -> 03e5e0f79d4430067568464bb47f897991a8a6b7 and checker17 -> f96f01725874934e1de60e08da15b3c0fde807ce. Both are verified in checker main; #17's added file/blob delta matches the reviewed head exactly. Fresh merged-main Pyodide checks pass; native checks were still running at this checkpoint. Assembly34/course17 remain open on the WebKit blockers. The single Font Awesome omission diagnostic did not fix ResizeObserver errors. See the restart file and current PRs for next steps.
+
+Historical checkpoint follows:
+
 LATEST CHECKPOINT — 22 October 2026. This supersedes historical states below.
 
 AC's current goal is a clean, fast Pyodide IDE delivered as a fully rendered static website ZIP. IT extracts it onto an existing webserver, preferably with no configuration. Pure CTM IDE/quiz completion remains first. On 22 October AC additionally authorized bounded cleanup of existing STACK code for otherwise free workers; this does not authorize Maxima bundling or new STACK integration (stage55+). No installer framework, transaction/CAS/journal layer or new native server. AC alone merges; never merge PRs, force-push, tag or update main. Use GitHub connector identity. Root alone updates this prompt.
