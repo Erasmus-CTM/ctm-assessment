@@ -22,6 +22,12 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: d39ef314ba05550d9efe8fb78919ab8962aaf4d3
+          path: _ci/layout-source
+          persist-credentials: false
       - name: Verify exact frozen original fixture
         uses: actions/github-script@v8
         with:
@@ -50,9 +56,23 @@ jobs:
           mkdir -p "$CTM_RESIZE_REPORT"
           node --check integration/resize-probe/local-lifecycle.mjs
           node integration/resize-probe/local-lifecycle.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
+      - name: Test the canonical local helper through matched owned-source consumers
+        shell: bash
+        env:
+          CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-fixture/before/_site
+          CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-local-candidate
+          CTM_LAYOUT_SOURCE: ${{ github.workspace }}/_ci/layout-source/_extensions/ctm-libs/ui/ctm-layout.js
+        run: |
+          set -o pipefail
+          mkdir -p "$CTM_RESIZE_REPORT"
+          node --test _ci/layout-source/tests/layout.test.cjs
+          node --check integration/resize-probe/local-candidate.mjs
+          node integration/resize-probe/local-candidate.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: resize-local-lifecycle
-          path: ${{ runner.temp }}/resize-local-report
+          path: |
+            ${{ runner.temp }}/resize-local-report
+            ${{ runner.temp }}/resize-local-candidate
           retention-days: 7
