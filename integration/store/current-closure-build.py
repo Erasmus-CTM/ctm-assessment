@@ -11,14 +11,14 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = '2d2f002cd6255e3fa9472a07f6ae4947b865621d'
-PRODUCTION = '8b46f20eed09e8b1e6a7d5faa45b6d0f0f859c8e'
+PRODUCTION = 'a7c300e99b061f6620c4f56bbd92438ebd8ddb0a'
 DIAGNOSTIC = '27cb273ffcbb6eea37f9ef2774dd8883d59df360'
 EXPECTED = {
     'ctm-assessment': PRODUCTION,
     'ctm-libs':'626b546604f51c9cb738210c56d054d421581e02',
     'math-exercise':'97a7dc5b1eb23adb398f789cb29e0266e1b256b0',
     'py-exercise':'18e6f1eb00713fdefbfc3d040c6a05eb88c6c314',
-    'pyodide-interaktiv':'5079500992d75fbfa9f8508a8a7c37c246e4cce7',
+    'pyodide-interaktiv':'4be390838e6f137e32cfb15de82b3a26b1e317bc',
     'ctm-checkers':'5976f1a97b78bd81d4d7a3a954ff2102df8c6e37',
     'jsxgraph':'e4ad81d82e1b56f86765026a3dd26f6975d29d57',
 }
