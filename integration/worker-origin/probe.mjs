@@ -99,13 +99,24 @@ async function probe() {
   const configuredSHA256 = crypto.createHash('sha256').update(configured).digest('hex');
   const vendorLoader = 'https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js';
   assert.equal(fixtureText.split(vendorLoader).length, 2, 'one MathJax src_mjx URL');
+  const adaptorPath = process.env.CTM_OPAQUE_ADAPTOR;
+  assert.ok(adaptorPath, 'test the explicitly pinned canonical pre-loader source');
+  const adaptorSource = fs.readFileSync(adaptorPath);
+  const adaptorSHA256 = crypto.createHash('sha256').update(adaptorSource).digest('hex');
+  const canonical = {repository: 'Erasmus-CTM/ctm-libs',
+    commit: '62235ae386da9ce591d956caae3b54aa7da9785d',
+    path: '_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js', sha256: adaptorSHA256};
+  const loadAttribute = 'onload="self.__ctmMathJaxLoad={src:this.src,version:MathJax.version,' +
+    'readyMethod:typeof MathJax.startup.defaultReady};" ';
   function candidateFrame(settings, csp) {
-    const bootstrap = '<script>window.MathJax = ' + JSON.stringify(settings || {}) + ';</script>\n';
-    return Buffer.from(fixtureText.replace('<head>', '<head>' + (csp ?
-      '<meta http-equiv="Content-Security-Policy" content="' + csp + '">' : ''))
-      .replace(loader, bootstrap + loader)
-      .replace(vendorLoader, 'data:text/javascript;base64,' +
-        fs.readFileSync(path.join(here, 'data-adaptor.js')).toString('base64')));
+    const bootstrap = '<script>window.MathJax = ' + JSON.stringify(settings || {}) + ';</script>\n' +
+      '<script src="data:text/javascript;base64,' + adaptorSource.toString('base64') + '"></script>\n';
+    const policy = csp ? '<meta http-equiv="Content-Security-Policy" content="' + csp + '">' : '';
+    const text = fixtureText.replace('<head>', '<head>' + policy)
+      .replace(loader, bootstrap + loader + ' ' + loadAttribute);
+    assert.equal(text.replace(policy, '').replace(bootstrap, '').replace(' ' + loadAttribute, ''), fixtureText,
+      'served copy only adds pre-loader configuration, optional CSP and a native loader observation');
+    return Buffer.from(text);
   }
   const candidateSettings = [
     {name: 'default', speech: true, braille: true},
@@ -132,6 +143,8 @@ async function probe() {
   cases.push({name: 'http-candidate-same-origin', src: '/candidate-frame.html',
     sandbox: 'allow-scripts allow-same-origin', candidate: true,
     settings: candidateSettings[0]});
+  cases.push({name: 'http-candidate-opaque', src: '/candidate-frame.html',
+    sandbox: 'allow-scripts', candidate: true, settings: candidateSettings[0]});
   const server = http.createServer((request, response) => {
     response.writeHead(200, {'content-type': request.url === '/data-adaptor.js' ?
         'text/javascript; charset=utf-8' : 'text/html; charset=utf-8',
@@ -139,7 +152,7 @@ async function probe() {
       'cross-origin-embedder-policy': 'require-corp',
       // This diagnostic resource opts in so Firefox can load the intentionally
       // opaque HTTP control. Parent-page COEP and every sandbox stay strict.
-      ...(request.url === '/exact-frame.html' ? {'cross-origin-resource-policy': 'cross-origin'} : {})});
+      ...(['/exact-frame.html', '/candidate-frame.html'].includes(request.url) ? {'cross-origin-resource-policy': 'cross-origin'} : {})});
     if (request.url === '/exact-frame.html') { response.end(fixture); return; }
     if (request.url === '/data-adaptor.js') {
       response.end(fs.readFileSync(path.join(here, 'data-adaptor.js'))); return;
@@ -154,7 +167,7 @@ async function probe() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = 'http://127.0.0.1:' + server.address().port;
   const report = {engine: engineName, fixtureSHA256: FIXTURE_SHA256,
-    source: {repository: 'aacchhee/ingmat3a_ntnu',
+    canonical, source: {repository: 'aacchhee/ingmat3a_ntnu',
       commit: '23e47057806766ecb95f3cc86cf92eefa8102316',
       run: 39835256923, job: 120022757378}, cases: []};
   let browser;
@@ -181,7 +194,7 @@ async function probe() {
         url: request.url(), failure: request.failure()
       }));
       page.on('response', response => {
-        if (response.url() === origin + '/exact-frame.html') {
+        if ([origin + '/exact-frame.html', origin + '/candidate-frame.html'].includes(response.url())) {
           const headers = response.headers();
           result.testFrameResourceHeaders = {coep: headers['cross-origin-embedder-policy'],
             corp: headers['cross-origin-resource-policy']};
@@ -232,6 +245,7 @@ async function probe() {
             urlOrigin: location.origin, effectiveOrigin: self.origin, readyState: document.readyState,
             isolated: crossOriginIsolated,
             mathjax: !!window.MathJax?.startup?.document,
+            nativeLoader: self.__ctmMathJaxLoad || null,
             speechOptions: window.MathJax?.startup?.document?.options ? {
               enableSpeech: MathJax.startup.document.options.enableSpeech,
               enableBraille: MathJax.startup.document.options.enableBraille
@@ -259,7 +273,7 @@ async function probe() {
     fs.mkdirSync(path.dirname(output), {recursive: true});
     fs.writeFileSync(output, JSON.stringify(report, null, 2) + '\n');
   }
-  assert.equal(report.cases.length, 10);
+  assert.equal(report.cases.length, 11);
   assert.ok(report.cases.every(item => !item.probeError), 'all embedded cases must become ready');
   for (const item of report.cases.filter(value => value.name === 'http-opaque' || value.name === 'http-same-origin')) {
     assert.deepEqual(item.testFrameResourceHeaders, {coep: 'require-corp', corp: 'cross-origin'},
@@ -285,7 +299,10 @@ async function probe() {
     const frame = result.frames.find(value => value.boards === 1);
     assert.ok(frame, item.name + ': actual board initialized');
     assert.equal(result.topIsolated, true, item.name + ': real parent isolation retained');
-    assert.equal(frame.effectiveOrigin, item.name.startsWith('data-') ? 'null' : origin);
+    const opaque = item.sandbox === 'allow-scripts';
+    assert.equal(frame.effectiveOrigin, opaque ? 'null' : origin);
+    assert.deepEqual(frame.nativeLoader, {src: vendorLoader, version: '4.1.3', readyMethod: 'function'},
+      item.name + ': unchanged original vendor script emits load after module initialization');
     assert.deepEqual(frame.speechOptions, {enableSpeech: item.settings.speech, enableBraille: item.settings.braille});
     assert.deepEqual(frame.speechMenuOptions, {speech: item.settings.speech, braille: item.settings.braille});
     assert.equal(result.renderer?.svg, true, item.name + ': actual SVG conversion completes');
@@ -294,14 +311,14 @@ async function probe() {
     if (item.settings.braille) assert.match(result.renderer.braille || '', /[\u2800-\u28ff]/u, item.name + ': braille generated');
     const workers = frame.trace.filter(value => value.kind === 'worker-create');
     assert.equal(workers.length, item.settings.speech || item.settings.braille ? 1 : 0);
-    if (workers.length) assert.ok(workers[0].url.startsWith(item.name.startsWith('data-') ? 'data:' : 'blob:'),
+    if (workers.length) assert.ok(workers[0].url.startsWith(opaque ? 'data:' : 'blob:'),
       item.name + ': data transport confined to opaque origin');
     assert.deepEqual(result.errors, [], item.name + ': no uncaught errors');
     assert.deepEqual(result.console.filter(value => value.type === 'error'), [], item.name + ': no raw console errors');
     assert.deepEqual(result.failedRequests, [], item.name + ': no failed requests');
   }
   const native = report.cases.find(value => value.name === 'http-same-origin').renderer;
-  for (const name of ['data-candidate-default', 'data-candidate-csp', 'http-candidate-same-origin']) {
+  for (const name of ['data-candidate-default', 'data-candidate-csp', 'http-candidate-same-origin', 'http-candidate-opaque']) {
     const renderer = report.cases.find(value => value.name === name).renderer;
     for (const key of ['speech', 'braille', 'locale']) assert.equal(renderer[key], native[key],
       name + ': accessibility output matches native MathJax');

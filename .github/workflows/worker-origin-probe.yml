@@ -30,6 +30,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: 62235ae386da9ce591d956caae3b54aa7da9785d
+          path: .probe-libs
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -37,6 +43,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Run exact frame under strict isolation
         env:
+          CTM_OPAQUE_ADAPTOR: ${{ github.workspace }}/.probe-libs/_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js
           CTM_BROWSER: ${{ matrix.browser }}
           CTM_WORKER_REPORT: ${{ runner.temp }}/worker-origin-${{ matrix.browser }}.json
         run: node integration/worker-origin/probe.mjs
