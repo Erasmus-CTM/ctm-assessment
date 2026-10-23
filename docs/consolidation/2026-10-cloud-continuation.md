@@ -79,26 +79,46 @@ There is still no end-to-end bootstrap/lock/install/background deadline. Range
 stall bounds and idle admission limits do not establish cancellation. No broad
 runtime timeout redesign or offline acceptance is claimed.
 
-## Variants authoring in progress
+## Variants authoring source checkpoint
 
-The native-only checker25 foundation at
-`f5c4e63b42d4eff2eabcb0e7e2ddb946cdeb2010` includes tested lazy reconciliation,
-Generate25more, atomic bulk decisions, review/undo, sticky checklist rendering,
-a data-only planner and an **inactive** trusted-base GitHub adapter. Passing
-bulk ticks cannot consent to candidates introduced by a later refresh. The
-adapter uses atomic expectedHeadOid, verifies exact-head producer/artifact
-provenance, rechecks comment intent, and accepts explicitly dispatched next-head
-runs. Fake API tests do not establish a live bot or check-status attachment.
-The real producer/template/card glue is a following slice, not claimed here.
-Browser checker wheels are unchanged.
+These are the published reviewed source heads at this checkpoint, separate from
+older immutable installed stages below. All are draft/HOLD. No browser checker
+wheel changed and no real teaching proposals were automatically approved.
 
-Authoring component branches are separate and stacked on loading leaves:
-
-| Draft | Exact source head | Boundary |
+| Draft | Exact source head | Implemented boundary |
 | --- | --- | --- |
-| libs43 | 5a067c93870a3719bc97a5f6198bb7cd21de138e | Shared chooser/P17, optional proposals, approval setting, equal-hash identity disambiguation and corrected rendezvous distribution. Linked explanations reset only on an accepted variant change; cancelled asynchronous collection cannot submit obsolete AI context. Four focused reset checks pass including actual Quarto, independently repeated. |
-| math32 | 9f80a119473869d63f7fe54e8db3eae04ae1bd1c | Canonical native resolver/wrapper, Lua build bridge, file CLI, shared chooser/P17 student consumer, exact native custom context, isolated boards, accepted-only events and stable question context IDs. Connected local helper source is included; its shared UI dependency and final installed tuple are following work. |
-| assessment56 | 9504873c236e838f644c1a2807720ad419734554 | Canonical native producer beside browser wheels. Exact component adapter/review-server allowlist; arbitrary Python, nested copies, checker definitions and foreign wheels remain rejected. Original12 portable checks and affected8 one-home checks pass; independent review/repetition. |
+| [checker25](https://github.com/Erasmus-CTM/ctm-checkers/pull/25) | `7074abf19a61bf13ea9a8f7f700fe5d66066f3b7` | Tested lazy generation, leased decisions/history, lossless complete-file G1 export, read-only next-batch route, strict changed/gone approval checks, rejection-only retirement, safe hints, pool CI, trusted producer/bot and inactive Pages templates, validated teacher displays and project reporting. |
+| [libs43](https://github.com/Erasmus-CTM/ctm-libs/pull/43) | `39f9b24c94c2c7c79b18d3dcb9b21d4042834691` | Shared stable chooser/P17, explicit optional/review proposals, corrected distribution, accepted-only linked explanation reset and opt-in numbered public result events with separate identity. |
+| [math32](https://github.com/Erasmus-CTM/math-exercise/pull/32) | `d1fea56a987e9e507b3f720494bd2ed2c2fb440d` | Canonical native resolver/wrapper, file CLI, connected local review with lazy actual multilingual Quarto student previews, pool checking, shared student chooser/exact custom context, single native payload, isolated board helper and late teacher presentation. |
+| [assessment56](https://github.com/Erasmus-CTM/ctm-assessment/pull/56) | `9504873c236e838f644c1a2807720ad419734554` | Canonical native producer beside unchanged browser wheels; exact component adapter/review-server allowlist. Arbitrary Python, nested copies, checker definitions and foreign wheels remain rejected. |
+
+The shared authoring UI has explicit decisions, undo, problems-only filtering,
+passing bulk approval and same-answer reapproval. Generate25more preserves existing
+numbers, tapes, rejections and the original page lease. Execution/grading failures
+stop rather than becoming another draw. Gone approvals may be retired only with
+a rejection reason, retaining their old hash, number and snapshot. Native strict
+CI rejects changed/gone approvals even if normal publication can still use some
+current approvals. Handwritten pools use a separate real teacher/authored-case
+check and receive no proposal or approval history.
+
+The trusted producer proves exact PR head, protected-default producer closure,
+run and archive digest before privileged effects. Bot writes use expectedHeadOid,
+latest comment intent and explicit next-head recheck dispatch. Its templates remain
+inactive outside `.github/workflows`: fake API tests do not establish live bot,
+required-check attachment or public hosting. G1 complete-file export preserves
+large integer lexemes and full history; humans inspect the branch/file and diff
+before committing. A stale artifact must be regenerated. G1's extra batch route
+opens GitHub's native Actions form with explicit expected-head inputs, never a
+browser generator or an automatic source write.
+
+Teacher display is late optional metadata from exact decoded teacher objects,
+validated by one strict shared MathML/LaTeX sanitizer. Canonical input remains
+visible, including unsupported displays; no evaluation of strings, hash change
+or student presentation payload is introduced. Native Chromium checks cover
+fractions/matrices and hostile printer output. Project reports emit escaped job
+summaries; more than30 open questions use one summary while preserving current
+checklist ticks. Deleted-question comments are archived as inert text. These are
+source/fake-service contracts; actual GitHub rendering and status remain unobserved.
 
 The actual component CLI50 workflow used math9bf8a2f/checker1a42281, retained
 separately from later student/UI changes: Generate25 → explicitly approve one
@@ -149,9 +169,11 @@ It still does not activate the Lua/JS component bridge.
 Ordinary Quarto preview versus render has no verified public Lua detection
 signal in1.8.27. Bounded actual preview/render probes agreed. Explicit review/
 preview settings exist; automatic ordinary-preview behavior remains open rather
-than weakening required publishing. Complete rendered multilingual review/TryIt,
-trusted workflow glue, course/example migration and final installed integration
-remain in progress. No full variants, course or first-visit clearance is claimed.
+than weakening required publishing. Connected local multilingual student previews and trusted workflow source are
+implemented. The current G1 artifact still has text previews; actual component
+student views for that route and legacy example/test cleanup are the next focused
+source slices. Final installed deltas remain separate from earlier stage evidence.
+No full variants, course or first-visit clearance is claimed.
 
 The course template now has separate draft
 [PR1](https://github.com/aacchhee/quarto-course-template/pull/1) at

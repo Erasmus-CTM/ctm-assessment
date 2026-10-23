@@ -38,9 +38,9 @@ python _extensions/math-exercise/question-variants.py \
 ```
 
 Review the notes, teacher values and test details, stage explicit decisions,
-then download one decision request. The page shows resolved Markdown text; it
-does not provide a connected TryIt or live Check. Staging and downloading save
-no decisions. Apply the downloaded file through the same component CLI:
+then download one decision request. This disconnected file shows resolved
+Markdown text and validated teacher mathematical display beside the canonical
+input. It does not run a student Check. Staging and downloading save no decisions. Apply the downloaded file through the same component CLI:
 
 ```sh
 python _extensions/math-exercise/question-variants.py \
@@ -82,8 +82,18 @@ reject and bulk decisions save through the canonical wrapper and rebuild the
 review from current source. It accepts decisions only for the file and label
 selected at launch. Keep the terminal running; Ctrl-C stops it. `--no-browser`
 prints the address without opening it; `--port` selects a port explicitly.
-There is no file watcher or live student TryIt. After a stale lease or uncertain
-save result, rebuild and inspect the current manifest before deciding again.
+Expand a candidate to build its student view lazily through the actual installed
+Quarto math filter. The view provides the question, worked solution, blank learner
+fields and Check controls; available authored languages have separate views.
+This isolated preview omits ambient course context and diagrams. A course review
+build is still needed to inspect those. Runtime/CDN availability is a separate
+condition: rendered controls alone do not prove that grading started.
+
+The connected page also provides **Generate 25 more**, preserving the original
+manifest lease and existing decisions. A stale source or another writer stops the
+operation. There is no file watcher. After a stale lease or uncertain save result,
+reload and inspect the current manifest before deciding again. A timeout after a
+possible write is uncertain; do not blindly retry an old decision request.
 
 Normal publishing requires approval: zero current approved notes stops the
 build, and fewer than the target emits a warning. Explicit OPEN is the existing
@@ -91,6 +101,38 @@ build, and fewer than the target emits a warning. Explicit OPEN is the existing
 warnings remain. `CTM_VARIANTS=review` chooses the nonstudent review route.
 Ordinary `quarto preview` is not an implicit approval-gate exception. These build
 settings do not turn the disconnected local review into a live bot or Check.
+
+## Reviewing a GitHub branch
+
+The inactive trusted workflow templates produce exact-head review files without
+writing proposal history. Once a maintainer installs the reviewed workflow on the
+trusted default branch and configures the actual preview host, its review links
+can offer **Copy file** and **Open in GitHub editor**. Stage decisions, copy the
+complete manifest, inspect the branch/file and Git diff, then make your own
+commit. The complete file preserves large JSON numbers, proposal tapes, snapshots,
+stable decision numbers and history. An old artifact is a snapshot: regenerate it
+if the source or manifest changed before pasting.
+
+On a same-repository PR, the GitHub batch link opens the native Actions form with
+explicit branch, PR number, expected head and question label. It requests one
+read-only tested batch; it does not write the source manifest or grant approval.
+Forks can use their own branch editor but do not get an unsupported privileged
+batch route. No workflow, dispatch, comment or preview deployment was activated
+by this campaign.
+
+Current source also provides rejection-only retirement for a gone approval,
+problems-only review, undo, safe same-answer reapproval and conservative rejection
+hints. Retiring an absent entry requires a reason and preserves its number,
+snapshot and history. It cannot approve an absent candidate. Strict review CI
+fails changed or gone approvals even when another approval can still publish.
+Handwritten pools have a separate read-only teacher/authored-case CI check and
+never acquire approval manifests.
+
+Project reports summarize current decisions and check results. More than 30 open
+questions use one project summary while preserving existing checklist ticks;
+deleted-question comments become inert read-only archives. These are tested source
+and fake-API contracts. Live status attachment, GitHub math rendering and a hosted
+review URL remain unobserved and require an installed trusted workflow.
 
 ## Focused verification retained for review
 
@@ -111,8 +153,8 @@ choice space failed explicitly at the 5,000-prefix-attempt budget, and a separat
 authored-test failure stopped without a partial manifest or resampling. These
 intentional faults are separate expected failures, not normal raw-clean runs.
 This native proof does not establish browser, live-course or deployment
-acceptance. The actual trusted bot producer, live sticky update and status
-attachment are separate work.
+acceptance. Later source slices implement the trusted producer, sticky updates and reporting.
+Live workflow/status attachment remains a separate acceptance item.
 
 The connected helper has separate focused server and browser evidence; it is
 not part of the earlier CLI50 tuple above. See the continuation checkpoint for
