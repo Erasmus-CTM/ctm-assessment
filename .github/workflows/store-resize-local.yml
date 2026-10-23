@@ -1,4 +1,4 @@
-name: Local CTM layout lifecycle trace
+name: Local CTM layout integration proof
 on:
   push:
     branches: [consolidation/2026-10-local-layout-trace]
@@ -7,12 +7,16 @@ permissions:
   contents: read
   actions: read
 jobs:
-  trace:
+  integration:
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.55.1-noble
       options: --user 1001
-    timeout-minutes: 15
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -25,7 +29,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-libs
-          ref: d39ef314ba05550d9efe8fb78919ab8962aaf4d3
+          ref: 670fee5431e743889bfcbc6e4c1ef1853482387d
           path: _ci/layout-source
           persist-credentials: false
       - name: Verify exact frozen original fixture
@@ -46,22 +50,13 @@ jobs:
           run-id: 39841421065
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/resize-fixture
-      - name: Trace exact owned boundaries without changing vendor source or observer construction
-        shell: bash
-        env:
-          CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-fixture/before/_site
-          CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-local-report
-        run: |
-          set -o pipefail
-          mkdir -p "$CTM_RESIZE_REPORT"
-          node --check integration/resize-probe/local-lifecycle.mjs
-          node integration/resize-probe/local-lifecycle.mjs 2>&1 | tee "$CTM_RESIZE_REPORT/probe.log"
       - name: Test the canonical local helper through matched owned-source consumers
         shell: bash
         env:
           CTM_RESIZE_FIXTURE: ${{ runner.temp }}/resize-fixture/before/_site
           CTM_RESIZE_REPORT: ${{ runner.temp }}/resize-local-candidate
           CTM_LAYOUT_SOURCE: ${{ github.workspace }}/_ci/layout-source/_extensions/ctm-libs/ui/ctm-layout.js
+          CTM_BROWSER: ${{ matrix.browser }}
         run: |
           set -o pipefail
           mkdir -p "$CTM_RESIZE_REPORT"
@@ -71,8 +66,6 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: resize-local-lifecycle
-          path: |
-            ${{ runner.temp }}/resize-local-report
-            ${{ runner.temp }}/resize-local-candidate
+          name: resize-local-integration-${{ matrix.browser }}
+          path: ${{ runner.temp }}/resize-local-candidate
           retention-days: 7
