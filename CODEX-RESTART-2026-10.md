@@ -1,10 +1,12 @@
-# Active cloud continuation — 23 October 2026
+# Active cloud continuation — 24 October 2026
 
 Read [the current continuation](docs/consolidation/2026-10-cloud-continuation.md) and [readable proof index](docs/consolidation/2026-10-23-proof-index.md). Fresh spinner-fixed tuples are validated: assessment56a7c300/default133, pyo11 4be390, demo19f9eb947 and demo20b50630 real three-browser/fault/network proofs; template0008395 task/page CI passes. Authoring99teachers/349fields is independently clear with zero decisions and its explicit incidental-target qualification.
 
-Assessment28f358 original focused store/D2 plus ordinary CI pass;28 and staged-foundation34 are ready for scoped AC source review, with52/56 successors required. Optional libs40 and checker13 966c3e are ready within their stated scopes. Native12's bounded existing-run restoration and focused208observation oracle pass, but ordinary PR11/12 CI remains pending. Maxima browser readiness remains independent/source-only, not established by native Linux calls. Historical failures and older five-page tuple limits remain preserved.
+Assessment28f358 original focused store/D2 plus ordinary CI pass;28 and staged-foundation34 are ready for scoped AC source review, with52/56 successors required. Optional libs40 and checker13 966c3e are ready within their stated scopes. Native12's bounded existing-run restoration and focused208observation oracle pass, and PR11/12 are now ready after all five ordinary supported-version jobs per PR pass and final raw/head/body transitions are verified. Maxima browser readiness remains independent/source-only, not established by native Linux calls. Historical failures and older five-page tuple limits remain preserved.
 
 This checkpoint publishes only readable source/CI summaries, stable GitHub links/hashes and a small default133 receipt. Automatic approval review rejected bundled raw evidence republication; those bundles are NOT published, and originals/rejection records remain preserved locally while original CI artifacts/logs remain on GitHub. No retry/re-encoding workaround is part of this checkpoint.
+
+Allowed isolated Ingmat preparation is published on a new branch at9ed97fc9 (two config files only). Normal133-file setup and ONE existing uke11 page render/membership check pass; no browser/full-course acceptance follows. PR17/main remain unchanged, with no new PR or workflow run. Later AC course rollout/full-course gates remain separate.
 
 AC alone merges. No merges, deployments, tags, protected Ingmat3a/main writes, live bot activation or real teaching approvals occurred. Other historical/protected/scientific scopes remain separate. Earlier restart/status records below are historical; current continuation controls.
 

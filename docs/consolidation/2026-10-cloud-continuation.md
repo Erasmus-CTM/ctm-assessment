@@ -1,4 +1,4 @@
-# Cloud continuation — 23 October 2026
+# Cloud continuation — 24 October 2026
 
 ## Current state — fresh loading tuples accepted; bounded prerequisite/checker work advanced
 
@@ -8,9 +8,11 @@ All baseline seven runtime-error categories are empty and observed request lifec
 
 Assessment28f358 is ready after original strict18storeblocks, D2 and ordinary examples succeed. Assessment34 unchanged1e2df499 is ready as staged-foundation source only (11success/23skips), requiring52/56 successors. Optional/nondefault libs40 unchanged2cdd3b47 and checker13 966c3e are ready after scoped source/CI review; checker13 all7actual jobs succeed. Prior natural14e36 warning, instrumented failures, stale-wheel failure and mutation-anchor failures remain history rather than current failures.
 
-Native12 existing run39948509280 bounded restoration now succeeds without native producer reruns; focused S10d967aee3 independently validates208observations/235Maxima processes, not widget coverage. Ordinary PR11/12 CI recovery remains pending, so neither is declared ready. Unsupported/native-policy limits, scientific STACK/protected-course scopes and AC merge order remain explicit. Across-pack loading audit preserves missing-JSXGraph/Python, missing-speech/ordinaryCheck and independent Maxima boundaries; Maxima browser/WASM review remains source-only.
+Native12 existing run39948509280 bounded restoration now succeeds without native producer reruns; focused S10d967aee3 independently validates208observations/235Maxima processes, not widget coverage. PR11/12 are now ready at unchanged0e63965b/74fa8e8e after all five ordinary supported-version jobs per PR pass and final raw/head/body transitions are verified. All eight resumed canceled version jobs succeed, with zero active/queued; original successes remain preserved. Unsupported/native-policy limits, scientific STACK/protected-course scopes and AC merge order remain explicit. Across-pack loading audit preserves missing-JSXGraph/Python, missing-speech/ordinaryCheck and independent Maxima boundaries; Maxima browser/WASM review remains source-only.
 
 **Publication limitation:** automatic approval review rejected raw archive republication. This checkpoint includes no raw logs, runtime payloads, archive parts or signed URLs. Local originals, inspected/redacted bundles and rejection records remain preserved; original workflow evidence remains on GitHub. The small readable index is an authorized alternative, not a retry or alternate encoding of the blocked archives.
+
+Isolated Ingmat preparation, explicitly allowed by the restart, is published at9ed97fc9 on a NEW preparation branch: exact two-config treef158798a, parentPR17source23e4705. Normal canonical133-file installation and ONE existing uke11 page render (zero warnings,13graded members) pass with independent review. Source content/26quizzes/176labels/352browser checks per engine stay unchanged. The227-byte root index is generated redirect scaffolding, not accepted homepage/site output. PR17 and main remain unchanged; no new PR or workflow run was created. This is preparation, not full-course/browser acceptance or AC rollout go-ahead.
 
 AC alone merges. No merges, deployments, tags, protected Ingmat3a/main writes, live bot activation or real teaching decisions occurred. Current scoped readiness does not declare all historical drafts/STACK/protected or future merged trees accepted.
 
