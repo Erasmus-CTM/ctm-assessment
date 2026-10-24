@@ -2,6 +2,7 @@ name: Official complete asset candidate
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: ctm-complete-assets-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -34,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Erasmus-CTM/ctm-libs
-          ref: 626b546604f51c9cb738210c56d054d421581e02
+          ref: 8f21ff0110814766c6590e8a9bfe67e90c190af0
           path: .asset-sources/libs
           persist-credentials: false
       - uses: actions/cache@v4
@@ -58,6 +59,61 @@ jobs:
       - name: Compose independently reviewed selections and verify complete carried bytes
         run: |
           python scripts/ctm_complete_assets_candidate.py --composer-root .asset-sources/composer --board-root .asset-sources/board --library .asset-sources/libs/_extensions/ctm-libs --pins .asset-sources/board/_extensions/ctm-assessment/jsxgraph-pins.yml --cache .asset-cache/complete --python-lock .private-extensions/complete-candidate/python-lock.json --npm-lock .private-extensions/complete-candidate/npm-lock.json --board-lock .private-extensions/complete-candidate/board-lock.json --private-index .private-extensions/complete-candidate/assets-imports.json --availability .private-extensions/complete-candidate/availability.json --output .private-extensions/complete-candidate/inspection --reviewed-digests integration/assets-complete-reviewed-digests.json
+      - name: Download the last AC-approved asset artifact for a lock-only comparison
+        uses: actions/download-artifact@v7
+        with:
+          name: prebuilt-offline-assets
+          run-id: 40081864918
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/approved-assets
+      - name: Verify the complete lock difference for the reviewed A1 runtime source
+        env:
+          REVIEW_ROOT: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as assets
+          previous = Path(os.environ['REVIEW_ROOT']) / 'approved-assets/inspection/complete-lock.json'
+          current = Path('.private-extensions/complete-candidate/inspection/complete-lock.json')
+          locks = {}
+          for name, path in [('last-approved', previous), ('a1-runtime', current)]:
+              raw = path.read_bytes()
+              value = json.loads(raw)
+              assert raw == assets.json_bytes(value)
+              digest = assets.digest(raw)
+              assert digest == hashlib.sha256(raw).hexdigest()
+              if name == 'last-approved':
+                  assert digest == '6f8a64b5a24ffdeda87f7cd83a6eee23ee87f7752bf027fbb68174a60d5359fe'
+              locks[name] = value
+              print('LOCK_RECEIPT ' + json.dumps({'name': name, 'bytes': len(raw),
+                    'raw_sha256': hashlib.sha256(raw).hexdigest(), 'ctm_assets_digest': digest,
+                    'files': len(value['files']),
+                    'source_fingerprints': {k: value['provenance'][k] for k in
+                        ['table_sha256', 'runtime_sha256', 'board_pins_sha256']}}, sort_keys=True))
+          def differences(a, b, path=''):
+              if type(a) is not type(b):
+                  return [{'path': path, 'old': a, 'new': b}]
+              if isinstance(a, dict):
+                  result = []
+                  for key in sorted(a.keys() | b.keys()):
+                      if key not in a or key not in b:
+                          result.append({'path': path + '/' + key, 'old': a.get(key), 'new': b.get(key)})
+                      else:
+                          result.extend(differences(a[key], b[key], path + '/' + key))
+                  return result
+              if a != b:
+                  return [{'path': path, 'old': a, 'new': b}]
+              return []
+          expected_diff = [{
+              'path': '/provenance/runtime_sha256',
+              'old': '55a51ab3c8fed6a759024e7dd0bc18e19200b70e29fb8130dbe9619f318f1154',
+              'new': 'a96ddf1e97710019296ab0549e86c48a9ae3bc4881e597298fdb73004ad1e0ea',
+          }]
+          assert differences(locks['last-approved'], locks['a1-runtime']) == expected_diff, 'Unexpected complete-lock changes beyond the reviewed A1 runtime fingerprint'
+          print('LOCK_DIFF ' + json.dumps(expected_diff, sort_keys=True))
+          PY
       - name: Preserve the verified prebuilt asset bundle
         uses: actions/upload-artifact@v4
         with:

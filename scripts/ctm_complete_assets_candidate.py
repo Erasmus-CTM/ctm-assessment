@@ -14,7 +14,7 @@ KINDS = {"python": "private-partial-python-assets-lock",
          "board": "private-partial-board-assets-lock"}
 SOURCES = {"composer": "63980a231771f63a4d20000f9fafadea73b136c9",
            "board": "56b36b43d602eda3971afc144e65a73f9f6cfcbb",
-           "ctm-libs": "626b546604f51c9cb738210c56d054d421581e02"}
+           "ctm-libs": "8f21ff0110814766c6590e8a9bfe67e90c190af0"}
 
 
 def main(argv=None):
