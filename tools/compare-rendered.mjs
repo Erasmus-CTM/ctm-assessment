@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire} from 'node:module';
 import {closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
+import {markStoreAdditions} from './compare-rendered/store.mjs';
 const require = createRequire(import.meta.url);
 const vm = require('node:vm');
 const {JSDOM} = require('jsdom');
@@ -122,7 +123,8 @@ function extract(file) {
     }
     if (el.getAttribute('type') === 'application/json') {
       // Activity data and other JSON islands: compared as JSON, keyed by their element.
-      const key = (el.className || 'json') + (el.parentElement?.id ? '#' + el.parentElement.id : '');
+      const key = el.id === 'ctm-store-manifest' ? 'ctm-store-manifest' :
+        (el.className || 'json') + (el.parentElement?.id ? '#' + el.parentElement.id : '');
       let json; try { json = JSON.parse(el.textContent); } catch (_) { json = el.textContent; }
       (configs[key] ||= []).push(json);
       continue;
@@ -553,7 +555,7 @@ function words(doc) {
   const list = [], spans = new Map();
   const walker = doc.createTreeWalker(doc.body, 4);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    if (node.parentElement?.closest('script, style, template, noscript')) continue;
+    if (node.parentElement?.closest('script, style, template, noscript') || doc.ctmValidatedStoreBar?.contains(node)) continue;
     const found = node.textContent.split(/\s+/).filter(Boolean);
     if (!found.length) continue;
     spans.set(node, [list.length, list.length + found.length]);
@@ -721,6 +723,10 @@ function duplicateIds(page, A, B) {
 
 function comparePage(page, before, after, ends, linked) {
   const A = extract(before), B = extract(after), items = [];
+  // Additive generated chrome has no authored position. Only a complete,
+  // catalogue-verified store bar may leave the invariant's prose accounting.
+  markStoreAdditions(A, []);
+  markStoreAdditions(B, []);
   for (const [change, list, other] of [['removed', A.files, B.files], ['added', B.files, A.files]])
     for (const what of list) if (!other.includes(what)) items.push({page, area: 'file', change, what});
   const kinds = side => side.inline.map(x => x.kind);
@@ -755,7 +761,9 @@ function comparePage(page, before, after, ends, linked) {
     Object.assign(item, features);
     delete item.index;
   }
-  return contextItems(items, B, page);
+  const contextual = contextItems(items, B, page);
+  markStoreAdditions(B, contextual);
+  return contextual;
 }
 
 // ---------------------------------------------------------------- expectations
@@ -777,7 +785,7 @@ function test(pattern, value) {
 function matches(rule, item) {
   if (rule.area && rule.area !== item.area) return false;
   for (const field of ['change', 'what', 'object', 'path', 'tag', 'element', 'attribute', 'before', 'after', 'line', 'page', 'effective', 'context',
-    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes', 'reveal', 'switchOrder'])
+    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes', 'reveal', 'switchOrder', 'store'])
     if (rule[field] !== undefined && !test(rule[field], item[field])) return false;
   for (const [field, pattern] of Object.entries(rule.where || {})) {
     const value = field.split('.').reduce((v, k) => (v == null ? v : v[k]), item.item ?? item.attrs);

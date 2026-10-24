@@ -1,0 +1,21 @@
+project:
+  type: website
+  render: [index.qmd, second.qmd]
+website:
+  title: Store integration
+filters:
+  - path: _extensions/ctm-assessment/tab-ids.lua
+    at: pre-ast
+  - ctm-assessment
+format:
+  html:
+    toc: false
+ctm-assessment:
+  storage-key: ctm-store-browser-integration
+  progress: true
+math-exercise:
+  feedback: false
+py-exercise:
+  feedback: false
+pyodide:
+  feedback: false

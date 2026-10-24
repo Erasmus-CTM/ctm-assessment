@@ -1,0 +1,102 @@
+name: Rendered store integration
+
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type broad testing campaign to authorize the broad jobs
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ctm-store-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
+
+  render:
+    needs: [campaign]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Select the reviewed component pins
+        env:
+          REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 tools/ci/review-dependencies.py
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'
+      - run: npm ci --ignore-scripts
+      - name: Check the existing browser helper
+        run: node --test tests/compare-browser.test.cjs integration/store/instrument.test.mjs
+      - name: Render the mixed old/new fixtures through the canonical installer
+        run: python integration/store/build.py --dest "$RUNNER_TEMP/store-integration" --review-refs "$CTM_REVIEW_REFS"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: store-rendered-fixtures
+          path: |
+            ${{ runner.temp }}/store-integration/before/_site
+            ${{ runner.temp }}/store-integration/after/_site
+            ${{ runner.temp }}/store-integration/resolved-repos.json
+          retention-days: 7
+
+  browser:
+    needs: render
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - uses: actions/download-artifact@v7
+        with:
+          name: store-rendered-fixtures
+          path: ${{ runner.temp }}/store-integration
+      - name: Test actual rendered components and persistence
+        env:
+          CTM_BROWSER: ${{ matrix.browser }}
+          CTM_STORE_ROOT: ${{ runner.temp }}/store-integration
+        run: |
+          set -o pipefail
+          node integration/store/browser.mjs 2>&1 | tee "$RUNNER_TEMP/store-browser.log"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: store-browser-${{ matrix.browser }}
+          path: ${{ runner.temp }}/store-browser.log
+          retention-days: 7

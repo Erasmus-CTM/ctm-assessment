@@ -1,0 +1,9 @@
+---
+title: Second store page
+lang: en
+---
+
+```{math-exercise}
+#| label: store-second
+Second-page task: _[9].
+```
