@@ -1,0 +1,190 @@
+name: Offline asset builder
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: ctm-assets-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  fixture-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile shared builder
+        run: python -m py_compile scripts/ctm_assets.py
+      - name: Integrity, extraction, licence and carried-bundle contracts
+        run: python -m unittest discover -s tests -p '*assets*.py' -v
+  official-metadata:
+    needs: fixture-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: 2ed1a3381bb6b606e3a913905095eadd8aee0988
+          path: .asset-sources/libs
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 4edd42835a8923ebeac1a44b158add3c2698b75c
+          path: .asset-report-helper
+          persist-credentials: false
+      - name: Collect official registry and release digests
+        run: |
+          python scripts/ctm_assets.py metadata --libs .asset-sources/libs/_extensions/ctm-libs --source-ref ctm-libs=2ed1a3381bb6b606e3a913905095eadd8aee0988 --resolve-board-lines --output .asset-report-helper/assets-metadata.json
+      - name: Emit one checksummed report without runner commits
+        run: |
+          git -C .asset-report-helper add -N -- assets-metadata.json
+          python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
+  archive-inspection:
+    needs: fixture-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 4edd42835a8923ebeac1a44b158add3c2698b75c
+          path: .asset-report-helper
+          persist-credentials: false
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache
+          key: ctm-official-archives-${{ hashFiles('integration/assets-metadata.json') }}
+      - name: Inspect verified official archives for licence and selection review
+        run: |
+          python scripts/ctm_assets.py inspect --metadata integration/assets-metadata.json --cache .asset-cache --output .asset-report-helper/assets-metadata.json
+      - name: Emit one checksummed review report without runner commits
+        run: |
+          git -C .asset-report-helper add -N -- assets-metadata.json
+          python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
+  hook-provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: 17112c0ff280a3e506cc6ebbf7611a825079b65f
+          path: .asset-sources/libs
+          persist-credentials: false
+      - name: Actual assessment hook and shared assets API provenance
+        env:
+          CTM_ASSETS_LIBS_SOURCE: ${{ github.workspace }}/.asset-sources/libs
+        run: node --test --test-concurrency=1 tests/assets-hook-render.test.cjs tests/author-imports-render.test.cjs
+
+  stdlib-availability:
+    needs: fixture-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 4edd42835a8923ebeac1a44b158add3c2698b75c
+          path: .asset-report-helper
+          persist-credentials: false
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache
+          key: ctm-official-archives-${{ hashFiles('integration/assets-metadata.json') }}
+      - name: Stage trusted exact-release runtime with verified archive digest
+        run: python scripts/ctm_assets.py prepare-stdlib-probe --metadata integration/assets-metadata.json --cache .asset-cache --candidates integration/assets-stdlib.json --directory .asset-stdlib-probe
+      - name: Inspect release import availability without authored code or network
+        run: node scripts/probe-pyodide-stdlib.mjs .asset-stdlib-probe .asset-report-helper/assets-metadata.json
+      - name: Consume the independently reviewed availability report into a private scanner index
+        env:
+          # Reviewed release evidence, not a digest learned from this job.
+          # A changed report requires a new independent evidence review.
+          REVIEWED_STDLIB_AVAILABILITY_SHA256: dd9327e9be5bb2b4fb06afd905077fd72de39e345c7ec67f76a87ff4033afe28
+        run: |
+          python scripts/ctm_assets.py import-index --probe-core .asset-stdlib-probe \
+            --availability .asset-report-helper/assets-metadata.json \
+            --reviewed-report-sha256 "$REVIEWED_STDLIB_AVAILABILITY_SHA256" \
+            --output .private-extensions/assets-imports.json
+          python - <<'PY'
+          import os, runpy
+          runpy.run_path('tests/test_ctm_assets.py')['release_availability_smoke'](
+              '.asset-stdlib-probe', '.asset-report-helper/assets-metadata.json',
+              '.private-extensions/assets-imports.json', os.environ['REVIEWED_STDLIB_AVAILABILITY_SHA256'])
+          PY
+      - name: Emit one checksummed availability report without runner commits
+        run: |
+          git -C .asset-report-helper add -N -- assets-metadata.json
+          python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
+
+  python-subset-candidate:
+    needs: fixture-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache
+          key: ctm-official-archives-${{ hashFiles('integration/assets-metadata.json') }}
+      - name: Inspect actual official selected package licence metadata
+        run: |
+          python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as a
+          result = a.inspect_python_subset(json.loads(Path('integration/assets-metadata.json').read_bytes()), Path('.asset-cache'))
+          for name, package in result['packages'].items():
+              print(json.dumps({'package': name, 'version': package['version'], 'metadata': package['metadata'],
+                                'licence_files': list(package['licence_texts'])}, sort_keys=True))
+          PY
+      - name: Produce deterministic PRIVATE PARTIAL candidate twice
+        run: |
+          python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --licence-policy integration/assets-python-licences.json --output .asset-cache/python-candidate.json
+          python scripts/ctm_assets.py python-lock --metadata integration/assets-metadata.json --cache .asset-cache --licence-policy integration/assets-python-licences.json --output .asset-cache/python-candidate-repeated.json
+          cmp .asset-cache/python-candidate.json .asset-cache/python-candidate-repeated.json
+      - name: Build and verify actual Python bytes, then install carried bundle without network
+        run: |
+          python scripts/ctm_assets.py build --lock .asset-cache/python-candidate.json --cache .asset-cache --bundle .private-python-built
+          python scripts/ctm_assets.py verify --lock .asset-cache/python-candidate.json --bundle .private-python-built
+          python - <<'PY'
+          import json, sys, tarfile
+          from pathlib import Path
+          from unittest.mock import patch
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as a
+          lock = json.loads(Path('.asset-cache/python-candidate.json').read_bytes())
+          with tarfile.open('.asset-cache/python-carried.tar', 'w') as tar:
+              tar.add('.private-python-built', arcname='_ctm-assets')
+          with patch.object(a.urllib.request, 'build_opener', side_effect=AssertionError('carried install attempted network')):
+              a.install_carried_bundle(lock, Path('.asset-cache/python-carried.tar'), Path('.private-python-carried'))
+          assert a.inventory(Path('.private-python-carried')) == lock['files']
+          print('PRIVATE PARTIAL Python candidate: packages=%d files=%d lock_sha256=%s' %
+                (len(lock['python_packages']), len(lock['files']), a.digest(a.json_bytes(lock))))
+          # Only this bounded summary leaves the private cache. No full lock artifact.
+          PY

@@ -1,0 +1,926 @@
+import base64
+import copy
+import gzip
+import hashlib
+import importlib.util
+from importlib.machinery import PathFinder
+import io
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+import tarfile
+import tempfile
+import unittest
+from unittest.mock import patch
+
+SPEC = importlib.util.spec_from_file_location("ctm_assets", Path(__file__).resolve().parents[1] / "scripts" / "ctm_assets.py")
+A = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(A)
+
+
+def archive(path, entries):
+    with tarfile.open(path, "w:gz") as out:
+        for name, value in entries:
+            info = tarfile.TarInfo(name)
+            if value is None:
+                info.type = tarfile.SYMTYPE
+                info.linkname = "/outside"
+                out.addfile(info)
+            else:
+                info.size = len(value)
+                out.addfile(info, io.BytesIO(value))
+
+
+def availability_fixture(root):
+    core = root / "verified core"
+    core.mkdir()
+    full = {"info": {"python": "3.13.2", "version": "0.28.3.dev0"},
+            "packages": {"sympy": {"imports": ["sympy"], "sha256": "not copied"},
+                         "math-data": {"imports": ["math"]}}}
+    data = {name: b"trusted fixture " + name.encode() for name in (
+        "pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip")}
+    data["package.json"] = A.json_bytes({"version": "0.28.3"})
+    data["pyodide-lock.json"] = A.json_bytes(full)
+    for name, value in data.items():
+        (core / name).write_bytes(value)
+    candidates = {"v": 1, "python": "3.13.2", "modules": ["math", "os", "sys", "winreg"],
+                  "source": {"url": "https://github.com/python/cpython/blob/v3.13.2/Python/stdlib_module_names.h",
+                             "git_blob_sha1": "c" * 40}}
+    request = {"v": 1, "python": "3.13.2", "pyodide": "0.28.3", "candidates": list(candidates["modules"]),
+               "candidate_source": dict(candidates["source"]), "runtime_files": {name: A.digest(value) for name, value in data.items()},
+               "source": {"url": "https://github.com/pyodide/pyodide/releases/download/0.28.3/pyodide-0.28.3.tar.bz2",
+                          "sha256": "a" * 64}}
+    (core / "probe-input.json").write_bytes(A.json_bytes(request))
+    facts = {"v": 2, "kind": "pyodide-stdlib-availability", "python": "3.13.2", "pyodide": "0.28.3",
+             "source": {**request["source"], "runtime_files": dict(request["runtime_files"]), "candidate_source": dict(candidates["source"]),
+                        "method": "Successful imports of trusted release stdlib candidates plus actual builtin/frozen inventory; network disabled; no authored execution"},
+             "modules": ["_pyodide_core", "math", "os", "sys"], "unavailable": {"winreg": "ModuleNotFoundError: fixture"}}
+    return core, candidates, request, facts, full
+
+
+class AvailabilityTests(unittest.TestCase):
+    def test_v2_consumption_preserves_v1_scanner_protocol_and_package_precedence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core, candidates, request, facts, full = availability_fixture(Path(tmp))
+            raw = A.json_bytes(facts)
+            index = A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+            self.assertEqual(index["v"], 1)
+            self.assertEqual(index["stdlib_modules"], facts["modules"])
+            self.assertNotIn("winreg", index["stdlib_modules"])
+            self.assertNotIn("unavailable", index)
+            self.assertNotIn("sha256", index["packages"]["sympy"])
+            self.assertEqual(index["source"]["availability_sha256"], A.digest(raw))
+            self.assertEqual(index["source"]["runtime_files"], request["runtime_files"])
+            self.assertEqual(index["source"]["pyodide"], "0.28.3")
+            subset = {"info": full["info"], "packages": {}}
+            self.assertEqual(A.check_python_sources([{"source": "import os\nraise RuntimeError('never execute')"}], index, subset)["imports"], ["os"])
+            with self.assertRaisesRegex(A.AssetError, "winreg"):
+                A.check_python_sources([{"source": "import winreg"}], index, subset)
+            with self.assertRaisesRegex(A.AssetError, "math-data"):
+                A.check_python_sources([{"source": "import math"}], index, subset)
+            subset["packages"]["math-data"] = full["packages"]["math-data"]
+            self.assertEqual(A.check_python_sources([{"source": "import math"}], index, subset)["imports"], ["math"])
+
+    def test_v2_rejects_changed_report_without_a_new_independent_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core, candidates, request, facts, full = availability_fixture(Path(tmp))
+            raw = A.json_bytes(facts)
+            facts["modules"].append("winreg")
+            with self.assertRaisesRegex(A.AssetError, "sha256 mismatch"):
+                A.private_import_index_from_availability(A.json_bytes(facts), core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+            for digest in ("", "0" * 63, None):
+                with self.subTest(digest=digest), self.assertRaises(A.AssetError):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=digest, candidates=candidates)
+
+    def test_v2_rejects_malformed_schema_and_provenance_even_with_matching_bytes_digest(self):
+        mutations = [
+            lambda f: f.update(v=True), lambda f: f.update(kind="cpython-stdlib"),
+            lambda f: f.update(extra="unknown"), lambda f: f.update(pyodide="0.28.4"), lambda f: f.update(python="3.12.0"),
+            lambda f: f["source"].update(url="https://github.com/other/release.tar.bz2"),
+            lambda f: f["source"].update(sha256="b" * 64),
+            lambda f: f["source"]["runtime_files"].update({"pyodide.mjs": "d" * 64}),
+            lambda f: f["source"]["runtime_files"].pop("python_stdlib.zip"),
+            lambda f: f["source"]["candidate_source"].update(git_blob_sha1="e" * 40),
+            lambda f: f["source"].update(method="unreviewed method"),
+            lambda f: f["modules"].append("winreg"), lambda f: f["modules"].append("sys"),
+            lambda f: f["modules"].reverse(), lambda f: f["modules"].append("a.b"),
+            lambda f: f["unavailable"].pop("winreg"), lambda f: f["unavailable"].update(winreg=""),
+            lambda f: f["unavailable"].update({"bad/name": "error"})]
+        for number, mutate in enumerate(mutations):
+            with self.subTest(mutation=number), tempfile.TemporaryDirectory() as tmp:
+                core, candidates, request, facts, full = availability_fixture(Path(tmp))
+                mutate(facts)
+                raw = A.json_bytes(facts)
+                with self.assertRaises(A.AssetError):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+
+    def test_v2_rehashes_every_staged_file_including_same_python_release_lock(self):
+        for file in ("pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json", "package.json"):
+            with self.subTest(file=file), tempfile.TemporaryDirectory() as tmp:
+                core, candidates, request, facts, full = availability_fixture(Path(tmp))
+                (core / file).write_bytes((core / file).read_bytes() + b" ")
+                raw = A.json_bytes(facts)
+                with self.assertRaisesRegex(A.AssetError, "staged runtime sha256 mismatch"):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+
+    def test_v2_rejects_request_candidate_and_release_provenance_mismatches(self):
+        mutations = [lambda r: r.update(v=2), lambda r: r.update(candidates=["os"]),
+                     lambda r: r["candidate_source"].update(url="https://example.test/candidates"),
+                     lambda r: r["source"].update(sha256="b" * 64),
+                     lambda r: r["runtime_files"].pop("pyodide.js")]
+        for number, mutate in enumerate(mutations):
+            with self.subTest(mutation=number), tempfile.TemporaryDirectory() as tmp:
+                core, candidates, request, facts, full = availability_fixture(Path(tmp))
+                mutate(request)
+                (core / "probe-input.json").write_bytes(A.json_bytes(request))
+                raw = A.json_bytes(facts)
+                with self.assertRaises(A.AssetError):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+
+    def test_v2_rejects_duplicate_json_keys_and_non_finite_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core, candidates, request, facts, full = availability_fixture(Path(tmp))
+            for raw in (b'{"v":2,"v":2}', b'{"v":NaN}', b'[]', b'\xff'):
+                with self.subTest(raw=raw), self.assertRaises(A.AssetError):
+                    A.private_import_index_from_availability(raw, core, reviewed_report_sha256=A.digest(raw), candidates=candidates)
+
+    def test_import_index_cli_writes_private_output_and_failed_validation_preserves_it(self):
+        with tempfile.TemporaryDirectory(prefix="ctm availability ") as tmp:
+            root = Path(tmp)
+            core, candidates, request, facts, full = availability_fixture(root)
+            report, names = root / "availability.json", root / "candidates.json"
+            report.write_bytes(A.json_bytes(facts))
+            names.write_bytes(A.json_bytes(candidates))
+            output = root / "private cache/imports.json"
+            args = [sys.executable, str(Path(A.__file__)), "import-index", "--probe-core", str(core),
+                    "--availability", str(report), "--candidates", str(names), "--reviewed-report-sha256", A.digest(report.read_bytes()),
+                    "--output", str(output)]
+            result = subprocess.run(args, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            previous = output.read_bytes()
+            self.assertNotIn("winreg", json.loads(previous)["stdlib_modules"])
+            report.write_bytes(report.read_bytes() + b" ")
+            result = subprocess.run(args, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(output.read_bytes(), previous)
+            report.write_bytes(A.json_bytes(facts))
+            args[-1] = str(root / "_ctm-assets/imports.json")
+            result = subprocess.run(args, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((root / "_ctm-assets").exists())
+
+
+def release_availability_smoke(core, report, index_file, reviewed_sha256):
+    """Called by the official-release producer job, using private real bytes."""
+    case = unittest.TestCase()
+    core, report, index_file = Path(core), Path(report), Path(index_file)
+    index = json.loads(index_file.read_text(encoding="utf-8"))
+    actual = A.private_import_index_from_availability(report.read_bytes(), core, reviewed_report_sha256=reviewed_sha256)
+    case.assertEqual(index, actual)
+    facts = json.loads(report.read_bytes())
+    request = json.loads((core / "probe-input.json").read_bytes())
+    case.assertEqual((facts["pyodide"], facts["python"]), ("0.28.3", "3.13.2"))
+    case.assertEqual((len(facts["modules"]), len(facts["unavailable"]), len(request["candidates"])), (247, 49, 290))
+    case.assertEqual(set(index["stdlib_modules"]), set(facts["modules"]))
+    case.assertFalse(set(index["stdlib_modules"]).intersection(facts["unavailable"]))
+    full = json.loads((core / "pyodide-lock.json").read_bytes())
+    empty = {"info": full["info"], "packages": {}}
+    case.assertEqual(A.check_python_sources([{"source": "import os\nimport math\nraise RuntimeError('never execute')"}], index, empty)["imports"], ["math", "os"])
+    with case.assertRaisesRegex(A.AssetError, "winreg"):
+        A.check_python_sources([{"source": "import winreg"}], index, empty)
+    collision = copy.deepcopy(index)
+    collision["stdlib_modules"].append("sympy")
+    with case.assertRaisesRegex(A.AssetError, "sympy"):
+        A.check_python_sources([{"source": "import sympy"}], collision, empty)
+    subset = A.package_closure(full, ["sympy"])
+    case.assertEqual(A.check_python_sources([{"source": "import sympy"}], collision, subset)["imports"], ["sympy"])
+    print("Reviewed Pyodide 0.28.3 availability: 247 admitted, 49 unavailable, 290 candidates accounted; private CLI/scanner/package-precedence canaries passed")
+
+
+class AssetsTests(unittest.TestCase):
+    def test_only_approved_https_sources_and_redirects(self):
+        for url in ("http://github.com/a", "https://evil.test/a", "https://github.com.evil.test/a",
+                    "https://user:secret@github.com/a", "https://registry.npmjs.org:444/a"):
+            with self.subTest(url=url), self.assertRaises(A.AssetError):
+                A.checked_url(url)
+        for host in A.ARCHIVE_HOSTS:
+            self.assertEqual(A.checked_url("https://" + host + "/a?download=1"), "https://" + host + "/a?download=1")
+        with self.assertRaises(A.AssetError):
+            A.SafeRedirect().redirect_request(None, None, 302, "", {}, "https://evil.test/redirect")
+
+    def test_integrity_verifies_bytes_and_rejects_weaker_or_invalid_sri(self):
+        data = b"official archive"
+        integrity = "sha512-" + base64.b64encode(hashlib.sha512(data).digest()).decode()
+        A.verify_bytes(data, integrity=integrity, sha256=hashlib.sha256(data).hexdigest())
+        for kwargs in ({}, {"integrity": "sha256-dummy"}, {"integrity": "sha512-!bad"},
+                       {"sha256": "0" * 64}, {"integrity": integrity}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(A.AssetError):
+                A.verify_bytes(b"tampered", **kwargs)
+
+    def test_selected_member_hash_and_output_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package = root / "package.tgz"
+            archive(package, [("package/dist/app.js", b"code"), ("package/unneeded", b"not copied")])
+            A.extract_selected(package, root / "out", [{"member": "dist/app.js", "path": "npm/demo@1.0.0/dist/app.js",
+                                                        "sha256": A.digest(b"code")}])
+            self.assertEqual((root / "out/npm/demo@1.0.0/dist/app.js").read_bytes(), b"code")
+            self.assertFalse((root / "out/unneeded").exists())
+            with self.assertRaises(A.AssetError):
+                A.extract_selected(package, root / "bad", [{"member": "dist/app.js", "path": "safe.js", "sha256": "0" * 64}])
+
+    def test_archive_traversal_symlink_duplicates_missing_member(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name, entries in {
+                "traversal": [("../escaped", b"bad")],
+                "absolute": [("/absolute", b"bad")],
+                "backslash": [("package\\bad", b"bad")],
+                "symlink": [("package/app.js", None)],
+                "repeated": [("package/app.js", b"x"), ("package/app.js", b"x")],
+                "missing": [("package/else.js", b"x")],
+            }.items():
+                with self.subTest(name=name):
+                    file = root / (name + ".tgz")
+                    archive(file, entries)
+                    with self.assertRaises(A.AssetError):
+                        A.extract_selected(file, root / name, [{"member": "app.js", "path": "app.js", "sha256": A.digest(b"x")}])
+            self.assertFalse((root.parent / "escaped").exists())
+
+    def test_lock_member_cannot_escape_or_collide(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            file = root / "ok.tgz"
+            archive(file, [("package/app.js", b"x")])
+            for path in ("../escape", "/root", "a\\b", "C:/file", "./file", "a//b"):
+                with self.subTest(path=path), self.assertRaises(A.AssetError):
+                    A.extract_selected(file, root / "out", [{"member": "app.js", "path": path, "sha256": A.digest(b"x")}])
+            item = {"member": "app.js", "path": "app.js", "sha256": A.digest(b"x")}
+            with self.assertRaises(A.AssetError):
+                A.extract_selected(file, root / "out", [item, dict(item)])
+
+    def test_named_dependency_closure_preserves_full_metadata_and_subset(self):
+        full = {"info": {"version": "0.28.0.dev0"}, "packages": {
+            "sympy": {"depends": ["mpmath"], "imports": ["sympy"]},
+            "mpmath": {"depends": [], "imports": ["mpmath"]},
+            "networkx": {"depends": [], "imports": ["networkx"]},
+            "unneeded": {"depends": [], "imports": ["unneeded"]}}}
+        subset = A.package_closure(full, ["sympy", "networkx"])
+        self.assertEqual(set(subset["packages"]), {"sympy", "mpmath", "networkx"})
+        self.assertIn("unneeded", full["packages"], "full lock must not be mutated")
+        self.assertIn("networkx", A.EXAM_PACKAGES)
+        for names in (["all"], ["not-shipped"]):
+            with self.assertRaises(A.AssetError):
+                A.package_closure(full, names)
+        with self.assertRaises(A.AssetError):
+            A.package_closure({"packages": {"a": {"depends": ["b"]}, "b": {"depends": ["a"]}}}, ["a"])
+
+    def test_licence_unknown_and_copyleft_are_explicit_gates(self):
+        for spdx in (None, "unknown", "LGPL-2.1"):
+            with self.subTest(spdx=spdx), self.assertRaises(A.AssetError):
+                A.allow_licence("extra", spdx)
+        for spdx in ("MIT", "BSD-3-Clause", "PSF-2.0", "MPL-2.0", "OFL-1.1"):
+            A.allow_licence("known", spdx)
+        A.allow_licence("extra", "LGPL-2.1", ["LGPL-2.1"])
+        with tempfile.TemporaryDirectory() as tmp:
+            lock = {"v": 1, "archives": [{"id": "extra", "licence": "LGPL-2.1"}]}
+            with self.assertRaisesRegex(A.AssetError, "source offer"):
+                A.build_from_lock(lock, Path(tmp) / "bundle", Path(tmp) / "cache", accepted_licences=["LGPL-2.1"])
+
+    def test_author_ast_scanner_stops_missing_packages_without_running_code(self):
+        full = {"stdlib_modules": ["os", "importlib"], "packages": {"numpy": {"imports": ["numpy"]}, "pandas": {"imports": ["pandas"]},
+                             "networkx": {"imports": ["networkx"]}, "sqlite3": {"imports": ["sqlite3"]}}}
+        subset = {"packages": {"numpy": {}}}
+        report = A.check_python_sources([{"origin": "starter", "source": "import numpy as np\nraise RuntimeError('never executed')\nfrom . import helper\nimport local_helper"}],
+                                        full, subset, local_modules=["local_helper"])
+        self.assertEqual(report["imports"], ["local_helper", "numpy"])
+        self.assertEqual(report["unmapped"], {})
+        for code in ("import pandas", "from pandas.core import frame",
+                     "__import__('pandas')", "importlib.import_module('pandas')",
+                     "graph_from_response(answer)", "import sqlite3"):
+            with self.subTest(code=code), self.assertRaisesRegex(A.AssetError, "absent from the local bundle"):
+                A.check_python_sources([{"source": code, "origin": "exercise:solution"}], full, subset)
+        with self.assertRaisesRegex(A.AssetError, "pandas"):
+            A.check_python_sources([{"source": "", "packages": ["pandas"]}], full, subset)
+        with self.assertRaisesRegex(A.AssetError, "cannot inspect"):
+            A.check_python_sources([{"source": "def invalid("}], full, subset)
+        report = A.check_python_sources([{"source": "import os\nimport js\nimport pyodide\n# import pandas"}], full, subset)
+        self.assertEqual(report["unmapped"], {})
+        self.assertNotIn("pandas", report["imports"])
+
+    def test_strict_import_scanner_resolves_release_stdlib_local_files_and_dynamic_aliases(self):
+        full = {"stdlib_modules": ["os", "importlib"], "packages": {"pandas": {"imports": ["pandas"]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "helper.py").write_text("raise RuntimeError('never executed')\n")
+            report = A.check_python_sources([{"source": "import os\nimport helper"}], full, {"packages": {}}, local_dirs=[root])
+            self.assertEqual(report["unmapped"], {})
+            for code in ("import totally_unmapped", "from importlib import import_module as load\nload('pandas')",
+                         "import importlib as il\nil.import_module('pandas')",
+                         "name = 'pandas'\n__import__(name)"):
+                with self.subTest(code=code), self.assertRaises(A.AssetError):
+                    A.check_python_sources([{"source": code}], full, {"packages": {}}, local_dirs=[root])
+            report = A.check_python_sources([{"source": "import diagnostic_only"}], full, {"packages": {}}, strict=False)
+            self.assertIn("diagnostic_only", report["unmapped"])
+
+
+    def test_dynamic_aliases_cross_fragments_assignments_and_literal_keywords(self):
+        full = {"stdlib_modules": ["importlib", "os"], "packages": {"pandas": {"imports": ["pandas"]}}}
+        for setup, code in (
+            ("from importlib import import_module as load", "load('pandas')"),
+            ("import importlib as il", "il.import_module(name='pandas')"),
+            ("import importlib as il\nload = il.import_module", "load('pandas')"),
+            ("from importlib import import_module as load\nagain = load", "again(name='pandas')"),
+            ("load = importlib.import_module", "load('pandas')"),
+            ("call = __import__", "call('pandas')"),
+        ):
+            with self.subTest(setup=setup), self.assertRaisesRegex(A.AssetError, "pandas"):
+                A.check_python_sources([{"source": setup, "origin": "setup"},
+                                        {"source": code, "origin": "cell"}], full, {"packages": {}})
+        report = A.check_python_sources([
+            {"source": "from importlib import import_module as load"},
+            {"source": "load(name='os')"}], full, {"packages": {}})
+        self.assertEqual(report["imports"], ["importlib", "os"])
+        with self.assertRaisesRegex(A.AssetError, "literal dynamic"):
+            A.check_python_sources([{"source": "load = importlib.import_module"},
+                                    {"source": "load(name=answer)"}], full, {"packages": {}})
+
+    def test_local_helpers_packages_relative_imports_and_cycles_are_inspected_without_execution(self):
+        full = {"stdlib_modules": ["importlib"], "packages": {"pandas": {"imports": ["pandas"]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            helper = root / "helper.py"
+            helper.write_text("import pandas\nraise RuntimeError('never execute')\n", encoding="utf-8")
+            with self.assertRaisesRegex(A.AssetError, "pandas.*local module"):
+                A.check_python_sources([{"source": "import helper"}], full, {"packages": {}}, local_dirs=[root])
+            package = root / "pkg"
+            package.mkdir()
+            (package / "__init__.py").write_text("from . import inner\n", encoding="utf-8")
+            (package / "inner.py").write_text("from . import again\n", encoding="utf-8")
+            (package / "again.py").write_text("from . import inner\nimport pandas\n", encoding="utf-8")
+            with self.assertRaisesRegex(A.AssetError, "pandas"):
+                A.check_python_sources([{"source": "import pkg"}], full, {"packages": {}}, local_dirs=[root])
+            (package / "again.py").write_text("from . import inner\nraise RuntimeError('never execute')\n", encoding="utf-8")
+            report = A.check_python_sources([{"source": "import pkg.inner"}], full, {"packages": {}}, local_dirs=[root])
+            self.assertIn("pkg", report["imports"])
+            helper.write_text("from importlib import import_module as load\n", encoding="utf-8")
+            with self.assertRaisesRegex(A.AssetError, "pandas"):
+                A.check_python_sources([{"source": "import helper\nload('pandas')"}], full, {"packages": {}}, local_dirs=[root])
+
+    def test_later_regular_local_package_overrides_earlier_namespace_portion(self):
+        full = {"stdlib_modules": [], "packages": {"pandas": {"imports": ["pandas"]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            project, page = Path(tmp) / "project", Path(tmp) / "page"
+            for directory in (project, page):
+                (directory / "pkg").mkdir(parents=True)
+            helper = page / "pkg" / "__init__.py"
+            helper.write_text("import pandas\nraise RuntimeError('author code must never run')\n", encoding="utf-8")
+            directories = [str(project), str(page)]
+            resolved = PathFinder.find_spec("pkg", directories)
+            self.assertEqual(Path(resolved.origin), helper)
+            with self.assertRaisesRegex(A.AssetError, "pandas.*local module"):
+                A.check_python_sources([{"source": "import pkg"}], full, {"packages": {}}, local_dirs=directories)
+            report = A.check_python_sources([{"source": "import pkg"}], full,
+                                            {"packages": {"pandas": {}}}, local_dirs=directories)
+            self.assertEqual(report["imports"], ["pandas", "pkg"])
+
+    def test_split_namespace_local_submodule_is_inspected_in_later_portion(self):
+        full = {"stdlib_modules": [], "packages": {"pandas": {"imports": ["pandas"]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            project, page = Path(tmp) / "project", Path(tmp) / "page"
+            for directory in (project, page):
+                (directory / "pkg").mkdir(parents=True)
+            helper = page / "pkg" / "inner.py"
+            helper.write_text("import pandas\nraise RuntimeError('author code must never run')\n", encoding="utf-8")
+            directories = [str(project), str(page)]
+            namespace = PathFinder.find_spec("pkg", directories)
+            self.assertIsNone(namespace.origin)
+            resolved = PathFinder.find_spec("pkg.inner", namespace.submodule_search_locations)
+            self.assertEqual(Path(resolved.origin), helper)
+            for authored in ("import pkg.inner", "from pkg import inner"):
+                with self.subTest(authored=authored):
+                    with self.assertRaisesRegex(A.AssetError, "pandas.*local module"):
+                        A.check_python_sources([{"source": authored}], full, {"packages": {}}, local_dirs=directories)
+                    report = A.check_python_sources([{"source": authored}], full,
+                                                    {"packages": {"pandas": {}}}, local_dirs=directories)
+                    self.assertEqual(report["imports"], ["pandas", "pkg"])
+
+    def test_scanner_stdin_is_utf8_even_when_native_pipe_encoding_is_ansi(self):
+        scanner = Path(__file__).resolve().parents[1] / "_extensions/ctm-assessment/author-imports.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index, subset = root / "index.json", root / "subset.json"
+            index.write_bytes(A.json_bytes({"v": 1, "python": "fixture", "stdlib_modules": ["os"], "packages": {}}))
+            subset.write_bytes(A.json_bytes({"info": {"python": "fixture"}, "packages": {}}))
+            args = [sys.executable, str(scanner), "--stdin", "--index", str(index), "--subset", str(subset)]
+            environment = dict(__import__("os").environ, PYTHONIOENCODING="cp1252")
+            payload = [{"source": "π = 3.14\nimport os", "origin": "øving π"}]
+            result = subprocess.run(args, input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                                    capture_output=True, env=environment)
+            self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8"))
+            self.assertEqual(json.loads(result.stdout.decode("utf-8"))["imports"], ["os"])
+            payload[0]["source"] = "import missing_module"
+            result = subprocess.run(args, input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                                    capture_output=True, env=environment)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("øving π", result.stderr.decode("utf-8"))
+
+
+    def test_stdlib_probe_stages_only_verified_core_and_checks_runtime_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tar = root / "official.tgz"
+            required = {"pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm",
+                        "python_stdlib.zip", "pyodide-lock.json", "package.json"}
+            entries = {"pyodide/" + name: b"trusted core " + name.encode() for name in required}
+            entries["pyodide/package.json"] = b'{"version":"0.28.3"}'
+            entries["pyodide/pyodide-lock.json"] = b'{"info":{"python":"3.13.2"},"packages":{}}'
+            entries["pyodide/not-needed.whl"] = b"must not be staged for the stdlib probe"
+            archive(tar, list(entries.items()))
+            metadata = {"archives": [{"id": "pyodide", "version": "0.28.3",
+                        "url": "https://github.com/pyodide/pyodide/releases/download/0.28.3/pyodide-0.28.3.tar.bz2",
+                        "sha256": A.digest(tar.read_bytes())}]}
+            def downloaded(url, destination, **checks):
+                data = tar.read_bytes()
+                A.verify_bytes(data, **checks)
+                destination.write_bytes(data)
+            candidates = {"python": "3.13.2", "modules": ["os"], "source": {"purpose": "candidate names only"}}
+            with patch.object(A, "download", side_effect=downloaded):
+                destination = A.prepare_stdlib_probe(metadata, root / "cache", root / "private-probe", candidates)
+                self.assertEqual({file.name for file in destination.iterdir()}, required | {"probe-input.json"})
+                request = json.loads((destination / "probe-input.json").read_text())
+                self.assertEqual(request["pyodide"], "0.28.3")
+                self.assertEqual(request["source"]["sha256"], metadata["archives"][0]["sha256"])
+                self.assertEqual(request["runtime_files"]["pyodide.mjs"], A.digest(entries["pyodide/pyodide.mjs"]))
+                with self.assertRaisesRegex(A.AssetError, "must not already exist"):
+                    A.prepare_stdlib_probe(metadata, root / "cache", destination, candidates)
+                with self.assertRaisesRegex(A.AssetError, "different Python releases"):
+                    A.prepare_stdlib_probe(metadata, root / "cache", root / "wrong-release",
+                                           {**candidates, "python": "3.12.0"})
+                bad = {"archives": [{**metadata["archives"][0], "sha256": "0" * 64}]}
+                with self.assertRaises(A.AssetError):
+                    A.prepare_stdlib_probe(bad, root / "cache", root / "unverified", candidates)
+
+    def test_private_import_index_is_release_matched_and_never_written_under_assets(self):
+        full = {"info": {"python": "3.13.2"}, "packages": {"extra": {"imports": ["extra"], "sha256": "not copied"}}}
+        stdlib = {"v": 1, "python": "3.13.2", "modules": ["os", "sys"]}
+        index = A.private_import_index(full, stdlib)
+        self.assertNotIn("sha256", index["packages"]["extra"])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            file = A.write_private_import_index(index, root / ".private-extensions/assets-imports.json")
+            self.assertEqual(json.loads(file.read_text()), index)
+            with self.assertRaisesRegex(A.AssetError, "outside published"):
+                A.write_private_import_index(index, root / "_ctm-assets/assets-imports.json")
+        with self.assertRaisesRegex(A.AssetError, "do not match"):
+            A.private_import_index(full, {**stdlib, "python": "3.12.0"})
+
+    def test_packaged_scanner_cli_uses_stdin_and_paths_with_spaces(self):
+        scanner = Path(__file__).resolve().parents[1] / "_extensions/ctm-assessment/author-imports.py"
+        with tempfile.TemporaryDirectory(prefix="ctm imports ") as tmp:
+            root = Path(tmp)
+            index, subset = root / "private index.json", root / "subset lock.json"
+            index.write_bytes(A.json_bytes({"v": 1, "python": "fixture", "stdlib_modules": ["os"],
+                                           "packages": {"pandas": {"imports": ["pandas"]}}}))
+            subset.write_bytes(A.json_bytes({"info": {"python": "fixture"}, "packages": {}}))
+            args = [sys.executable, str(scanner), "--stdin", "--index", str(index), "--subset", str(subset)]
+            result = subprocess.run(args, input=json.dumps([{"source": "import os\nraise RuntimeError('never run')", "origin": "starter"}]),
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["imports"], ["os"])
+            result = subprocess.run(args, input=json.dumps([{"source": "import pandas", "origin": "solution"}]),
+                                    text=True, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("solution", result.stderr)
+            self.assertIn("absent from the local bundle", result.stderr)
+
+    def test_curated_texts_keep_official_git_bytes_and_stdlib_facts_are_release_scoped(self):
+        root = Path(__file__).resolve().parents[1]
+        provenance = json.loads((root / "integration/assets-licences/provenance.json").read_text())
+        for name, entry in provenance["entries"].items():
+            with self.subTest(component=name):
+                data = (root / entry["file"]).read_bytes()
+                self.assertTrue(data)
+                actual = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+                self.assertEqual(actual, entry["git_blob_sha1"])
+                A.allow_licence(name, entry["licence"])
+        facts = json.loads((root / "integration/assets-stdlib.json").read_text())
+        self.assertEqual(facts["v"], 1)
+        self.assertIn("os", facts["modules"])
+        self.assertIn("sys", facts["modules"])
+        self.assertEqual(len(facts["modules"]), len(set(facts["modules"])))
+
+    def test_composite_licences_require_all_and_choose_permissive_or_branch(self):
+        self.assertFalse(A.allow_licence("icons", "(CC-BY-4.0 AND OFL-1.1 AND MIT)"))
+        self.assertFalse(A.allow_licence("board", "(MIT OR LGPL-3.0)", ["LGPL-3.0"]))
+        self.assertEqual(A.allow_licence("extra", "MIT AND LGPL-2.1", ["LGPL-2.1"]), {"LGPL-2.1"})
+        for expression in ("MIT AND LGPL-2.1", "MIT OR", "(MIT", "MIT WITH exception", "MIT ; BSD-3-Clause"):
+            with self.subTest(expression=expression), self.assertRaises(A.AssetError):
+                A.allow_licence("bad", expression)
+        with tempfile.TemporaryDirectory() as tmp:
+            lock = {"v": 1, "archives": [{"id": "extra", "licence": "MIT AND LGPL-2.1"}]}
+            with self.assertRaisesRegex(A.AssetError, "source offer"):
+                A.build_from_lock(lock, Path(tmp) / "bundle", Path(tmp) / "cache", accepted_licences=["LGPL-2.1"])
+
+    def test_python_package_aliases_use_release_keys_and_reject_ambiguous_lock(self):
+        full = {"packages": {"pyodide-http": {"depends": ["Some_Dep"]}, "some-dep": {"depends": []}}}
+        self.assertEqual(set(A.package_closure(full, ["pyodide_http"])["packages"]), {"pyodide-http", "some-dep"})
+        with self.assertRaisesRegex(A.AssetError, "Ambiguous"):
+            A.package_closure({"packages": {"a_b": {}, "a-b": {}}}, ["a_b"])
+        with self.assertRaises(A.AssetError):
+            A.package_closure(full, ["ALL"])
+
+    def test_compression_is_deterministic_and_preserves_range_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for suffix in ("wasm", "js", "mjs", "json", "css", "whl", "zip"):
+                (root / ("asset." + suffix)).write_bytes(b"asset bytes" * 20)
+            A.precompress(root)
+            first = {file.name: file.read_bytes() for file in root.glob("*.gz")}
+            self.assertEqual(len(first), 5)
+            for data in first.values():
+                self.assertEqual(gzip.decompress(data), b"asset bytes" * 20)
+            A.precompress(root)
+            self.assertEqual(first, {file.name: file.read_bytes() for file in root.glob("*.gz")})
+            self.assertFalse((root / "asset.whl.gz").exists())
+            self.assertFalse((root / "asset.zip.gz").exists())
+
+    def test_carried_bundle_is_verified_against_external_lock_not_its_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            asset = root / "app.js"
+            asset.write_bytes(b"trusted")
+            manifest = {"v": 1, "versions": {"demo": "1.0.0"}, "files": {"app.js": A.digest(b"trusted")}}
+            (root / "manifest.json").write_bytes(A.json_bytes(manifest))
+            lock = {"v": 1, "versions": manifest["versions"], "files": A.inventory(root)}
+            A.verify_bundle(root, lock)
+            asset.write_bytes(b"tampered")
+            manifest["files"]["app.js"] = A.digest(b"tampered")
+            (root / "manifest.json").write_bytes(A.json_bytes(manifest))
+            with self.assertRaises(A.AssetError):
+                A.verify_bundle(root, lock)
+
+    def test_unknown_files_and_full_lock_are_never_published(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "manifest.json").write_bytes(A.json_bytes({"v": 1, "versions": {}, "files": {}}))
+            lock = {"v": 1, "versions": {}, "files": A.inventory(root)}
+            (root / "extra").write_bytes(b"x")
+            with self.assertRaises(A.AssetError):
+                A.verify_bundle(root, lock)
+            (root / "extra").unlink()
+            (root / "pyodide-lock.full.json").write_bytes(b"{}")
+            lock["files"] = A.inventory(root)
+            with self.assertRaisesRegex(A.AssetError, "full Pyodide lock"):
+                A.verify_bundle(root, lock)
+
+    def build_fixture(self, root):
+        """Independent expected inventory for a tiny reviewed archive."""
+        tar = root / "official.tgz"
+        code, licence = b"fixture code", b"Fixture MIT licence text"
+        archive(tar, [("package/dist/app.js", code), ("package/LICENSE", licence)])
+        app, text = "npm/demo@1.0.0/dist/app.js", "LICENSES/demo/LICENSE"
+        notices = "# Third-party notices\n\n## demo\nLicence: MIT\n\nLICENSES/demo/LICENSE\n\n"
+        buffer = io.BytesIO()
+        with gzip.GzipFile(fileobj=buffer, mode="wb", filename="", mtime=0) as out:
+            out.write(code)
+        files = {app: A.digest(code), app + ".gz": A.digest(buffer.getvalue()),
+                 text: A.digest(licence), "THIRD-PARTY-NOTICES.md": A.digest(notices.encode())}
+        manifest = {"v": 1, "versions": {"demo": "1.0.0"}, "files": dict(files)}
+        files["manifest.json"] = A.digest(A.json_bytes(manifest))
+        lock = {"v": 1, "versions": manifest["versions"], "files": files,
+                "archives": [{"id": "demo", "url": "https://registry.npmjs.org/demo/-/demo-1.0.0.tgz",
+                              "sha256": A.digest(tar.read_bytes()), "licence": "MIT", "licence_files": [text],
+                              "files": [{"member": "dist/app.js", "path": app, "sha256": A.digest(code)},
+                                        {"member": "LICENSE", "path": text, "sha256": A.digest(licence)}]}]}
+        def downloaded(url, destination, **checks):
+            data = tar.read_bytes()
+            A.verify_bytes(data, **checks)
+            destination.write_bytes(data)
+            return destination
+        return lock, downloaded
+
+    def test_successful_build_stages_on_target_filesystem_and_reuses_verified_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            target, cache = root / "project/_ctm-assets", root / "other-drive-cache"
+            rename = Path.rename
+            def same_filesystem(source, destination):
+                self.assertEqual(source.parent.parent, target.parent,
+                                 "publication stage must be under destination.parent, not cache")
+                return rename(source, destination)
+            with patch.object(A, "download", side_effect=downloaded) as fetch, patch.object(Path, "rename", same_filesystem):
+                self.assertEqual(A.build_from_lock(lock, target, cache), target)
+                A.verify_bundle(target, lock)
+                self.assertEqual(A.build_from_lock(lock, target, cache), target)
+                self.assertEqual(fetch.call_count, 1)
+            self.assertEqual(list(target.parent.glob(".ctm-assets-*")), [])
+            (target / "npm/demo@1.0.0/dist/app.js").write_bytes(b"tamper")
+            with self.assertRaisesRegex(A.AssetError, "sha256"):
+                A.build_from_lock(lock, target, cache)
+
+    def test_existing_bundle_does_not_bypass_licence_consent_or_source_offer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            target, cache = root / "bundle", root / "cache"
+            with patch.object(A, "download", side_effect=downloaded):
+                A.build_from_lock(lock, target, cache)
+            lock["archives"][0]["licence"] = "LGPL-2.1"
+            with self.assertRaises(A.AssetError):
+                A.build_from_lock(lock, target, cache)
+            with self.assertRaisesRegex(A.AssetError, "source offer"):
+                A.build_from_lock(lock, target, cache, accepted_licences=["LGPL-2.1"])
+            lock["archives"][0]["licence"] = "MIT"
+            lock["archives"][0]["licence_files"] = []
+            with self.assertRaisesRegex(A.AssetError, "licence text"):
+                A.build_from_lock(lock, target, cache)
+
+    def test_carried_directory_and_tar_are_verified_before_replacing_previous_assets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            bundle = root / "verified"
+            with patch.object(A, "download", side_effect=downloaded):
+                A.build_from_lock(lock, bundle, root / "cache")
+            target = root / "project/_ctm-assets"
+            target.mkdir(parents=True)
+            (target / "previous").write_bytes(b"old assets")
+            A.install_carried_bundle(lock, bundle, target)
+            A.verify_bundle(target, lock)
+            packed = root / "carried.tar.gz"
+            with tarfile.open(packed, "w:gz") as out:
+                out.add(bundle, arcname="_ctm-assets")
+            A.install_carried_bundle(lock, packed, target)
+            A.verify_bundle(target, lock)
+            (bundle / "npm/demo@1.0.0/dist/app.js").write_bytes(b"tampered")
+            with self.assertRaises(A.AssetError):
+                A.install_carried_bundle(lock, bundle, target)
+            A.verify_bundle(target, lock)
+
+    def test_carried_tar_rejects_extra_entries_and_failed_publish_restores_previous(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            bundle = root / "verified"
+            with patch.object(A, "download", side_effect=downloaded):
+                A.build_from_lock(lock, bundle, root / "cache")
+            target = root / "project/_ctm-assets"
+            target.mkdir(parents=True)
+            (target / "previous").write_bytes(b"old assets")
+            packed = root / "carried.tar.gz"
+            with tarfile.open(packed, "w:gz") as out:
+                out.add(bundle, arcname="_ctm-assets")
+                extra = tarfile.TarInfo("_ctm-assets/unreviewed")
+                extra.size = 1
+                out.addfile(extra, io.BytesIO(b"x"))
+            with self.assertRaises(A.AssetError):
+                A.install_carried_bundle(lock, packed, target)
+            self.assertEqual((target / "previous").read_bytes(), b"old assets")
+            rename = Path.rename
+            def fail_publish(source, destination):
+                if source.name == "bundle":
+                    raise OSError("simulated publication failure")
+                return rename(source, destination)
+            with patch.object(Path, "rename", fail_publish), self.assertRaises(OSError):
+                A.install_carried_bundle(lock, bundle, target)
+            self.assertEqual((target / "previous").read_bytes(), b"old assets")
+
+    def test_carried_publish_and_rollback_failure_preserves_recoverable_previous_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock, downloaded = self.build_fixture(root)
+            bundle = root / "verified"
+            with patch.object(A, "download", side_effect=downloaded):
+                A.build_from_lock(lock, bundle, root / "cache")
+            target = root / "project/_ctm-assets"
+            target.mkdir(parents=True)
+            (target / "old-answer").write_bytes(b"recoverable")
+            rename = Path.rename
+            def concurrent_destination(source, destination):
+                if source.name == "bundle":
+                    target.mkdir()
+                    (target / "concurrent").write_bytes(b"new owner")
+                    raise OSError("simulated failed publication after concurrent recreation")
+                return rename(source, destination)
+            with patch.object(Path, "rename", concurrent_destination), self.assertRaisesRegex(A.AssetError, "previous assets retained at"):
+                A.install_carried_bundle(lock, bundle, target)
+            retained = list(target.parent.glob(".ctm-assets-previous-*/previous/old-answer"))
+            self.assertEqual(len(retained), 1)
+            self.assertEqual(retained[0].read_bytes(), b"recoverable")
+            self.assertEqual((target / "concurrent").read_bytes(), b"new owner")
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "POSIX special-entry fixture")
+    def test_carried_bundle_rejects_fifo_without_reading_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            os.mkfifo(root / "pipe")
+            with self.assertRaisesRegex(A.AssetError, "special filesystem"):
+                A.inventory(root)
+
+    def test_selected_hardlink_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            file = root / "hardlink.tgz"
+            with tarfile.open(file, "w:gz") as out:
+                item = tarfile.TarInfo("package/app.js")
+                item.type, item.linkname = tarfile.LNKTYPE, "package/other.js"
+                out.addfile(item)
+            with self.assertRaises(A.AssetError):
+                A.extract_selected(file, root / "out", [{"member": "app.js", "path": "app.js", "sha256": A.digest(b"x")}])
+
+    def test_cache_key_changes_with_any_reviewed_lock_change(self):
+        self.assertEqual(A.cache_key({"v": 1, "a": 2}), A.cache_key({"a": 2, "v": 1}))
+        self.assertNotEqual(A.cache_key({"v": 1, "a": 2}), A.cache_key({"v": 1, "a": 3}))
+
+
+
+class MetadataTests(unittest.TestCase):
+    def sources(self, root):
+        table = {"v": 1, "assets": {"katex": {"npm": "katex", "version": "0.16.47",
+                  "cdn": "https://cdn.jsdelivr.net/npm/katex@{version}/", "local": "npm/katex@{version}/"}}}
+        (root / "assets.json").write_bytes(A.json_bytes(table))
+        (root / "runtime").mkdir()
+        (root / "runtime/pyodide-runtime.js").write_text("var indexURL = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';\n", encoding="utf-8")
+        return table
+
+    def test_version_sources_keep_runtime_as_the_only_pyodide_home(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = self.sources(root)
+            found = A.version_sources(root)
+            self.assertEqual(found["pyodide"], "0.28.3")
+            self.assertEqual(found["assets"]["katex"]["version"], "0.16.47")
+            table["assets"]["pyodide"] = dict(table["assets"]["katex"])
+            (root / "assets.json").write_bytes(A.json_bytes(table))
+            with self.assertRaises(A.AssetError):
+                A.version_sources(root)
+
+    def pins(self, root):
+        pins = root / "jsxgraph-pins.yml"
+        pins.write_text(
+            "jsxgraph:\n"
+            "  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.2.3/distrib/jsxgraphcore.js\n"
+            "  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.2.3/distrib/jsxgraph.css\n"
+            "  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.0.0/tex-mml-svg.js\n"
+            "  mjx_fonts: https://cdn.jsdelivr.net/npm/@mathjax/mathjax-newcm-font@4.0.0/\n", encoding="utf-8")
+        return pins
+
+    def test_three_canonical_version_homes_must_equal_the_lock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.sources(root)
+            pins = self.pins(root)
+            versions = {"katex": "0.16.47", "pyodide": "0.28.3", "jsxgraph": "1.2.3",
+                        "mathjax4": "4.0.0", "mathjax-newcm-font": "4.0.0"}
+            self.assertEqual(A.validate_version_homes({"versions": versions}, root, pins), versions)
+            for changes in ({"pyodide": "0.28.4"}, {"katex": "0.16.11"}, {"jsxgraph": "1.2.4"}):
+                with self.subTest(changes=changes), self.assertRaises(A.AssetError):
+                    A.validate_version_homes({"versions": {**versions, **changes}}, root, pins)
+            pins.write_text(pins.read_text().replace("jsxgraph@1.2.3", "jsxgraph@1"))
+            with self.assertRaisesRegex(A.AssetError, "exact"):
+                A.board_versions(pins)
+
+    def test_conflicting_board_home_cannot_be_hidden_by_lock_merge(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = self.sources(root)
+            pins = self.pins(root)
+            versions = {"katex": "0.16.47", "pyodide": "0.28.3", "jsxgraph": "1.2.3",
+                        "mathjax4": "4.0.0", "mathjax-newcm-font": "4.0.0"}
+            for name, npm, version in (("mathjax4", "mathjax", "4.1.2"),
+                                       ("disguised", "mathjax", "4.1.2"),
+                                       ("jsxgraph", "katex", "0.16.47"),
+                                       ("python-alias", "pyodide", "0.28.3")):
+                with self.subTest(name=name):
+                    duplicate = {**table, "assets": {**table["assets"], name: {"npm": npm, "version": version,
+                                 "local": "npm/duplicate@{version}/"}}}
+                    (root / "assets.json").write_bytes(A.json_bytes(duplicate))
+                    with self.assertRaisesRegex(A.AssetError, "belongs to runtime/jsxgraph-pins"):
+                        A.validate_version_homes({"versions": versions}, root, pins)
+
+    def test_profiles_preserve_authored_files_and_separate_exam_answers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "_quarto-offline.yml").write_text("# Author profile\n", encoding="utf-8")
+            (root / ".gitignore").write_text("existing/\n", encoding="utf-8")
+            created = A.write_profiles(root, course_key="course")
+            self.assertEqual([file.name for file in created], ["_quarto-exam.yml"])
+            self.assertEqual((root / "_quarto-offline.yml").read_text(), "# Author profile\n")
+            exam = (root / "_quarto-exam.yml").read_text()
+            self.assertIn('storage-key: "course-exam"', exam)
+            self.assertIn("save: answers", exam)
+            self.assertIn("export: true", exam)
+            self.assertIn("enabled: false", exam)
+            self.assertIn("output-dir: _site-exam", exam)
+            self.assertEqual(A.write_profiles(root, course_key="ignored"), [])
+            self.assertEqual((root / ".gitignore").read_text(), "existing/\n_ctm-assets/\n")
+            (root / "_quarto-offline.yml").unlink()
+            A.write_profiles(root)
+            offline = (root / "_quarto-offline.yml").read_text()
+            self.assertIn('_ctm-assets/**', offline)
+            self.assertIn('_extensions/ctm-assessment/offline.scss', offline)
+            self.assertIn('assets: local', offline)
+
+    def test_release_version_uses_package_json_not_full_lock_dev_version(self):
+        self.assertEqual(A.release_version(b'{"version":"0.28.3"}', "0.28.3"), "0.28.3")
+        with self.assertRaises(A.AssetError):
+            A.release_version(b'{"version":"0.28.0.dev0"}', "0.28.3")
+
+    def test_single_file_profile_uses_system_font_variant(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            A.write_profiles(root, website=False)
+            self.assertIn("offline-system.scss", (root / "_quarto-offline.yml").read_text())
+        extension = Path(__file__).resolve().parents[1] / "_extensions/ctm-assessment"
+        website = (extension / "offline.scss").read_text()
+        single = (extension / "offline-system.scss").read_text()
+        self.assertIn('../../_ctm-assets/fonts/source-sans-pro.css', website)
+        self.assertIn('$web-font-path: false;', single)
+        self.assertNotIn('https://', website + single)
+
+    def test_metadata_redirects_use_their_own_official_hosts_and_https_ports(self):
+        original = A.urllib.request.Request("https://api.github.com/repos/pyodide/pyodide/releases")
+        moved = "https://api.github.com/repos/pyodide/pyodide/releases/tags/0.28.3"
+        request = A.SafeMetadataRedirect().redirect_request(original, None, 302, "", {}, moved)
+        self.assertEqual(request.full_url, moved)
+        for url in ("https://github.com/a", "https://evil.test/a", "http://api.github.com/a",
+                    "https://api.github.com:444/a", "https://registry.npmjs.org:444/a",
+                    "https://user:secret@api.github.com/a"):
+            with self.subTest(url=url), self.assertRaises(A.AssetError):
+                A.checked_metadata_url(url)
+            with self.subTest(redirect=url), self.assertRaises(A.AssetError):
+                A.SafeMetadataRedirect().redirect_request(original, None, 302, "", {}, url)
+
+    def test_official_metadata_is_exact_and_is_not_claimed_as_a_verified_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.sources(root)
+            integrity = "sha512-" + base64.b64encode(hashlib.sha512(b"archive").digest()).decode()
+            def metadata(url):
+                if "api.github.com" in url:
+                    return {"assets": [{"name": "pyodide-0.28.3.tar.bz2", "digest": "sha256:" + "a" * 64,
+                            "browser_download_url": "https://github.com/pyodide/pyodide/releases/download/0.28.3/pyodide-0.28.3.tar.bz2"}]}
+                return {"name": "katex", "version": "0.16.47", "license": "MIT",
+                        "dist": {"integrity": integrity, "tarball": "https://registry.npmjs.org/katex/-/katex-0.16.47.tgz"}}
+            with patch.object(A, "fetch_json", side_effect=metadata):
+                report = A.collect_metadata(root, source_refs={"ctm-libs": "b" * 40})
+            self.assertEqual(len(report["archives"]), 2)
+            self.assertEqual(report["archives"][0]["integrity"], integrity)
+            self.assertEqual(report["archives"][1]["sha256"], "a" * 64)
+            self.assertEqual(report["source_refs"]["ctm-libs"], "b" * 40)
+            self.assertIn("still require verification", report["status"])
+
+    def test_board_candidates_stay_in_approved_major_lines(self):
+        integrity = "sha512-" + base64.b64encode(hashlib.sha512(b"archive").digest()).decode()
+        def metadata(url):
+            package = A.urllib.parse.unquote(url.split("registry.npmjs.org/", 1)[1])
+            if re := __import__("re").search(r"/(\d+\.\d+\.\d+)$", package):
+                version = re.group(1)
+                return {"name": package[:re.start()], "version": version, "license": "MIT",
+                        "dist": {"integrity": integrity, "tarball": "https://registry.npmjs.org/a/-/a.tgz"}}
+            return {"versions": {v: {} for v in ("1.9.0", "1.10.0", "1.10.1-beta", "4.0.0", "4.1.2", "5.0.0")}}
+        with patch.object(A, "fetch_json", side_effect=metadata):
+            candidates = A.resolve_board_metadata()
+        self.assertEqual([item["version"] for item in candidates], ["1.10.0", "4.1.2", "4.1.2"])
+        self.assertEqual([item["id"] for item in candidates], ["jsxgraph", "mathjax4", "mathjax-newcm-font"])
+
+    def test_archive_inspection_verifies_bytes_and_reports_licence_texts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tar = root / "source.tgz"
+            archive(tar, [("package/LICENSE", b"fixture MIT text"), ("package/dist/app.js", b"code")])
+            entry = {"id": "fixture", "url": "https://registry.npmjs.org/demo/-/demo.tgz", "sha256": A.digest(tar.read_bytes())}
+            def downloaded(url, destination, **checks):
+                data = tar.read_bytes()
+                A.verify_bytes(data, **checks)
+                destination.write_bytes(data)
+            with patch.object(A, "download", side_effect=downloaded):
+                report = A.inspect_archives({"archives": [entry], "sources": {}}, root / "cache")
+                self.assertEqual(report["archives"][0]["texts"], {"package/LICENSE": "fixture MIT text"})
+                members = report["archives"][0]["members"]
+                self.assertEqual({x["member"]: x["sha256"] for x in members},
+                                 {"package/LICENSE": A.digest(b"fixture MIT text"), "package/dist/app.js": A.digest(b"code")})
+                entry["sha256"] = "0" * 64
+                with self.assertRaises(A.AssetError):
+                    A.inspect_archives({"archives": [entry], "sources": {}}, root / "cache")
+
+    def test_missing_official_digest_never_becomes_a_guessed_lock_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.sources(root)
+            integrity = "sha512-" + base64.b64encode(hashlib.sha512(b"archive").digest()).decode()
+            def metadata(url):
+                if "api.github.com" in url:
+                    return {"assets": [{"name": "pyodide-0.28.3.tar.bz2", "digest": None}]}
+                return {"name": "katex", "version": "0.16.47",
+                        "dist": {"integrity": integrity, "tarball": "https://registry.npmjs.org/katex/-/katex-0.16.47.tgz"}}
+            with patch.object(A, "fetch_json", side_effect=metadata), self.assertRaisesRegex(A.AssetError, "no SHA-256"):
+                A.collect_metadata(root)
+
+
+if __name__ == "__main__":
+    unittest.main()
