@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "scope": "Umbrella Meta filter only; no downstream JSXGraph render or asset delivery",
+  "quarto": "1.8.27",
+  "filter_sha256": "e8236e4b650cbed9d1ecf465397ff8050920ba3dcbbee138be223a78f9f4bb91",
+  "cases": [
+    {
+      "case": "default",
+      "value": "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js",
+      "recorded_as_default": true
+    },
+    {
+      "case": "blank",
+      "value": "",
+      "recorded_as_default": false
+    },
+    {
+      "case": "false-metadata-only",
+      "value": false,
+      "recorded_as_default": false
+    },
+    {
+      "case": "custom",
+      "value": "author-preload.js",
+      "recorded_as_default": false
+    }
+  ]
+}
