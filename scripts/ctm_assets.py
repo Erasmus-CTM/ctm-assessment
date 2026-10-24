@@ -1140,6 +1140,154 @@ def write_private_lock(lock: dict, destination: Path) -> Path:
     return destination
 
 
+# Runtime files required by the canonical asset table's consumers. Versions and
+# package identities stay in assets.json; this is only the selection policy.
+NPM_SELECTION = {
+    "font-awesome": {"files": ("js/all.min.js",)},
+    "katex": {"prefixes": ("dist/",),
+              "files": ("dist/katex.mjs", "dist/katex.min.css", "dist/contrib/auto-render.mjs")},
+    "mathjax3": {"prefixes": ("es5/",), "files": ("es5/tex-chtml-full.js",)},
+    "monaco-editor": {"prefixes": ("min/",),
+                      "files": ("min/vs/loader.js", "min/vs/editor/editor.main.js",
+                                "min/vs/editor/editor.main.css", "min/vs/base/worker/workerMain.js")},
+    "source-sans-pro": {"prefixes": ("files/",),
+                        "files": ("300.css", "400.css", "700.css"), "root_css": True},
+}
+
+
+def _npm_licence_member(name: str) -> bool:
+    basename = PurePosixPath(name).name
+    return bool(re.search(r"(^|[_.-])(licen[cs]e|copying|notice|thirdpartynotices)([_.-]|$)",
+                          basename, re.I))
+
+
+def produce_npm_lock(metadata: dict, library: Path, cache: Path, *, accepted_licences=()) -> dict:
+    """Generate a private, partial lock from exact canonical npm source bytes.
+
+    This deliberately excludes Pyodide and board packages. It is not a complete
+    installable offline asset set. Building and carrying this candidate exercises
+    the same canonical materializer as the eventual composed lock.
+    """
+    if metadata.get("v") != 1 or metadata.get("kind") != "official-asset-metadata":
+        raise AssetError("An official asset metadata record is required")
+    sources = version_sources(library)
+    assets = sources["assets"]
+    if set(assets) != set(NPM_SELECTION):
+        raise AssetError("The canonical npm asset table needs a reviewed file-selection policy")
+    recorded = metadata.get("sources", {})
+    if recorded.get("assets") != assets or recorded.get("table_sha256") != sources["table_sha256"]:
+        raise AssetError("Npm metadata differs from the canonical asset table")
+    entries = metadata.get("archives")
+    if not isinstance(entries, list):
+        raise AssetError("Official metadata archives must be a list")
+    indexed = {}
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+            raise AssetError("Malformed official npm metadata entry")
+        name = entry["id"]
+        if name in indexed:
+            raise AssetError(f"Duplicate official asset metadata: {name}")
+        if name not in assets and name != "pyodide":
+            raise AssetError(f"Unrecognized official asset metadata: {name}")
+        indexed[name] = entry
+    if set(assets) - set(indexed):
+        raise AssetError("Official metadata lacks canonical npm assets")
+    selected_metadata = []
+    for name, asset in sorted(assets.items()):
+        entry = indexed[name]
+        package, version = asset["npm"], asset["version"]
+        metadata_url = "https://registry.npmjs.org/" + urllib.parse.quote(package, safe="@") + "/" + version
+        tarball_url = "https://registry.npmjs.org/" + package + "/-/" + package.split("/")[-1] + "-" + version + ".tgz"
+        if (entry.get("npm") != package or entry.get("version") != version
+                or entry.get("metadata_url") != metadata_url or entry.get("url") != tarball_url):
+            raise AssetError(f"{name}: npm package, version or official source URL differs from assets.json")
+        selected_metadata.append(entry)
+    inspection = inspect_archives({**metadata, "archives": selected_metadata}, cache)
+    archives = []
+    for inspected in inspection["archives"]:
+        name = inspected["id"]
+        asset, policy = assets[name], NPM_SELECTION[name]
+        members, texts = {}, inspected["texts"]
+        for item in inspected["members"]:
+            original = item["member"]
+            if not original.startswith("package/"):
+                raise AssetError(f"{name}: npm member is outside package/: {original}")
+            member = str(relative_path(original[len("package/"):]))
+            if member in members:
+                raise AssetError(f"{name}: duplicate normalized member: {member}")
+            members[member] = item
+        try:
+            package_data = texts["package/package.json"]
+            package_json = json.loads(package_data)
+        except (KeyError, json.JSONDecodeError, TypeError):
+            raise AssetError(f"{name}: verified archive has no readable package.json") from None
+        if package_json.get("name") != asset["npm"] or package_json.get("version") != asset["version"]:
+            raise AssetError(f"{name}: archive package.json does not match the canonical package/version")
+        licence = package_json.get("license")
+        if not isinstance(licence, str) or licence != inspected.get("reported_licence"):
+            raise AssetError(f"{name}: archive and official metadata licence declarations differ")
+        obligations = allow_licence(name, licence, accepted_licences)
+        # This initial core selection has no approved source-offer record. A new
+        # copyleft package needs a separate reviewed policy, not just a CLI token.
+        if obligations:
+            raise AssetError(f"{name}: core npm selection has no reviewed source-offer record")
+        license_members = sorted(member for member in members if _npm_licence_member(member))
+        root_licenses = [member for member in license_members if "/" not in member
+                         and re.match(r"^(licen[cs]e|copying)([_.-]|$)", member, re.I)]
+        if not root_licenses:
+            raise AssetError(f"{name}: verified archive has no root licence text")
+        for member in license_members:
+            text = texts.get("package/" + member)
+            if not isinstance(text, str) or not text.strip():
+                raise AssetError(f"{name}: unreadable or empty licence/notice text: {member}")
+        if name == "monaco-editor" and not any(
+                re.match(r"^thirdpartynotices([_.-]|$)", PurePosixPath(member).name, re.I)
+                for member in license_members):
+            raise AssetError("monaco-editor: ThirdPartyNotices must accompany the runtime")
+        required = set(policy["files"])
+        if not required <= set(members):
+            raise AssetError(f"{name}: archive lacks required runtime files: " + ", ".join(sorted(required - set(members))))
+        runtime = set(required)
+        for prefix in policy.get("prefixes", ()):
+            matching = {member for member in members if member.startswith(prefix)}
+            if not matching:
+                raise AssetError(f"{name}: archive lacks required runtime directory {prefix}")
+            runtime.update(matching)
+        if policy.get("root_css"):
+            runtime.update(member for member in members if "/" not in member and member.endswith(".css"))
+        selected = runtime | set(license_members)
+        local = asset["local"].replace("{version}", asset["version"])
+        if not local.endswith("/"):
+            raise AssetError(f"{name}: canonical local package base must end in /")
+        relative_path(local.rstrip("/"))
+        files = [{"member": member, "path": local + member, "sha256": members[member]["sha256"]}
+                 for member in sorted(selected)]
+        archives.append({
+            "id": name, "version": asset["version"], "npm": asset["npm"],
+            "url": inspected["url"], "integrity": inspected["integrity"], "prefix": "package/",
+            "licence": licence, "licence_files": [local + member for member in license_members],
+            "files": files, "package_json_sha256": digest(package_data.encode("utf-8")),
+        })
+    font = assets["source-sans-pro"]
+    font_local = font["local"].replace("{version}", font["version"])
+    css = "".join('@import url("../' + font_local + str(weight) + '.css");\n'
+                  for weight in (300, 400, 700))
+    generated = [{"path": "fonts/source-sans-pro.css", "text": css,
+                  "sha256": digest(css.encode("utf-8"))}]
+    lock = {
+        "v": 1, "kind": "private-partial-npm-assets-lock",
+        "scope": sorted(assets),
+        "versions": {name: asset["version"] for name, asset in sorted(assets.items())},
+        "archives": archives, "generated": generated,
+        "provenance": {"metadata_sha256": digest(json_bytes(metadata)),
+                       "table_sha256": sources["table_sha256"],
+                       "source_refs": dict(metadata.get("source_refs", {}))},
+    }
+    lock["files"] = derive_lock_files(lock, cache, accepted_licences=accepted_licences)
+    return lock
+
+
+
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1174,6 +1322,11 @@ def main(argv=None):
     python_lock.add_argument("--python-packages", default="", help="Explicit comma-separated extras; never all")
     python_lock.add_argument("--licence-policy", type=Path)
     python_lock.add_argument("--accept-licence", action="append", default=[])
+    npm_lock = sub.add_parser("npm-lock", help="Produce a PRIVATE PARTIAL canonical npm asset candidate")
+    npm_lock.add_argument("--metadata", type=Path, required=True)
+    npm_lock.add_argument("--libs", type=Path, required=True)
+    npm_lock.add_argument("--cache", type=Path, required=True)
+    npm_lock.add_argument("--output", type=Path, required=True)
     build = sub.add_parser("build", help="Build bytes from an external reviewed lock")
     build.add_argument("--lock", type=Path, required=True)
     build.add_argument("--cache", type=Path, required=True)
@@ -1206,6 +1359,10 @@ def main(argv=None):
                     reviewed_report_sha256=args.reviewed_report_sha256, candidates=candidates)
         write_private_import_index(index, args.output)
         print(f'Validated {len(index["stdlib_modules"])} available modules into the private import index')
+    elif args.command == "npm-lock":
+        result = produce_npm_lock(json.loads(args.metadata.read_text(encoding="utf-8")), args.libs, args.cache)
+        write_private_lock(result, args.output)
+        print(f'Generated PRIVATE PARTIAL npm lock for {len(result["versions"])} canonical assets; no Pyodide/board assets')
     elif args.command == "python-lock":
         policy = _availability_json(args.licence_policy.read_bytes(), "licence policy") if args.licence_policy else None
         result = produce_python_lock(_availability_json(args.metadata.read_bytes(), "metadata"), args.cache,
