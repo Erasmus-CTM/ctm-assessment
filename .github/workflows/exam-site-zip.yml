@@ -1,0 +1,271 @@
+name: Rendered offline Python website ZIP
+on:
+  pull_request:
+    paths: [integration/offline-ide/**, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: offline-python-zip-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ASSET_RUN_ID: '40081864918'
+      IDE_PYODIDE_COMMIT: '16561e6604a8047027a4b053ad0d7b8e140efe7f'
+      REVIEWED_LOCK_SHA256: 6f8a64b5a24ffdeda87f7cd83a6eee23ee87f7752bf027fbb68174a60d5359fe
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Select reviewed component sources
+        env:
+          REVIEW_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 tools/ci/review-dependencies.py
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v7
+        with:
+          name: prebuilt-offline-assets
+          run-id: ${{ env.ASSET_RUN_ID }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/prebuilt-assets
+      - name: Install the existing Python frontend
+        run: |
+          IDE_REVIEW_REFS="$(python -c 'import json,os; print(json.dumps({**json.loads(os.environ.get("CTM_REVIEW_REFS") or "{}"), "pyodide-interaktiv": os.environ["IDE_PYODIDE_COMMIT"]}))')"
+          python scripts/build-course.py --path integration/offline-ide \
+            --dest "$RUNNER_TEMP/python-site" --workspace "$RUNNER_TEMP/package" \
+            --review-refs "$IDE_REVIEW_REFS" --no-render
+      - name: Verify and copy prebuilt assets; create standard profiles
+        run: |
+          python - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          from unittest.mock import patch
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as a
+          root = Path(os.environ['RUNNER_TEMP'])
+          carried, project = root / 'prebuilt-assets', root / 'python-site'
+          raw = (carried / 'inspection/complete-lock.json').read_bytes()
+          lock = json.loads(raw)
+          assert a.digest(raw) == os.environ['REVIEWED_LOCK_SHA256'], 'unreviewed complete lock'
+          assert raw == a.json_bytes(lock) and lock['kind'] == 'ctm-assets-lock'
+          versions = a.validate_version_homes(lock, project / '_extensions/ctm-libs',
+              project / '_extensions/ctm-assessment/jsxgraph-pins.yml')
+          assert lock['scope'] == sorted(versions)
+          bundle = carried / 'inspection/complete-built'
+          a.verify_bundle(bundle, lock)
+          index = (carried / 'assets-imports.json').read_bytes()
+          base = bundle / 'pyodide' / versions['pyodide']
+          a.validate_bound_import_index(index, lock['private']['import_index'],
+              public_files=a.inventory(bundle), subset_bytes=(base / 'pyodide-lock.json').read_bytes())
+          a.release_version((base / 'package.json').read_bytes(), versions['pyodide'])
+          with patch.object(a, 'download', side_effect=AssertionError('carried install attempted network')):
+              a.install_carried_bundle(lock, bundle, project / '_ctm-assets')
+          (project / '.private-extensions/assets-imports.json').write_bytes(index)
+          a.write_profiles(project, course_key='python-ide')
+          print('Verified prebuilt files:', len(lock['files']))
+          PY
+      - name: Render the offline exam website
+        working-directory: ${{ runner.temp }}/python-site
+        run: quarto render --profile offline,exam
+      - name: ZIP website contents and extract the actual deployment
+        run: |
+          python - <<'PY'
+          import json, os, shutil, sys, zipfile
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as a
+          root = Path(os.environ['RUNNER_TEMP'])
+          site = root / 'python-site/_site-exam'
+          assert (site / 'index.html').is_file() and (site / 'nested/index.html').is_file()
+          lock = json.loads((root / 'prebuilt-assets/inspection/complete-lock.json').read_bytes())
+          a.verify_bundle(site / '_ctm-assets', lock)
+          readme = Path('docs/exam-site-zip.md').read_text().split('<!-- IT -->\n', 1)[1].split('\n<!-- /IT -->', 1)[0]
+          (site / 'README-IT.txt').write_text(readme + '\n', encoding='utf-8')
+          output = root / 'python-offline-website.zip'
+          with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+              for file in sorted(site.rglob('*')):
+                  assert not file.is_symlink()
+                  if not file.is_file():
+                      continue
+                  relative = file.relative_to(site)
+                  assert not any(p.startswith('.private-') or p in {'.git', '.quarto', '_freeze', '_site-exam'} for p in relative.parts)
+                  assert file.name not in {'complete-lock.json', 'assets-imports.json', 'pyodide-lock.full.json'}
+                  if relative.parts[0] != '_ctm-assets':
+                      assert '_extensions' not in relative.parts
+                      assert not (file.name.startswith('_quarto') and file.suffix in {'.yml', '.yaml'})
+                      assert file.suffix != '.qmd'
+                  archive.write(file, relative.as_posix())
+          deployed = root / 'deployed'
+          with zipfile.ZipFile(output) as archive:
+              assert archive.testzip() is None
+              assert 'index.html' in archive.namelist() and '_site-exam/index.html' not in archive.namelist()
+              archive.extractall(deployed)
+          a.verify_bundle(deployed / '_ctm-assets', lock)
+          shutil.copytree(deployed, root / 'hosted/dept/python')
+          print('Website ZIP sha256:', a.digest(output.read_bytes()))
+          PY
+      - run: npx playwright install --with-deps chromium
+      - name: Serve the extracted website using ordinary static hosting and optional headers
+        run: |
+          python -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/deployed" > "$RUNNER_TEMP/plain.log" 2>&1 &
+          python -m http.server 8767 --bind 0.0.0.0 --directory "$RUNNER_TEMP/hosted" > "$RUNNER_TEMP/subdirectory.log" 2>&1 &
+          python scripts/serve-offline.py "$RUNNER_TEMP/deployed" --port 8766 > "$RUNNER_TEMP/headers.log" 2>&1 &
+          python scripts/serve-offline.py "$RUNNER_TEMP/hosted" --port 8768 > "$RUNNER_TEMP/subdirectory-headers.log" 2>&1 &
+          hostname -I | awk '{print $1}' > "$RUNNER_TEMP/lan-ip"
+      - name: Exercise real Python without internet access
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {launchOfflineBrowser, checkOfflinePages} from './tools/offline-check.mjs';
+          import {chromium} from 'playwright';
+          const root = process.env.RUNNER_TEMP, browser = await launchOfflineBrowser();
+          let plainBrowser;
+          const report = {scope: 'two-page Python IDE only; no graders, boards or Maxima', strict: [], plainLAN: []};
+          const basicCode = 'print("IDE_OFFLINE_OK", 20 + 22)';
+          const optionalCode = 'import numpy as np\nprint("IDE_OFFLINE_OK", int(np.array([20, 22]).sum()))';
+          async function runIDE(page, entry) {
+            const code = entry.path.startsWith('nested/') ? optionalCode : basicCode;
+            const requests = [];
+            page.on('request', request => {if (/\/_ctm-assets\/pyodide\//.test(request.url())) requests.push(request.url());});
+            await page.waitForFunction(() => globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.editor,
+              null, {timeout: 180000});
+            const editorObservedReadyMs = await page.evaluate(() => performance.now());
+            await page.waitForFunction(() => globalThis.qpyodideCellsReady === true &&
+              [...document.querySelectorAll('.qpyodide-button-run')].some(b => !b.disabled),
+              null, {timeout: 180000});
+            const runObservedEnabledMs = await page.evaluate(() => performance.now());
+            await page.evaluate(code => qpyodideCellContainer.cells[0].primaryUnit.editor.setValue(code), code);
+            const firstStart = Date.now();
+            await page.locator('.qpyodide-button-run').first().click({timeout: 180000});
+            await page.waitForFunction(() => document.querySelector('.qpyodide-output-code-area')
+              ?.innerText.includes('IDE_OFFLINE_OK 42'), null, {timeout: 180000});
+            const firstRunMs = Date.now() - firstStart;
+            await page.waitForFunction(() => [...document.querySelectorAll('.qpyodide-button-run')]
+              .every(b => b.innerText.trim() !== globalThis.QP_L?.stopLabel?.replace(/<[^>]*>/g, '').trim()));
+            await page.evaluate(() => qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('print("IDE_WARM_OK", 6 * 7)'));
+            const warmStart = Date.now();
+            await page.locator('.qpyodide-button-run').first().click();
+            await page.waitForFunction(() => document.querySelector('.qpyodide-output-code-area')
+              ?.innerText.includes('IDE_WARM_OK 42'), null, {timeout: 180000});
+            const warmRunMs = Date.now() - warmStart;
+            console.log('IDE_RUN_TIMING ' + JSON.stringify({url: page.url(), editorObservedReadyMs,
+              runObservedEnabledMs, firstRunMs, warmRunMs}));
+            await page.waitForFunction(() => [...document.querySelectorAll('.qpyodide-button-run')]
+              .every(b => b.innerText.trim() !== QP_L.stopLabel.replace(/<[^>]*>/g, '').trim()));
+            if (!fs.existsSync(path.join(root, 'python-ide.png')))
+              await page.screenshot({path: path.join(root, 'python-ide.png'), fullPage: true});
+            await page.evaluate(() => qpyodideCellContainer.cells[0].primaryUnit.editor.setValue(
+              'loops = 0\ntry:\n    while True:\n        loops += 1\nexcept KeyboardInterrupt:\n    print("IDE_INTERRUPTED")'));
+            await page.locator('.qpyodide-button-run').first().click();
+            await page.waitForFunction(() => [...document.querySelectorAll('.qpyodide-button-run')]
+              .some(b => b.innerText.trim() === QP_L.stopLabel.replace(/<[^>]*>/g, '').trim()));
+            await page.waitForTimeout(500);
+            const stopStart = Date.now();
+            await page.locator('.qpyodide-button-run').first().click();
+            await page.waitForFunction(() => [...document.querySelectorAll('.qpyodide-button-run')]
+              .every(b => b.innerText.trim() !== QP_L.stopLabel.replace(/<[^>]*>/g, '').trim()),
+              null, {timeout: 180000});
+            await page.evaluate(() => qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('print("IDE_AFTER_STOP_OK")'));
+            await page.locator('.qpyodide-button-run').first().click({timeout: 180000});
+            await page.waitForFunction(() => document.querySelector('.qpyodide-output-code-area')
+              ?.innerText.includes('IDE_AFTER_STOP_OK'), null, {timeout: 180000});
+            const stopRecoveryMs = Date.now() - stopStart;
+            return {...await page.evaluate(() => ({secureContext: isSecureContext, isolated: crossOriginIsolated,
+              output: document.querySelector('.qpyodide-output-code-area').innerText})),
+              editorObservedReadyMs, runObservedEnabledMs, firstRunMs, warmRunMs, stopRecoveryMs,
+              pythonRequestsObservedDuringProbe: requests};
+          }
+          try {
+            for (const baseURL of ['http://127.0.0.1:8766/', 'http://127.0.0.1:8768/dept/python/']) {
+              report.strict.push(await checkOfflinePages({browser, baseURL, loads: 5,
+                pages: [{path: 'index.html', boards: 0}, {path: 'nested/index.html', boards: 0}],
+                probes: [runIDE], scope: 'Python IDE root/subdirectory with isolation headers'}));
+            }
+            assert.ok(report.strict.every(result => result.ok), 'strict network-refused IDE acceptance');
+            const ip = fs.readFileSync(path.join(root, 'lan-ip'), 'utf8').trim();
+            assert.match(ip, /^\d{1,3}(?:\.\d{1,3}){3}$/);
+            assert.notEqual(ip, '127.0.0.1');
+            plainBrowser = await chromium.launch({headless: true, channel: 'chromium', args: [
+              '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE ' + ip,
+              '--disable-background-networking', '--no-proxy-server']});
+            for (const baseURL of ['http://' + ip + ':8765/', 'http://' + ip + ':8767/dept/python/']) {
+              for (const name of ['index.html', 'nested/index.html']) {
+                const context = await plainBrowser.newContext({serviceWorkers: 'block'});
+                const evidence = {baseURL, path: name, external: [], errors: [], failed: [], responses: [], pythonRequests: []};
+                let navigationStart = 0;
+                context.on('request', request => {
+                  if (/\/_ctm-assets\/pyodide\//.test(request.url()))
+                    evidence.pythonRequests.push({url: request.url(), msAfterNavigationStart: Date.now() - navigationStart});
+                });
+                await context.route('**/*', route => {
+                  if (new URL(route.request().url()).origin !== new URL(baseURL).origin) {
+                    evidence.external.push(route.request().url()); return route.abort('blockedbyclient');
+                  }
+                  return route.continue();
+                });
+                await context.routeWebSocket('**/*', socket => {evidence.external.push(socket.url()); socket.close();});
+                context.on('page', page => page.on('pageerror', error => evidence.errors.push(error.message)));
+                context.on('requestfailed', request => evidence.failed.push({url: request.url(), error: request.failure()?.errorText}));
+                context.on('response', response => {if (response.status() >= 400) evidence.responses.push(response.url());});
+                try {
+                  const page = await context.newPage();
+                  navigationStart = Date.now();
+                  await page.goto(new URL(name, baseURL).href, {waitUntil: 'load'});
+                  evidence.python = await runIDE(page, {path: name});
+                  if (baseURL.endsWith(':8765/') && name === 'index.html')
+                    await page.screenshot({path: path.join(root, 'python-ide.png'), fullPage: true});
+                  assert.equal(evidence.python.secureContext, false, 'ordinary insecure LAN HTTP');
+                  for (const key of ['external', 'errors', 'failed', 'responses']) assert.deepEqual(evidence[key], [], key);
+                } finally {report.plainLAN.push(evidence); await context.close();}
+              }
+            }
+            assert.ok(report.strict.every(result => result.ok), 'strict network-refused IDE acceptance');
+          } finally {
+            fs.writeFileSync(path.join(root, 'python-offline-checks.json'), JSON.stringify(report, null, 2));
+            console.log('IDE_ACCEPTANCE ' + JSON.stringify({scope: report.scope,
+              strict: report.strict.map(r => ({ok: r.ok, loads: r.loads,
+                results: r.results.map(x => ({path: x.path, load: x.load, ok: x.ok, problems: x.problems, probes: x.probes}))})),
+              plainLAN: report.plainLAN}));
+            if (plainBrowser) await plainBrowser.close();
+            await browser.close();
+          }
+          JS
+      - name: Publish the rendered website ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-offline-website
+          path: ${{ runner.temp }}/python-offline-website.zip
+          compression-level: 0
+          archive: false
+          if-no-files-found: error
+      - name: Preserve acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-offline-website-evidence
+          path: |
+            ${{ runner.temp }}/python-offline-checks.json
+            ${{ runner.temp }}/python-ide.png
+            ${{ runner.temp }}/plain.log
+            ${{ runner.temp }}/subdirectory.log
+            ${{ runner.temp }}/headers.log
+            ${{ runner.temp }}/subdirectory-headers.log

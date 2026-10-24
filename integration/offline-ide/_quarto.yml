@@ -1,0 +1,19 @@
+project:
+  type: website
+  render: [index.qmd, nested/index.qmd]
+website:
+  title: Python IDE
+  navbar:
+    left:
+      - href: index.qmd
+        text: Python
+      - href: nested/index.qmd
+        text: Second window
+format:
+  html:
+    theme: cosmo
+    toc: false
+filters: [ctm-assessment]
+pyodide:
+  feedback: false
+  preload-packages: false
