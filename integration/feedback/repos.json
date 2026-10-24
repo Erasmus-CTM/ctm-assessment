@@ -4,12 +4,9 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "1f7a3a5de7b765d108fe2ca4ec98b36635c6814f",
+      "commit": "41b2be0a94a5bbf9dd8389fa83458d23692f2b4a",
       "extensions": [
         "ctm-libs"
-      ],
-      "ships-copies": [
-        "ai-feedback"
       ],
       "review-ref-aliases": [
         "ai-feedback"
@@ -18,22 +15,22 @@
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "main",
-      "commit": "ad56804fd511bf89d909bf5e495ad515bb0c0c37"
+      "commit": "ea21348341854f2c5f36a5fd0b253d98fe1d68f3"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "e092b8dece85f420f25ce774e5e85779cc078309"
+      "commit": "b282111da4bb208effd8bad8d7e6df7020d0db0a"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
       "branch": "main",
-      "commit": "9e042dc5e57a1636be64ca5d08910c9af5ff1371"
+      "commit": "a1637dc95b9e11d8a0c838c801cd53e20997eceb"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "feature/shared-feedback-integration",
-      "commit": "d12d80cebf478ca88ed0a773c090e038b59bac63",
+      "commit": "95af2cc10868dfb515a8a60f54417e1ec27512a1",
       "ships-copies": [
         "ai-feedback",
         "ctm-libs"
@@ -52,4 +49,3 @@
     }
   }
 }
-

@@ -10,10 +10,9 @@ name: Pyodide parity and goldens
 #   (rows from the courses and the umbrella's examples, which stay here).
 #   The capture runs with PYTHONHASHSEED 0 and is repeated with seed 1 for
 #   the umbrella's and math-exercise's corpora: any row that differs fails.
-# - builds (L2): the same corpora built with the pull request's base and with
-#   its head, graded under 0.28.3; any difference (status, score, details,
-#   feedback, cases) fails unless integration/pyodide-parity/expected/<PR
-#   number>.json lists it.
+# - builds (L2): the same corpora built with the explicit base and dispatched
+#   commit, graded under 0.28.3; any difference (status, score, details,
+#   feedback, cases) fails unless the reviewed expected-file input lists it.
 # Either job fails when a case has no result, times out or ends in a harness
 # error, or when a teacher answer (answers.json) gets another verdict.
 # - following (informational, never fails): the courses that follow a branch
@@ -21,66 +20,23 @@ name: Pyodide parity and goldens
 #   is gone) graded the same way, and on pull requests compared with the base;
 #   a problem there is a warning, so work in progress on a course branch never
 #   turns main or a pull request red (round-2 review N1).
-# Runs when the harness, the pins, the package or the example site change; in
-# full every Monday; on demand (also with other course commits) once on the
-# default branch.
+# Only on an explicitly confirmed broad campaign, with frozen package and
+# course refs. Automatic campaigns and the weekly schedule are disabled.
 on:
-  pull_request:
-    paths:
-      - integration/pyodide-parity/**
-      - integration/feedback/repos.json
-      - integration/feedback/page-scripts.cjs
-      - tests/python-examples.cases.cjs
-      - scripts/setup-feedback-integration.py
-      - scripts/install-project.py
-      - scripts/build-course.py
-      - tools/ci/review-dependencies.py
-      - _extensions/**
-      - _filters/**
-      - examples/**
-      - example.qmd
-      - examples.qmd
-      - index.qmd
-      - _quarto.yml
-      - feedback.yml
-      - feedback/**
-      - assets/**
-      - package.json
-      - package-lock.json
-      - .github/workflows/pyodide-parity.yml
-  push:
-    branches: [main]
-    paths:
-      - integration/pyodide-parity/**
-      - integration/feedback/repos.json
-      - integration/feedback/page-scripts.cjs
-      - tests/python-examples.cases.cjs
-      - scripts/setup-feedback-integration.py
-      - scripts/install-project.py
-      - scripts/build-course.py
-      - tools/ci/review-dependencies.py
-      - _extensions/**
-      - _filters/**
-      - examples/**
-      - example.qmd
-      - examples.qmd
-      - index.qmd
-      - _quarto.yml
-      - feedback.yml
-      - feedback/**
-      - assets/**
-      - package.json
-      - package-lock.json
-      - .github/workflows/pyodide-parity.yml
-  schedule:
-    - cron: '23 3 * * 1'
   workflow_dispatch:
     inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
       courses:
         description: 'Other course commits, as NAME=COMMIT separated by spaces (names from corpora.json, e.g. ingmat3a=d7ddfc6); empty: as corpora.json says'
         default: ''
       base:
         description: 'Umbrella commit, tag or branch built as the base of the build comparison (a branch means origin/<branch>; empty: no comparison)'
+        default: ''
+      expected:
+        description: 'Reviewed integration/pyodide-parity/expected/*.json file, or empty for no expected differences'
         default: ''
 
 permissions:
@@ -97,7 +53,20 @@ env:
   COURSES: ${{ github.event.inputs.courses }}
 
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   parity:
+    needs: [campaign]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -195,7 +164,8 @@ jobs:
             ${{ runner.temp }}/goldens/PROVENANCE.md
 
   builds:
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.base != '')
+    needs: [campaign]
+    if: inputs.base != ''
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
@@ -248,13 +218,18 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm ci --ignore-scripts
         working-directory: integration/pyodide-parity
+      - name: Exercise real materialized triangle fixtures and negative coverage canaries
+        env:
+          CTM_PARITY_VARIANT_BUILD: ${{ runner.temp }}/builds/head
+        run: node --test tests/parity-variants.test.cjs
       - name: Grade every exercise of both builds under Pyodide 0.28.3
         env:
           # The differences this pull request causes on purpose, if any (docs/development.md).
-          EXPECTED: ${{ github.event.pull_request.number && format('integration/pyodide-parity/expected/{0}.json', github.event.pull_request.number) || '' }}
+          EXPECTED: ${{ inputs.expected }}
         run: |
           set -o pipefail
           expected=()
+          if [ -n "$EXPECTED" ] && [ ! -f "$EXPECTED" ]; then echo "::error::Expected-difference file does not exist: $EXPECTED"; exit 1; fi
           if [ -n "$EXPECTED" ] && [ -f "$EXPECTED" ]; then expected=(--expected "$EXPECTED"); echo "Expected differences: $EXPECTED"; fi
           node integration/pyodide-parity/run.cjs --builds base="$RUNNER_TEMP/builds/base",head="$RUNNER_TEMP/builds/head" "${expected[@]}" \
             --corpora corpora-built.json --out "$RUNNER_TEMP/builds-report" 2>&1 | tee "$RUNNER_TEMP/builds.log"
@@ -273,6 +248,7 @@ jobs:
             ${{ runner.temp }}/builds-report/results-*.jsonl
 
   following:
+    needs: [campaign]
     name: following (courses that follow a branch; informational)
     runs-on: ubuntu-latest
     timeout-minutes: 150

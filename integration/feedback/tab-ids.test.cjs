@@ -36,12 +36,23 @@ function config({preAst = true, packaged = true} = {}) {
 }
 // A copy of the fixture with its _quarto.yml and extensions: the repository's
 // tab-ids.lua alone, or the built package (CTM_INTEGRATION_SITE).
+// Keep the Quarto-alone canary free of executable cells: only the installed
+// package can register the exercise that makes its quiz valid.
+function withQuizExercise(source) {
+  const anchor = 'A written id with attributes.\n';
+  assert.equal(source.split(anchor).length, 2, 'one quiz-tab insertion point');
+  return source.replace(anchor, anchor + '\n```{math-exercise}\n#| label: tab-id-quiz-answer\n#| field-labels: x\nA labelled exercise in this quiz: _[2].\n```\n');
+}
 function project(options) {
   const parent = options.packaged ? path.dirname(path.dirname(site)) : os.tmpdir();
   const dir = fs.mkdtempSync(path.join(parent, 'tab-ids-'));
   fs.cpSync(FIXTURE, dir, {recursive: true});
   fs.writeFileSync(path.join(dir, '_quarto.yml'), config(options));
-  if (options.packaged) fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true});
+  if (options.packaged) {
+    const index = path.join(dir, 'index.qmd');
+    fs.writeFileSync(index, withQuizExercise(fs.readFileSync(index, 'utf8')));
+    fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true});
+  }
   else fs.cpSync(FILTER, path.join(dir, '_extensions', 'ctm-assessment', 'tab-ids.lua'), {recursive: true});
   return dir;
 }
@@ -53,12 +64,13 @@ const page = (dir, name) => new JSDOM(fs.readFileSync(path.join(dir, '_site', na
 const SKIPPED = ['fig-plot', 'thm-main', 'eq-one', 'sec-part', 'vid-intro'];
 
 // The ids of tab headings are on their panes' first element; nothing else moved.
-function checkTargets(doc, stderr) {
+function checkTargets(doc, stderr, {packaged = false} = {}) {
   const targets = [...doc.querySelectorAll('.ctm-tab-target')];
   assert.deepEqual(targets.map(target => target.id), ['plain-tab', 'uke3-del5', 'starts-active', 'inner-one', 'inner-two', 'in-callout']);
   for (const target of targets) {
     assert.equal(target.tagName, 'DIV', target.id);
-    assert.equal(target.className, 'ctm-tab-target', target.id + ': the heading keeps its classes');
+    const classes = packaged && target.id === 'uke3-del5' ? 'ctm-tab-target ctm-progress-slot' : 'ctm-tab-target';
+    assert.equal(target.className, classes, target.id + ': only the quiz marker gains its progress class');
     assert.equal(target.textContent.trim(), '', target.id + ' is empty');
     const pane = target.parentElement;
     assert.ok(pane.classList.contains('tab-pane'), target.id + ' is in a tab pane');
@@ -66,7 +78,17 @@ function checkTargets(doc, stderr) {
   }
   // Attributes move with the id (quiz= for quiz starts on tab titles).
   const polynomials = doc.getElementById('uke3-del5');
-  assert.equal(polynomials.getAttribute('data-quiz'), 'm1-2');
+  assert.equal(polynomials.getAttribute('data-quiz'), packaged ? null : 'm1-2');
+  assert.equal(polynomials.getAttribute('data-ctm-quiz'), packaged ? 'm1-2' : null);
+  if (packaged) {
+    const manifest = JSON.parse(doc.getElementById('ctm-store-manifest').textContent);
+    assert.deepEqual(manifest.quizzes.map(quiz => quiz.id), ['m1-2']);
+    assert.deepEqual(manifest.exercises.map(({component, id, quiz}) => ({component, id, quiz})),
+      [{component: 'math-exercise', id: 'tab-id-quiz-answer', quiz: 'm1-2'}]);
+    const cells = doc.querySelectorAll('[data-ctm-component="math-exercise"][data-ctm-id="tab-id-quiz-answer"]');
+    assert.equal(cells.length, 1, 'the sole quiz member is rendered once');
+    assert.equal(cells[0].closest('.tab-pane'), polynomials.parentElement, 'the exercise belongs to the quiz tab');
+  }
   assert.equal(polynomials.getAttribute('data-note'), 'kept');
   // The pane of each target belongs to the tab whose heading carried the id.
   const title = id => doc.getElementById(doc.getElementById(id).parentElement.getAttribute('aria-labelledby')).textContent.trim();
@@ -122,7 +144,7 @@ test('with the package: the ids reach ctm-libs, links into tabs load, markdown-l
     const {status, stderr} = render(dir);
     assert.equal(status, 0, stderr);
     const doc = page(dir, 'index.html');
-    checkTargets(doc, stderr);
+    checkTargets(doc, stderr, {packaged: true});
     assert.doesNotMatch(stderr, /markdown-lint/, 'no lint warning with the line');
     assert.ok([...doc.scripts].some(script => /ctm-nav\.js$/.test(script.getAttribute('src') || '')), 'ctm-nav.js on a page with tabs');
     // The shipped file is the repository's.

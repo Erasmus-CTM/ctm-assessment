@@ -1,11 +1,33 @@
 name: Offline asset builder
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
+
 permissions:
   contents: read
 concurrency:
   group: ctm-assets-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  campaign:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   fixture-contracts:
     runs-on: ubuntu-latest
     steps:
@@ -18,7 +40,7 @@ jobs:
       - name: Integrity, extraction, licence and carried-bundle contracts
         run: python -m unittest discover -s tests -p '*assets*.py' -v
   official-metadata:
-    needs: fixture-contracts
+    needs: [fixture-contracts, campaign]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +67,7 @@ jobs:
           git -C .asset-report-helper add -N -- assets-metadata.json
           python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
   archive-inspection:
-    needs: fixture-contracts
+    needs: [fixture-contracts, campaign]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,6 +92,7 @@ jobs:
           git -C .asset-report-helper add -N -- assets-metadata.json
           python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
   hook-provenance:
+    needs: [campaign]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -94,7 +117,7 @@ jobs:
         run: node --test --test-concurrency=1 tests/assets-hook-render.test.cjs tests/author-imports-render.test.cjs
 
   stdlib-availability:
-    needs: fixture-contracts
+    needs: [fixture-contracts, campaign]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -140,7 +163,7 @@ jobs:
           python .asset-report-helper/tools/ci/emit-converted-source.py .asset-report-helper
 
   python-subset-candidate:
-    needs: fixture-contracts
+    needs: [fixture-contracts, campaign]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

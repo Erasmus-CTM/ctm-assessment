@@ -147,10 +147,11 @@ export function inventory(root, page, side, ends) {
   for (const details of doc.querySelectorAll('main details')) {
     if (details.closest(COMPONENTS)) continue;
     let kind = null;
-    if (side === 'new') kind = details.classList.contains('ctm-reveal') ? details.classList[1] : null;
-    else if (!details.className.trim()) kind = 'details';
-    else kind = Object.keys(OLD_REVEALS).find(c => details.classList.contains(c)) ? OLD_REVEALS[Object.keys(OLD_REVEALS).find(c => details.classList.contains(c))] : null;
-    if (kind) reveals.push({kind, summary: norm(details.querySelector(':scope > summary')?.textContent), bySection: bySection(details)});
+    const modern = details.classList.contains('ctm-reveal');
+    if (modern) kind = details.classList[1];
+    else if (side === 'old' && !details.className.trim()) kind = 'details';
+    else if (side === 'old') kind = Object.keys(OLD_REVEALS).find(c => details.classList.contains(c)) ? OLD_REVEALS[Object.keys(OLD_REVEALS).find(c => details.classList.contains(c))] : null;
+    if (kind) reveals.push({kind, summary: norm(details.querySelector(':scope > summary')?.textContent), bySection: modern ? false : bySection(details)});
   }
   const links = [];
   const main = doc.querySelector('main') || doc.body;
@@ -170,7 +171,8 @@ export function inventory(root, page, side, ends) {
   // Where each id stands, as a kind of place (a link's target: sampled by it on a first visit).
   const places = new Map();
   for (const el of doc.querySelectorAll('[id]')) if (!places.has(el.id)) places.set(el.id, placeOf(el));
-  return {reveals, links, groups, switch: !!doc.querySelector(side === 'new' ? '.ctm-modes' : '[data-learning-mode]'),
+  const switchSelector = side === 'new' || doc.querySelector('.ctm-modes') ? '.ctm-modes' : '[data-learning-mode]';
+  return {reveals, links, groups, switch: !!doc.querySelector(switchSelector), switchSelector,
     nav: !!doc.querySelector('script[src*="ctm-nav"]'), toggle: !!doc.querySelector('.quarto-color-scheme-toggle'),
     tabsets: doc.querySelectorAll('.panel-tabset').length, ids: new Set(places.keys()), places,
     tabTitles: new Set([...doc.querySelectorAll('.ctm-tab-target[id]')].map(el => el.id)),
@@ -231,7 +233,11 @@ const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 // Playwright's routes, so the served files point them at a closed port.
 const HEAVY = /https?:\/\/[\w.-]+(?=[^\s"'`()<>]*?(?:\/pyodide\/v[\d.]+\/|\/monaco-editor@))/g;
 const BLOCKED = 'http://127.0.0.1:9';
-function serve(roots, isolated = true) {
+// The optional policy keeps existing callers on credentialless. require-corp
+// lets engines without credentialless support use real cross-origin isolation.
+export function serve(roots, isolated = true, coep = 'credentialless') {
+  if (!['credentialless', 'require-corp'].includes(coep))
+    throw new TypeError('COEP must be credentialless or require-corp');
   const server = http.createServer((request, response) => {
     const parts = decodeURIComponent(new URL(request.url, 'http://x').pathname).split('/');
     const root = roots[parts[1]];
@@ -241,7 +247,7 @@ function serve(roots, isolated = true) {
     if (!root || !file.startsWith(root) || !fs.existsSync(file)) { response.writeHead(404); response.end(); return; }
     // Without the isolation headers (--first-visit), as GitHub Pages serves a course.
     response.writeHead(200, {'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
-      ...(isolated ? {'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'credentialless'} : {})});
+      ...(isolated ? {'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': coep} : {})});
     let body = fs.readFileSync(file);
     if (!isolated && ['.html', '.js', '.mjs'].includes(path.extname(file))) body = body.toString('utf8').replace(HEAVY, BLOCKED);
     response.end(body);
@@ -553,12 +559,12 @@ class Run {
           const main = document.querySelector('main') || document.body, mainText = textNodes(main);
           return [...document.querySelectorAll('main details')].filter(d => !d.closest(components)).map(d => {
             let kind = null;
-            if (side === 'new') kind = d.classList.contains('ctm-reveal') ? d.classList[1] : null;
-            else if (!d.className.trim()) kind = 'details';
-            else for (const [c, k] of Object.entries(kinds)) if (d.classList.contains(c)) kind = k;
+            if (d.classList.contains('ctm-reveal')) kind = d.classList[1];
+            else if (side === 'old' && !d.className.trim()) kind = 'details';
+            else if (side === 'old') for (const [c, k] of Object.entries(kinds)) if (d.classList.contains(c)) kind = k;
             return kind && {d, kind};
           }).filter(Boolean).map(({d, kind}, k) => {
-            const found = {kind, summary: (d.querySelector(':scope > summary')?.textContent || '').replace(/\s+/g, ' ').trim(), open: d.open, words: wordsIn(d)};
+            const found = {kind, summary: (d.querySelector(':scope > summary')?.textContent || '').replace(/\s+/g, ' ').trim(), open: d.open, words: wordsIn(d), modern: d.classList.contains('ctm-reveal')};
             if (side === 'old') {
               const after = [];
               for (const node of mainText) {
@@ -601,6 +607,7 @@ class Run {
         const n = seen.new[k], ow = o.words.join(' '), nw = n.words.join(' ');
         if (ow === nw) return;
         const where = `"${o.summary}" (${k + 1}) holds ${n.words.length} words, on old ${o.words.length}`;
+        if (o.modern) { problems.push(where + ': modern reveal words changed'); return; }
         if (!nw.startsWith(ow + ' ')) { problems.push(where + (ow.startsWith(nw) ? ': it ends early' : ': other words')); return; }
         const extra = n.words.slice(o.words.length);
         if (o.after.slice(0, extra.length).join(' ') !== extra.join(' ')) problems.push(where + ': more than what followed it on old');
@@ -630,8 +637,8 @@ class Run {
         const context = await this.context(side);
         const tab = await context.newPage();
         await this.load(tab, side, this.url(side, page));
-        const sw = side === 'old' ? '[data-learning-mode]' : '.ctm-modes';
-        const read = () => tab.evaluate(([sw]) => {
+        const sw = this.inventories[page][side].switchSelector;
+        const read = (on = page) => tab.evaluate(([sw]) => {
           const box = document.querySelector(sw);
           const status = box?.querySelector('[role="status"], .ctm-modes-status');
           return {visible: !!box && box.getClientRects().length > 0 && getComputedStyle(box).visibility !== 'hidden',
@@ -639,7 +646,7 @@ class Run {
             pressed: [...(box?.querySelectorAll('button[data-mode]') || [])].map(b => b.getAttribute('aria-pressed')),
             status: (status?.textContent || '').trim(),
             steps: [...document.querySelectorAll('main details.reading-step')].map(d => d.open)};
-        }, [sw]);
+        }, [this.inventories[on][side].switchSelector]);
         const result = {initial: await read(), place: await tab.evaluate(switchPlace, [sw, WORDS_IN]).catch(() => null)};
         await tab.click(sw + ' button[data-mode="reading"]');
         await tab.waitForTimeout(250);
@@ -652,7 +659,7 @@ class Run {
         if (other) {
           await tab.goto(this.url(side, other));
           await this.settle(tab, side === 'new' ? 700 : 1500);
-          result.other = await read();
+          result.other = await read(other);
           await tab.goto(this.url(side, page));
           await this.settle(tab, side === 'new' ? 700 : 1500);
         }
@@ -700,7 +707,7 @@ class Run {
         const context = await this.context(side);
         const tab = await context.newPage();
         await this.load(tab, side, this.url(side, page));
-        const sw = side === 'old' ? '[data-learning-mode]' : '.ctm-modes';
+        const sw = this.inventories[page][side].switchSelector;
         const result = {buttons: null, summaries: []};
         if (await tab.$(sw + ' button')) {
           // Tab from the top of the page to the switch's first button, then the second.
@@ -944,7 +951,7 @@ class Run {
         const context = await this.context(side);
         const tab = await context.newPage();
         await this.load(tab, side, this.url(side, page));
-        const sw = side === 'old' ? '[data-learning-mode]' : '.ctm-modes';
+        const sw = this.inventories[page][side].switchSelector;
         const read = () => tab.evaluate(sw => ({steps: [...document.querySelectorAll('main details.reading-step')].map(d => d.open),
           switch: document.querySelector(sw) ? getComputedStyle(document.querySelector(sw)).display : 'none'}), sw);
         const before = await read();
@@ -1000,7 +1007,7 @@ class Run {
             await tab.waitForTimeout(300);
           }
           await tab.addStyleTag({content: '#quarto-header, .headroom, #quarto-sidebar-toggle-title, .quarto-secondary-nav { visibility: hidden !important; }'});
-          const selector = side === 'old' ? oldSelector : newSelector;
+          const selector = side === 'old' ? (shot === 'switch' ? this.inventories[page].old.switchSelector : oldSelector + ', ' + newSelector) : newSelector;
           // The first such element, shown: its tabs and <details> are opened as a reader would.
           const element = (await tab.evaluateHandle(([selector, components]) => {
             const el = [...document.querySelectorAll(selector)].find(el => !el.closest(components));
@@ -1093,7 +1100,7 @@ class Run {
           const details = summary.parentElement;
           if (details.open) details.open = false;
           let kind = 'component ' + [...details.classList].join('.');
-          if (side === 'new' && details.classList.contains('ctm-reveal')) kind = details.classList[1];
+          if (details.classList.contains('ctm-reveal')) kind = details.classList[1];
           else if (side === 'old' && details.closest('main') && !details.className.trim()) kind = 'details';
           else if (side === 'old') for (const [c, k] of Object.entries(kinds)) if (details.classList.contains(c)) kind = k;
           const style = getComputedStyle(summary);

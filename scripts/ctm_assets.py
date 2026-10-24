@@ -106,9 +106,16 @@ def download(url: str, destination: Path, *, sha256=None, integrity=None) -> Pat
         data = response.read()
     verify_bytes(data, sha256=sha256, integrity=integrity)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_suffix(destination.suffix + ".partial")
-    temporary.write_bytes(data)
-    temporary.replace(destination)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="wb", prefix="." + destination.name + ".",
+                                         suffix=".partial", dir=destination.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(data)
+        temporary.replace(destination)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
     return destination
 
 
@@ -672,6 +679,13 @@ def validate_version_homes(lock: dict, library: Path, pins: Path) -> dict[str, s
     expected.update(boards)
     if lock.get("versions") != expected:
         raise AssetError("Asset lock versions differ from assets.json, runtime constant or jsxgraph-pins.yml; run --update-assets and review the lock")
+    if lock.get("kind") == "ctm-assets-lock":
+        provenance = lock.get("provenance")
+        fingerprints = {"table_sha256": sources["table_sha256"],
+                        "runtime_sha256": sources["runtime_sha256"],
+                        "board_pins_sha256": digest(Path(pins).read_bytes())}
+        if not isinstance(provenance, dict) or any(provenance.get(key) != value for key, value in fingerprints.items()):
+            raise AssetError("Complete asset lock was produced from different canonical source bytes")
     return expected
 
 
@@ -1161,22 +1175,11 @@ def _npm_licence_member(name: str) -> bool:
                           basename, re.I))
 
 
-def produce_npm_lock(metadata: dict, library: Path, cache: Path, *, accepted_licences=()) -> dict:
-    """Generate a private, partial lock from exact canonical npm source bytes.
-
-    This deliberately excludes Pyodide and board packages. It is not a complete
-    installable offline asset set. Building and carrying this candidate exercises
-    the same canonical materializer as the eventual composed lock.
-    """
+def select_npm_archives(metadata: dict, assets: dict, selection: dict, cache: Path, *,
+                        allowed_extras=(), accepted_licences=(), curated_licences=None) -> tuple[list[dict], dict]:
+    """Validate official npm identity, integrity, licence texts and runtime selection."""
     if metadata.get("v") != 1 or metadata.get("kind") != "official-asset-metadata":
         raise AssetError("An official asset metadata record is required")
-    sources = version_sources(library)
-    assets = sources["assets"]
-    if set(assets) != set(NPM_SELECTION):
-        raise AssetError("The canonical npm asset table needs a reviewed file-selection policy")
-    recorded = metadata.get("sources", {})
-    if recorded.get("assets") != assets or recorded.get("table_sha256") != sources["table_sha256"]:
-        raise AssetError("Npm metadata differs from the canonical asset table")
     entries = metadata.get("archives")
     if not isinstance(entries, list):
         raise AssetError("Official metadata archives must be a list")
@@ -1187,7 +1190,7 @@ def produce_npm_lock(metadata: dict, library: Path, cache: Path, *, accepted_lic
         name = entry["id"]
         if name in indexed:
             raise AssetError(f"Duplicate official asset metadata: {name}")
-        if name not in assets and name != "pyodide":
+        if name not in assets and name not in allowed_extras:
             raise AssetError(f"Unrecognized official asset metadata: {name}")
         indexed[name] = entry
     if set(assets) - set(indexed):
@@ -1200,13 +1203,15 @@ def produce_npm_lock(metadata: dict, library: Path, cache: Path, *, accepted_lic
         tarball_url = "https://registry.npmjs.org/" + package + "/-/" + package.split("/")[-1] + "-" + version + ".tgz"
         if (entry.get("npm") != package or entry.get("version") != version
                 or entry.get("metadata_url") != metadata_url or entry.get("url") != tarball_url):
-            raise AssetError(f"{name}: npm package, version or official source URL differs from assets.json")
+            raise AssetError(f"{name}: npm package, version or official source URL differs from the canonical npm source")
+        if not isinstance(entry.get("integrity"), str) or not entry["integrity"].startswith("sha512-"):
+            raise AssetError(f"{name}: official npm metadata needs SHA-512 integrity")
         selected_metadata.append(entry)
     inspection = inspect_archives({**metadata, "archives": selected_metadata}, cache)
     archives = []
     for inspected in inspection["archives"]:
         name = inspected["id"]
-        asset, policy = assets[name], NPM_SELECTION[name]
+        asset, policy = assets[name], selection[name]
         members, texts = {}, inspected["texts"]
         for item in inspected["members"]:
             original = item["member"]
@@ -1234,7 +1239,8 @@ def produce_npm_lock(metadata: dict, library: Path, cache: Path, *, accepted_lic
         license_members = sorted(member for member in members if _npm_licence_member(member))
         root_licenses = [member for member in license_members if "/" not in member
                          and re.match(r"^(licen[cs]e|copying)([_.-]|$)", member, re.I)]
-        if not root_licenses:
+        supplement = (curated_licences or {}).get(name)
+        if not root_licenses and not supplement:
             raise AssetError(f"{name}: verified archive has no root licence text")
         for member in license_members:
             text = texts.get("package/" + member)
@@ -1244,10 +1250,10 @@ def produce_npm_lock(metadata: dict, library: Path, cache: Path, *, accepted_lic
                 re.match(r"^thirdpartynotices([_.-]|$)", PurePosixPath(member).name, re.I)
                 for member in license_members):
             raise AssetError("monaco-editor: ThirdPartyNotices must accompany the runtime")
-        required = set(policy["files"])
+        required = set(policy.get("files", ()))
         if not required <= set(members):
             raise AssetError(f"{name}: archive lacks required runtime files: " + ", ".join(sorted(required - set(members))))
-        runtime = set(required)
+        runtime = set(members) if policy.get("all_files") else set(required)
         for prefix in policy.get("prefixes", ()):
             matching = {member for member in members if member.startswith(prefix)}
             if not matching:
@@ -1262,12 +1268,44 @@ def produce_npm_lock(metadata: dict, library: Path, cache: Path, *, accepted_lic
         relative_path(local.rstrip("/"))
         files = [{"member": member, "path": local + member, "sha256": members[member]["sha256"]}
                  for member in sorted(selected)]
+        licence_files = [local + member for member in license_members]
+        if supplement:
+            effective = supplement["licence"]
+            if allow_licence(name, effective, accepted_licences):
+                raise AssetError(f"{name}: curated npm licence needs a reviewed source offer")
+            for item in supplement["files"]:
+                relative_path(item["path"])
+                if not item["text"].strip() or digest(item["text"].encode("utf-8")) != item["sha256"]:
+                    raise AssetError(f"{name}: invalid curated licence text")
+                licence_files.append(item["path"])
+            if not supplement["files"]:
+                raise AssetError(f"{name}: empty curated licence supplement")
+            licence = effective
         archives.append({
             "id": name, "version": asset["version"], "npm": asset["npm"],
             "url": inspected["url"], "integrity": inspected["integrity"], "prefix": "package/",
-            "licence": licence, "licence_files": [local + member for member in license_members],
+            "licence": licence, "licence_files": licence_files,
             "files": files, "package_json_sha256": digest(package_data.encode("utf-8")),
         })
+    return archives, inspection
+
+
+def produce_npm_lock(metadata: dict, library: Path, cache: Path, *, accepted_licences=()) -> dict:
+    """Generate a private, partial lock from exact canonical npm source bytes.
+
+    This deliberately excludes Pyodide and board packages. It is not a complete
+    installable offline asset set. Building and carrying this candidate exercises
+    the same canonical materializer as the eventual composed lock.
+    """
+    sources = version_sources(library)
+    assets = sources["assets"]
+    if set(assets) != set(NPM_SELECTION):
+        raise AssetError("The canonical npm asset table needs a reviewed file-selection policy")
+    recorded = metadata.get("sources", {})
+    if recorded.get("assets") != assets or recorded.get("table_sha256") != sources["table_sha256"]:
+        raise AssetError("Npm metadata differs from the canonical asset table")
+    archives, _ = select_npm_archives(metadata, assets, NPM_SELECTION, cache,
+                                     allowed_extras={"pyodide"}, accepted_licences=accepted_licences)
     font = assets["source-sans-pro"]
     font_local = font["local"].replace("{version}", font["version"])
     css = "".join('@import url("../' + font_local + str(weight) + '.css");\n'
@@ -1284,6 +1322,195 @@ def produce_npm_lock(metadata: dict, library: Path, cache: Path, *, accepted_lic
                        "source_refs": dict(metadata.get("source_refs", {}))},
     }
     lock["files"] = derive_lock_files(lock, cache, accepted_licences=accepted_licences)
+    return lock
+
+
+
+def _validate_private_index_separation(public_files: dict, index_sha256: str) -> None:
+    if any(path == ".private-extensions" or path.startswith(".private-extensions/")
+           or checksum == index_sha256 for path, checksum in public_files.items()):
+        raise AssetError("Private import-index bytes or paths must not enter public assets")
+
+
+def validate_bound_import_index(index_bytes: bytes, binding: dict, *, public_files: dict,
+                                subset_bytes: bytes) -> dict:
+    """Validate the existing private index and its complete-lock binding."""
+    fields = {"path", "sha256", "availability_sha256", "pyodide", "python",
+              "archive_sha256", "source_url", "runtime_files"}
+    if not isinstance(binding, dict) or set(binding) != fields:
+        raise AssetError("Complete lock needs the exact private import-index binding")
+    if (binding["path"] != ".private-extensions/assets-imports.json"
+            or not isinstance(binding["pyodide"], str) or not re.fullmatch(r"\d+\.\d+\.\d+", binding["pyodide"])
+            or not isinstance(binding["python"], str) or not re.fullmatch(r"3\.\d+\.\d+", binding["python"])):
+        raise AssetError("Private index binding uses an invalid path or release")
+    for name in ("sha256", "availability_sha256", "archive_sha256"):
+        if not isinstance(binding[name], str) or not re.fullmatch(r"[a-f0-9]{64}", binding[name]):
+            raise AssetError("Private index binding needs sha256: " + name)
+    official_url = ("https://github.com/pyodide/pyodide/releases/download/" + binding["pyodide"]
+                    + "/pyodide-" + binding["pyodide"] + ".tar.bz2")
+    if binding["source_url"] != official_url:
+        raise AssetError("Private index needs the canonical official Python archive")
+    verify_bytes(index_bytes, sha256=binding["sha256"])
+    index = _availability_json(index_bytes, "private import index")
+    if index_bytes != json_bytes(index):
+        raise AssetError("Private import index must use canonical JSON bytes")
+    if (set(index) != {"v", "python", "stdlib_modules", "source", "packages"}
+            or type(index.get("v")) is not int or index["v"] != 1 or index["python"] != binding["python"]
+            or not isinstance(index["stdlib_modules"], list) or not index["stdlib_modules"]
+            or any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)
+                   for name in index["stdlib_modules"])
+            or index["stdlib_modules"] != sorted(set(index["stdlib_modules"]))
+            or not isinstance(index["packages"], dict)):
+        raise AssetError("The existing private scanner-index schema is required")
+    for name, entry in index["packages"].items():
+        if (not isinstance(name, str) or not name or not isinstance(entry, dict) or set(entry) != {"imports"}
+                or not isinstance(entry["imports"], list) or any(not isinstance(value, str) for value in entry["imports"])):
+            raise AssetError("Invalid private package import map")
+    source = index["source"]
+    source_fields = {"url", "sha256", "runtime_files", "candidate_source", "method", "kind", "pyodide", "availability_sha256"}
+    method = "Successful imports of trusted release stdlib candidates plus actual builtin/frozen inventory; network disabled; no authored execution"
+    if (not isinstance(source, dict) or set(source) != source_fields
+            or source["kind"] != "pyodide-stdlib-availability" or source["method"] != method
+            or source["pyodide"] != binding["pyodide"] or source["url"] != official_url
+            or source["sha256"] != binding["archive_sha256"]
+            or source["availability_sha256"] != binding["availability_sha256"]):
+        raise AssetError("Private import evidence differs from its reviewed release binding")
+    candidate = source["candidate_source"]
+    if (not isinstance(candidate, dict) or set(candidate) != {"url", "git_blob_sha1"}
+            or candidate["url"] != "https://github.com/python/cpython/blob/v" + index["python"] + "/Python/stdlib_module_names.h"
+            or not isinstance(candidate["git_blob_sha1"], str) or not re.fullmatch(r"[a-f0-9]{40}", candidate["git_blob_sha1"])):
+        raise AssetError("Private import evidence has invalid candidate provenance")
+    runtime = binding["runtime_files"]
+    names = {"pyodide.js", "pyodide.mjs", "pyodide.asm.js", "pyodide.asm.wasm",
+             "python_stdlib.zip", "pyodide-lock.json", "package.json"}
+    if (not isinstance(runtime, dict) or set(runtime) != names or source["runtime_files"] != runtime
+            or any(not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value) for value in runtime.values())):
+        raise AssetError("Private index needs all seven bound runtime hashes")
+    prefix = "pyodide/" + binding["pyodide"] + "/"
+    if not isinstance(public_files, dict) or not isinstance(subset_bytes, bytes):
+        raise AssetError("Private index validation needs a public inventory and subset bytes")
+    _validate_private_index_separation(public_files, binding["sha256"])
+    if public_files.get(prefix + "pyodide-lock.json") != digest(subset_bytes):
+        raise AssetError("Private index subset bytes differ from the public inventory")
+    for name in sorted(names - {"pyodide-lock.json"}):
+        if public_files.get(prefix + name) != runtime[name]:
+            raise AssetError("Private index and selected Python runtime differ: " + name)
+    subset = _availability_json(subset_bytes, "Python subset lock")
+    if (not isinstance(subset.get("info"), dict) or subset["info"].get("python") != index["python"]
+            or not isinstance(subset.get("packages"), dict) or not subset["packages"]):
+        raise AssetError("Private index and Python subset versions differ")
+    for name, entry in subset["packages"].items():
+        if (not isinstance(entry, dict) or name not in index["packages"]
+                or index["packages"][name]["imports"] != entry.get("imports", [])):
+            raise AssetError("Private index and subset package imports differ: " + name)
+    return index
+
+
+def compose_asset_lock(partials: list[dict], library: Path, pins: Path, cache: Path, *,
+                       reviewed_partial_sha256: dict[str, str], private_index_bytes: bytes,
+                       reviewed_index_sha256: str, reviewed_availability_sha256: str,
+                       accepted_licences=()) -> dict:
+    """Compose reviewed selections, regenerating one complete file inventory.
+
+    Partial inventories contain separate manifests and notices. They are checked
+    against the canonical materializer, then discarded rather than concatenated.
+    The private scanner index is bound by digest; its bytes never enter assets.
+    """
+    sources = version_sources(library)
+    core_versions = {name: item["version"] for name, item in sources["assets"].items()}
+    board_pins = board_versions(pins)
+    versions = {**core_versions, "pyodide": sources["pyodide"], **board_pins}
+    if len(versions) != len(core_versions) + 1 + len(board_pins):
+        raise AssetError("Asset version homes overlap")
+    families = {
+        "private-partial-python-assets-lock": {"pyodide"},
+        "private-partial-npm-assets-lock": set(core_versions),
+        "private-partial-board-assets-lock": set(board_pins),
+    }
+    if not isinstance(partials, list) or len(partials) != len(families):
+        raise AssetError("Composition requires exactly the Python, npm and board families")
+    if not isinstance(reviewed_partial_sha256, dict) or set(reviewed_partial_sha256) != set(families):
+        raise AssetError("Composition needs all three independently reviewed partial digests")
+    indexed = {}
+    for partial in partials:
+        if not isinstance(partial, dict) or partial.get("kind") not in families:
+            raise AssetError("Unsupported partial lock family")
+        kind = partial["kind"]
+        if kind in indexed:
+            raise AssetError("Duplicate partial lock family")
+        verify_bytes(json_bytes(partial), sha256=reviewed_partial_sha256[kind])
+        scope = families[kind]
+        if (type(partial.get("v")) is not int or partial["v"] != 1
+                or partial.get("scope") != sorted(scope)
+                or partial.get("versions") != {name: versions[name] for name in sorted(scope)}):
+            raise AssetError("Partial scope or canonical versions differ: " + kind)
+        archives = partial.get("archives")
+        if (not isinstance(archives, list) or not archives
+                or any(not isinstance(item, dict) or not isinstance(item.get("id"), str) for item in archives)
+                or len({item["id"] for item in archives}) != len(archives)
+                or {item["id"] for item in archives} != scope):
+            raise AssetError("Partial archives differ from their declared family: " + kind)
+        if any(("version" in item or kind != "private-partial-python-assets-lock")
+               and item.get("version") != versions[item["id"]] for item in archives):
+            raise AssetError("Partial archive version differs from its canonical home: " + kind)
+        provenance = partial.get("provenance")
+        if kind == "private-partial-npm-assets-lock" and (
+                not isinstance(provenance, dict) or provenance.get("table_sha256") != sources["table_sha256"]):
+            raise AssetError("Npm partial was produced from a different canonical asset table")
+        if kind == "private-partial-board-assets-lock" and (
+                not isinstance(provenance, dict) or provenance.get("board_pins_sha256") != digest(Path(pins).read_bytes())):
+            raise AssetError("Board partial was produced from different canonical pins")
+        generated = partial.get("generated", [])
+        if not isinstance(generated, list) or any(not isinstance(item, dict) for item in generated):
+            raise AssetError("Malformed partial generated files")
+        actual = derive_lock_files(partial, cache, accepted_licences=accepted_licences)
+        if partial.get("files") != actual:
+            raise AssetError("Partial inventory differs from canonical materialization: " + kind)
+        _validate_private_index_separation(actual, reviewed_index_sha256)
+        indexed[kind] = partial
+    if set(indexed) != set(families):
+        raise AssetError("A required partial lock family is missing")
+    raw_index = _availability_json(private_index_bytes, "private import index")
+    source = raw_index.get("source") if isinstance(raw_index.get("source"), dict) else {}
+    python = indexed["private-partial-python-assets-lock"]
+    archive = python["archives"][0]
+    official_url = ("https://github.com/pyodide/pyodide/releases/download/" + versions["pyodide"]
+                    + "/pyodide-" + versions["pyodide"] + ".tar.bz2")
+    prefix = "pyodide/" + versions["pyodide"] + "/"
+    subset_entries = [item for item in python.get("generated", []) if item.get("path") == prefix + "pyodide-lock.json"]
+    if len(subset_entries) != 1 or not isinstance(subset_entries[0].get("text"), str):
+        raise AssetError("Python family needs its generated subset lock")
+    binding = {
+        "path": ".private-extensions/assets-imports.json", "sha256": reviewed_index_sha256,
+        "availability_sha256": reviewed_availability_sha256, "pyodide": versions["pyodide"],
+        "python": raw_index.get("python"), "archive_sha256": archive.get("sha256"),
+        "source_url": official_url, "runtime_files": source.get("runtime_files"),
+    }
+    if archive.get("url") != official_url:
+        raise AssetError("Python family is not the canonical official archive")
+    validate_bound_import_index(private_index_bytes, binding,
+        public_files=python["files"],
+        subset_bytes=subset_entries[0]["text"].encode("utf-8"))
+    archives, generated = [], []
+    for kind in sorted(indexed):
+        archives.extend(indexed[kind]["archives"])
+        generated.extend(indexed[kind].get("generated", []))
+    # A canonical JSON copy keeps the caller's partial dictionaries independent.
+    lock = json.loads(json.dumps({
+        "v": 1, "kind": "ctm-assets-lock", "scope": sorted(versions), "versions": versions,
+        "archives": sorted(archives, key=lambda item: item["id"]),
+        "generated": sorted(generated, key=lambda item: item["path"]),
+        "python_packages": python.get("python_packages", {}),
+        "python_roots": python.get("python_roots", []), "python_extras": python.get("python_extras", []),
+        "private": {"import_index": binding},
+        "provenance": {"partials": reviewed_partial_sha256,
+                       "table_sha256": sources["table_sha256"],
+                       "runtime_sha256": sources["runtime_sha256"],
+                       "board_pins_sha256": digest(Path(pins).read_bytes())},
+    }))
+    lock["files"] = derive_lock_files(lock, cache, accepted_licences=accepted_licences)
+    _validate_private_index_separation(lock["files"], reviewed_index_sha256)
+    validate_version_homes(lock, library, pins)
     return lock
 
 
@@ -1382,3 +1609,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+
