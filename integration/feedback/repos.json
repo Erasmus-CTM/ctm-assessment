@@ -4,12 +4,9 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "1f7a3a5de7b765d108fe2ca4ec98b36635c6814f",
+      "commit": "626b546604f51c9cb738210c56d054d421581e02",
       "extensions": [
         "ctm-libs"
-      ],
-      "ships-copies": [
-        "ai-feedback"
       ],
       "review-ref-aliases": [
         "ai-feedback"
@@ -18,22 +15,22 @@
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "main",
-      "commit": "ad56804fd511bf89d909bf5e495ad515bb0c0c37"
+      "commit": "18e6f1eb00713fdefbfc3d040c6a05eb88c6c314"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "e092b8dece85f420f25ce774e5e85779cc078309"
+      "commit": "97a7dc5b1eb23adb398f789cb29e0266e1b256b0"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
       "branch": "main",
-      "commit": "9e042dc5e57a1636be64ca5d08910c9af5ff1371"
+      "commit": "5976f1a97b78bd81d4d7a3a954ff2102df8c6e37"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "feature/shared-feedback-integration",
-      "commit": "d12d80cebf478ca88ed0a773c090e038b59bac63",
+      "commit": "4be390838e6f137e32cfb15de82b3a26b1e317bc",
       "ships-copies": [
         "ai-feedback",
         "ctm-libs"
@@ -42,9 +39,9 @@
     "jsxgraph": {
       "repository": "jsxgraph/jsxgraph-quarto",
       "branch": "main",
-      "commit": "17de83e006cf8907a146cc6a2366f42a35463c6e",
+      "commit": "e4ad81d82e1b56f86765026a3dd26f6975d29d57",
       "extension": "jsxgraph",
-      "pin-outside-branch": "the fork commit of upstream pull request #2, not on upstream main"
+      "pin-outside-branch": "AC-approved upstream pull request #2 head e4ad81d82e1b56f86765026a3dd26f6975d29d57 (jsxgraph-quarto 1.2.0, optional src_mjx_preload); not yet on upstream main"
     },
     "ctm-assessment": {
       "repository": "Erasmus-CTM/ctm-assessment",
@@ -52,4 +49,3 @@
     }
   }
 }
-

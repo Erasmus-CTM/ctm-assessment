@@ -1,0 +1,48 @@
+{
+  "base": "79cb004d1e8158a6074ddc07a40bd4fd725b3dc9",
+  "command": [
+    "python",
+    "scripts/setup-feedback-integration.py",
+    "--update-pins",
+    "--only",
+    "ctm-libs,py-exercise,pyodide-interaktiv"
+  ],
+  "method": "Temporarily select the three reviewed branch names in this isolated config, run the unmodified canonical selective updater, assert exact resolved heads, then restore only original branch metadata. Commit values are canonical producer output.",
+  "changes": {
+    "ctm-libs": {
+      "before": "41b2be0a94a5bbf9dd8389fa83458d23692f2b4a",
+      "resolved": "3277d66b7c1c108f6b073a75b38d669d17b73283",
+      "selected_review_branch": "consolidation/2026-10-layout-opaque-union",
+      "restored_branch": "main"
+    },
+    "py-exercise": {
+      "before": "ea21348341854f2c5f36a5fd0b253d98fe1d68f3",
+      "resolved": "fda82aa916b2abb564b909ec3021b6cad59fd49f",
+      "selected_review_branch": "consolidation/2026-10-layout-lifecycle",
+      "restored_branch": "main"
+    },
+    "pyodide-interaktiv": {
+      "before": "95af2cc10868dfb515a8a60f54417e1ec27512a1",
+      "resolved": "035e7307f53207d8f4b90c6692ec926ee802ab38",
+      "selected_review_branch": "consolidation/2026-10-layout-lifecycle",
+      "restored_branch": "feature/shared-feedback-integration"
+    }
+  },
+  "before_config_sha256": "f07487ba3f49ca6dc44234d4b00a9f746b9da32dac4b3d2ad0f4df013981ab78",
+  "canonical_produced_config_sha256": "6a464dd5fe05575e1863d78ed4cd3a8262782fc1eb8c93d124712a7bc8b9365a",
+  "final_config_sha256": "04947951ce3b829f2528b198b79420353811636859680cb8e1e49e9bbba63220",
+  "other_entries_unchanged": true,
+  "hook_proof": {
+    "hook-result.json": "844c98e0a0ba3714c398eb22d78e2016d16a7be8a58dfb99853cc67c6411cecd",
+    "hook-test.mjs": "c20f457d47208d8fc2ee2902c85893a1147810eb970f74d11f18fa7bcc4089b6",
+    "hook.log": "7b5da526241581c3a87a5c03ce7d1f341cf855fe56288ff48e639af5ac8d5dcb"
+  },
+  "hook_original_log_sha256": "29bac0d6c564154e5efca8405a937bc012bad5508c6b3809dd683a83dd822ffa",
+  "hook_log_normalization": "Only CRLF line endings normalized to LF; the single JSON log line is unchanged.",
+  "activation_default_location": "One pins.src_mjx_preload assignment in _extensions/ctm-assessment/ctm-assessment.lua before existing fill-absent loop",
+  "unchanged_asset_pins": {
+    "path": "_extensions/ctm-assessment/jsxgraph-pins.yml",
+    "git_blob": "9e51e3c39a0b32bbbb8c4d9dd6452883b5373bb0",
+    "sha256": "68b51902932f8c4146de7478e4c6355196c45c940133abfab2d3c0968883f156"
+  }
+}

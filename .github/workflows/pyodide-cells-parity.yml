@@ -9,13 +9,17 @@ name: Pyodide cells, old against new
 # cells in Firefox and WebKit against Chromium (module workers, Atomics.wait
 # and COEP credentialless differ between the engines).
 #
-# On pull requests that change the pins or the tool: ctm-demo and ingmat3a
-# (main), old = the pull request's base, new = its head; ingmat3a's
-# linalg-branch is informational (a warning, never a failure). On demand: any
-# course, course ref and package refs.
+# Only on an explicitly confirmed broad campaign: choose the course, course ref
+# and old/new package refs. Automatic course sweeps are disabled; the original
+# actual-cell and cross-engine assertions remain unchanged.
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
   workflow_dispatch:
     inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
       course:
         description: 'Course repository (owner/name)'
         default: 'aacchhee/ingmat3a_ntnu'
@@ -28,11 +32,6 @@ on:
       new:
         description: 'ctm-assessment ref of the new package (empty: the branch this runs on)'
         default: ''
-  pull_request:
-    paths:
-      - integration/feedback/repos.json
-      - tools/pyodide-cells.mjs
-      - .github/workflows/pyodide-cells-parity.yml
 
 permissions:
   contents: read
@@ -42,7 +41,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   courses:
+    needs: [campaign]
     name: cells ${{ matrix.course }} @ ${{ matrix.ref }}${{ matrix.informational && ' (informational)' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 150
@@ -117,6 +129,7 @@ jobs:
           path: ${{ runner.temp }}/cells
 
   engines:
+    needs: [campaign]
     name: example cells in Firefox and WebKit against Chromium
     runs-on: ubuntu-latest
     timeout-minutes: 60

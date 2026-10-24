@@ -74,7 +74,8 @@ test('math pages load ctm-checkers\' page script, in document order; its develop
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'parity-scripts-'));
   try {
     const files = {'ctm-runtime-0.9.0/pyodide-runtime.js': 'ctm-runtime', 'ctm-checkers-0.1.1.dev0+be41199f/ctm-checkers.js': 'ctm-checkers',
-      'math-exercise-0.11.0/math-exercise.js': 'math-exercise', 'other-1.0/other.js': 'other'};
+      'ctm-layout-0.9.0/ctm-layout.js': 'ctm-layout', 'ctm-locale-ui-0.9.0/ui.js': 'ctm-locale-ui', 'ctm-store-0.9.0/ctm-store.js': 'ctm-store',
+      'ctm-variants-0.9.0/variants.js': 'ctm-variants', 'math-exercise-0.11.0/math-exercise.js': 'math-exercise', 'other-1.0/other.js': 'other'};
     for (const [file, name] of Object.entries(files)) {
       fs.mkdirSync(path.join(dir, 'site_libs', 'quarto-contrib', path.dirname(file)), {recursive: true});
       fs.writeFileSync(path.join(dir, 'site_libs', 'quarto-contrib', file), `(window.loaded = window.loaded || []).push(${JSON.stringify(name)});`);
@@ -84,7 +85,7 @@ test('math pages load ctm-checkers\' page script, in document order; its develop
       + '</head><body></body></html>');
     const w = new JSDOM(fs.readFileSync(page, 'utf8'), {url: 'http://localhost/page.html', runScripts: 'outside-only'}).window;
     scripts.run(w, page, scripts.MATH);
-    assert.deepEqual([...w.loaded], ['ctm-runtime', 'ctm-checkers', 'math-exercise']);
+    assert.deepEqual([...w.loaded], ['ctm-runtime', 'ctm-checkers', 'ctm-layout', 'ctm-locale-ui', 'ctm-store', 'ctm-variants', 'math-exercise']);
     w.close();
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
 });
@@ -125,7 +126,8 @@ test('authored tests run through ctm-checkers when the build has it, else throug
     fs.writeFileSync(path.join(wheelDir, '__init__.py'), '');
     fs.writeFileSync(path.join(wheelDir, 'authored.py'), run
       + 'def run_question(options, base):\n    run(options, base, "ctm-checkers")\n'
-      + 'def authored_questions(path):\n    yield ' + question.replace('LABEL', '"q (ctm-checkers)"') + '\n');
+      + 'def authored_questions(path):\n    yield ' + question.replace('LABEL', '"q (ctm-checkers)"') + '\n'
+      + '    yield {"label": "recipe", "parameters": "", "tests": "- answers: [\\\"{{ab}}\\\"]\\n  expected: correct"}\n');
     const wheel = path.join(parity, 'ctm_checkers-0.0.0-py3-none-any.whl');
     const zip = spawnSync(python, ['-c', 'import shutil, sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2]); shutil.move(sys.argv[1] + ".zip", sys.argv[3])',
       path.join(dir, 'archive'), path.join(dir, 'wheel'), wheel], {encoding: 'utf8'});
@@ -134,11 +136,13 @@ test('authored tests run through ctm-checkers when the build has it, else throug
     fs.mkdirSync(tree);
     fs.writeFileSync(path.join(tree, 'page.qmd'), 'stand-in\n');
     const program = (wheelPath) => '_ctm_parity_wheel = ' + (wheelPath ? JSON.stringify(wheelPath) : 'None') + '\n'
-      + AUTHORED.split('/ctm-parity/').join(parity + '/') + '\nprint(_ctm_authored(' + JSON.stringify(tree) + ', ["page.qmd"]))\n';
+      + AUTHORED.split('/ctm-parity/').join(parity.split(path.sep).join('/') + '/') + '\nprint(_ctm_authored(' + JSON.stringify(tree) + ', ["page.qmd"]))\n';
     const records = (wheelPath) => {
       const result = spawnSync(python, ['-c', program(wheelPath)], {encoding: 'utf8'});
       assert.equal(result.status, 0, result.stderr);
-      return JSON.parse(result.stdout).map(text => JSON.parse(text));
+      const found = JSON.parse(result.stdout).map(text => JSON.parse(text));
+      assert.equal(found.length, 1, 'the ordinary authored test remains; a parameter recipe uses materialized fixtures');
+      return found;
     };
     const [legacy] = records(null), [current] = records(wheel);
     assert.equal(legacy.label, 'q (0.10)');
@@ -146,4 +150,26 @@ test('authored tests run through ctm-checkers when the build has it, else throug
     assert.deepEqual([legacy.outcome, legacy.calls, legacy.responses], ['pass', [{by: 'question-tests.py', score: 1}], [{inputs: {}, kind: 'expressions', raw: ['1']}]]);
     assert.deepEqual([current.outcome, current.calls, current.responses], ['pass', [{by: 'ctm-checkers', score: 1}], [{inputs: {}, kind: 'expressions', raw: ['1']}]]);
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
+});
+
+// Both task protocols must enumerate the requested choice, never a random draw.
+test('parity selects numbered shared pools and exact generated ids while retaining legacy session selection', () => {
+  const {prepare} = require('../integration/pyodide-parity/cases.cjs');
+  const w = new JSDOM('<div id="slot"></div>', {url:'http://localhost/lesson.html?keep=yes'}).window;
+  try {
+    let observed;
+    const source = `<div data-storage-variants='[{"n":7,"id":"first","hash":"a"},{"n":12,"id":"second","hash":"b"}]'></div>`;
+    const api = {setupCell(cell) { observed = new URL(w.location.href).searchParams.get('variant'); }};
+    let cell = prepare(w,api,w.document.getElementById('slot'),source,'q',{kind:'pool',index:1});
+    assert.equal(observed,'q:12');
+    assert.equal(new URL(w.location.href).searchParams.get('keep'),'yes');
+    assert.equal(w.sessionStorage.getItem('math-pool|/lesson.html|q'),'1');
+    cell = prepare(w,api,cell,'<div></div>','old',{kind:'pool',index:0});
+    assert.equal(observed,null);
+    assert.equal(w.sessionStorage.getItem('math-pool|/lesson.html|old'),'0');
+    const generated = {setupCell(cell) {cell.mathExercise={selectVariant(id) {cell.dataset.variantId=id;}};}};
+    cell = prepare(w,generated,cell,'<div></div>','new',{kind:'generated',id:'exact-id',index:0});
+    assert.equal(cell.dataset.variantId,'exact-id');
+    assert.throws(()=>prepare(w,{setupCell(cell) {cell.mathExercise={selectVariant(){}};}},cell,'<div></div>','new',{kind:'generated',id:'missing',index:0}),/exact generated variant/);
+  } finally {w.close();}
 });

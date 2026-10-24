@@ -61,6 +61,7 @@ const {isDeepStrictEqual} = require('node:util');
 const {ensureWheels} = require('./wheels.cjs');
 const {pageCases, pagesUnder, authoredSources, ANSWERS} = require('./cases.cjs');
 const capture = require('./capture.cjs');
+const variantCoverage = require('./variant-coverage.cjs');
 
 function parse(argv) {
   const options = {site: [], sources: [], versions: null, builds: null, timeout: 240, python: null, extensions: null, out: null, capture: null,
@@ -247,15 +248,16 @@ function readExpected(file) {
   const entries = data.differences;
   if (!Array.isArray(entries)) throw new Error(file + ': {"differences": [...]} expected');
   return entries.map((entry, i) => {
-    const unknown = Object.keys(entry).filter(key => !['path', 'case', 'reason', 'required'].includes(key));
+    const unknown = Object.keys(entry).filter(key => !['path', 'case', 'reason', 'required', 'onlyIn'].includes(key));
     if (unknown.length || typeof entry.reason !== 'string' || !entry.reason.trim() || !(entry.path || entry.case))
       throw new Error(`${file}: entry ${i + 1} needs a reason and a path or case (path, case, reason, required)`);
+    if (entry.onlyIn !== undefined && !['base', 'head'].includes(entry.onlyIn)) throw new Error(file + ': onlyIn must be base or head');
     const pattern = typeof entry.case === 'string' && /^\/.*\/$/.test(entry.case) ? new RegExp(entry.case.slice(1, -1)) : null;
     // The narrower entry wins a difference: an exact case id, then a case pattern, then a path alone; the longer path, then the
     // longer pattern, then the earlier entry.
     const rank = [entry.case ? (pattern ? 2 : 3) : 1, (entry.path || '').length, (entry.case || '').length];
     return {...entry, required: entry.required !== false, index: i, rank,
-      matches: d => (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
+      matches: d => (!entry.onlyIn || d.why === 'only in ' + entry.onlyIn) && (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
         && (!entry.case || (pattern ? pattern.test(d.id) : d.id === entry.case))};
   });
 }
@@ -327,12 +329,13 @@ function buildJob(run, options, wheels, authoredResponses, corpora) {
   const job = {wheels, hashSeed: options.hashSeed, pages: {}, cases: [], skipped: [], cells: [], unshaped: [], misfits: [], authored: [], python: null, duplicates: [],
     mathExtension: path.join(at(run, options.extensions), 'math-exercise'), checkersWheel: checkersWheel(at(run, options.extensions)),
     capture: Boolean(options.capture)};
-  const seen = new Map();
+  const seen = new Map(), generated = [];
   for (const site of options.site) {
     const root = at(run, site.dir), corpus = siteCorpus(site, options, corpora);
     for (const file of pagesUnder(root)) {
       const relative = site.name + '/' + file.split(path.sep).join('/');
-      const {cases, skipped, cells, unshaped, misfits} = pageCases(path.join(root, file), relative, authoredResponses[corpus] || {}, answersOf(corpus, corpora));
+      const {cases, skipped, cells, unshaped, misfits, generated: manifests} = pageCases(path.join(root, file), relative, authoredResponses[corpus] || {}, answersOf(corpus, corpora));
+      generated.push(...manifests.map(cell => ({...cell, corpus})));
       const signature = casesSignature(cases);
       if (cases.length && seen.has(signature)) {
         // Graded once, as the earlier page; its teacher answers count as found for this corpus too.
@@ -348,7 +351,12 @@ function buildJob(run, options, wheels, authoredResponses, corpora) {
   }
   for (const tree of options.sources) {
     const root = at(run, tree.dir);
-    job.authored.push({name: tree.name, root, files: authoredSources(root)});
+    const files = authoredSources(root);
+    job.authored.push({name: tree.name, root, files});
+    // Duplicate rendered pages share the already graded page's cases.
+    const manifests = generated.map(cell => ({...cell, page: job.duplicates.find(d => d.page === cell.page)?.same || cell.page}));
+    (job.variantRecipes ||= []).push(...variantCoverage.coverage(root, files, corpusOf(tree.name, options.sources, corpora),
+      job.mathExtension, job.checkersWheel, manifests, job.cases));
   }
   if (options.python) {
     const {cases, browserPython} = require('../../tests/python-examples.cases.cjs');
@@ -461,8 +469,7 @@ async function main() {
   const answersUnexpected = unexpectedAll.filter(enforced);
   answerNotes.push(...unexpectedAll.filter(item => !enforced(item)).map(a => `${a.run}: ${a.id}: expected ${a.expected}, got ${a.got}`));
   const keysNotCorrect = job.cases.filter(c => c.source === 'keys' && !(last.get(c.id)?.results || []).every(r => r.status === 'correct')).map(c => c.id);
-  const fixtureMismatch = job.cases.filter(c => c.kind === 'fixture').map(c => ({c, got: runs.map(r => (results[r.name].get(c.id)?.results || []).map(x => x.status))}))
-    .filter(({c, got}) => got.some(statusList => JSON.stringify(statusList) !== JSON.stringify(c.expected))).map(({c, got}) => ({id: c.id, expected: c.expected, got}));
+  const fixtureMismatch = variantCoverage.fixtureMismatches(job, runs, results);
   const pythonExpectations = job.python ? job.python.cases.map(c => ({c, got: runs.map(r => results[r.name].get(`python:${c.label}:${c.name}`)?.results[0].status)}))
     .filter(({c, got}) => got.some(status => status !== c.expected)) : [];
   const authored = [...last.keys()].filter(id => id.startsWith('authored:') && id !== 'authored:all');
@@ -479,7 +486,7 @@ async function main() {
     authoredResponsesNotPageShaped: job.unshaped.length, teacherAnswers: job.cases.filter(c => c.expect).length,
     teacherAnswersUnexpected: answersUnexpected.length, teacherAnswersUnused: answersUnused.length, teacherAnswersMisfit: answersMisfit.length,
     teacherAnswerNotes: answerNotes.length, courseCommits: options.courseCommits || null,
-    authoredTests: authored.length, authoredNotPassing: authoredFailing.length,
+    authoredTests: authored.length, authoredNotPassing: authoredFailing.length, variantRecipes: (job.variantRecipes || []).length,
     pythonPrograms: job.python ? job.python.cases.length : 0, pythonUnexpected: pythonExpectations.length,
     skipped: job.skipped.length, timeouts: Object.fromEntries(runs.map((r, i) => [r.name, timeouts[i]])), incomplete: incomplete.length,
     statuses, keysNotCorrect: keysNotCorrect.length, fixturesUnexpected: fixtureMismatch.length,
@@ -537,6 +544,7 @@ async function main() {
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify({summary, differences, expectedDifferences: accepted, staleExpectations: stale, notes, incomplete,
     teacherAnswersUnexpected: answersUnexpected, teacherAnswersUnused: answersUnused, teacherAnswersMisfit: answersMisfit, teacherAnswerNotes: answerNotes, customWithoutCorrect: covered.withoutCorrect, customCells: covered.cells,
     authoredResponsesNotPageShaped: job.unshaped, skipped: job.skipped, duplicates: job.duplicates, keysNotCorrect, fixtureMismatch,
+    variantRecipes: Object.fromEntries(runs.map((run, i) => [run.name, jobs[i].variantRecipes || []])),
     authoredNotPassing: authoredFailing.map(id => ({id, outcome: last.get(id).results[0].status})), pythonUnexpected: pythonExpectations}, null, 1));
   const title = strict
     ? `## Build comparison: ${runs.map(r => r.name).join(' vs ')} under ${runtimes[runs[1].name] || 'Pyodide ' + runs[1].version}`
@@ -575,7 +583,7 @@ async function main() {
   fs.writeFileSync(path.join(out, 'report.md'), md.join('\n') + '\n');
   console.log(md.join('\n'));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join('\n') + '\n');
-  const failed = differences.length || stale.length || incomplete.length || answersUnexpected.length || answersUnused.length || answersMisfit.length
+  const failed = differences.length || stale.length || incomplete.length || answersUnexpected.length || answersUnused.length || answersMisfit.length || fixtureMismatch.length || authoredFailing.length
     || (summary.captureConflicts && !strict);
   process.exit(failed ? 1 : 0);
 }

@@ -135,6 +135,57 @@ board.create('circle', [[0,0],1]);
     once(html, SCRIPTS)
     assert 'var ME_CFG =' not in html, 'math-exercise must not inline its bundle'
     assert 'ai-feedback-' + libs_version + '/' in html
+    # Author tests run against the checker wheel installed from this archive.
+    # Built-in declarative grading requires the shared question-test API.
+    config = (course / '_quarto.yml').read_text()
+    (course / '_quarto.yml').write_text(
+        'project:\n  type: default\n  render: [author-tests.qmd]\nfilters: [ctm-assessment]\n')
+    author_tests = '''---
+format: html
+---
+
+```{math-exercise}
+#| label: packaged-numeric-author-test
+#| mode: numeric
+#| tolerance: 0.01
+#| tests:
+#|   - name: PACKAGED_NUMERIC_ASSERTION
+#|     answers: ['raw("0.501")']
+#|     expect: correct
+Answer: _[1/2].
+```
+
+```{math-exercise}
+#| label: packaged-legacy-author-test
+#| mode: custom
+#| checker: |
+#|   def check(response, symbols):
+#|       return {"correct": True}
+#| tests: |
+#|   def test(check, symbols):
+#|       assert check({"expressions": []}, symbols)["correct"], "PACKAGED_LEGACY_ASSERTION"
+Answer: _[].
+```
+'''
+    author_page = course / 'author-tests.qmd'
+    author_page.write_text(author_tests)
+    render(course)
+    author_html = (course / 'author-tests.html').read_text()
+    for label in ('packaged-numeric-author-test', 'packaged-legacy-author-test'):
+        assert label in author_html, label + ' missing from the installed-package fixture'
+    assert 'PACKAGED_NUMERIC_ASSERTION' not in author_html and 'PACKAGED_LEGACY_ASSERTION' not in author_html
+    for original, mutation, label, assertion in (
+        ('raw("0.501")', 'raw("9")', 'packaged-numeric-author-test', 'PACKAGED_NUMERIC_ASSERTION'),
+        ('assert check(', 'assert not check(', 'packaged-legacy-author-test', 'PACKAGED_LEGACY_ASSERTION'),
+    ):
+        changed = author_tests.replace(original, mutation)
+        assert changed != author_tests, 'the authored-test mutation must alter the real fixture'
+        author_page.write_text(changed)
+        failed = render(course, expect_ok=False)
+        diagnostic = failed.stdout + failed.stderr
+        assert failed.returncode != 0 and label in diagnostic and assertion in diagnostic, diagnostic
+    author_page.write_text(author_tests)
+    (course / '_quarto.yml').write_text(config)
     # The pre-ast filter that keeps tab-heading ids is installed with the
     # package, at the path a course's _quarto.yml names (step 4).
     config = (course / '_quarto.yml').read_text()
@@ -157,7 +208,9 @@ board.create('circle', [[0,0],1]);
     html = (course / 'example.html').read_text()
     once(html, SCRIPTS, ' next to standalone copies')
     frames = ' '.join(base64.b64decode(m).decode('utf8', 'replace') for m in re.findall(r'data:text/html;base64,([A-Za-z0-9+/=]+)', html))
-    assert 'jsxgraph@1/distrib/jsxgraphcore.js' in frames, 'JSXGraph boards do not load the package library versions'
+    pins = (extensions / 'ctm-assessment' / 'jsxgraph-pins.yml').read_text()
+    board_script, = re.findall(r'(?m)^\s*src_jxg:\s*(\S+)\s*$', pins)
+    assert board_script in frames, 'JSXGraph boards do not load the exact installed package library URL'
     for name, spec in record['repositories'].items():
         own = extensions / spec['extensions'][0]
         notice = (extensions / 'ctm-assessment' / 'licenses' / (name + '.txt')).is_file()
@@ -200,6 +253,7 @@ assert answer() == 2
 ''')
     result = render(course, expect_ok=False)
     assert result.returncode != 0 and 'combines filters that use different ai-feedback versions' in result.stderr, result.stderr
+    assert 'remove ai-feedback from filters: and delete the old folder.' in result.stderr, result.stderr
     # Without ctm-checkers, a page with a math exercise stops with the install
     # command; a page without one renders.
     away = course / 'ctm-checkers-away'
