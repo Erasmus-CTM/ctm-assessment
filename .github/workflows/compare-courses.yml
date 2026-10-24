@@ -24,6 +24,7 @@ name: Compare rendered courses
 # migration of an unmigrated branch, `expect` adds expect files, `browser`
 # adds the browser comparison, `review-refs` builds the after side with
 # unmerged component commits (a preview of a fix, never a pin).
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
   workflow_call:
     inputs:

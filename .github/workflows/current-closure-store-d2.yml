@@ -1,0 +1,130 @@
+name: Shared-store prerequisite and current successor closure
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/current-closure-store-d2.yml
+      - integration/store/**
+      - integration/feedback/check-d2-background-validity.cjs
+      - integration/feedback/check-d2-background-validity.test.cjs
+      - _extensions/**
+      - scripts/**
+      - integration/feedback/repos.json
+      - integration/feedback/loading-timing.cjs
+      - integration/feedback/timing/**
+      - tools/ci/review-dependencies.py
+      - package.json
+      - package-lock.json
+      - _quarto.yml
+      - example.qmd
+      - feedback.yml
+      - feedback/**
+      - examples/**
+      - _filters/**
+      - assets/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'
+      - name: Focused ON/OFF validity negative controls
+        run: node --test integration/feedback/check-d2-background-validity.test.cjs
+      - name: Verify historical source equality and canonically render only two store pages plus combined example
+        run: python integration/store/current-closure-build.py --dest "$RUNNER_TEMP/closure"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: current-store-d2-closure-site
+          path: |
+            ${{ runner.temp }}/closure/before/_site
+            ${{ runner.temp }}/closure/after/_site
+            ${{ runner.temp }}/closure/combined/_site
+            ${{ runner.temp }}/closure/source-closure.json
+            ${{ runner.temp }}/closure/resolved-repos.json
+            ${{ runner.temp }}/closure/d2-driver
+  store:
+    needs: render
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.1-noble
+      options: --user 1001
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v7
+        with:
+          name: current-store-d2-closure-site
+          path: ${{ runner.temp }}/closure
+      - name: Original credentialless store policy and all six original behavior/raw-error blocks
+        shell: bash
+        env:
+          CTM_BROWSER: ${{ matrix.browser }}
+          CTM_STORE_ROOT: ${{ runner.temp }}/closure
+        run: |
+          set -o pipefail
+          node integration/store/browser.mjs 2>&1 | tee "$RUNNER_TEMP/store-${CTM_BROWSER}.log"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: current-store-${{ matrix.browser }}
+          path: ${{ runner.temp }}/store-${{ matrix.browser }}.log
+  d2:
+    needs: render
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.1-noble
+      options: --user 1001
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v7
+        with:
+          name: current-store-d2-closure-site
+          path: ${{ runner.temp }}/closure
+      - name: Original on/off stage2 comparisons only, all four fast/slow cold/warm error and two-second gates
+        env:
+          CTM_INTEGRATION_SITE: ${{ runner.temp }}/closure/combined/_site
+          CTM_TIMING_D2_ONLY: '1'
+          CTM_TIMING_D2_LIMIT_S: '2'
+        run: |
+          export NODE_PATH="$GITHUB_WORKSPACE/node_modules"
+          node "$RUNNER_TEMP/closure/d2-driver/loading-timing.cjs" "$RUNNER_TEMP/d2-current.json"
+      - name: Verify background ON/OFF validity and unchanged grading/two-second gates
+        run: node integration/feedback/check-d2-background-validity.cjs "$RUNNER_TEMP/d2-current.json" "$RUNNER_TEMP/closure/combined/_site/example.html"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: current-d2
+          path: ${{ runner.temp }}/d2-current.json

@@ -12,6 +12,7 @@ name: Pyodide cells, old against new
 # Only on an explicitly confirmed broad campaign: choose the course, course ref
 # and old/new package refs. Automatic course sweeps are disabled; the original
 # actual-cell and cross-engine assertions remain unchanged.
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
   workflow_dispatch:
     inputs:

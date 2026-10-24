@@ -1,5 +1,6 @@
 name: Rendered store integration
 
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
   workflow_dispatch:
     inputs:

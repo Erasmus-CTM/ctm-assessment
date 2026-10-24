@@ -5,6 +5,7 @@ name: Measure loading times
 # D2 (consolidation step 3, T8): the combined page's first check
 # comes within 2 s of the same page with pyodide-interaktiv's stage 2
 # switched off, on the fast and the slow profile, or the job fails.
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
   workflow_dispatch:
     inputs:

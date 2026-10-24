@@ -22,6 +22,7 @@ name: Pyodide parity and goldens
 #   turns main or a pull request red (round-2 review N1).
 # Only on an explicitly confirmed broad campaign, with frozen package and
 # course refs. Automatic campaigns and the weekly schedule are disabled.
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
   workflow_dispatch:
     inputs:
@@ -38,6 +39,7 @@ on:
       expected:
         description: 'Reviewed integration/pyodide-parity/expected/*.json file, or empty for no expected differences'
         default: ''
+
 
 permissions:
   contents: read
