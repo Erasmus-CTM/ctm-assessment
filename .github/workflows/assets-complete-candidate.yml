@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Erasmus-CTM/ctm-libs
-          ref: 41b2be0a94a5bbf9dd8389fa83458d23692f2b4a
+          ref: 626b546604f51c9cb738210c56d054d421581e02
           path: .asset-sources/libs
           persist-credentials: false
       - uses: actions/cache@v4
