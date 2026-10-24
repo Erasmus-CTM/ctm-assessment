@@ -2,6 +2,7 @@ name: Official complete asset candidate
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: ctm-complete-assets-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -34,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Erasmus-CTM/ctm-libs
-          ref: 41b2be0a94a5bbf9dd8389fa83458d23692f2b4a
+          ref: 626b546604f51c9cb738210c56d054d421581e02
           path: .asset-sources/libs
           persist-credentials: false
       - uses: actions/cache@v4
@@ -58,6 +59,77 @@ jobs:
       - name: Compose independently reviewed selections and verify complete carried bytes
         run: |
           python scripts/ctm_complete_assets_candidate.py --composer-root .asset-sources/composer --board-root .asset-sources/board --library .asset-sources/libs/_extensions/ctm-libs --pins .asset-sources/board/_extensions/ctm-assessment/jsxgraph-pins.yml --cache .asset-cache/complete --python-lock .private-extensions/complete-candidate/python-lock.json --npm-lock .private-extensions/complete-candidate/npm-lock.json --board-lock .private-extensions/complete-candidate/board-lock.json --private-index .private-extensions/complete-candidate/assets-imports.json --availability .private-extensions/complete-candidate/availability.json --output .private-extensions/complete-candidate/inspection --reviewed-digests integration/assets-complete-reviewed-digests.json
+      - name: Download the original reviewed artifact for a lock-only comparison
+        uses: actions/download-artifact@v7
+        with:
+          name: prebuilt-offline-assets
+          run-id: 39818419447
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/original-reviewed-assets
+      - name: Download the proposed replacement artifact for a lock-only comparison
+        uses: actions/download-artifact@v7
+        with:
+          name: prebuilt-offline-assets
+          run-id: 40076693126
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/proposed-replacement-assets
+      - name: Compare exact old, proposed and current-runtime complete locks
+        env:
+          REVIEW_ROOT: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as assets
+          root = Path(os.environ['REVIEW_ROOT'])
+          expected = '93e96c89432d46f90be347fe8c65a6596e3467f9cbf2ee8cbc15f59ab08ec3be'
+          paths = {
+              'original-39818419447': root / 'original-reviewed-assets/inspection/complete-lock.json',
+              'proposed-40076693126': root / 'proposed-replacement-assets/inspection/complete-lock.json',
+              'current-runtime': Path('.private-extensions/complete-candidate/inspection/complete-lock.json'),
+          }
+          locks = {}
+          for name, path in paths.items():
+              raw = path.read_bytes()
+              value = json.loads(raw)
+              assert raw == (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + '\n').encode()
+              digest = assets.digest(raw)
+              assert digest == hashlib.sha256(raw).hexdigest()
+              if name != 'current-runtime':
+                  assert digest == expected, (name, digest)
+              locks[name] = value
+              print('LOCK_RECEIPT ' + json.dumps({'name': name, 'bytes': len(raw),
+                    'raw_sha256': hashlib.sha256(raw).hexdigest(), 'ctm_assets_digest': digest,
+                    'files': len(value['files']),
+                    'source_fingerprints': {k: value['provenance'][k] for k in
+                        ['table_sha256', 'runtime_sha256', 'board_pins_sha256']}}, sort_keys=True))
+          def differences(a, b, path=''):
+              if type(a) is not type(b):
+                  return [{'path': path, 'old': a, 'new': b}]
+              if isinstance(a, dict):
+                  result = []
+                  for key in sorted(a.keys() | b.keys()):
+                      if key not in a or key not in b:
+                          result.append({'path': path + '/' + key, 'old': a.get(key), 'new': b.get(key)})
+                      else:
+                          result.extend(differences(a[key], b[key], path + '/' + key))
+                  return result
+              if a != b:
+                  return [{'path': path, 'old': a, 'new': b}]
+              return []
+          prior_diff = differences(locks['original-39818419447'], locks['proposed-40076693126'])
+          current_diff = differences(locks['original-39818419447'], locks['current-runtime'])
+          expected_diff = [{
+              'path': '/provenance/runtime_sha256',
+              'old': '80a3170533d7fdd656ed4a79224ffdf55c26bd38945fff69cbcc3d8de617c345',
+              'new': '55a51ab3c8fed6a759024e7dd0bc18e19200b70e29fb8130dbe9619f318f1154',
+          }]
+          assert prior_diff == [], 'Proposed existing artifact differs from the reviewed lock'
+          assert current_diff == expected_diff, 'Current lock has changes beyond the reviewed runtime source fingerprint'
+          print('LOCK_DIFF ' + json.dumps({'original_to_proposed': prior_diff,
+                'original_to_current': expected_diff}, sort_keys=True))
+          PY
       - name: Preserve the verified prebuilt asset bundle
         uses: actions/upload-artifact@v4
         with:
