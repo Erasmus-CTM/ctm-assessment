@@ -9,9 +9,9 @@ explicit Python imports still request their required local packages. The
 reviewed frontend commit is explicit in the workflow. Timing and request
 measurements establish the observed effect; no speed threshold is assumed.
 
-The workflow consumes the reviewed prebuilt artifact from run 39818419447,
+The workflow consumes the reviewed prebuilt artifact from run 40081864918,
 checks complete-lock SHA256
-`93e96c89432d46f90be347fe8c65a6596e3467f9cbf2ee8cbc15f59ab08ec3be`,
+`6f8a64b5a24ffdeda87f7cd83a6eee23ee87f7752bf027fbb68174a60d5359fe`,
 uses the canonical carried installer and profile writer, and renders
 `offline,exam`. AI feedback is off; answer saving and export remain on.
 Private build metadata is excluded.
