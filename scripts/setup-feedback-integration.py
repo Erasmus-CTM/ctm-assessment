@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import urllib.request
@@ -196,10 +197,26 @@ def check_shared_files(config, sources, extensions, hashes, pinned_libs=None):
 # Checker Python has one home, ctm-checkers (step-2 design §3.6): no other
 # packaged folder defines math-exercise's checks or the basis helper (in any
 # file: scripts, modules, JSON, also inside an escaped string) or ships a
-# wheel, and math-exercise's only Python files are its variant generator and
-# the question-test script that runs ctm-checkers.
+# wheel. Math-exercise's allowed Python files are its component adapters and
+# local review server; their grading calls still belong to ctm-checkers.
 CHECKER_DEFINITIONS = re.compile(rb'(?:(?<![\w\\])|(?<=\\[nrt]))def(?:\s|\\[nrt])+(_math_check|assess_basis)\b')
-MATH_EXERCISE_PYTHON = {'variants.py', 'question-tests.py'}
+MATH_EXERCISE_PYTHON = {'variants.py', 'question-tests.py', 'variant_resolver.py', 'question-variants.py', 'variants-review.py'}
+
+
+def produce_native_authoring(sources, extensions_root, hashes):
+    """Carry canonical native tools outside the checker browser wheel."""
+    producer = sources['ctm-checkers'] / 'tools' / 'build_authoring.py'
+    wrapper = extensions_root / 'math-exercise' / 'question-variants.py'
+    if not producer.is_file():
+        if wrapper.is_file():
+            raise SystemExit('math-exercise native variants requires the canonical ctm-checkers authoring producer.')
+        return
+    destination = extensions_root / 'ctm-checkers' / 'native-authoring'
+    run([sys.executable, producer, '--install-extension', extensions_root / 'ctm-checkers'])
+    run([sys.executable, producer, '--install-extension', extensions_root / 'ctm-checkers', '--check'])
+    for path in sorted(destination.rglob('*')):
+        if path.is_file():
+            hashes['ctm-checkers'][path.relative_to(extensions_root / 'ctm-checkers').as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def check_one_home(extensions, extensions_root):
@@ -221,7 +238,7 @@ def check_one_home(extensions, extensions_root):
     for folder in extensions.get('math-exercise', []):
         extra = sorted(str(path.relative_to(extensions_root / folder)) for path in (extensions_root / folder).rglob('*.py')
                        if path.name not in MATH_EXERCISE_PYTHON or path.parent != extensions_root / folder)
-        problems += [f'{folder}/{path} is Python besides variants.py and question-tests.py' for path in extra]
+        problems += [f'{folder}/{path} is Python besides the approved component authoring wrappers' for path in extra]
     if problems:
         raise SystemExit('Checker code belongs in ctm-checkers only: ' + '; '.join(problems) + '.')
 
@@ -428,6 +445,7 @@ def main():
             destination = extensions_root / folder
             shutil.copytree(extension, destination, ignore=build_files)
             hashes[folder] = {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(destination.rglob('*')) if p.is_file()}
+    produce_native_authoring(sources, extensions_root, hashes)
     # The one deliberate shared copy (ctm-libs' bootstrap in every component)
     # stays byte-identical; copies that moved into ctm-libs are gone.
     # Following branch tips, a component may still carry the bootstrap of the

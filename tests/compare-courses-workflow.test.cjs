@@ -103,9 +103,32 @@ test('umbrella PR defaults still use the package PR base and head', () => {
   assert.equal(value(workflow.jobs.compare.env.PR_BASE, context), SHA.packageBase);
 });
 
-test('every job checks out the umbrella tools and retains first-visit and reveal checks', () => {
-  for (const job of Object.values(workflow.jobs)) {
+test('manual confirmation is a pure guard while pinned reusable comparisons retain their entry point', () => {
+  const input = workflow.on.workflow_dispatch.inputs.confirmation;
+  assert.equal(input.type, 'string');
+  assert.equal(input.required, true);
+  const guard = workflow.jobs.campaign;
+  assert.equal(guard.if, "github.event_name == 'workflow_dispatch' && !inputs['tooling-ref']");
+  assert.equal(guard.steps.length, 1, 'the confirmation role must not build or run browsers');
+  const step = guard.steps[0];
+  assert.deepEqual(Object.keys(step).sort(), ['env', 'name', 'run']);
+  assert.deepEqual(step.env, {CONFIRMATION: '${{ inputs.confirmation }}'});
+  assert.deepEqual(step.run.trim().split(/\r?\n/).map(line => line.trim()), [
+    'if [ "$CONFIRMATION" != \'broad testing campaign\' ]; then',
+    "echo '::error::Broad jobs require the exact confirmation: broad testing campaign'",
+    'exit 1',
+    'fi'
+  ], 'the guard must only validate the exact confirmation, without checkout/build/browser commands');
+  assert.deepEqual(workflow.jobs.courses.needs, ['campaign']);
+  assert.equal(workflow.jobs.courses.if,
+    "${{ !cancelled() && (inputs['tooling-ref'] || needs.campaign.result == 'success') }}");
+});
+
+test('every comparison job checks out the umbrella tools and retains first-visit and reveal checks', () => {
+  for (const [name, job] of Object.entries(workflow.jobs)) {
+    if (name === 'campaign') continue; // Its pure confirmation role is validated above.
     const checkout = job.steps.find(step => step.uses?.startsWith('actions/checkout@'));
+    assert.ok(checkout, name + ' must check out the umbrella tools');
     assert.equal(checkout.with.repository, 'Erasmus-CTM/ctm-assessment');
     assert.equal(value(checkout.with.ref, {inputs}), SHA.tools);
     assert.equal(value(checkout.with.ref, {inputs: {}}), undefined);
@@ -118,4 +141,17 @@ test('every job checks out the umbrella tools and retains first-visit and reveal
   const compare = workflow.jobs.compare.steps.find(step => step.id === 'compare').run;
   for (const file of ['step2.yml', 'step3.yml', 'step4.yml']) assert.ok(compare.includes('/expect/' + file));
   assert.ok(compare.includes('/expect/$name.yml'));
+});
+
+test('asset validation uses installed after sources and after pins',()=>{
+ const steps=workflow.jobs.compare.steps;
+ const calibration=steps.find(s=>s.name==='Calibrate store bindings on the actual example pages').run;
+ const comparison=steps.find(s=>s.id==='compare').run;
+ assert.ok(calibration.includes('--asset-sources'));
+ assert.ok(calibration.includes('$RUNNER_TEMP/ws-after/site'));
+ assert.ok(calibration.includes('$RUNNER_TEMP/after/integration/feedback/repos.json'));
+ assert.ok(comparison.includes('assetSources=\"$RUNNER_TEMP/out/after\"'));
+ assert.ok(comparison.includes('$RUNNER_TEMP/ws-after/site'));
+ assert.ok(comparison.includes('--asset-sources \"$assetSources\" --asset-pins \"$RUNNER_TEMP/after/integration/feedback/repos.json\"'));
+ assert.ok(comparison.includes('--reveal-ends'));
 });

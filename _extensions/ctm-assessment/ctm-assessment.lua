@@ -23,6 +23,24 @@ local function warnNestedJsxgraph()
   end
 end
 
+-- The default child and parent permission channel are emitted together. The
+-- original standalone adaptor has no capability flag and keeps its own timing.
+local function defaultMathjaxPreloader()
+  if not quarto.doc.is_format("html") then
+    return pandoc.MetaString('_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js')
+  end
+  local source = quarto.utils.resolve_path('../ctm-libs/runtime/mathjax-opaque-adaptor.js')
+  local file = io.open(source, 'rb')
+  assert(file, 'ctm-assessment: missing canonical opaque-frame MathJax adaptor')
+  local script = file:read('*a'); file:close()
+  local capability = 'globalThis.CTM_COI_FRAME_STARTUP={protocol:"ctm-coi-frame-startup",version:1};\n'
+  quarto.doc.add_html_dependency({
+    name = 'ctm-coi-frame-startup', version = '1',
+    scripts = {quarto.utils.resolve_path('../ctm-libs/runtime/coi-frame-startup.js')}
+  })
+  return pandoc.MetaString('data:text/javascript;base64,' .. quarto.base64.encode(capability .. script))
+end
+
 function Meta(meta)
   _G.__ctmAuthorImports = dofile(quarto.utils.resolve_path("author-imports.lua"))
   warnNestedJsxgraph()
@@ -35,6 +53,7 @@ function Meta(meta)
     local own = meta.jsxgraph
     -- A string or list value (`jsxgraph: plain`) is not a settings map.
     if pandoc.utils.type(own) ~= "table" then own = pandoc.MetaMap({}) end
+    if own.src_mjx_preload == nil then pins.src_mjx_preload = defaultMathjaxPreloader() end
     for key, value in pairs(pins) do
       if own[key] == nil then
         own[key] = value

@@ -1,19 +1,13 @@
 name: Rendered store integration
 
+# Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
-  pull_request:
-    paths:
-      - integration/store/**
-      - integration/feedback/repos.json
-      - scripts/install-project.py
-      - scripts/setup-feedback-integration.py
-      - tools/ci/review-dependencies.py
-      - tools/compare-browser.mjs
-      - _extensions/**
-      - package.json
-      - package-lock.json
-      - .github/workflows/store-integration.yml
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -23,7 +17,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   render:
+    needs: [campaign]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -60,9 +67,12 @@ jobs:
           retention-days: 7
 
   browser:
-    needs: render
+    needs: [render, campaign]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.1-noble
+      options: --user 1001
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -74,12 +84,12 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps ${{ matrix.browser }}
       - uses: actions/download-artifact@v7
         with:
           name: store-rendered-fixtures
           path: ${{ runner.temp }}/store-integration
       - name: Test actual rendered components and persistence
+        shell: bash
         env:
           CTM_BROWSER: ${{ matrix.browser }}
           CTM_STORE_ROOT: ${{ runner.temp }}/store-integration

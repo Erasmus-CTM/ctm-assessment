@@ -1,0 +1,522 @@
+{
+  "passed": true,
+  "adaptorSha256": "81642e45028f35eab27b7be2cbce427efb9395799b9e335e834c667315fd5b61",
+  "jsxgraphRevision": "e4ad81d82e1b56f86765026a3dd26f6975d29d57",
+  "upstreamLuaSha256": "f7c234ba4e3a778f7362af702040cbc4adef39776c1abb34fd159d6bbdd9e5d4",
+  "mathjaxVersion": "4.1.3",
+  "cases": [
+    {
+      "engine": "chromium",
+      "width": 1280,
+      "kind": "accessible",
+      "browserVersion": "151.0.7922.34",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": "x squared plus 1",
+        "braille": "⠭⠘⠆⠐⠬⠂",
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 2157.899999976158
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 0,
+          "pageReadyIdentity": true,
+          "readyIdentity": false
+        },
+        "speechEnabled": true,
+        "brailleEnabled": true,
+        "workers": [
+          {
+            "scheme": "data:",
+            "at": 2709.399999976158
+          }
+        ],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "chromium",
+      "width": 1280,
+      "kind": "authored-ready",
+      "browserVersion": "151.0.7922.34",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": null,
+        "braille": null,
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 2090
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 1,
+          "pageReadyIdentity": true,
+          "readyIdentity": true
+        },
+        "speechEnabled": false,
+        "brailleEnabled": false,
+        "workers": [],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "chromium",
+      "width": 390,
+      "kind": "accessible",
+      "browserVersion": "151.0.7922.34",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": "x squared plus 1",
+        "braille": "⠭⠘⠆⠐⠬⠂",
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 1755
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 0,
+          "pageReadyIdentity": true,
+          "readyIdentity": false
+        },
+        "speechEnabled": true,
+        "brailleEnabled": true,
+        "workers": [
+          {
+            "scheme": "data:",
+            "at": 1753.0999999940395
+          }
+        ],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "chromium",
+      "width": 390,
+      "kind": "authored-ready",
+      "browserVersion": "151.0.7922.34",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": null,
+        "braille": null,
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 1857.7999999821186
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 1,
+          "pageReadyIdentity": true,
+          "readyIdentity": true
+        },
+        "speechEnabled": false,
+        "brailleEnabled": false,
+        "workers": [],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "firefox",
+      "width": 1280,
+      "kind": "accessible",
+      "browserVersion": "153.0",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": "x squared plus 1",
+        "braille": "⠭⠘⠆⠐⠬⠂",
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 1395.32
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 0,
+          "pageReadyIdentity": true,
+          "readyIdentity": false
+        },
+        "speechEnabled": true,
+        "brailleEnabled": true,
+        "workers": [
+          {
+            "scheme": "data:",
+            "at": 1390.42
+          }
+        ],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "firefox",
+      "width": 1280,
+      "kind": "authored-ready",
+      "browserVersion": "153.0",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": null,
+        "braille": null,
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 934.28
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 1,
+          "pageReadyIdentity": true,
+          "readyIdentity": true
+        },
+        "speechEnabled": false,
+        "brailleEnabled": false,
+        "workers": [],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "firefox",
+      "width": 390,
+      "kind": "accessible",
+      "browserVersion": "153.0",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": "x squared plus 1",
+        "braille": "⠭⠘⠆⠐⠬⠂",
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 828.82
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 0,
+          "pageReadyIdentity": true,
+          "readyIdentity": false
+        },
+        "speechEnabled": true,
+        "brailleEnabled": true,
+        "workers": [
+          {
+            "scheme": "data:",
+            "at": 826.54
+          }
+        ],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "firefox",
+      "width": 390,
+      "kind": "authored-ready",
+      "browserVersion": "153.0",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": null,
+        "braille": null,
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 928.56
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 1,
+          "pageReadyIdentity": true,
+          "readyIdentity": true
+        },
+        "speechEnabled": false,
+        "brailleEnabled": false,
+        "workers": [],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "webkit",
+      "width": 1280,
+      "kind": "accessible",
+      "browserVersion": "26.5",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": "x squared plus 1",
+        "braille": "⠭⠘⠆⠐⠬⠂",
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 999.84
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 0,
+          "pageReadyIdentity": true,
+          "readyIdentity": false
+        },
+        "speechEnabled": true,
+        "brailleEnabled": true,
+        "workers": [
+          {
+            "scheme": "data:",
+            "at": 982
+          }
+        ],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "webkit",
+      "width": 1280,
+      "kind": "authored-ready",
+      "browserVersion": "26.5",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": null,
+        "braille": null,
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 675.76
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 1,
+          "pageReadyIdentity": true,
+          "readyIdentity": true
+        },
+        "speechEnabled": false,
+        "brailleEnabled": false,
+        "workers": [],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "webkit",
+      "width": 390,
+      "kind": "accessible",
+      "browserVersion": "26.5",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": "x squared plus 1",
+        "braille": "⠭⠘⠆⠐⠬⠂",
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 768.52
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 0,
+          "pageReadyIdentity": true,
+          "readyIdentity": false
+        },
+        "speechEnabled": true,
+        "brailleEnabled": true,
+        "workers": [
+          {
+            "scheme": "data:",
+            "at": 760.52
+          }
+        ],
+        "boards": 1,
+        "boardMath": true
+      }
+    },
+    {
+      "engine": "webkit",
+      "width": 390,
+      "kind": "authored-ready",
+      "browserVersion": "26.5",
+      "errors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "render": {
+        "origin": "null",
+        "glyphs": 8,
+        "speech": null,
+        "braille": null,
+        "nativeLoader": {
+          "src": "http://127.0.0.1:59623/node_modules/mathjax/tex-mml-svg.js",
+          "version": "4.1.3",
+          "readyMethod": "function",
+          "at": 576.26
+        },
+        "attributes": [
+          "async",
+          "id",
+          "src"
+        ],
+        "authored": {
+          "loadCount": 1,
+          "pageReadyCount": 1,
+          "readyCount": 1,
+          "pageReadyIdentity": true,
+          "readyIdentity": true
+        },
+        "speechEnabled": false,
+        "brailleEnabled": false,
+        "workers": [],
+        "boards": 1,
+        "boardMath": true
+      }
+    }
+  ],
+  "quarto": "1.9.35",
+  "fixtures": [
+    {
+      "kind": "accessible",
+      "frameSha256": "33b07e2cbba037011f1d2cdc094edb7868f956f94f23c70020fd303948648b6c",
+      "authoredSetupSha256": "a11171b13b0268372166b36b547a169c5f8fbc512aaedc75651bc8ddcce1883d",
+      "adaptorSha256": "81642e45028f35eab27b7be2cbce427efb9395799b9e335e834c667315fd5b61"
+    },
+    {
+      "kind": "authored-ready",
+      "frameSha256": "f3b81e4723862bf345feae4ccd96fdc974d320e81395ea25cee1a458ae458507",
+      "authoredSetupSha256": "72ad396af4d7d7117d090272efa77fb781fc338ffeb817707c399067f84423bd",
+      "adaptorSha256": "81642e45028f35eab27b7be2cbce427efb9395799b9e335e834c667315fd5b61"
+    }
+  ]
+}

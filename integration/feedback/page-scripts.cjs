@@ -10,7 +10,9 @@ const path = require('node:path');
 // (math-exercise with ctm-checkers' page script, from math-exercise 0.11).
 const FEEDBACK = ['ai-feedback'];
 const LIBRARY = ['ai-feedback', 'ctm-runtime', 'ctm-locale', 'ctm-locale-math-exercise', 'ctm-locale-py-exercise'];
-const MATH = [...LIBRARY, 'ctm-checkers', 'math-exercise'];
+// These are actual rendered HTML dependencies used by the shared pool chooser.
+// run() still executes only matching page tags, in document order.
+const MATH = [...LIBRARY, 'ctm-layout', 'ctm-locale-ui', 'ctm-store', 'ctm-variants', 'ctm-checkers', 'math-exercise'];
 // Inline configuration written by ctm-libs and the components.
 const CONFIG = /^\s*window\.(__aiFeedbackPolicies|__aiFeedbackConfig|__mathExerciseConfig|__pyExerciseConfig) =/;
 
