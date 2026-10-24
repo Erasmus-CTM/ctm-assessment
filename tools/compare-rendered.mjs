@@ -24,6 +24,7 @@ import path from 'node:path';
 import {createRequire} from 'node:module';
 import {closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 import {markStoreAdditions} from './compare-rendered/store.mjs';
+import {loadAssetSources, markAssetChanges} from './compare-rendered/assets.mjs';
 const require = createRequire(import.meta.url);
 const vm = require('node:vm');
 const {JSDOM} = require('jsdom');
@@ -36,6 +37,10 @@ function options(argv) {
     const [flag, value] = [argv[i], argv[i + 1]];
     if (flag === '--expect') o.expect.push(value);
     else if (flag === '--pages') o.pages = value.split(',').filter(Boolean);
+    else if (flag === '--asset-sources') o.assetSources = value;
+    else if (flag === '--asset-pins') o.assetPins = value;
+    else if (flag === '--renderer-before-sources') o.rendererBeforeSources = value;
+    else if (flag === '--renderer-before-pins') o.rendererBeforePins = value;
     else if (flag === '--reveal-ends') o.revealEnds = value;
     else if (['--before', '--after', '--name', '--report', '--summary'].includes(flag)) o[flag.slice(2)] = value;
     else throw new Error('Unknown option ' + flag);
@@ -721,7 +726,7 @@ function duplicateIds(page, A, B) {
     .map(([id, k]) => ({page, area: 'dom', change: 'duplicate id', line: `id="${id}"`, before: ca.get(id) || 0, after: k, invariant: true}));
 }
 
-function comparePage(page, before, after, ends, linked) {
+function comparePage(page, before, after, ends, linked, assets) {
   const A = extract(before), B = extract(after), items = [];
   // Additive generated chrome has no authored position. Only a complete,
   // catalogue-verified store bar may leave the invariant's prose accounting.
@@ -763,6 +768,7 @@ function comparePage(page, before, after, ends, linked) {
   }
   const contextual = contextItems(items, B, page);
   markStoreAdditions(B, contextual);
+  markAssetChanges(A, B, contextual, assets, page, after, before);
   return contextual;
 }
 
@@ -785,7 +791,7 @@ function test(pattern, value) {
 function matches(rule, item) {
   if (rule.area && rule.area !== item.area) return false;
   for (const field of ['change', 'what', 'object', 'path', 'tag', 'element', 'attribute', 'before', 'after', 'line', 'page', 'effective', 'context',
-    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes', 'reveal', 'switchOrder', 'store'])
+    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes', 'reveal', 'switchOrder', 'store', 'assets'])
     if (rule[field] !== undefined && !test(rule[field], item[field])) return false;
   for (const [field, pattern] of Object.entries(rule.where || {})) {
     const value = field.split('.').reduce((v, k) => (v == null ? v : v[k]), item.item ?? item.attrs);
@@ -808,6 +814,7 @@ function main() {
   const o = options(process.argv.slice(2));
   const categories = loadExpectations(o.expect);
   const ends = loadRevealEnds(o.revealEnds);
+  const assets = loadAssetSources(o.assetSources, o.assetPins, o.rendererBeforeSources, o.rendererBeforePins);
   const pagesBefore = htmlPages(o.before), pagesAfter = htmlPages(o.after);
   const pages = o.pages || [...new Set([...pagesBefore, ...pagesAfter])].sort();
   const items = [], linked = linkTargets(o.before, pagesBefore);
@@ -815,7 +822,7 @@ function main() {
   for (const page of pages) {
     const [a, b] = [path.join(o.before, page), path.join(o.after, page)];
     if (!fs.existsSync(a) || !fs.existsSync(b)) { items.push({page, area: 'page', change: fs.existsSync(a) ? 'removed' : 'added'}); continue; }
-    const found = comparePage(page, a, b, ends, linked);
+    const found = comparePage(page, a, b, ends, linked, assets);
     if (!found.length) identical++;
     items.push(...found);
   }

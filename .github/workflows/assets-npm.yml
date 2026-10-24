@@ -1,0 +1,107 @@
+name: Canonical npm asset subset
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+concurrency:
+  group: ctm-npm-assets-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  campaign:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Actual tar bytes, source identity, runtime closure, licences and carried bundle
+        run: python -m unittest discover -s tests -p 'test_assets_npm_lock.py' -v
+  official-npm:
+    needs: [contracts, campaign]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: 2ed1a3381bb6b606e3a913905095eadd8aee0988
+          path: .asset-sources/libs
+          persist-credentials: false
+      - uses: actions/cache@v4
+        with:
+          path: .asset-cache/npm
+          key: ctm-npm-archives-${{ hashFiles('integration/assets-metadata.json') }}
+      - name: Produce a partial candidate from verified exact official npm archives
+        run: |
+          python scripts/ctm_assets.py npm-lock --metadata integration/assets-metadata.json --libs .asset-sources/libs/_extensions/ctm-libs --cache .asset-cache/npm --output .private-extensions/npm-lock.json
+          python scripts/ctm_assets.py build --lock .private-extensions/npm-lock.json --cache .asset-cache/npm --bundle .private-extensions/npm-bundle
+          python scripts/ctm_assets.py verify --lock .private-extensions/npm-lock.json --bundle .private-extensions/npm-bundle
+          python scripts/ctm_assets.py install-carried --lock .private-extensions/npm-lock.json --source .private-extensions/npm-bundle --bundle .private-extensions/npm-carried
+      - name: Preserve the theme font weights and every local font reference
+        run: |
+          python - <<'PY'
+          import importlib.util, json, pathlib, re
+          spec = importlib.util.spec_from_file_location('assets', 'scripts/ctm_assets.py')
+          assets = importlib.util.module_from_spec(spec); spec.loader.exec_module(assets)
+          root = pathlib.Path('.private-extensions/npm-bundle').resolve()
+          lock = json.loads(pathlib.Path('.private-extensions/npm-lock.json').read_text())
+          assert assets.inventory(root) == assets.inventory(pathlib.Path('.private-extensions/npm-carried'))
+          table = json.loads(pathlib.Path('.asset-sources/libs/_extensions/ctm-libs/assets.json').read_text())
+          font = table['assets']['source-sans-pro']
+          local = font['local'].replace('{version}', font['version'])
+          alias = (root / 'fonts/source-sans-pro.css').read_text()
+          references = 0
+          for weight in (300, 400, 700):
+              css = root / local / (str(weight) + '.css')
+              assert str(weight) + '.css' in alias
+              text = css.read_text()
+              assert re.search(r'font-weight:\s*' + str(weight) + r'\b', text), weight
+              for value in re.findall(r'url\(([^)]+)\)', text):
+                  path = (css.parent / value.strip('"\'')).resolve()
+                  assert path.is_relative_to(root) and path.is_file(), path
+                  references += 1
+          assert references > 0
+          print(json.dumps({'kind': lock['kind'], 'scope': lock['scope'], 'files': len(lock['files']), 'font_references': references}))
+          PY
+      - name: Import the actual carried KaTeX ES modules
+        run: |
+          node --input-type=module - <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {resolve} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const table = JSON.parse(readFileSync('.asset-sources/libs/_extensions/ctm-libs/assets.json'));
+          const item = table.assets.katex;
+          const local = item.local.replace('{version}', item.version);
+          const root = resolve('.private-extensions/npm-carried', local);
+          const katex = await import(pathToFileURL(resolve(root, 'dist/katex.mjs')).href);
+          const autoRender = await import(pathToFileURL(resolve(root, 'dist/contrib/auto-render.mjs')).href);
+          if (!katex.default.renderToString('x^2').includes('katex') || typeof autoRender.default !== 'function') throw new Error('Actual carried KaTeX module failed');
+          console.log('Actual carried KaTeX renderer and auto-render modules imported');
+          JS

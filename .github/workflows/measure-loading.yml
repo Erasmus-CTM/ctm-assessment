@@ -1,8 +1,8 @@
 name: Measure loading times
 
 # Time to the first graded exercise (cold/warm cache, fast/slow network) and
-# Pyodide runtime/package costs. On demand, and when the measurement or the
-# pins change. D2 (consolidation step 3, T8): the combined page's first check
+# Pyodide runtime/package costs. Only on an explicitly confirmed broad campaign.
+# D2 (consolidation step 3, T8): the combined page's first check
 # comes within 2 s of the same page with pyodide-interaktiv's stage 2
 # switched off, on the fast and the slow profile, or the job fails.
 # Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type broad testing campaign to authorize the broad jobs
+        description: 'Type broad testing campaign to authorize the broad jobs'
         type: string
         required: true
 
@@ -33,7 +33,6 @@ jobs:
             echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
             exit 1
           fi
-
 
   measure:
     needs: [campaign]

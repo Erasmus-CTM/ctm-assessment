@@ -165,3 +165,22 @@ test('new-only: a switch whose script did not run fails once, and the other page
   assert.match(only('a.html').note, /^the switch is not shown$/, run.output);
   assert.ok(only('b.html').ok, run.output);
 });
+
+test('modern before uses the same reveal and switch checks, retaining content, state and style failures', () => {
+  const fine = page(STUB + reveal('reading-step', 'Go deeper') + reveal('hint', 'Hint')
+    + reveal('solution', 'Solution') + reveal('details', 'Details'));
+  const sites = html => ({old: {'p.html': fine}, new: {'p.html': html}});
+  let run = compare(sites(fine), ['--checks', 'reveals,switch,styles,print,keyboard']);
+  assert.equal(run.status, 0, run.output);
+  for (const check of ['reveals', 'switch', 'styles', 'print', 'keyboard'])
+    assert.ok(run.results.some(r => r.check === check && r.ok), check + ' actually ran: ' + run.output);
+  run = compare(sites(fine.replace('<p>Text.</p>', '<p>Text.</p><h2>Injected heading</h2>')), ['--checks', 'reveals']);
+  assert.equal(run.status, 1, run.output);
+  assert.match(run.results.find(r => r.check === 'reveals').note, /modern reveal words changed/, run.output);
+  run = compare(sites(fine.replace("d.open = mode === 'reading';", 'd.open = false;')), ['--checks', 'switch']);
+  assert.equal(run.status, 1, run.output);
+  assert.match(run.results.find(r => r.check === 'switch').note, /reading leaves a reading step closed/, run.output);
+  run = compare(sites(fine.replace('</head>', '<style>.ctm-reveal.hint > summary {font-weight:100 !important;}</style></head>')), ['--checks', 'styles']);
+  assert.equal(run.status, 1, run.output);
+  assert.ok(run.results.some(r => r.check === 'styles' && !r.ok), run.output);
+});

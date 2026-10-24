@@ -10,24 +10,33 @@ name: Quarto versions
 # filter keeps tab-heading ids only while Quarto parses tabsets after pre-ast
 # filters, and a release that changed this would make it silently do nothing
 # (step 4, design §6.1). It has its own job, which fails the run with either
-# Quarto (review A2 S4). On demand, weekly, and when this file or the filter
-# changes.
+# Quarto (review A2 S4). Only on an explicitly confirmed broad campaign.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '41 4 * * 1'
-  push:
-    paths:
-      - .github/workflows/quarto-versions.yml
-      - _extensions/ctm-assessment/tab-ids.lua
-      - integration/feedback/tab-ids.test.cjs
-      - integration/feedback/tab-ids/**
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
   canary:
+    needs: [campaign]
     name: canary tab-ids.lua (Quarto ${{ matrix.quarto }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -56,6 +65,7 @@ jobs:
           fi
 
   build:
+    needs: [campaign]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     continue-on-error: ${{ matrix.quarto == 'release' }}

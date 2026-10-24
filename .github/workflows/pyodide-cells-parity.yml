@@ -9,16 +9,15 @@ name: Pyodide cells, old against new
 # cells in Firefox and WebKit against Chromium (module workers, Atomics.wait
 # and COEP credentialless differ between the engines).
 #
-# On pull requests that change the pins or the tool: ctm-demo and ingmat3a
-# (main), old = the pull request's base, new = its head; ingmat3a's
-# linalg-branch is informational (a warning, never a failure). On demand: any
-# course, course ref and package refs.
+# Only on an explicitly confirmed broad campaign: choose the course, course ref
+# and old/new package refs. Automatic course sweeps are disabled; the original
+# actual-cell and cross-engine assertions remain unchanged.
 # Broad campaigns remain explicit; the focused prerequisite closure has its own gate.
 on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type broad testing campaign to authorize the broad jobs
+        description: 'Type broad testing campaign to authorize the broad jobs'
         type: string
         required: true
       course:
@@ -53,7 +52,6 @@ jobs:
             echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
             exit 1
           fi
-
 
   courses:
     needs: [campaign]

@@ -5,6 +5,11 @@ on:
     branches: [main, 'feature/**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -14,7 +19,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  campaign:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - name: Source contracts without rendering or browser downloads
+        run: >-
+          node --test tests/ci-policy.test.cjs tests/compare-browser.test.cjs
+          tests/compare-courses-workflow.test.cjs tests/compare-pyodide-settings.test.cjs
+          tests/compare-rendered.test.cjs tests/compare-rendered-store.test.cjs
+          tests/compare-rendered-assets.test.cjs tests/parity-capture.test.cjs
+          tests/parity-checkers.test.cjs tests/parity-variants.test.cjs
+
   build:
+    if: ${{ !cancelled() && needs.source.result == 'success' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || needs.campaign.result == 'success') }}
+    needs: [source, campaign]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -39,10 +79,13 @@ jobs:
       - name: Render and exercise the examples
         run: |
           set -o pipefail
-          python scripts/setup-feedback-integration.py --review-refs "$CTM_REVIEW_REFS" --test 2>&1 | tee "$RUNNER_TEMP/build.log"
+          tests=(); [ "${{ github.event_name }}" != workflow_dispatch ] || tests=(--test)
+          python scripts/setup-feedback-integration.py --review-refs "$CTM_REVIEW_REFS" "${tests[@]}" 2>&1 | tee "$RUNNER_TEMP/build.log"
       - name: Install Chromium
+        if: github.event_name == 'workflow_dispatch'
         run: npx playwright install --with-deps chromium
       - name: Test all five integration tabs
+        if: github.event_name == 'workflow_dispatch'
         env:
           CTM_INTEGRATION_SITE: ${{ github.workspace }}/.feedback-workspace/site/_site
         run: |
