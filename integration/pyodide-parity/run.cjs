@@ -62,6 +62,7 @@ const {ensureWheels} = require('./wheels.cjs');
 const {pageCases, pagesUnder, authoredSources, ANSWERS} = require('./cases.cjs');
 const capture = require('./capture.cjs');
 const variantCoverage = require('./variant-coverage.cjs');
+const stack = require('./stack.cjs');
 
 function parse(argv) {
   const options = {site: [], sources: [], versions: null, builds: null, timeout: 240, python: null, extensions: null, out: null, capture: null,
@@ -365,6 +366,18 @@ function buildJob(run, options, wheels, authoredResponses, corpora) {
     job.python = {cases: list.map(({label, name, expected}) => ({label, name, expected})),
       input: {module: browserPython(source, 'MODULE_PY'), cases: list.map(({code, tests, forbiddenImports, forbiddenKeywords}) => ({code, tests, forbiddenImports, forbiddenKeywords}))}};
   }
+  job.stackWheels = [];
+  const checkerDir = path.join(at(run, options.extensions), 'ctm-checkers');
+  const checkerManifest = JSON.parse(fs.readFileSync(path.join(checkerDir, 'checkers.json'), 'utf8'));
+  if (checkerManifest.parts?.stack) job.stackWheels = [job.checkersWheel, path.join(checkerDir, checkerManifest.parts.stack.wheel)];
+  for (const site of options.site) {
+    const root = at(run, site.dir), corpus = siteCorpus(site, options, corpora);
+    for (const file of stack.pagesUnder(root)) {
+      const relative = site.name + '/' + file.split(path.sep).join('/');
+      job.pages[relative] ||= {root,file};
+      job.cases.push(...stack.casesOf(path.join(root,file), relative).map(c => ({...c,corpus})));
+    }
+  }
   return job;
 }
 
@@ -416,7 +429,7 @@ async function main() {
   const count = kind => job.cases.filter(c => c.kind === kind).length;
   const bySource = {};
   for (const c of job.cases) if (c.kind === 'response') bySource[c.source] = (bySource[c.source] || 0) + 1;
-  log(`Cases: ${count('response')} responses (${Object.entries(bySource).map(([s, n]) => `${s} ${n}`).join(', ')}) and ${count('fixture')} fixtures `
+  log(`Cases: ${count('response')} responses (${Object.entries(bySource).map(([s, n]) => `${s} ${n}`).join(', ')}), ${count('stack')} STACK replays and ${count('fixture')} fixtures `
     + `in ${Object.keys(job.pages).length} pages (${job.duplicates.length} pages with the same exercises as a page above not repeated); `
     + `${job.authored.reduce((n, t) => n + t.files.length, 0)} source files with authored tests; ${job.python ? job.python.cases.length : 0} Python programs; `
     + `${job.skipped.length} cells or variants without anything to grade`);
@@ -481,7 +494,7 @@ async function main() {
     sites: options.site.map(s => s.name), sources: options.sources.map(s => s.name),
     pages: Object.keys(job.pages).length, duplicatePages: job.duplicates.length, cells: new Set(job.cases.map(c => c.page + '#' + c.position)).size,
     variants: new Set(job.cases.map(c => c.page + '#' + c.position + '|' + c.variantKey)).size,
-    responses: count('response'), responsesBySource: bySource, fixtures: count('fixture'),
+    responses: count('response'), stackResponses: count('stack'), responsesBySource: bySource, fixtures: count('fixture'),
     customCells: covered.cells.length, customCoverage: covered.byCorpus, customWithoutCorrect: covered.withoutCorrect.length,
     authoredResponsesNotPageShaped: job.unshaped.length, teacherAnswers: job.cases.filter(c => c.expect).length,
     teacherAnswersUnexpected: answersUnexpected.length, teacherAnswersUnused: answersUnused.length, teacherAnswersMisfit: answersMisfit.length,
@@ -552,7 +565,7 @@ async function main() {
   const cov = Object.entries(covered.byCorpus);
   const md = [title, '',
     `${summary.pages} pages (and ${summary.duplicatePages} with the same exercises), ${summary.cells} exercises, ${summary.variants} exercise variants: ${summary.responses} graded responses `
-    + `(${Object.entries(bySource).map(([s, n]) => `${s} ${n}`).join(', ')}) and ${summary.fixtures} variant fixtures; `
+    + `(${Object.entries(bySource).map(([s, n]) => `${s} ${n}`).join(', ')}), ${summary.stackResponses} STACK replays and ${summary.fixtures} variant fixtures; `
     + `${summary.authoredTests} authored question tests; ${summary.pythonPrograms} Python programs. ${summary.minutes} min.`, '',
     strict
       ? `**Differences (status, score, details, feedback or cases): ${differences.length}.** Expected (--expected): ${accepted.length}; expected but not found: ${stale.length}.`

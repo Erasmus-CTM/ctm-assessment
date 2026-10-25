@@ -45,6 +45,14 @@
     "ctm-assessment": {
       "repository": "Erasmus-CTM/ctm-assessment",
       "branch": "main"
+    },
+    "ctm-stack": {
+      "repository": "Erasmus-CTM/ctm-stack",
+      "branch": "main",
+      "commit": "4cfa735d5470126a56dfaceb49ea582c30c937e2",
+      "extensions": [
+        "ctm-stack"
+      ]
     }
   }
 }

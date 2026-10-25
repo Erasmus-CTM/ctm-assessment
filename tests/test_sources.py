@@ -13,7 +13,8 @@ spec.loader.exec_module(builder)
 class SourceSelection(unittest.TestCase):
     def test_manifest_pins_every_component_by_commit(self):
         repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
-        self.assertEqual(set(repositories), {'ctm-libs', 'py-exercise', 'math-exercise', 'ctm-checkers', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'})
+        self.assertEqual(set(repositories), {'ctm-libs', 'py-exercise', 'math-exercise', 'ctm-stack', 'ctm-checkers', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'})
+        self.assertEqual(repositories['ctm-stack']['repository'], 'Erasmus-CTM/ctm-stack')
         self.assertEqual(repositories['jsxgraph']['repository'], 'aacchhee/jsxgraph-quarto')
         self.assertNotIn('pin-outside-branch', repositories['jsxgraph'])
         # ctm-checkers, the Python checker library math-exercise grades with: its generated extension folder.
@@ -288,7 +289,7 @@ class SharedFiles(unittest.TestCase):
         self.folders = builder.extension_folders(self.config)
         self.sources = {'ctm-libs': libs}
         self.hashes = {folder: {'_extension.yml': 'x'} for folders in self.folders.values() for folder in folders}
-        for name in ('math-exercise', 'py-exercise', 'pyodide-interaktiv'):
+        for name in ('math-exercise', 'py-exercise', 'pyodide-interaktiv', 'ctm-stack'):
             self.hashes[name]['ctm-bootstrap.lua'] = self.digest
 
     def check(self, pinned_libs=None):
@@ -333,6 +334,11 @@ class SharedFiles(unittest.TestCase):
         # From 1.9 (step 3) pyodide-interaktiv loads ctm-libs through the bootstrap.
         del self.hashes['pyodide-interaktiv']['ctm-bootstrap.lua']
         with self.assertRaisesRegex(SystemExit, r'pyodide-interaktiv/ctm-bootstrap.lua=missing'):
+            self.check()
+
+    def test_stack_needs_the_canonical_bootstrap(self):
+        del self.hashes['ctm-stack']['ctm-bootstrap.lua']
+        with self.assertRaisesRegex(SystemExit, r'ctm-stack/ctm-bootstrap.lua=missing'):
             self.check()
 
     def test_retired_copies_fail_everywhere(self):

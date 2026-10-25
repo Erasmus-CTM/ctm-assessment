@@ -19,13 +19,20 @@ const site = process.env.CTM_INTEGRATION_SITE;
 const QUARTO = process.env.QUARTO_BIN || 'quarto';
 const FIXTURE = path.join(__dirname, 'no-ai');
 const MARKERS = /CRITERIA_MARKER_3381|STARTER_MARKER_6604|POLICY_MARKER_5126|STEP_MARKER_2087/;
-const ABSENT = /window\.__aiFeedbackConfig =|window\.__aiFeedbackPolicies =|class="ai-feedback-data"|data-ai-feedback-context|data-ai-feedback-tex|math-feedback-btn|math-reconfig-btn|py-exercise-feedback|ai-feedback-gear|ai-feedback-policy-summary/;
+const ABSENT = /window\.__aiFeedbackConfig =|window\.__aiFeedbackPolicies =|class="ai-feedback-data"|data-ai-feedback-context|data-ai-feedback-tex|math-feedback-btn|math-reconfig-btn|py-exercise-feedback|data-stack-feedback=|stack-feedback-button|ai-feedback-gear|ai-feedback-policy-summary/;
 const FILES = /(^|\/)(ai-feedback-\d[^/]*|feedback-core\.js|feedback-dom\.js|ai-feedback\.js|ai-feedback\.css|py-exercise-feedback[^/]*)$/;
 
 function project(source) {
   const dir = fs.mkdtempSync(path.join(path.dirname(path.dirname(site)), 'no-ai-'));
   fs.cpSync(source, dir, {recursive: true, filter: file => !/[\\/](_site|\.quarto|__pycache__)$|\.pyc$/.test(file)});
   if (!fs.existsSync(path.join(dir, '_extensions'))) fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true, filter: file => !/[\\/]__pycache__$|\.pyc$/.test(file)});
+  if (source === FIXTURE) {
+    const workspace=path.dirname(path.dirname(site));
+    const record=JSON.parse(fs.readFileSync(path.join(workspace,'resolved-repos.json')));
+    fs.copyFileSync(path.join(workspace,'src','ctm-checkers-'+record.repositories['ctm-checkers'].commit.slice(0,12),
+      'examples/stack/polynomial-expansion.xml'),path.join(dir,'question.xml'));
+    fs.appendFileSync(path.join(dir,'all.qmd'),'\n```{#no-ai-stack .stack-question}\n#| label: no-ai-stack\n#| file: question.xml\n#| question: Expand a product (form-sensitive)\n#| feedback: true\n```\n');
+  }
   return dir;
 }
 function render(dir, args = [], env = {}) {
@@ -86,6 +93,7 @@ function checkWithout(dir, pages, reason, stderr) {
   assert.equal(task.querySelectorAll('textarea, button, noscript').length, 0);
   assert.equal(doc.querySelectorAll('.math-exercise-cell').length, 1);
   assert.equal(doc.querySelectorAll('.math-check-btn').length, 1, 'math-exercise still checks answers');
+  assert.equal(doc.querySelectorAll('.ctm-stack .stack-check').length,1,'STACK still checks answers');
   assert.equal(doc.querySelectorAll('.py-exercise-cell').length, 1);
   assert.deepEqual([...html.matchAll(/qpyodideFeedbackOptions = \{\s*enabled: (\w+)/g)].map(m => m[1]), ['false']);
   const config = [...doc.scripts].find(s => s.textContent.includes('window.__pyExerciseConfig ='));

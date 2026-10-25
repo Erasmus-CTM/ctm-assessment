@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix='ctm-install-', dir=archive.parent) as t
     extensions = course / '_extensions'
     subprocess.run(['quarto', 'add', str(archive), '--no-prompt'], cwd=course, check=True)
     record = json.loads((extensions / 'ctm-assessment' / 'resolved-repos.json').read_text())
-    assert set(record['repositories']) >= {'ctm-libs', 'math-exercise', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph'}, 'installed record incomplete'
+    assert set(record['repositories']) >= {'ctm-libs', 'math-exercise', 'ctm-stack', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph'}, 'installed record incomplete'
     assert record['version'] == version(extensions / 'ctm-assessment'), 'the record names another package version'
     # ctm-libs: its library only. The ai-feedback alias (CTM Assessment 0.9
     # and 0.10) is no longer packaged (step 3, U3b; M5), and nothing else
@@ -91,6 +91,12 @@ with tempfile.TemporaryDirectory(prefix='ctm-install-', dir=archive.parent) as t
     assert tuple(int(part) for part in re.findall(r'\d+', math_version)[:2]) >= (0, 11), \
         f'math-exercise {math_version} does not grade with ctm-checkers; the package ships 0.11 or later'
     SCRIPTS.append(('ctm-checkers', manifest['script']))
+    stack = extensions / 'ctm-stack'
+    assert (stack / 'ctm-bootstrap.lua').read_bytes() == (extensions / 'math-exercise/ctm-bootstrap.lua').read_bytes()
+    assert not (stack / 'worker.js').exists() and not (stack / 'vendor/matrix-input.js').exists()
+    source = Path(os.environ['CTM_CHECKERS_SOURCE']) / 'examples/stack/polynomial-expansion.xml'
+    shutil.copy2(source, course / 'question.xml')
+    SCRIPTS.extend([('ctm-stack','ctm-stack.js'),('ctm-matrix-input','ctm-matrix-input.js')])
     (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [example.qmd]\nfilters: [ctm-assessment]\npy-exercise:\n  feedback: true\npyodide:\n  feedback: true\n')
     (course / 'example.qmd').write_text('''---
 format: html
@@ -99,6 +105,13 @@ format: html
 # A shared course
 
 Use exact values.
+
+```{#installed-stack .stack-question}
+#| label: installed-stack
+#| file: question.xml
+#| question: Expand a product (form-sensitive)
+#| feedback: false
+```
 
 ::: {.ai-feedback}
 Explain a half.
@@ -129,7 +142,7 @@ board.create('circle', [[0,0],1]);
 ''')
     render(course)
     html = (course / 'example.html').read_text()
-    for marker in ['ai-feedback-activity', 'math-exercise-cell', 'py-exercise-cell', 'qpyodide-insertion-location-', '<iframe']:
+    for marker in ['ai-feedback-activity', 'math-exercise-cell', 'ctm-stack-data', 'py-exercise-cell', 'qpyodide-insertion-location-', '<iframe']:
         assert marker in html, marker + ' missing after archive installation'
     # Scripts are cacheable files, each once per page, none inlined (D1).
     once(html, SCRIPTS)

@@ -277,6 +277,8 @@ jobs:
             if [ "$COURSE" = examples ]; then
               python "$RUNNER_TEMP/$side/scripts/setup-feedback-integration.py" --workspace "$RUNNER_TEMP/ws-$side"
               mkdir -p "$out" && cp -r "$RUNNER_TEMP/ws-$side/site/_site" "$out/_site"
+            elif [ "$COURSE" = ctm-stack ]; then
+              python scripts/build-stack-site.py --umbrella "$RUNNER_TEMP/$side" --dest "$out" --workspace "$RUNNER_TEMP/ws-$side"
             else
               if [ -n "$COURSE_PATH" ]; then course=(--path "$COURSE_PATH"); else course=(--repo "https://github.com/$COURSE.git" --ref "$ref"); fi
               python scripts/build-course.py --umbrella "$RUNNER_TEMP/$side" "${course[@]}" --dest "$out" --workspace "$RUNNER_TEMP/ws-$side" "${extra[@]}"
@@ -298,6 +300,7 @@ jobs:
         run: |
           name=$(basename "$COURSE")
           expect=(--expect tools/compare-rendered/expect/step4.yml --expect tools/compare-rendered/expect/step2.yml --expect tools/compare-rendered/expect/step3.yml --expect tools/compare-rendered/expect/step6-a1.yml)
+          [ "$COURSE" != ctm-stack ] || expect+=(--expect tools/compare-rendered/expect/step6-a2.yml)
           for file in $EXPECT; do expect+=(--expect "tools/compare-rendered/expect/$file"); done
           [ -f "tools/compare-rendered/expect/$name.yml" ] && expect+=(--expect "tools/compare-rendered/expect/$name.yml")
           outputs=(_site)
