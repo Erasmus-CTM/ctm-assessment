@@ -2,7 +2,7 @@ name: Pyodide parity and goldens
 
 # The parity harness (integration/pyodide-parity) over the example site,
 # math-exercise's example site and the courses of corpora.json (the one course
-# list) with a pinned commit (ctm-demo with its review build, ingmat3a):
+# list) with a pinned commit (ctm-demo and ingmat3a):
 # - parity: every exercise graded under Pyodide 0.27.2 and 0.28.3 (D4 gate;
 #   any difference in status or score fails), with the golden capture for
 #   ctm-checkers (step-2 design §6, §13): artifact goldens-export (the rows
