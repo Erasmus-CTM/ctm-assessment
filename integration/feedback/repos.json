@@ -4,7 +4,7 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "13aedaac07403bfdc6eddf58834454fd54271461",
+      "commit": "6f464e687e47282b3faebed27317c48dd8ad70ff",
       "extensions": [
         "ctm-libs"
       ],
@@ -15,12 +15,12 @@
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "main",
-      "commit": "0d485669c3d206e3277ad246cbf85b667e785f1c"
+      "commit": "80e0cac604d59d7cc7f3360b57cf4e820e381545"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "1c8b2e0b5441428e01b45ecc97f9086eff01e92a"
+      "commit": "ac4fc45e42673ef1d38e08009daa46c1f5a89f6b"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
