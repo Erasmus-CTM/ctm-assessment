@@ -425,6 +425,7 @@ async function main() {
   // Phase 2: the cases of each run (one list for both versions; per build).
   const jobs = strict ? runs.map(run => buildJob(run, options, wheels, authoredResponses, corpora))
     : Array(2).fill(buildJob(runs[0], options, wheels, authoredResponses, corpora));
+  if(strict)require('./stack.cjs').shareCasebook(jobs);
   const job = jobs[jobs.length - 1];
   const count = kind => job.cases.filter(c => c.kind === kind).length;
   const bySource = {};
@@ -494,7 +495,7 @@ async function main() {
     sites: options.site.map(s => s.name), sources: options.sources.map(s => s.name),
     pages: Object.keys(job.pages).length, duplicatePages: job.duplicates.length, cells: new Set(job.cases.map(c => c.page + '#' + c.position)).size,
     variants: new Set(job.cases.map(c => c.page + '#' + c.position + '|' + c.variantKey)).size,
-    responses: count('response'), stackResponses: count('stack'), responsesBySource: bySource, fixtures: count('fixture'),
+    responses: count('response'), stackResponses: count('stack'), stackCasebook:jobs.map(j=>j.stackCasebook || []), responsesBySource: bySource, fixtures: count('fixture'),
     customCells: covered.cells.length, customCoverage: covered.byCorpus, customWithoutCorrect: covered.withoutCorrect.length,
     authoredResponsesNotPageShaped: job.unshaped.length, teacherAnswers: job.cases.filter(c => c.expect).length,
     teacherAnswersUnexpected: answersUnexpected.length, teacherAnswersUnused: answersUnused.length, teacherAnswersMisfit: answersMisfit.length,

@@ -32,4 +32,36 @@ function casesOf(file, relative) {
   } finally { dom.window.close(); }
   return cases;
 }
-module.exports = {pagesUnder, casesOf};
+function shareCasebook(jobs) {
+  // A seed-selection migration must compare both engines on the union of old
+  // and new plans. Only an identical question at the same card position may
+  // share cases; changed questions keep the ordinary strict comparison.
+  const {isDeepStrictEqual:same}=require('node:util');
+  if(jobs.length!==2)return;
+  const groups=jobs.map(job=>{
+    const map=new Map();
+    for(const c of job.cases.filter(c=>c.kind==='stack')) {
+      const key=c.page+'#'+c.position;
+      if(!map.has(key))map.set(key,[]);
+      map.get(key).push(c);
+    }
+    return map;
+  });
+  for(const [key,left] of groups[0]) {
+    const right=groups[1].get(key);
+    if(!right || !same(left[0].request.question,right[0].request.question))continue;
+    const book=new Map();
+    for(const c of [...left,...right]) {
+      const old=book.get(c.id);
+      if(old && !same(old.request,c.request))throw new Error('Conflicting frozen STACK plan: '+c.id);
+      book.set(c.id,c);
+    }
+    for(const job of jobs) {
+      const oldCount=job.cases.length;
+      job.cases=job.cases.filter(c=>c.kind!=='stack' || c.page+'#'+c.position!==key)
+        .concat([...book.values()].sort((a,b)=>a.id.localeCompare(b.id)));
+      (job.stackCasebook ||= []).push({card:key,additionalCases:job.cases.length-oldCount});
+    }
+  }
+}
+module.exports = {pagesUnder, casesOf, shareCasebook};

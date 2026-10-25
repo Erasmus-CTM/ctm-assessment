@@ -36,6 +36,9 @@ def main():
     checker_pin = json.loads((workspace / 'resolved-repos.json').read_text())['repositories']['ctm-checkers']['commit']
     source = builder.snapshot('Erasmus-CTM/ctm-checkers', checker_pin, workspace / 'src')
     env = dict(os.environ, CTM_CHECKERS_SOURCE=str(source))
+    # This is the teacher test site; publishing approval remains required.
+    if (dest / '_extensions/ctm-stack/question-variants.py').is_file():
+        env['CTM_VARIANTS'] = 'review'
     subprocess.run(['quarto','render'], cwd=dest, env=env, check=True)
 
 

@@ -1,0 +1,9 @@
+categories:
+  - id: step6-stack-native-variants
+    title: Backend-owned seeds and content identities verified from current XML and native approval history
+    match:
+      - {area: config, object: '^stack-variants$', effective: '^native-verified-seeds-and-history$'}
+      - {area: dom, stack: '^variant-(identity|store|documentation)$'}
+      - {area: config, stack: '^variant-store$'}
+      - {area: dom, store: '^bar$'}
+      - {area: file, change: added, what: '^script ctm-variants/variants\.js$'}

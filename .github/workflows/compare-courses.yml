@@ -300,7 +300,13 @@ jobs:
         run: |
           name=$(basename "$COURSE")
           expect=(--expect tools/compare-rendered/expect/step4.yml --expect tools/compare-rendered/expect/step2.yml --expect tools/compare-rendered/expect/step3.yml --expect tools/compare-rendered/expect/step6-a1.yml)
-          [ "$COURSE" != ctm-stack ] || expect+=(--expect tools/compare-rendered/expect/step6-a2.yml)
+          if [ "$COURSE" = ctm-stack ]; then
+            if [ -f "$RUNNER_TEMP/out/after/_extensions/ctm-stack/question-variants.py" ]; then
+              expect+=(--expect tools/compare-rendered/expect/step6-v5.yml)
+            else
+              expect+=(--expect tools/compare-rendered/expect/step6-a2.yml)
+            fi
+          fi
           for file in $EXPECT; do expect+=(--expect "tools/compare-rendered/expect/$file"); done
           [ -f "tools/compare-rendered/expect/$name.yml" ] && expect+=(--expect "tools/compare-rendered/expect/$name.yml")
           outputs=(_site)
