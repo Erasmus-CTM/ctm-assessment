@@ -14,10 +14,7 @@
     "ctm-demo": {
       "repository": "aacchhee/ctm-demo",
       "course": {
-        "branch": "main",
-        "profiles": [
-          "review"
-        ]
+        "branch": "main"
       },
       "commit": "efe1d8eababbedd22072f836816e685fdeb76292",
       "licence": "course repository (no licence file); rows stay in the umbrella",
