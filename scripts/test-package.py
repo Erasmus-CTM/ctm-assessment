@@ -27,7 +27,13 @@ def version(folder):
 
 
 def render(course, expect_ok=True):
-    result = subprocess.run(['quarto', 'render'], cwd=course, capture_output=True, text=True)
+    env = os.environ.copy()
+    # This temporary installation checks the archive before its generated
+    # proposals have been reviewed. Normal course publishing still requires
+    # approval; only this isolated fixture selects the explicit review mode.
+    if (course / '_extensions/ctm-stack/question-variants.py').is_file():
+        env['CTM_VARIANTS'] = 'review'
+    result = subprocess.run(['quarto', 'render'], cwd=course, env=env, capture_output=True, text=True)
     if expect_ok:
         assert result.returncode == 0, result.stderr
     return result
