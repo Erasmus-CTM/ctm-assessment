@@ -147,19 +147,14 @@ use. A policy is not typed as teaching-only or generation-only. The author
 chooses which policy to use for each purpose; the same named policy may serve
 both. This supersedes the earlier proposal for a nested `generation` block.
 
-For example, define a shared policy once:
+For example, define shared guidance once and retain the shipped base prompts:
 
 ```yaml
 # feedback.yml
 ai-feedback:
   policies:
-    linear-algebra-practice:
+    course-practice:
       base-prompt: Use course notation. Keep every vector at length 5 or less.
-      harder: Use more vectors or less obvious dependencies.
-      easier: Use fewer vectors and simpler dependencies.
-      same: Keep the same level of linear-independence reasoning.
-      steps:
-        - step-prompt: Give a conceptual hint.
 ```
 
 Choose it for both purposes, or choose different names:
@@ -169,15 +164,25 @@ Choose it for both purposes, or choose different names:
 ai-feedback:
   similar: true
   policy-files: feedback.yml
-  policy: linear-algebra-practice
-  generation-policy: linear-algebra-practice
+  policy: {default: course-practice}
+  generation-policy: {default: course-practice}
 ```
 
-`generation-policy` is an optional selector using the existing policy-selection
-machinery. It does not define a second policy dictionary or parser. Omitted,
-generation uses its distinct shipped generation baseline; it does not silently
-adopt the selected feedback policy. An author explicitly selects the same name
-when both uses should share instructions. Exercise-specific selection can use
+`generation-policy` is an optional selector with the same nearest-level
+scalar/integration-map semantics as `policy`, using the existing selection
+machinery. A `{default: ...}` common selection adds shared instructions while
+retaining the consumer's shipped integration base; a scalar selection replaces
+that integration base as it does today. Generation consumes the resolver's full
+`basePrompts` composition, including common and integration instructions, not
+only its singular `base-prompt` field.
+
+Use one resolver with the selected use's baseline and selector inputs chosen
+before any overlays. Keep feedback behavior unchanged by default. Omitted
+generation selection does not apply teaching `policy`, deprecated `page-policy`
+or the exercise's `feedback-policy`. Do not resolve feedback first and overwrite
+its prompt afterward. Generation remains integration `math-exercise`; no new
+integration name or second dictionary/parser is introduced. An author explicitly
+selects the same name when both uses should share instructions. Exercise-specific selection can use
 `#| generation-policy:` through the same resolution rules as `feedback-policy`.
 Existing page selection already covers quiz pages; no separate quiz spec is
 needed. Policy loading never enables Similar problems.
@@ -193,13 +198,23 @@ Use the existing `#|` marker, not a new `#!` parser. `harder` appends to resolve
 harder guidance, `simpler` appends to easier guidance (internal direction
 `easier`), and optional `#| same:` appends to same-difficulty guidance. These
 text addons preserve the selected base instructions and do not enable the
-feature. Reuse the existing multiline form when necessary.
+feature. Reuse the existing multiline form when necessary. Policy direction
+keys are `harder`/`easier`/`same`; `simpler` is the exercise directive mapped to
+`easier`. Whitespace-only addons contribute nothing. Repeated occurrences of
+the same directive follow the existing parser's last-value-wins rule; do not
+introduce different duplicate handling for generation.
 
 Add `harder`, `easier` and `same` as optional string fields of the common policy
 schema. Reuse `policy-files`, named `extends`, existing exercise-ID overrides
 and explicit exercise selections in the same resolution order; omitted fields
-inherit and strings replace. Generation consumes the resolved `base-prompt`,
-the selected direction and its exercise addon. It ignores `steps` and other
+inherit and strings replace. Existing `exercises.math-exercise.<label>`
+overrides are shared by both uses, after page selection and before the
+explicit exercise policy. Use `feedback-policy` or `generation-policy` for a
+purpose-specific final specialization. Preserve the original authored exercise
+label for policy resolution in generated children; generated DOM IDs are not
+new policy identities. Append only the selected direction's exercise addon
+after policy resolution. Generation consumes resolved `basePrompts`, the
+selected direction and its exercise addon. It ignores `steps` and other
 feedback-only controls and never advances a hint counter. A shared policy may
 contain steps for teaching; a generation-only policy can simply omit them.
 Teaching feedback ignores difficulty-direction fields. Do not infer a policy's
@@ -212,9 +227,12 @@ already supported by current main
 Ship a separate generation baseline as an ordinary policy dictionary in the
 existing defaults source
 (`ctm-libs:_extensions/ctm-libs/feedback/feedback-defaults.yml:1`), generated
-through the existing browser-default sync machinery. It has a generation
-`base-prompt` and needs no steps; no nested generation-specific policy schema
-is introduced. The prompt asks for a self-contained, well-posed, nontrivial
+through the existing browser-default sync machinery. Store it as the internal
+`ai-feedback.generation` baseline alongside the existing shipped `defaults` and
+`integrations`, emitted as `shippedPolicies.generation`. Its value uses the same
+ordinary policy dictionary schema: a generation `base-prompt` and `steps: []`
+for resolver compatibility, not an author-facing nested policy type. Generation
+ignores steps even when a shared authored policy supplies them. The prompt asks for a self-contained, well-posed, nontrivial
 problem on the same topic/method at the requested difficulty, respecting the
 authored constraints and supplied checkers without copying context exercises.
 Apply authored policy fields over that baseline by the same rules as teaching
@@ -228,11 +246,15 @@ must enforce a hard vector-length limit before display (§12.10).
 
 G2 extends the common policy schema and adds the selector and shipped baseline;
 G3 reads the addons and assembles the request; G4 supplies the authoring example.
+Teaching fingerprints include only fields teaching consumes: editing
+`harder`/`easier`/`same` must not reset hint counters. Preserve ordinary feedback
+and L6 STACK behavior as the common schema grows.
 Test the same dictionary selected for both uses, separate selections, defaults,
 inheritance/overrides, generated-default sync, addons/directions, ignored steps
 and unchanged feedback behavior. Also test guidance in both attempts and
 rejection of a candidate exceeding an authored bound despite an agreeing key.
-Restore remains provider/Python free.
+Restore remains provider/Python free. See the approved review contract in
+§12.11 for the concrete authored vector-bound path and compatibility gates.
 
 ## 7. Saving
 
@@ -362,6 +384,10 @@ These answers settle the original §11 questions and apply to phase 1:
     default through ctm-libs' existing shipped-default and sync machinery.
     Authors inherit or replace it through the same policy rules; it is distinct
     from the shipped teaching/feedback base prompt (§6.1).
+12. **Sol xhigh YAML review approved.** AC approved the five findings from the
+    independent review: concrete hard-limit validation, full base-prompt
+    composition, purpose-specific resolver inputs, explicit shared overrides
+    and addons, and teaching-only fingerprints. They are binding in §12.11.
 
 ## 12. Independent design review (25 Oct 2026; binding)
 
@@ -713,3 +739,83 @@ chosen checker and restrictions do and do not establish. Implementation tests
 must include a well-formed candidate with agreeing answers that fails an
 applicable author-supplied mathematical constraint, and verify rejection before
 rendering or storage.
+
+### 12.11 Approved Sol xhigh YAML review (AC, 25 Oct; binding)
+
+AC requested an independent Sol review at xhigh and approved its findings.
+The reviewer supports the shared flat dictionary and minimal authoring approach.
+These corrections complete the YAML contract and override earlier shorthand:
+
+1. **Give the vector bound a concrete trusted validation path.** The §6.1
+   sentence is prompt guidance, not an executable constraint. The first-release
+   example must pair it with an existing parameterized authored checker, reused
+   unchanged, with a declared matrix variable `A` whose columns are the given
+   vectors. The checker requires `1 <= A.rows <= 5` and `A.cols >= 1` before
+   assessing the submitted answer. The constant 5 comes from authored code,
+   never a model-supplied replacement limit. The question displays the same
+   admitted `A` used by checking, not a separate model transcription.
+
+   The selected row in the compact checker table declares only the mathematical
+   datum `A` and the original's fixed response shape. Browser code admits the
+   returned matrix, constructs its exact-value wire data and binds it into the
+   existing `question_context.variables` as `A`. Only allowlisted declared
+   variables are replaceable; copy the original trusted checker, field mapping
+   and other authored constants. The existing `math_exercise.check_custom`
+   route decodes that context into `response["variables"]["A"]`
+   (`ctm-checkers:src/ctm_checkers/math_exercise/custom.py:31`, `:70`;
+   `ctm-checkers:src/ctm_checkers/variants.py:156`). No new author callback,
+   Python source from the model, generic guardrail DSL or quiz configuration
+   is required. This is a specified G3 binding to the existing context route,
+   not an assertion that current main already binds AI data this way.
+
+   A linear-independence example can use one scalar answer field (1 for
+   independent, 0 for dependent) and an authored checker that first validates
+   the matrix dimensions and then compares that answer with `A.rank() == A.cols`.
+   This avoids resizable answer inputs and does not require a new checker mode.
+   Run the proposed answer through that checker before display. A six-coordinate
+   candidate is rejected even when its rank/independence answer is correct;
+   a valid <=5-coordinate candidate can proceed. Include both in tests and
+   the authored G4 example. Other mathematical hard bounds likewise need
+   explicit authored checks; prose is never advertised as automatic validation.
+
+2. **Preserve common and integration base instructions.** The current resolver
+   returns both as `basePrompts`
+   (`ctm-libs:_extensions/ctm-libs/feedback/feedback-core.js:110`, `:123`).
+   Generation consumes that same composition. Test a common course vector cap
+   plus an integration-specific practice instruction and confirm both reach
+   both generation attempts. Keep scalar replacement semantics unchanged;
+   do not turn replacement into unconditional concatenation.
+
+3. **Choose use-specific resolver inputs before overlays.** Generalize one
+   resolver with the teaching or generation shipped baseline and selections,
+   defaulting to today's feedback behavior. `generation-policy` uses the same
+   nearest-level string/map rule and original `math-exercise` integration.
+   It does not read teaching selections when omitted, including deprecated
+   `page-policy` and exercise `feedback-policy`. Update the existing reader,
+   Lua selector and browser validation together; do not add a parallel loader.
+   The current selector is feedback-specific
+   (`ctm-libs:_extensions/ctm-libs/lua/policy.lua:15`). The shipped generation
+   baseline's empty `steps` keeps the common resolver compatible with its
+   existing step-list handling (`ctm-libs:_extensions/ctm-libs/feedback/feedback-core.js:124`).
+
+4. **Keep overrides and final addons explicit.** Shared exercise-ID overrides
+   affect both consumers in the existing position in precedence
+   (`ctm-libs:_extensions/ctm-libs/feedback/feedback-core.js:118`). Explicit
+   use-specific exercise selections follow them. The policy lookup identity
+   stays the original authored label, independently of generated DOM IDs.
+   Apply the `simpler` -> `easier` directive mapping, empty/duplicate handling
+   and final selected-direction append from §6.1 through the existing parser
+   (`math-exercise:_extensions/math-exercise/math-exercise.lua:223`). Test
+   these rules rather than creating another override system.
+
+5. **Fingerprint only consumed teaching fields.** Today the interface serializes
+   the full resolved policy and resets hint progress when it changes
+   (`ctm-libs:_extensions/ctm-libs/feedback/ai-feedback.js:100`). Project its
+   fingerprint onto the fields teaching uses. Test that changing only direction
+   guidance neither resets hints nor alters teaching requests; changing an
+   actually consumed teaching field retains the current reset behavior. Keep
+   STACK's already-supported integration and context contract covered as well.
+
+This review was static and read-only. Its approval settles the design; the
+implementation and tests remain G1–G4 work. No merge, tag or deployment is
+part of the approval.
