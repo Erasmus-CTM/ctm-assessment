@@ -79,7 +79,7 @@ jobs:
               assets.install_carried_bundle(lock, root, pathlib.Path('.private-extensions/board-carried'))
           assert assets.inventory(pathlib.Path('.private-extensions/board-carried')) == lock['files']
           metadata = json.loads(pathlib.Path('integration/assets-board-metadata.json').read_text())
-          metadata['archives'] = [entry for entry in metadata['archives'] if entry['id'] in boards.PACKAGES]
+          metadata['archives'] = [entry for entry in metadata['archives'] if entry['id'] in boards.PACKAGES and entry.get('kind') != 'git-build']
           inspection = assets.inspect_archives(metadata, pathlib.Path('.asset-cache/boards'))
           counts = {}
           for inspected in inspection['archives']:
@@ -91,6 +91,12 @@ jobs:
               else:
                   assert {key: value for key, value in source.items() if key.startswith('distrib/')} .items() <= selected.items()
               counts[inspected['id']] = len(selected)
+          for archive in lock['archives']:
+              if archive.get('upstream'):
+                  assert archive['id'] == 'jsxgraph' and archive['licence'] == 'MIT'
+                  assert archive['upstream']['repository'] == 'jsxgraph/jsxgraph'
+                  assert len(archive['upstream']['commit']) == 40
+                  counts['jsxgraph'] = len(archive['files'])
           policy = json.loads(pathlib.Path('integration/assets-board-licences.json').read_text())
           font, = [item for item in lock['archives'] if item['id'] == 'mathjax-newcm-font']
           assert font['licence'] == 'Apache-2.0 AND GUST-Font-License'
