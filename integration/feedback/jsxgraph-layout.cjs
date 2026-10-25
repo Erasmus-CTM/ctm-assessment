@@ -188,6 +188,19 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     const frame = async id => (await page.$('iframe#' + id)).contentFrame();
     const probe = async id => (await frame(id)).evaluate(() => window.__probe ? window.__probe() : null);
     const settle = () => page.waitForTimeout(400);
+    // Chromium pauses rendering/ResizeObserver in off-screen cross-origin
+    // frames. Observe each resized board while visible, then await its real
+    // canvas update; never synthesize a resize or change the requested view.
+    const visibleProbe = async id => {
+      await page.locator('iframe#' + id).scrollIntoViewIfNeeded();
+      await (await frame(id)).waitForFunction(() => {
+        const value = window.__probe && window.__probe();
+        const box = document.querySelector('.jxgbox');
+        return value && box && value.w > 0 && value.w === box.clientWidth;
+      });
+      return probe(id);
+    };
+
     // The visible board has started; it finds its container through BOARDID.
     await page.waitForFunction(() => document.querySelectorAll('iframe').length === 16);
     await (await frame('named')).waitForFunction(() => typeof window.__probe === 'function');
@@ -310,36 +323,37 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
 
     // A view the board's code set after initBoard is the one kept; page code that
     // still fits the board itself keeps working.
-    const variant = await probe('variant'), legacy = await probe('legacy'), padded = await probe('padded');
+    const variant = await visibleProbe('variant'), legacy = await visibleProbe('legacy'), padded = await visibleProbe('padded');
     // A container narrower than the iframe (a toolbar beside it) sets the size.
     assert.ok(padded.w === padded.vw && contains(padded.bbox, [0, 6, 14, 0]), 'padded: ' + JSON.stringify(padded));
     assert.ok(close(variant.bbox, [10, 14, 18, 10]), 'variant: ' + JSON.stringify(variant));
     assert.ok(contains(legacy.bbox, [0, 10, 10, 0]) && legacy.w === legacy.vw, 'legacy: ' + JSON.stringify(legacy));
 
-    const unitsWide = await probe('units');
+    const unitsWide = await visibleProbe('units');
     // Mobile width: the boards follow the iframe and keep the intended view.
     await page.setViewportSize({width: 390, height: 800}); await settle();
-    const units = await probe('units');
-    const narrow = await probe('tabbed'), narrowCollapsed = await probe('collapsed');
+    const units = await visibleProbe('units');
+    const narrow = await visibleProbe('tabbed'), narrowCollapsed = await visibleProbe('collapsed');
     assert.ok(narrow.w < 400 && narrow.w === narrow.vw, 'narrow width: ' + JSON.stringify(narrow));
     assert.ok(close(narrow.bbox, [-1, 3, 14, -3]), 'narrow tabbed: ' + JSON.stringify(narrow));
     assert.ok(narrowCollapsed.w === narrowCollapsed.vw && contains(narrowCollapsed.bbox, [0, 6, 14, 0]), 'narrow collapsed: ' + JSON.stringify(narrowCollapsed));
 
     // And back: the same view as before, no drift.
     await page.setViewportSize({width: 1100, height: 900}); await settle();
-    assert.ok(close((await probe('tabbed')).bbox, tabbed.bbox));
-    assert.ok(close((await probe('collapsed')).bbox, collapsed.bbox), 'collapsed drifted');
-    assert.ok(close((await probe('variant')).bbox, [10, 14, 18, 10]), 'variant view lost');
+    assert.ok(close((await visibleProbe('tabbed')).bbox, tabbed.bbox));
+    assert.ok(close((await visibleProbe('collapsed')).bbox, collapsed.bbox), 'collapsed drifted');
+    assert.ok(close((await visibleProbe('variant')).bbox, [10, 14, 18, 10]), 'variant view lost');
     // A board set up with origin and units keeps that view (no default box).
     assert.ok(units.w === units.vw && Math.abs(units.bbox[1] - unitsWide.bbox[1]) < 1e-6 && units.bbox[0] === unitsWide.bbox[0], 'units narrow: ' + JSON.stringify([unitsWide, units]));
-    assert.ok(close((await probe('units')).bbox, unitsWide.bbox), 'units drifted: ' + JSON.stringify(await probe('units')));
-    assert.ok(close((await probe('padded')).bbox, padded.bbox), 'padded drifted');
-    assert.ok(close((await probe('legacy')).bbox, legacy.bbox), 'legacy drifted: ' + JSON.stringify(await probe('legacy')));
+    assert.ok(close((await visibleProbe('units')).bbox, unitsWide.bbox), 'units drifted: ' + JSON.stringify(await visibleProbe('units')));
+    assert.ok(close((await visibleProbe('padded')).bbox, padded.bbox), 'padded drifted');
+    assert.ok(close((await visibleProbe('legacy')).bbox, legacy.bbox), 'legacy drifted: ' + JSON.stringify(await visibleProbe('legacy')));
 
     // A view the user chose survives a resize.
+    await visibleProbe('tabbed');
     await (await frame('tabbed')).evaluate(() => window.__zoom([2, 1, 6, -1]));
     await page.setViewportSize({width: 900, height: 900}); await settle();
-    const zoomed = await probe('tabbed');
+    const zoomed = await visibleProbe('tabbed');
     assert.ok(contains(zoomed.bbox, [2, 1, 6, -1]) && zoomed.bbox[2] - zoomed.bbox[0] < 5, 'zoom lost: ' + JSON.stringify(zoomed));
 
     assert.deepEqual(errors, []);
