@@ -65,3 +65,8 @@ merged by AC.
   independence/coordinate-bound checker. The focused pinned-stack workflow records
   native/browser checks and exact package hashes. AC alone merges; no tag,
   deployment or phase-2 relay is included.
+- **25 Oct.** Similar problems UI stack corrected to include ctm-libs PR48's
+  complete saved-answer Settings panel and compact navigation. G2 is based on its
+  exact reviewed head; the combined page passes 33 browser cases, including
+  practice/original-credit isolation. AC merges PR48 before G2; no merge or tag
+  performed by this work.

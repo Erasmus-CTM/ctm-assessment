@@ -844,9 +844,13 @@ A disputed-answer notice offers Create another problem while keeping the reporte
 problem and its stable local flag. Busy/Cancel, copy-mode explanation, keyboard
 focus and mobile wrapping remain explicit.
 
-This work coordinates with ctm-libs PR48 at `53579c8`: retain its optional shared
-CTMSettings hooks and both fetched-model selectors. The combined snapshot passes
-Settings/progress/localization/model-selection suites and its Chromium fixture.
-Both branches append catalogue messages; retain both message sets when resolving
-the documented textual merge conflict, then rebaseline and rerun CI before merge.
+G2 is stacked directly on ctm-libs PR48 at `53579c8`, and PR46 targets that
+branch. The published package must include PR48's complete saved-answer Settings
+panel and compact navigator along with generation, not merely test compatibility
+on a separate snapshot. Both fetched-model selectors and all catalogue messages
+are retained. Practice-only saves preserve the original navigation credit and
+answered marker. The actual combined page passes all 33 browser cases, including
+real Pyodide, Settings, credit isolation, keyboard and mobile checks. AC merges
+PR48 first, then retargets/re-baselines PR46 onto main. Before the next merge,
+compare the resulting tree with the tested head and update/retest if different.
 Neither PR48 nor the feature set is merged by this work.
