@@ -1,0 +1,53 @@
+name: Similar problems pinned stack
+
+# Focused three-exercise fixture; no broad campaign or publication path.
+on:
+  pull_request:
+    paths:
+      - integration/feedback/repos.json
+      - integration/similar-problems/**
+      - examples/similar-problems.qmd
+      - .github/workflows/similar-problems.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: similar-problems-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pinned-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6' pytest
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Build exactly the reviewed component pins
+        run: python scripts/setup-feedback-integration.py --workspace .similar-workspace --package-only
+      - name: Test the canonical generation stack
+        run: python integration/similar-problems/run.py --workspace .similar-workspace
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: similar-problems-evidence
+          path: |
+            .similar-workspace/resolved-repos.json
+            .similar-workspace/similar-evidence.json
+            .similar-workspace/similar-results.json
+            .similar-workspace/similar-browser-artifacts

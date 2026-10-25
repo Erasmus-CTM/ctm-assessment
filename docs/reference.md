@@ -290,3 +290,31 @@ policy, context and feedback implementation belongs in ctm-libs.
 ## Page and exercise policy examples
 
 The mathematics tab contains identical problems and drafts with different named YAML policies: a guiding question versus an immediate worked solution. The first activity in each integration also selects a shared page policy. All examples include collapsed copyable source directly after the activity, with JSXGraph source and policy YAML where used. Policy definitions live in YAML; inline `feedback-policy` attributes/options select existing names only. See [the scoped policy guide](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/feedback-policies.md).
+
+### Similar practice problems
+
+Opt in with `ai-feedback: similar: true` per course/page, or `#| similar: true`
+per exercise; an exercise's false overrides course opt-in. Exam/no-AI builds
+keep it off. Direct API and a reasoning generation model are required; use
+`generator-model` for a course default or choose one in Feedback settings.
+
+Generation uses the existing named policy dictionary and rules, with independent
+`generation-policy` selection and a separate shipped base prompt. The same policy
+may serve teaching and generation. `{default: practice}` adds common instructions
+while retaining each shipped integration prompt. Policies can set `harder`,
+`easier` and `same`; exercise `#| harder:`, `#| simpler:` and `#| same:` lines append
+small refinements. Generation ignores hint steps; generation-only edits do not
+reset teaching hint counters. See [the testbox](../examples/similar-problems.qmd).
+
+Computed keys use admitted SymPy recipes and must agree with the model's answer.
+Other keys require an independent solve and remain labelled unverified. Trusted
+compatible original checkers may be reused with admitted mathematical data, never
+model-written Python. Authored checks enforce hard bounds such as vector length;
+matching answers alone do not establish problem quality. No graphical responses
+or resizable answer matrices are generated in phase 1.
+
+Practice work and local key flags live inside the original saved record, with
+count/byte limits, copy/export and reload without re-solving or grading. A flag
+starts one independent re-check; disagreement marks the key disputed and replaces
+wrong verdicts with “Can't confirm against the generated key”. Reports stay local.
+Phase 2 and the rag_app reporting relay remain out of scope.

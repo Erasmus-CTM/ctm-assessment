@@ -57,3 +57,11 @@ merged by AC.
 - **24 Oct.** Branch-housekeeping review records the [listed branch dispositions](2026-10-24-branch-triage.md), one table per repository, with Git/tree witnesses and no branch deletion. [Retained handoff knowledge](2026-10-24-retained-handoff.md) preserves loading/failure boundaries, the practical authoring route, C6's unchanged checker decisions and unverified follow-up leads; raw test logs and archives remain outside main. Stranded library variants are recovered in [ctm-libs #44](https://github.com/Erasmus-CTM/ctm-libs/pull/44), directly against current main with the exact reviewed tree; optional transport follows through existing #37. These proposals are not recorded as merged, and course/offline acceptance remains separate.
 - **24 Oct.** Merged-component package freeze pins ctm-libs `d8d1daf`, math-exercise `792dcfa`, py-exercise `0d48566`, ctm-checkers `cf6570b`, and pyodide-interaktiv's intended integration branch `f16c766` (the reviewed `4be3908` tree); the approved JSXGraph exception stays `e4ad81d`. Normal installation with no dependency overrides verifies all 138 packaged/installed files, and one unchanged mixed example renders without warnings. The candidate awaits fresh ctm-demo acceptance; Ingmat3a and full parity remain separate gates. Step 6 remains a later set. AC alone merges.
 - **24 Oct.** Step table brought up to date with the merges of 23–24 October: steps 2–4 merged; step 5 merged except P13; step 6 implementing (L6, M6 and C6 merged); variants merged on the math-exercise side.
+
+- **25 Oct.** Similar problems phase 1 prepared as G1–G4: admitted computed keys,
+  shared generation policies/client options, checked browser practice with nested
+  storage and local key disputes, and reviewed-head package pins. The dedicated
+  three-exercise testbox covers derivatives, fixed matrices and an authored
+  independence/coordinate-bound checker. The focused pinned-stack workflow records
+  native/browser checks and exact package hashes. AC alone merges; no tag,
+  deployment or phase-2 relay is included.
