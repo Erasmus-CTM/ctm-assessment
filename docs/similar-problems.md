@@ -146,7 +146,12 @@ project teaching policies, plus an optional one-line refinement in an exercise.
 Do not add a parallel course/page prompt system or a separate per-quiz spec.
 Existing page policy selection can already specialize a quiz page when needed.
 
-Extend the existing named policy with a small generation block:
+Reuse the same YAML parsing, policy selection, validation conventions and
+inheritance/replacement rules. The generation block has no `steps`: its fields
+are `base-prompt`, `harder`, `easier` and `same`. It defines one generation request,
+not a progression of hints. Do not add a generation step schema or counter.
+
+Extend the existing named policy with that small generation block:
 
 ```yaml
 # feedback.yml, loaded and selected through the existing policy settings
@@ -327,7 +332,8 @@ These answers settle the original §11 questions and apply to phase 1:
     `#| simpler:` one-liners (`simpler` maps to direction `easier`). Reuse the
     current `#|` marker and policy machinery. Keep this to project-wide policies
     plus short exercise refinements; no separate `#!` parser, per-quiz spec or
-    parallel prompt configuration is needed (§6.1).
+    parallel prompt configuration is needed (§6.1). Use the same parsing and
+    policy rules; generation has no steps or hint progression.
 
 ## 12. Independent design review (25 Oct 2026; binding)
 
