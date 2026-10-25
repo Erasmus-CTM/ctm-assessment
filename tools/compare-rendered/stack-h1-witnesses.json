@@ -3,11 +3,11 @@
   "design": "Step 6 H1: API-v1 checker replacement and rewritten author guides. Exact canonical DOM/configuration/source witnesses; native source/plan checks on both sides and full candidate/hash/test regeneration on head.",
   "base": {
     "ctm-checkers": "58fe5f16b40e5da308d34084bb4d6c1728a6af9f",
-    "ctm-stack": "b810a22ab08b0fbc0cb6a9e0d538397d734ceee2"
+    "ctm-stack": "54744b85d6829ae28f01384dbdb83d0af77cee54"
   },
   "head": {
     "ctm-checkers": "406df5883357499b73293e0e97ee63503d490ca8",
-    "ctm-stack": "6b295a136471f26e6c6a8fa4ef2b48f8ba7d20a2"
+    "ctm-stack": "a9f90c52cfad2d4ace0e09dd38c46c6a1812c8a6"
   },
   "pages": {
     "corpus.html": [
