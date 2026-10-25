@@ -151,6 +151,22 @@ inheritance/replacement rules. The generation block has no `steps`: its fields
 are `base-prompt`, `harder`, `easier` and `same`. It defines one generation request,
 not a progression of hints. Do not add a generation step schema or counter.
 
+Ship a distinct generation `base-prompt` in the existing ctm-libs defaults
+source (`ctm-libs:_extensions/ctm-libs/feedback/feedback-defaults.yml:1`), under
+`defaults.generation.base-prompt`, and generate the browser defaults through the
+existing sync machinery. G3 consumes the resolved value; it does not duplicate
+the shipped prompt in its own JavaScript. No author policy or generation block
+is required to obtain this baseline once Similar problems is explicitly enabled.
+
+The shipped prompt asks for one self-contained, well-posed, nontrivial problem
+on the original topic/method at the requested difficulty, respecting authored
+constraints and the supplied checker contracts, without copying context
+exercises. It is separate from the shipped teaching/feedback prompt and contains
+no hint steps. An author-supplied generation `base-prompt` replaces this default
+through the same policy rules; omitted fields inherit. Fixed JSON/protocol,
+safety, admission and checker requirements remain enforced outside the
+replaceable base prompt.
+
 Extend the existing named policy with that small generation block:
 
 ```yaml
@@ -204,8 +220,10 @@ trusted author-supplied constraint/checker enforces a hard bound before display
 (§12.10). Do not imply arbitrary prose is automatically executable validation.
 Validate the new policy fields and addon types and preserve request size limits.
 
-G2 extends the policy schema/resolver; G3 reads the short addons and assembles
+G2 adds the shipped generation prompt and extends the policy schema/resolver;
+G3 reads the short addons and assembles
 the prompt; G4 supplies the authoring example. Test existing policy inheritance,
+the shipped generation fallback and author replacement, generated-default sync,
 addons/direction selection, unchanged feedback behavior, guidance in both
 attempts, and rejection of a candidate exceeding an authored vector-length
 bound despite an agreeing key. Restore remains provider/Python free.
@@ -334,6 +352,10 @@ These answers settle the original §11 questions and apply to phase 1:
     plus short exercise refinements; no separate `#!` parser, per-quiz spec or
     parallel prompt configuration is needed (§6.1). Use the same parsing and
     policy rules; generation has no steps or hint progression.
+11. **Separate shipped generation base prompt.** Supply a generation-specific
+    default through ctm-libs' existing shipped-default and sync machinery.
+    Authors inherit or replace it through the same policy rules; it is distinct
+    from the shipped teaching/feedback base prompt (§6.1).
 
 ## 12. Independent design review (25 Oct 2026; binding)
 
