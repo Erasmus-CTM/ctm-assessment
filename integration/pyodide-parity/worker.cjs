@@ -61,7 +61,7 @@ function answerFor(w, cell, payload) {
 
 async function mathCases(py) {
   const byPage = new Map();
-  for (const c of job.cases) if (!done.has(c.id)) (byPage.get(c.page) || byPage.set(c.page, []).get(c.page)).push(c);
+  for (const c of job.cases) if (c.kind !== 'stack' && !done.has(c.id)) (byPage.get(c.page) || byPage.set(c.page, []).get(c.page)).push(c);
   for (const [relative, cases] of byPage) {
     const calls = [];
     const {w, api} = openPage(path.join(job.pages[relative].root, job.pages[relative].file), 'http://localhost/' + relative.split(path.sep).join('/'), recording(py, calls));
@@ -118,6 +118,58 @@ async function mathCases(py) {
 }
 
 
+async function stackCases(py) {
+  const cases = job.cases.filter(c => c.kind === 'stack' && !done.has(c.id));
+  if (!cases.length) return;
+  if (!job.stackWheels?.length) throw new Error('STACK pages without their checker wheels');
+  py.FS.mkdirTree('/ctm-stack-parity');
+  const wheels = job.stackWheels.map(file => {
+    const target = '/ctm-stack-parity/' + path.basename(file);
+    py.FS.writeFile(target, fs.readFileSync(file)); return target;
+  });
+  py.globals.set('_stack_wheels', py.toPy(wheels));
+  py.runPython(`
+import sys, pkgutil
+sys.path[:0] = list(_stack_wheels)
+import ctm_checkers
+ctm_checkers.__path__ = pkgutil.extend_path(ctm_checkers.__path__, 'ctm_checkers')
+from ctm_checkers.browser import call as _stack_call
+from ctm_checkers.stack.engine import _environment, _qtest_answer, _input_uses_written_form
+def _stack_parity(text):
+    import json
+    item = json.loads(text)
+    request = item['request']
+    question, variant = request['question'], request['variant']
+    probe = item['probe']
+    if probe == 'tests':
+        reply = json.loads(_stack_call('stack.tests', {'_ctm_request': json.dumps(request)}))
+        return json.dumps([reply])
+    if probe == 'teacher':
+        env = _environment(question, variant)
+        answers = {i['name']: _qtest_answer(question, i['teacher'], env,
+                   preserve_form=_input_uses_written_form(question, i['name'])) for i in question['inputs']}
+    else:
+        value = {'empty':'', 'zero':'0', 'one':'1', 'invalid':'!!!', 'symbolic':'x+1'}[probe]
+        answers = {i['name']:value for i in question['inputs']}
+    request['answers'] = answers
+    return json.dumps([json.loads(_stack_call('stack.' + op, {'_ctm_request':json.dumps(request)})) for op in ('validate','grade')])
+`);
+  for (const c of cases) {
+    process.stdout.write('case ' + c.id + '\n');
+    const started = Date.now();
+    try {
+      py.globals.set('_stack_case', JSON.stringify(c));
+      const replies = JSON.parse(await py.runPythonAsync('_stack_parity(_stack_case)'));
+      const results = replies.map(reply => {
+        if (!reply.ok) return {status:'harness-error',detail:reply};
+        if (c.probe === 'tests') return {status:reply.result.passed ? 'pass' : 'harness-error',detail:reply.result};
+        return outcome(reply.result);
+      });
+      write({id:c.id,results,feedback:[],ms:Date.now()-started});
+    } catch (error) { write({id:c.id,results:[{status:'harness-error',detail:String(error)}],feedback:[]}); }
+  }
+}
+
 async function authoredCases(py) {
   if (!job.authored.length || done.has('authored:all')) return;
   process.stdout.write('case authored:all\n');
@@ -164,7 +216,10 @@ async function pythonCases(py) {
   process.stdout.write(`ready Pyodide ${version} (Python ${python}, SymPy ${sympy}, PYTHONHASHSEED ${job.hashSeed || 0})\n`);
   if (!job.responsesOnly) await pythonCases(py);
   await authoredCases(py);
-  if (!job.responsesOnly) await mathCases(py);
+  if (!job.responsesOnly) {
+    await mathCases(py);
+    await stackCases(py);
+  }
   process.stdout.write('finished\n');
   process.exit(0);
 })().catch(error => { console.error(error); process.exit(1); });
