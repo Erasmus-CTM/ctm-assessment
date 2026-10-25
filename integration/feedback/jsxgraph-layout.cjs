@@ -228,8 +228,13 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     assert.equal(reply.error, undefined, reply.error);
     assert.equal(reply.payload.started, true);
 
-    // A hidden board asked for its picture (AI context) draws at a provisional
-    // size, not blank; its graph editor still works once shown.
+    // The pinned renderer initializes a hidden view at its first real size.
+    // AI context is requested from the visible editor; hidden response-only
+    // assessment is checked above. The graph must produce an actual picture.
+    await page.getByRole('tab', {name: 'Outer'}).click();
+    await page.getByRole('tab', {name: 'Editor'}).click();
+    await page.locator('iframe#editor').scrollIntoViewIfNeeded();
+    await (await frame('editor')).waitForFunction(() => window.__probe && window.__probe().w > 0);
     const pictured = await page.evaluate(() => new Promise((resolve, reject) => {
       const target = document.getElementById('editor').contentWindow;
       const listener = async event => {
@@ -255,7 +260,7 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
       setTimeout(() => reject(new Error('no picture from a hidden board')), 10000);
     }));
     assert.equal(pictured.error, undefined, pictured.error);
-    assert.ok(pictured.width > 100 && pictured.inked > 100, 'hidden picture: ' + JSON.stringify(pictured));
+    assert.ok(pictured.width > 100 && pictured.inked > 100, 'visible picture: ' + JSON.stringify(pictured));
 
     // A hidden board whose code waits for the page's load event starts when shown.
     await page.getByRole('tab', {name: 'Onload'}).click();
