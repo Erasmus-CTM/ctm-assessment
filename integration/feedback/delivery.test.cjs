@@ -19,12 +19,12 @@ const PYODIDE_BUNDLES = /globalThis\.QP_L\s*=|globalThis\.qpyodideStorage\s*=|qp
 // The mixed example page (activities, mathematics, Python, Pyodide, JSXGraph;
 // its tabsets load ctm-libs' links into tabs, on by default since step 4).
 const EXPECTED = [
-  'ctm-assets/assets.js',
+  'ctm-assets/assets.js', 'ctm-layout/ctm-layout.js', 'ctm-coi-frame-startup/coi-frame-startup.js',
   'ai-feedback/feedback-core.js', 'ai-feedback/feedback-dom.js', 'ai-feedback/ai-feedback.js', 'ai-feedback/ai-feedback.css',
   'ctm-runtime/pyodide-runtime.js', 'ctm-locale/ctm-locale.js', 'ctm-locale/common.js', 'ctm-nav/ctm-nav.js', 'ctm-ui/ctm-ui.css',
   'ctm-copy/ctm-copy.js', 'ctm-export/ctm-export.js', 'ctm-locale-ui/ui.js', 'ctm-store/ctm-store.js', 'math-exercise/math-store.js',
   'ctm-locale-math-exercise/math-exercise.js', 'ctm-locale-py-exercise/py-exercise.js',
-  'math-exercise/matrix-input.css', 'math-exercise/math-exercise.css', 'math-exercise/matrix-input.js', 'math-exercise/math-exercise.js',
+  'ctm-matrix-input/ctm-matrix-input.css', 'math-exercise/math-exercise.css', 'ctm-matrix-input/ctm-matrix-input.js', 'math-exercise/math-exercise.js',
   'py-exercise-feedback/py-exercise-feedback.js', 'py-exercise/py-exercise.css', 'py-exercise/py-exercise.js',
 ];
 // pyodide-interaktiv 1.9 (consolidation step 3) runs on ctm-libs: its worker
