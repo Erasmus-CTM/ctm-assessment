@@ -49,7 +49,7 @@
     "ctm-stack": {
       "repository": "Erasmus-CTM/ctm-stack",
       "branch": "main",
-      "commit": "6de422a786e42dd528e99888ed2029364149816e",
+      "commit": "f2bb1e92f6f54b9b102962610412e9aff86f9288",
       "extensions": [
         "ctm-stack"
       ]
