@@ -32,7 +32,7 @@ class BuildCorpora(unittest.TestCase):
 
     def test_the_course_list_has_the_courses_and_ingmat3a_linalg_branch(self):
         courses = {name: spec['course'] for name, spec in self.module.COURSES.items()}
-        self.assertEqual(courses['ctm-demo']['profiles'], ['review'])
+        self.assertEqual(courses['ctm-demo'], {'branch': 'main'})
         self.assertEqual(courses['ingmat3a-linalg'], {'branch': 'linalg-branch', 'optional': True})
         self.assertNotIn('commit', self.module.COURSES['ingmat3a-linalg'], 'it follows its branch')
 

@@ -14,7 +14,8 @@ class SourceSelection(unittest.TestCase):
     def test_manifest_pins_every_component_by_commit(self):
         repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
         self.assertEqual(set(repositories), {'ctm-libs', 'py-exercise', 'math-exercise', 'ctm-checkers', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'})
-        self.assertEqual(repositories['jsxgraph']['repository'], 'jsxgraph/jsxgraph-quarto')
+        self.assertEqual(repositories['jsxgraph']['repository'], 'aacchhee/jsxgraph-quarto')
+        self.assertNotIn('pin-outside-branch', repositories['jsxgraph'])
         # ctm-checkers, the Python checker library math-exercise grades with: its generated extension folder.
         self.assertEqual(repositories['ctm-checkers']['repository'], 'Erasmus-CTM/ctm-checkers')
         self.assertEqual(repositories['jsxgraph']['extension'], 'jsxgraph')
@@ -83,9 +84,10 @@ class SourceSelection(unittest.TestCase):
 
     def test_check_pins_names_the_pins_not_on_their_branch(self):
         # A stacked set pins reviewed heads; after its merges each is on its branch.
-        # repos.json marks the JSXGraph pin as outside its branch: never checked.
+        # The reviewed Git runtime fork pin must also be on its declared branch.
+        checked = []
         def tip(name, spec, review_ref=None, follow=False):
-            assert name != 'jsxgraph', 'the JSXGraph pin is not checked'
+            checked.append(name)
             return 'f' * 40
         with patch.object(builder, 'remote_revision', side_effect=tip), \
              patch.object(builder, 'descends', side_effect=lambda repository, ancestor, head: 'math-exercise' not in repository and 'jsxgraph' not in repository), \
@@ -93,7 +95,9 @@ class SourceSelection(unittest.TestCase):
              patch('sys.argv', ['setup', '--check-pins']):
             with self.assertRaises(SystemExit) as stop:
                 builder.main()
-            self.assertEqual(str(stop.exception), 'Pins not on their branch: math-exercise (merge the set, or pin commits of the branch).')
+            self.assertEqual(str(stop.exception),
+                             'Pins not on their branch: math-exercise, jsxgraph (merge the set, or pin commits of the branch).')
+            self.assertIn('jsxgraph', checked)
             write.assert_not_called()
         with patch.object(builder, 'remote_revision', side_effect=tip), patch.object(builder, 'descends', return_value=True), \
              patch('sys.argv', ['setup', '--check-pins']):
@@ -177,7 +181,7 @@ class SourceSelection(unittest.TestCase):
                 builder.main()
         remote.assert_not_called()
         self.assertEqual(sorted(call.args[0] for call in follow.call_args_list), sorted(set(config) - {'ctm-assessment'}))
-        self.assertEqual(built['jsxgraph/jsxgraph-quarto'], config['jsxgraph']['commit'])
+        self.assertEqual(built[config['jsxgraph']['repository']], config['jsxgraph']['commit'])
         self.assertEqual(built['Erasmus-CTM/ctm-libs'], 'a' * 40)
 
     def test_only_needs_update_pins_and_known_names(self):

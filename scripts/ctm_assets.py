@@ -23,7 +23,7 @@ import urllib.request
 
 METADATA_HOSTS = frozenset({"registry.npmjs.org", "api.github.com"})
 ARCHIVE_HOSTS = frozenset({"registry.npmjs.org", "github.com",
-                           "objects.githubusercontent.com", "release-assets.githubusercontent.com"})
+                           "objects.githubusercontent.com", "release-assets.githubusercontent.com", "codeload.github.com"})
 COMPRESS = frozenset({".wasm", ".js", ".mjs", ".json", ".css"})
 EXAM_PACKAGES = ("numpy", "scipy", "sympy", "matplotlib", "networkx",
                  "micropip", "pyodide_http", "sqlite3", "ssl", "lzma",
@@ -657,15 +657,25 @@ def board_versions(pins: Path) -> dict[str, str]:
     packages = {"src_jxg": ("jsxgraph", "jsxgraph"), "src_css": ("jsxgraph", "jsxgraph"),
                 "src_mjx": ("mathjax4", "mathjax"), "mjx_fonts": ("mathjax-newcm-font", "@mathjax/mathjax-newcm-font")}
     versions = {}
+    git_source = None
     for key, (logical, package) in packages.items():
         url = values.get(key, "")
-        pattern = r"https://cdn\.jsdelivr\.net/npm/" + re.escape(package) + r"@([0-9]+\.[0-9]+\.[0-9]+)(?:/.*)?"
-        found = re.fullmatch(pattern, url)
-        if not found:
-            raise AssetError(f"jsxgraph-pins.yml {key} needs an exact npm version")
-        if logical in versions and versions[logical] != found[1]:
+        if logical == 'jsxgraph' and '/gh/' in url:
+            member = 'js/jsxgraphcore.js' if key == 'src_jxg' else 'css/jsxgraph.css'
+            git = re.fullmatch(r'https://cdn\.jsdelivr\.net/gh/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([a-f0-9]{40})/_extensions/jsxgraph/resources/' + re.escape(member), url)
+            if not git or git_source is not None and git_source != git.groups():
+                raise AssetError('JSXGraph Git script/CSS need one exact repository and full commit')
+            git_source = git.groups()
+            version = git[2]
+        else:
+            pattern = r"https://cdn\.jsdelivr\.net/npm/" + re.escape(package) + r"@([0-9]+\.[0-9]+\.[0-9]+)(?:/.*)?"
+            found = re.fullmatch(pattern, url)
+            if not found:
+                raise AssetError(f"jsxgraph-pins.yml {key} needs an exact npm version or immutable JSXGraph Git artifact")
+            version = found[1]
+        if logical in versions and versions[logical] != version:
             raise AssetError("JSXGraph script and CSS pins differ")
-        versions[logical] = found[1]
+        versions[logical] = version
     return versions
 
 

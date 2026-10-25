@@ -297,7 +297,7 @@ jobs:
         continue-on-error: ${{ matrix.informational == true }}
         run: |
           name=$(basename "$COURSE")
-          expect=(--expect tools/compare-rendered/expect/step4.yml --expect tools/compare-rendered/expect/step2.yml --expect tools/compare-rendered/expect/step3.yml)
+          expect=(--expect tools/compare-rendered/expect/step4.yml --expect tools/compare-rendered/expect/step2.yml --expect tools/compare-rendered/expect/step3.yml --expect tools/compare-rendered/expect/step6-a1.yml)
           for file in $EXPECT; do expect+=(--expect "tools/compare-rendered/expect/$file"); done
           [ -f "tools/compare-rendered/expect/$name.yml" ] && expect+=(--expect "tools/compare-rendered/expect/$name.yml")
           outputs=(_site)

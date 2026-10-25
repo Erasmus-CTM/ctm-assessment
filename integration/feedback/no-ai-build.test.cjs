@@ -24,8 +24,8 @@ const FILES = /(^|\/)(ai-feedback-\d[^/]*|feedback-core\.js|feedback-dom\.js|ai-
 
 function project(source) {
   const dir = fs.mkdtempSync(path.join(path.dirname(path.dirname(site)), 'no-ai-'));
-  fs.cpSync(source, dir, {recursive: true, filter: file => !/[\\/](_site|\.quarto)$/.test(file)});
-  if (!fs.existsSync(path.join(dir, '_extensions'))) fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true});
+  fs.cpSync(source, dir, {recursive: true, filter: file => !/[\\/](_site|\.quarto|__pycache__)$|\.pyc$/.test(file)});
+  if (!fs.existsSync(path.join(dir, '_extensions'))) fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true, filter: file => !/[\\/]__pycache__$|\.pyc$/.test(file)});
   return dir;
 }
 function render(dir, args = [], env = {}) {
@@ -155,7 +155,7 @@ test('E3: a page with only Pyodide cells with #| task: builds without AI feedbac
   // Pyodide unless the project asked for its feedback.
   const dir = fs.mkdtempSync(path.join(path.dirname(path.dirname(site)), 'no-ai-pyodide-'));
   try {
-    fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true});
+    fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true, filter: file => !/[\\/]__pycache__$|\.pyc$/.test(file)});
     fs.writeFileSync(path.join(dir, '_quarto.yml'), 'project:\n  type: website\n  render: [cells.qmd]\nfilters: [ctm-assessment]\n');
     fs.writeFileSync(path.join(dir, '_quarto-no-ai.yml'), 'ai-feedback:\n  enabled: false\n');
     fs.writeFileSync(path.join(dir, 'cells.qmd'), '---\ntitle: Cells\n---\n\n```{pyodide-python}\n#| task: Print two.\nprint(0)\n```\n');

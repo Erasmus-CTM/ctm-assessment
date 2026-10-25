@@ -514,6 +514,10 @@ def main():
         env = dict(base_env, CTM_INTEGRATION_SITE=str(site / '_site'), CTM_INTEGRATION_RECORD=str(workspace / 'resolved-repos.json'),
                    CTM_LIBS_EXTENSION=str(libs),
                    CTM_CHECKERS_EXTENSION=str(extensions_root / 'ctm-checkers'), CTM_CHECKERS_SOURCE=str(sources['ctm-checkers']))
+        checker_extension = extensions_root / 'ctm-checkers'
+        checker_manifest = json.loads((checker_extension / 'checkers.json').read_text())
+        env['CTM_CHECKERS_WHEEL'] = str(checker_extension / checker_manifest['wheel'])
+        env['CTM_VARIANTS_NATIVE'] = str(checker_extension / 'native-authoring')
         run(['npm', 'ci', '--ignore-scripts'], cwd=ROOT)
         if args.test:
             legacy = snapshot(*LEGACY_AI_FEEDBACK, cache)
@@ -533,11 +537,16 @@ def main():
             # umbrella's own _extensions/ctm-assessment, so tests of "no package
             # installed" would see one: they get a temporary folder outside.
             component_tmp = Path(tempfile.mkdtemp(prefix='ctm-component-tests-'))
-            component_env = dict(env, TMPDIR=str(component_tmp))
+            component_env = dict(env, TMPDIR=str(component_tmp), CTM_COMPONENT_DEV='1')
             try:
                 for consumer in ('ctm-libs', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'):
                     run(['npm', 'ci', '--ignore-scripts'], cwd=sources[consumer])
-                    run(['npm', 'test'], cwd=sources[consumer], env=component_env)
+                    consumer_env = dict(component_env)
+                    # The library tests exercise the package gate itself and
+                    # explicitly enable development mode only in that case.
+                    if consumer == 'ctm-libs':
+                        consumer_env.pop('CTM_COMPONENT_DEV', None)
+                    run(['npm', 'test'], cwd=sources[consumer], env=consumer_env)
                 run(['python', '-m', 'unittest', 'discover', '-s', 'tests'], cwd=sources['py-exercise'], env=component_env)
             finally:
                 shutil.rmtree(component_tmp, ignore_errors=True)
