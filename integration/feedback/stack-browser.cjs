@@ -11,7 +11,7 @@ const dir = fs.mkdtempSync(path.join(workspace,'stack-mixed-'));
 fs.cpSync(path.join(path.dirname(site),'_extensions'),path.join(dir,'_extensions'),{recursive:true});
 const source = path.join(workspace,'src','ctm-checkers-'+record.repositories['ctm-checkers'].commit.slice(0,12),'examples/stack/polynomial-expansion.xml');
 fs.copyFileSync(source,path.join(dir,'question.xml'));
-fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\nfilters: [ctm-assessment]\nai-feedback:\n  enabled: false\nstack:\n  feedback: false\n');
+fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\n  render: [index.qmd]\nfilters: [ctm-assessment]\nai-feedback:\n  enabled: false\nstack:\n  feedback: false\n');
 fs.writeFileSync(path.join(dir,'index.qmd'),'---\ntitle: Mixed runtime test\n---\n\n'
   +'```{math-exercise}\n#| label: mixed-math\nCompute two plus two: _[4]\n```\n\n'
   +'```{pyodide-python}\nprint("mixed Python ready")\n```\n\n'
