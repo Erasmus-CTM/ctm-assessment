@@ -8,6 +8,7 @@ contributes:
     - ../ctm-libs/ctm-libs.lua
     - ../jsxgraph/lua/jsxgraph.lua
     - ../math-exercise/math-exercise.lua
+    - ../ctm-stack/ctm-stack.lua
     - ../py-exercise/py-exercise.lua
     - ../pyodide-interaktiv/qpyodide.lua
     - author-imports-end.lua

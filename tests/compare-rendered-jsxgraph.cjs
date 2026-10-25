@@ -10,21 +10,23 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'renderer-transition-'));
 
 (async()=>{
  const M=await import(pathToFileURL(path.join(root,'tools/compare-rendered/jsxgraph-renderer.mjs')));
+ const afterSide=process.env.JSXGRAPH_AFTER_SIDE||'after';
  const sources={},projects={},pins={};let checks=0;
  try {
   for(const side of ['before','after']) {
    const checkout=process.env[side==='before'?'JSXGRAPH_BEFORE_SOURCE':'JSXGRAPH_AFTER_SOURCE'];
    assert.ok(checkout,'Both exact upstream checkout paths are required');
-   assert.equal(run('git',['rev-parse','HEAD'],checkout),M.RENDERERS[side].commit);
+   const selected=side==='after'?afterSide:'before',expected=M.RENDERERS[selected];
+   assert.equal(run('git',['rev-parse','HEAD'],checkout),expected.commit);
    const dir=projects[side]=path.join(tmp,side);fs.mkdirSync(dir,{recursive:true});
    fs.cpSync(path.join(checkout,'_extensions/jsxgraph'),path.join(dir,'_extensions/jsxgraph'),{recursive:true});
-   const entry={repository:'jsxgraph/jsxgraph-quarto',commit:M.RENDERERS[side].commit};
+   const entry={repository:expected.repository||'jsxgraph/jsxgraph-quarto',commit:expected.commit};
    pins[side]={repositories:{jsxgraph:entry}};
    const record={repositories:{jsxgraph:entry},extension_sha256:{jsxgraph:{}}};
    for(const file of ['lua/jsxgraph.lua','graph-editor.js'])record.extension_sha256.jsxgraph[file]=hash(fs.readFileSync(path.join(dir,'_extensions/jsxgraph',file)));
    fs.writeFileSync(path.join(dir,'resolved-repos.json'),JSON.stringify(record));
    fs.writeFileSync(path.join(dir,'pins.json'),JSON.stringify(pins[side]));
-   sources[side]=M.rendererSource(dir,pins[side],side);checks++;
+   sources[side]=M.rendererSource(dir,pins[side],selected);checks++;
    fs.writeFileSync(path.join(dir,'page.qmd'),`---\ntitle: Renderer regression\nfilters: [jsxgraph]\njsxgraph:\n  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraphcore.js\n  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraph.css\n  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js\n---\n\n\`\`\`{.jsxgraph assessment_id="strict-board" width="760" height="440" unit="px"}\n'use strict';\nvar board=JXG.JSXGraph.initBoard(BOARDID,{boundingbox:[-5,5,5,-5]});\nboard.create('point',[1,2]);\n\`\`\`\n\n\`\`\`{.jsxgraph assessment_id="relative-board" width="100" height="50" unit="%"}\nvar board=JXG.JSXGraph.initBoard(BOARDID,{boundingbox:[-4,4,4,-4]});\nboard.create('point',[2,1]);\n\`\`\`\n`);
    run(process.env.QUARTO||'quarto',['render','page.qmd','--to','html'],dir);
   }
@@ -54,21 +56,21 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'renderer-transition-'));
   assert.throws(()=>M.proveRendererPair(original,sources,wrongGeometry));checks++;
   const record=path.join(projects.after,'resolved-repos.json'),saved=fs.readFileSync(record);
   const bad=JSON.parse(saved);bad.repositories.jsxgraph.local_override=true;fs.writeFileSync(record,JSON.stringify(bad));
-  assert.throws(()=>M.rendererSource(projects.after,pins.after,'after'));checks++;fs.writeFileSync(record,saved);
+  assert.throws(()=>M.rendererSource(projects.after,pins.after,afterSide));checks++;fs.writeFileSync(record,saved);
   const lua=path.join(projects.after,'_extensions/jsxgraph/lua/jsxgraph.lua'),bytes=fs.readFileSync(lua);fs.appendFileSync(lua,'\n-- changed');
-  assert.throws(()=>M.rendererSource(projects.after,pins.after,'after'));checks++;
+  assert.throws(()=>M.rendererSource(projects.after,pins.after,afterSide));checks++;
   const changed=JSON.parse(saved);changed.extension_sha256.jsxgraph['lua/jsxgraph.lua']=hash(fs.readFileSync(lua));fs.writeFileSync(record,JSON.stringify(changed));
-  assert.throws(()=>M.rendererSource(projects.after,pins.after,'after'));checks++;
+  assert.throws(()=>M.rendererSource(projects.after,pins.after,afterSide));checks++;
   fs.writeFileSync(lua,bytes);fs.writeFileSync(record,saved);
   const dirty=JSON.parse(saved);dirty.repositories.jsxgraph.dirty_files=['lua/jsxgraph.lua'];fs.writeFileSync(record,JSON.stringify(dirty));
-  assert.throws(()=>M.rendererSource(projects.after,pins.after,'after'));checks++;fs.writeFileSync(record,saved);
+  assert.throws(()=>M.rendererSource(projects.after,pins.after,afterSide));checks++;fs.writeFileSync(record,saved);
   const ambiguous=JSON.parse(saved);ambiguous.extension_sha256.jsxgraph['lua\\jsxgraph.lua']=ambiguous.extension_sha256.jsxgraph['lua/jsxgraph.lua'];fs.writeFileSync(record,JSON.stringify(ambiguous));
-  assert.throws(()=>M.rendererSource(projects.after,pins.after,'after'));checks++;fs.writeFileSync(record,saved);
+  assert.throws(()=>M.rendererSource(projects.after,pins.after,afterSide));checks++;fs.writeFileSync(record,saved);
   const unknown=JSON.parse(JSON.stringify(pins.after));unknown.repositories.jsxgraph.commit='a'.repeat(40);
-  assert.throws(()=>M.rendererSource(projects.after,unknown,'after'));checks++;
-  const fork=JSON.parse(JSON.stringify(pins.after));fork.repositories.jsxgraph.repository='aacchhee/jsxgraph-quarto';
-  assert.throws(()=>M.rendererSource(projects.after,fork,'after'));checks++;
+  assert.throws(()=>M.rendererSource(projects.after,unknown,afterSide));checks++;
+  const fork=JSON.parse(JSON.stringify(pins.after));fork.repositories.jsxgraph.repository='wrong-owner/jsxgraph-quarto';
+  assert.throws(()=>M.rendererSource(projects.after,fork,afterSide));checks++;
   assert.ok(M.loadRendererSources(projects.before,path.join(projects.before,'pins.json'),projects.after,path.join(projects.after,'pins.json')));checks++;
-  console.log(JSON.stringify({checks,actualQuartoFrames:items.length,before:M.RENDERERS.before.commit,after:M.RENDERERS.after.commit,allNegativeMutationsRejected:true}));
+  console.log(JSON.stringify({checks,actualQuartoFrames:items.length,before:M.RENDERERS.before.commit,after:M.RENDERERS[afterSide].commit,allNegativeMutationsRejected:true}));
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

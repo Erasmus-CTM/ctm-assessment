@@ -21,9 +21,12 @@
 // Exit status: 0 when every difference is expected, 1 otherwise, 2 on errors.
 import fs from 'node:fs';
 import path from 'node:path';
+import {isDeepStrictEqual} from 'node:util';
 import {createRequire} from 'node:module';
 import {closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 import {markStoreAdditions} from './compare-rendered/store.mjs';
+import {stackTransition,stackVariantsTransition,markStackChanges} from './compare-rendered/stack.mjs';
+import {stackCheckerTransition} from './compare-rendered/stack-h1.mjs';
 import {loadAssetSources, markAssetChanges} from './compare-rendered/assets.mjs';
 const require = createRequire(import.meta.url);
 const vm = require('node:vm');
@@ -150,7 +153,7 @@ function extract(file) {
   for (const exercise of configs.__pyExercises || []) if (exercise && exercise.policySelection) selections.push(['py-exercise', exercise.policySelection]);
   for (const cell of configs.qpyodideCellDetails || []) if (cell?.options?.policySelection) selections.push(['pyodide-interaktiv', cell.options.policySelection]);
   const domNodes = [];
-  return {doc, files, inline, configs, sources, selections, dom: canonical(doc.body, domNodes), domNodes};
+  return {file,doc, files, inline, configs, sources, selections, dom: canonical(doc.body, domNodes), domNodes};
 }
 
 // Feedback context: the prose an exercise sends is that of its own section,
@@ -315,17 +318,17 @@ function pageContexts(B, json) {
 // Whether two policy configurations give every selection on the page the same
 // effective policy, resolved by the after page's feedback-core.js (the browser
 // contract reads the old and the new keys' JSON alike).
-function samePolicies(coreFile, before, after, selections) {
+function samePolicies(coreFile, before, after, selections, stackMove = false) {
   if (!coreFile || !fs.existsSync(coreFile)) return 'unknown';
   const context = vm.createContext({window: {}, console});
   context.globalThis = context;
   vm.runInContext(fs.readFileSync(coreFile, 'utf8'), context);
   const core = context.AIFeedbackCore || context.window.AIFeedbackCore || context.AIFeedback || context.window.AIFeedback;
   if (!core || typeof core.resolvePolicy !== 'function') return 'unknown';
-  const all = [...selections, ...['plain-text', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'].map(name => [name, {}])];
+  const all = stackMove ? selections : [...selections, ...['plain-text', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'].map(name => [name, {}])];
   for (const [integration, selection] of all) {
     let a, b;
-    try { a = JSON.stringify(core.resolvePolicy(integration, 'en', {}, before, selection)); } catch (error) { a = 'error ' + error.message; }
+    try { a = JSON.stringify(core.resolvePolicy(stackMove ? 'math-exercise' : integration, 'en', {}, before, selection)); } catch (error) { a = 'error ' + error.message; }
     try { b = JSON.stringify(core.resolvePolicy(integration, 'en', {}, after, selection)); } catch (error) { b = 'error ' + error.message; }
     if (a !== b) return 'different';
   }
@@ -726,8 +729,45 @@ function duplicateIds(page, A, B) {
     .map(([id, k]) => ({page, area: 'dom', change: 'duplicate id', line: `id="${id}"`, before: ca.get(id) || 0, after: k, invariant: true}));
 }
 
+// Generated author notes show the entire shipped feedback defaults. L6 adds
+// STACK's copied policy there. Verify that sole addition before comparing the
+// surrounding prose/reveals; any other edit still reaches every invariant.
+function stackPolicyNotes(page, A, B) {
+  const selector = '.example-author-notes.ai-feedback-ignore details pre > code.language-yaml';
+  const old = [...A.doc.querySelectorAll(selector)], now = [...B.doc.querySelectorAll(selector)], items = [];
+  if (old.length !== now.length) return items;
+  for (let i = 0; i < old.length; i++) {
+    if (old[i].textContent === now[i].textContent) continue;
+    try {
+      const a = yaml.load(old[i].textContent), b = yaml.load(now[i].textContent);
+      const integrations = b?.['ai-feedback']?.integrations;
+      if (!integrations || Object.hasOwn(a?.['ai-feedback']?.integrations || {}, 'stack') ||
+          !Object.hasOwn(integrations, 'stack') || !Object.hasOwn(integrations, 'math-exercise') ||
+          !isDeepStrictEqual(integrations.stack, integrations['math-exercise'])) continue;
+      const policy = integrations.stack;
+      delete integrations.stack;
+      if (!isDeepStrictEqual(a, b)) continue;
+      now[i].textContent = old[i].textContent;
+      items.push({page, area: 'config', change: 'added', object: 'generated-policy-yaml',
+        path: '/ai-feedback/integrations/stack', after: policy, effective: 'stack-copy'});
+    } catch (_) { /* Malformed or edited notes stay unexplained. */ }
+  }
+  if (items.length) {
+    B.domNodes = [];
+    B.dom = canonical(B.doc.body, B.domNodes);
+  }
+  return items;
+}
+
 function comparePage(page, before, after, ends, linked, assets) {
   const A = extract(before), B = extract(after), items = [];
+  if(stackCheckerTransition(A,B,page,canonical))items.push({page,area:'config',change:'changed',object:'stack-h1',path:'/',effective:'exact-render-witnesses-and-native-plans'});
+  if(stackTransition(A,B))items.push({page,area:'config',change:'changed',object:'stack-card-shell',path:'/',effective:'identical-engine-data'});
+  if(stackVariantsTransition(A,B)) {
+    items.push({page,area:'config',change:'changed',object:'stack-variants',path:'/',effective:'native-verified-seeds-and-history'});
+    B.domNodes=[];B.dom=canonical(B.doc.body,B.domNodes);
+  }
+  items.push(...stackPolicyNotes(page, A, B));
   // Additive generated chrome has no authored position. Only a complete,
   // catalogue-verified store bar may leave the invariant's prose accounting.
   markStoreAdditions(A, []);
@@ -748,7 +788,9 @@ function comparePage(page, before, after, ends, linked, assets) {
     if (!a || !b) { items.push({page, area: 'config', change: a ? 'removed' : 'added', object, path: '/', before: a, after: b}); continue; }
     const differences = jsonDiff(sorted(a), sorted(b));
     const effective = object === '__aiFeedbackPolicies' && differences.length
-      ? samePolicies(Object.entries(B.sources).find(([url]) => url.endsWith('/feedback-core.js'))?.[1], a[0], b[0], B.selections) : undefined;
+      ? samePolicies(Object.entries(B.sources).find(([url]) => url.endsWith('/feedback-core.js'))?.[1], a[0], b[0],
+          B.stackTransitionCards ? [...B.stackTransitionCards].map(card => ['stack', JSON.parse(card.dataset.stackFeedback || '{}').policySelection || {exercise:card.dataset.stackId,name:''}]) : B.selections,
+          Boolean(B.stackTransitionCards)) : undefined;
     for (const d of differences) items.push({page, area: 'config', change: 'changed', object, ...d, effective, item: (b[d.path.split('/')[1]] ?? a[d.path.split('/')[1]])});
   }
   const dom = [];
@@ -766,6 +808,7 @@ function comparePage(page, before, after, ends, linked, assets) {
     Object.assign(item, features);
     delete item.index;
   }
+  markStackChanges(B,items,(card,text,refs)=>contextVerdict(B.doc,card,text,null,refs,false)==='own-section');
   const contextual = contextItems(items, B, page);
   markStoreAdditions(B, contextual);
   markAssetChanges(A, B, contextual, assets, page, after, before);
@@ -791,7 +834,7 @@ function test(pattern, value) {
 function matches(rule, item) {
   if (rule.area && rule.area !== item.area) return false;
   for (const field of ['change', 'what', 'object', 'path', 'tag', 'element', 'attribute', 'before', 'after', 'line', 'page', 'effective', 'context',
-    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes', 'reveal', 'switchOrder', 'store', 'assets'])
+    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes', 'reveal', 'switchOrder', 'store', 'stack', 'assets'])
     if (rule[field] !== undefined && !test(rule[field], item[field])) return false;
   for (const [field, pattern] of Object.entries(rule.where || {})) {
     const value = field.split('.').reduce((v, k) => (v == null ? v : v[k]), item.item ?? item.attrs);

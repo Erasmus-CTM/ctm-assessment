@@ -32,7 +32,7 @@ class BuildCorpora(unittest.TestCase):
 
     def test_the_course_list_has_the_courses_and_ingmat3a_linalg_branch(self):
         courses = {name: spec['course'] for name, spec in self.module.COURSES.items()}
-        self.assertEqual(courses['ctm-demo']['profiles'], ['review'])
+        self.assertEqual(courses['ctm-demo'], {'branch': 'main'})
         self.assertEqual(courses['ingmat3a-linalg'], {'branch': 'linalg-branch', 'optional': True})
         self.assertNotIn('commit', self.module.COURSES['ingmat3a-linalg'], 'it follows its branch')
 
@@ -57,7 +57,7 @@ class BuildCorpora(unittest.TestCase):
             matrix = json.loads(output.read_text().removeprefix('matrix='))
         self.assertIn('::notice title=Course skipped::', out)
         self.assertEqual([(m['course'], m['ref']) for m in matrix],
-                         [('examples', ''), ('aacchhee/ctm-demo', 'main'), ('aacchhee/ingmat3a_ntnu', 'main')])
+                         [('examples', ''), ('ctm-stack', ''), ('aacchhee/ctm-demo', 'main'), ('aacchhee/ingmat3a_ntnu', 'main')])
 
     def test_the_blocking_jobs_build_the_pinned_courses_and_a_followed_branch_is_informational(self):
         self.assertEqual(list(self.module.selection('pinned')), ['ctm-demo', 'ingmat3a'])
@@ -73,7 +73,7 @@ class BuildCorpora(unittest.TestCase):
             finally:
                 del os.environ['GITHUB_OUTPUT']
             matrix = json.loads(output.read_text().removeprefix('matrix='))
-        self.assertEqual([m.get('informational') for m in matrix], [None, False, False, True])
+        self.assertEqual([m.get('informational') for m in matrix], [None, None, False, False, True])
 
     def test_a_course_that_is_not_optional_fails_when_its_branch_is_gone(self):
         self.module.COURSES['ingmat3a-linalg'] = dict(self.module.COURSES['ingmat3a-linalg'], course={'branch': 'linalg-branch'})

@@ -62,6 +62,8 @@ const {ensureWheels} = require('./wheels.cjs');
 const {pageCases, pagesUnder, authoredSources, ANSWERS} = require('./cases.cjs');
 const capture = require('./capture.cjs');
 const variantCoverage = require('./variant-coverage.cjs');
+const stack = require('./stack.cjs');
+const stackH1 = require('./stack-h1.cjs');
 
 function parse(argv) {
   const options = {site: [], sources: [], versions: null, builds: null, timeout: 240, python: null, extensions: null, out: null, capture: null,
@@ -221,12 +223,13 @@ function compare(runs, jobs, results, inventories, strict) {
   for (const id of [...new Set([...idsA, ...idsB])].sort()) {
     const c = casesB.get(id) || casesA.get(id) || null;
     const where = pathOf(id, c);
+    const witness=c?.kind==='stack'?{stackEvidence:stackH1.evidence(casesA.get(id),casesB.get(id),before.get(id),after.get(id))}:{};
     if (!idsA.has(id) || !idsB.has(id)) {
-      differences.push({id, path: where, why: 'only in ' + (idsA.has(id) ? runs[0].name : runs[1].name), case: c});
+      differences.push({id, path: where, why: 'only in ' + (idsA.has(id) ? runs[0].name : runs[1].name), case: c,...witness});
       continue;
     }
     if (casesA.has(id) && caseContent(casesA.get(id)) !== caseContent(casesB.get(id))) {
-      differences.push({id, path: where, why: 'the builds grade different responses', case: {[runs[0].name]: casesA.get(id), [runs[1].name]: casesB.get(id)}});
+      differences.push({id, path: where, why: 'the builds grade different responses', case: {[runs[0].name]: casesA.get(id), [runs[1].name]: casesB.get(id)},...witness});
       continue;
     }
     const a = before.get(id), b = after.get(id);
@@ -235,7 +238,7 @@ function compare(runs, jobs, results, inventories, strict) {
     const ga = graded(a), gb = graded(b);
     const same = ga.length === gb.length && ga.every((x, i) => x.status === gb[i].status && sameScore(x.score, gb[i].score));
     const identical = isDeepStrictEqual(a.results, b.results) && isDeepStrictEqual(a.feedback, b.feedback) && isDeepStrictEqual(a.responses, b.responses);
-    const entry = {id, path: where, case: c, [runs[0].name]: {results: a.results, feedback: a.feedback}, [runs[1].name]: {results: b.results, feedback: b.feedback}};
+    const entry = {id, path: where, case: c, [runs[0].name]: {results: a.results, feedback: a.feedback}, [runs[1].name]: {results: b.results, feedback: b.feedback},...witness};
     if (!same || (strict && !identical)) differences.push(entry);
     else if (!identical) notes.push(entry);
   }
@@ -248,16 +251,17 @@ function readExpected(file) {
   const entries = data.differences;
   if (!Array.isArray(entries)) throw new Error(file + ': {"differences": [...]} expected');
   return entries.map((entry, i) => {
-    const unknown = Object.keys(entry).filter(key => !['path', 'case', 'reason', 'required', 'onlyIn'].includes(key));
+    const unknown = Object.keys(entry).filter(key => !['path', 'case', 'reason', 'required', 'onlyIn', 'witness'].includes(key));
     if (unknown.length || typeof entry.reason !== 'string' || !entry.reason.trim() || !(entry.path || entry.case))
       throw new Error(`${file}: entry ${i + 1} needs a reason and a path or case (path, case, reason, required)`);
     if (entry.onlyIn !== undefined && !['base', 'head'].includes(entry.onlyIn)) throw new Error(file + ': onlyIn must be base or head');
+    if(entry.witness)stackH1.validate(entry);
     const pattern = typeof entry.case === 'string' && /^\/.*\/$/.test(entry.case) ? new RegExp(entry.case.slice(1, -1)) : null;
     // The narrower entry wins a difference: an exact case id, then a case pattern, then a path alone; the longer path, then the
     // longer pattern, then the earlier entry.
     const rank = [entry.case ? (pattern ? 2 : 3) : 1, (entry.path || '').length, (entry.case || '').length];
     return {...entry, required: entry.required !== false, index: i, rank,
-      matches: d => (!entry.onlyIn || d.why === 'only in ' + entry.onlyIn) && (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
+      matches: d => stackH1.matches(entry,d) && (!entry.onlyIn || d.why === 'only in ' + entry.onlyIn) && (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
         && (!entry.case || (pattern ? pattern.test(d.id) : d.id === entry.case))};
   });
 }
@@ -365,6 +369,18 @@ function buildJob(run, options, wheels, authoredResponses, corpora) {
     job.python = {cases: list.map(({label, name, expected}) => ({label, name, expected})),
       input: {module: browserPython(source, 'MODULE_PY'), cases: list.map(({code, tests, forbiddenImports, forbiddenKeywords}) => ({code, tests, forbiddenImports, forbiddenKeywords}))}};
   }
+  job.stackWheels = [];
+  const checkerDir = path.join(at(run, options.extensions), 'ctm-checkers');
+  const checkerManifest = JSON.parse(fs.readFileSync(path.join(checkerDir, 'checkers.json'), 'utf8'));
+  if (checkerManifest.parts?.stack) job.stackWheels = [job.checkersWheel, path.join(checkerDir, checkerManifest.parts.stack.wheel)];
+  for (const site of options.site) {
+    const root = at(run, site.dir), corpus = siteCorpus(site, options, corpora);
+    for (const file of stack.pagesUnder(root)) {
+      const relative = site.name + '/' + file.split(path.sep).join('/');
+      job.pages[relative] ||= {root,file};
+      job.cases.push(...stack.casesOf(path.join(root,file), relative).map(c => ({...c,corpus})));
+    }
+  }
   return job;
 }
 
@@ -412,11 +428,12 @@ async function main() {
   // Phase 2: the cases of each run (one list for both versions; per build).
   const jobs = strict ? runs.map(run => buildJob(run, options, wheels, authoredResponses, corpora))
     : Array(2).fill(buildJob(runs[0], options, wheels, authoredResponses, corpora));
+  if(strict)require('./stack.cjs').shareCasebook(jobs);
   const job = jobs[jobs.length - 1];
   const count = kind => job.cases.filter(c => c.kind === kind).length;
   const bySource = {};
   for (const c of job.cases) if (c.kind === 'response') bySource[c.source] = (bySource[c.source] || 0) + 1;
-  log(`Cases: ${count('response')} responses (${Object.entries(bySource).map(([s, n]) => `${s} ${n}`).join(', ')}) and ${count('fixture')} fixtures `
+  log(`Cases: ${count('response')} responses (${Object.entries(bySource).map(([s, n]) => `${s} ${n}`).join(', ')}), ${count('stack')} STACK replays and ${count('fixture')} fixtures `
     + `in ${Object.keys(job.pages).length} pages (${job.duplicates.length} pages with the same exercises as a page above not repeated); `
     + `${job.authored.reduce((n, t) => n + t.files.length, 0)} source files with authored tests; ${job.python ? job.python.cases.length : 0} Python programs; `
     + `${job.skipped.length} cells or variants without anything to grade`);
@@ -481,7 +498,7 @@ async function main() {
     sites: options.site.map(s => s.name), sources: options.sources.map(s => s.name),
     pages: Object.keys(job.pages).length, duplicatePages: job.duplicates.length, cells: new Set(job.cases.map(c => c.page + '#' + c.position)).size,
     variants: new Set(job.cases.map(c => c.page + '#' + c.position + '|' + c.variantKey)).size,
-    responses: count('response'), responsesBySource: bySource, fixtures: count('fixture'),
+    responses: count('response'), stackResponses: count('stack'), stackCasebook:jobs.map(j=>j.stackCasebook || []), responsesBySource: bySource, fixtures: count('fixture'),
     customCells: covered.cells.length, customCoverage: covered.byCorpus, customWithoutCorrect: covered.withoutCorrect.length,
     authoredResponsesNotPageShaped: job.unshaped.length, teacherAnswers: job.cases.filter(c => c.expect).length,
     teacherAnswersUnexpected: answersUnexpected.length, teacherAnswersUnused: answersUnused.length, teacherAnswersMisfit: answersMisfit.length,
@@ -552,7 +569,7 @@ async function main() {
   const cov = Object.entries(covered.byCorpus);
   const md = [title, '',
     `${summary.pages} pages (and ${summary.duplicatePages} with the same exercises), ${summary.cells} exercises, ${summary.variants} exercise variants: ${summary.responses} graded responses `
-    + `(${Object.entries(bySource).map(([s, n]) => `${s} ${n}`).join(', ')}) and ${summary.fixtures} variant fixtures; `
+    + `(${Object.entries(bySource).map(([s, n]) => `${s} ${n}`).join(', ')}), ${summary.stackResponses} STACK replays and ${summary.fixtures} variant fixtures; `
     + `${summary.authoredTests} authored question tests; ${summary.pythonPrograms} Python programs. ${summary.minutes} min.`, '',
     strict
       ? `**Differences (status, score, details, feedback or cases): ${differences.length}.** Expected (--expected): ${accepted.length}; expected but not found: ${stale.length}.`

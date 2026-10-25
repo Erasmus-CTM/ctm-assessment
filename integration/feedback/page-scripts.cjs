@@ -33,6 +33,9 @@ function scriptsOf(document, name, file) {
 // Evaluates, in document order, the inline configuration and the files of
 // `dependencies` (names) of the page `htmlFile` in window `w`.
 function run(w, htmlFile, dependencies = LIBRARY, {config = true, transform = {}} = {}) {
+  // This helper evaluates a complete rendered document. Match a browser's
+  // after-parse path so shared layout callbacks finish before jsdom closes.
+  if (w.document.readyState === 'loading') Object.defineProperty(w.document, 'readyState', {value:'interactive',configurable:true});
   const loaded = [];
   for (const script of [...w.document.scripts]) {
     const src = script.getAttribute('src');

@@ -76,7 +76,7 @@ def _ctm_authored(root, files):
         from ctm_checkers.variants import decode_context
         from ctm_checkers.testing import Raw, _expect
         for (name, label), item in native_questions.items():
-            aggregate = {'outcome': 'pass', 'calls': [], 'responses': [], 'nativeCandidates': [],
+            aggregate = {'outcome': 'pass', 'calls': [], 'responses': [], 'nativeCandidates': [], 'nativeRecords': [],
                          'file': name, 'label': label, 'sourceSHA256': item['sourceSHA256']}
             identities = set()
             for candidate in item['records']:
@@ -110,6 +110,8 @@ def _ctm_authored(root, files):
                         _expect(actual, 'correct', 'native teacher answers/' + str(field))
                     return reports
                 record = _ar.record(native_run, dict(options, tests=[automatic] + tests), root)
+                aggregate['nativeRecords'].append({'input': {'options': options,
+                    'context': candidate['context'], 'teacherInputs': teacher_inputs}, 'output': record})
                 if record['outcome'] != 'pass':
                     aggregate['outcome'] = record['outcome']
                 aggregate['calls'].extend(record['calls'])

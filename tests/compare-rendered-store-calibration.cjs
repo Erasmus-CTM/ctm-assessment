@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..'),tmp=fs.mkdtempSync(path.join(os.tmpdir()
 function run(candidate,name) {
   const report=path.join(tmp,name+'.json');
   const args=['tools/compare-rendered.mjs','--before',before,'--after',candidate,'--report',report,...assetArgs];
-  const expectations=['step4.yml','step2.yml','step3.yml',...(process.env.EXPECT || '').trim().split(/\s+/).filter(Boolean)];
+  const expectations=['step4.yml','step2.yml','step3.yml','step6-a1.yml',...(process.env.EXPECT || '').trim().split(/\s+/).filter(Boolean)];
   if(fs.existsSync(path.join(root,'tools/compare-rendered/expect/examples.yml')))expectations.push('examples.yml');
   for(const file of new Set(expectations))args.push('--expect','tools/compare-rendered/expect/'+file);
   const p=spawnSync(process.execPath,args,{cwd:root,encoding:'utf8'});

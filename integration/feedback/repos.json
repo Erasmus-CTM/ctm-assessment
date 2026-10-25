@@ -4,7 +4,7 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "b7c8e503ddd6f25cee42617356986be2dcc1bd7e",
+      "commit": "18bfbfded7978b4fc36f49b5d144bd20ddc39002",
       "extensions": [
         "ctm-libs"
       ],
@@ -20,12 +20,12 @@
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "a94dc047787fd1c9fc182ba4e48c0eb2b230606e"
+      "commit": "b6ac7be10bce548c49cfcf3660f1238194f995be"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
       "branch": "main",
-      "commit": "16de388a85b5762948995a688aafec1bc6ff78ee"
+      "commit": "406df5883357499b73293e0e97ee63503d490ca8"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
@@ -37,15 +37,22 @@
       ]
     },
     "jsxgraph": {
-      "repository": "jsxgraph/jsxgraph-quarto",
-      "branch": "main",
-      "commit": "e4ad81d82e1b56f86765026a3dd26f6975d29d57",
-      "extension": "jsxgraph",
-      "pin-outside-branch": "AC-approved upstream pull request #2 head e4ad81d82e1b56f86765026a3dd26f6975d29d57 (jsxgraph-quarto 1.2.0, optional src_mjx_preload); not yet on upstream main"
+      "repository": "aacchhee/jsxgraph-quarto",
+      "branch": "fix/2026-10-jsxgraph-115-runtime",
+      "commit": "e31b5d19cb7f282e220634c0e21304067910efff",
+      "extension": "jsxgraph"
     },
     "ctm-assessment": {
       "repository": "Erasmus-CTM/ctm-assessment",
       "branch": "main"
+    },
+    "ctm-stack": {
+      "repository": "Erasmus-CTM/ctm-stack",
+      "branch": "main",
+      "commit": "6b295a136471f26e6c6a8fa4ef2b48f8ba7d20a2",
+      "extensions": [
+        "ctm-stack"
+      ]
     }
   }
 }

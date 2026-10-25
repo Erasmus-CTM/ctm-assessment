@@ -188,6 +188,19 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     const frame = async id => (await page.$('iframe#' + id)).contentFrame();
     const probe = async id => (await frame(id)).evaluate(() => window.__probe ? window.__probe() : null);
     const settle = () => page.waitForTimeout(400);
+    // Chromium pauses rendering/ResizeObserver in off-screen cross-origin
+    // frames. Observe each resized board while visible, then await its real
+    // canvas update; never synthesize a resize or change the requested view.
+    const visibleProbe = async id => {
+      await page.locator('iframe#' + id).scrollIntoViewIfNeeded();
+      await (await frame(id)).waitForFunction(() => {
+        const value = window.__probe && window.__probe();
+        const box = document.querySelector('.jxgbox');
+        return value && box && value.w > 0 && value.w === box.clientWidth;
+      });
+      return probe(id);
+    };
+
     // The visible board has started; it finds its container through BOARDID.
     await page.waitForFunction(() => document.querySelectorAll('iframe').length === 16);
     await (await frame('named')).waitForFunction(() => typeof window.__probe === 'function');
@@ -206,11 +219,13 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     await page.waitForTimeout(400);
     const panel = await probe('panel');
     assert.ok(panel.w === panel.cw && panel.cw > 0, 'panel: ' + JSON.stringify(panel));
-    // Hidden boards run while the page is parsed, as upstream, at a provisional
-    // pixel size instead of a zero-size, invalid one.
+    // JSXGraph 1.14.1 starts hidden boards without a valid view. The extension
+    // preserves the requested view until their first real size. Check that
+    // their code ran here; the finite view and exact dimensions are checked
+    // after showing them below, alongside assessment while still hidden.
     for (const id of ['tabbed', 'collapsed']) {
       const hidden = await probe(id);
-      assert.ok(hidden && hidden.w > 0 && hidden.bbox.every(Number.isFinite), id + ' hidden start: ' + JSON.stringify(hidden));
+      assert.ok(hidden, id + ' hidden board code did not run');
     }
 
     // An assessment request starts a hidden board and is answered.
@@ -226,8 +241,13 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     assert.equal(reply.error, undefined, reply.error);
     assert.equal(reply.payload.started, true);
 
-    // A hidden board asked for its picture (AI context) draws at a provisional
-    // size, not blank; its graph editor still works once shown.
+    // The pinned renderer initializes a hidden view at its first real size.
+    // AI context is requested from the visible editor; hidden response-only
+    // assessment is checked above. The graph must produce an actual picture.
+    await page.getByRole('tab', {name: 'Outer'}).click();
+    await page.getByRole('tab', {name: 'Editor'}).click();
+    await page.locator('iframe#editor').scrollIntoViewIfNeeded();
+    await (await frame('editor')).waitForFunction(() => window.__probe && window.__probe().w > 0);
     const pictured = await page.evaluate(() => new Promise((resolve, reject) => {
       const target = document.getElementById('editor').contentWindow;
       const listener = async event => {
@@ -253,12 +273,13 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
       setTimeout(() => reject(new Error('no picture from a hidden board')), 10000);
     }));
     assert.equal(pictured.error, undefined, pictured.error);
-    assert.ok(pictured.width > 100 && pictured.inked > 100, 'hidden picture: ' + JSON.stringify(pictured));
+    assert.ok(pictured.width > 100 && pictured.inked > 100, 'visible picture: ' + JSON.stringify(pictured));
 
     // A hidden board whose code waits for the page's load event starts when shown.
     await page.getByRole('tab', {name: 'Onload'}).click();
     await (await frame('onload')).waitForFunction(() => typeof window.__probe === 'function');
-    assert.ok(close((await probe('onload')).bbox, [0, 4, 8, 0]), 'onload board');
+    await (await frame('onload')).waitForFunction(() => window.__probe && window.__probe().w > 0 && window.__probe().bbox.every(Number.isFinite));
+    assert.ok(close((await probe('onload')).bbox, [0, 4, 8, 0]), 'onload board: ' + JSON.stringify(await probe('onload')));
 
     // Shown: the intended bounding box at the full width.
     await page.getByRole('tab', {name: 'Outer'}).click();
@@ -302,36 +323,37 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
 
     // A view the board's code set after initBoard is the one kept; page code that
     // still fits the board itself keeps working.
-    const variant = await probe('variant'), legacy = await probe('legacy'), padded = await probe('padded');
+    const variant = await visibleProbe('variant'), legacy = await visibleProbe('legacy'), padded = await visibleProbe('padded');
     // A container narrower than the iframe (a toolbar beside it) sets the size.
     assert.ok(padded.w === padded.vw && contains(padded.bbox, [0, 6, 14, 0]), 'padded: ' + JSON.stringify(padded));
     assert.ok(close(variant.bbox, [10, 14, 18, 10]), 'variant: ' + JSON.stringify(variant));
     assert.ok(contains(legacy.bbox, [0, 10, 10, 0]) && legacy.w === legacy.vw, 'legacy: ' + JSON.stringify(legacy));
 
-    const unitsWide = await probe('units');
+    const unitsWide = await visibleProbe('units');
     // Mobile width: the boards follow the iframe and keep the intended view.
     await page.setViewportSize({width: 390, height: 800}); await settle();
-    const units = await probe('units');
-    const narrow = await probe('tabbed'), narrowCollapsed = await probe('collapsed');
+    const units = await visibleProbe('units');
+    const narrow = await visibleProbe('tabbed'), narrowCollapsed = await visibleProbe('collapsed');
     assert.ok(narrow.w < 400 && narrow.w === narrow.vw, 'narrow width: ' + JSON.stringify(narrow));
     assert.ok(close(narrow.bbox, [-1, 3, 14, -3]), 'narrow tabbed: ' + JSON.stringify(narrow));
     assert.ok(narrowCollapsed.w === narrowCollapsed.vw && contains(narrowCollapsed.bbox, [0, 6, 14, 0]), 'narrow collapsed: ' + JSON.stringify(narrowCollapsed));
 
     // And back: the same view as before, no drift.
     await page.setViewportSize({width: 1100, height: 900}); await settle();
-    assert.ok(close((await probe('tabbed')).bbox, tabbed.bbox));
-    assert.ok(close((await probe('collapsed')).bbox, collapsed.bbox), 'collapsed drifted');
-    assert.ok(close((await probe('variant')).bbox, [10, 14, 18, 10]), 'variant view lost');
+    assert.ok(close((await visibleProbe('tabbed')).bbox, tabbed.bbox));
+    assert.ok(close((await visibleProbe('collapsed')).bbox, collapsed.bbox), 'collapsed drifted');
+    assert.ok(close((await visibleProbe('variant')).bbox, [10, 14, 18, 10]), 'variant view lost');
     // A board set up with origin and units keeps that view (no default box).
     assert.ok(units.w === units.vw && Math.abs(units.bbox[1] - unitsWide.bbox[1]) < 1e-6 && units.bbox[0] === unitsWide.bbox[0], 'units narrow: ' + JSON.stringify([unitsWide, units]));
-    assert.ok(close((await probe('units')).bbox, unitsWide.bbox), 'units drifted: ' + JSON.stringify(await probe('units')));
-    assert.ok(close((await probe('padded')).bbox, padded.bbox), 'padded drifted');
-    assert.ok(close((await probe('legacy')).bbox, legacy.bbox), 'legacy drifted: ' + JSON.stringify(await probe('legacy')));
+    assert.ok(close((await visibleProbe('units')).bbox, unitsWide.bbox), 'units drifted: ' + JSON.stringify(await visibleProbe('units')));
+    assert.ok(close((await visibleProbe('padded')).bbox, padded.bbox), 'padded drifted');
+    assert.ok(close((await visibleProbe('legacy')).bbox, legacy.bbox), 'legacy drifted: ' + JSON.stringify(await visibleProbe('legacy')));
 
     // A view the user chose survives a resize.
+    await visibleProbe('tabbed');
     await (await frame('tabbed')).evaluate(() => window.__zoom([2, 1, 6, -1]));
     await page.setViewportSize({width: 900, height: 900}); await settle();
-    const zoomed = await probe('tabbed');
+    const zoomed = await visibleProbe('tabbed');
     assert.ok(contains(zoomed.bbox, [2, 1, 6, -1]) && zoomed.bbox[2] - zoomed.bbox[0] < 5, 'zoom lost: ' + JSON.stringify(zoomed));
 
     assert.deepEqual(errors, []);

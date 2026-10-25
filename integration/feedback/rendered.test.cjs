@@ -70,7 +70,7 @@ test('common page renders the active extensions and keeps local dependencies res
     assert.ok(fs.existsSync(path.resolve(site, resource.split('?')[0])), 'Missing ' + resource);
   }
   const record = JSON.parse(fs.readFileSync(path.join(site, 'resolved-repos.json'), 'utf8'));
-  assert.deepEqual(Object.keys(record.repositories).sort(), ['ctm-assessment', 'ctm-checkers', 'ctm-libs', 'jsxgraph', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
+  assert.deepEqual(Object.keys(record.repositories).sort(), ['ctm-assessment', 'ctm-checkers', 'ctm-libs', 'ctm-stack', 'jsxgraph', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
   assert.equal(panels[2].querySelectorAll('.math-exercise-cell').length, 7);
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'repos.json'), 'utf8'));
   for (const [name, source] of Object.entries(record.repositories)) {
@@ -249,7 +249,7 @@ test('individually listed math-exercise loads one usable runtime; an old ai-feed
   // (step 3, U3b); an old ai-feedback 0.8.1 listed next to the components
   // stops with the migration message (L3, §18.4).
   const {spawnSync} = require('node:child_process');
-  const dir = fs.mkdtempSync(path.join(path.dirname(site), 'filter-order-'));
+  const dir = fs.mkdtempSync(path.join(path.dirname(path.dirname(site)), 'filter-order-'));
   try {
     const source = path.join(path.dirname(site), '_extensions');
     // ctm-checkers: math-exercise 0.11 and later grade with it (unused with 0.10).
@@ -296,7 +296,7 @@ test('Pyodide through ctm-libs without the alias: [pyodide-interaktiv], [ctm-ass
   // pyodide-interaktiv 1.9 runs on ctm-libs through the shared bootstrap: no
   // ai-feedback folder is installed (step 3, U3b), in either layout.
   const {spawnSync} = require('node:child_process');
-  const dir = fs.mkdtempSync(path.join(path.dirname(site), 'pyodide-order-'));
+  const dir = fs.mkdtempSync(path.join(path.dirname(path.dirname(site)), 'pyodide-order-'));
   try {
     fs.cpSync(path.join(path.dirname(site), '_extensions'), path.join(dir, '_extensions'), {recursive: true});
     assert.ok(!fs.existsSync(path.join(dir, '_extensions', 'ai-feedback')));

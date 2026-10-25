@@ -103,6 +103,17 @@ function collector() {
     authored(name, text, python) {
       const store = corpus(name);
       const record = pythonJson(text);
+      if (Array.isArray(record.nativeRecords)) {
+        for (const native of record.nativeRecords) {
+          if (!native.input?.options || !native.input.context || !native.input.teacherInputs || !native.output)
+            throw new Error('Native authored capture requires concrete options, context, teacher inputs and output');
+          const options = {...native.input.options};
+          for (const key of ['checker', 'tests']) if (key in options) options[key] = source(store, options[key]);
+          add(name, 'authored', 'authored_native', {...native.input, options}, native.output, python, null);
+        }
+        return;
+      }
+      if (!record.options) throw new Error('Authored capture requires options');
       const options = {...record.options};
       for (const key of ['checker', 'tests']) if (key in options) options[key] = source(store, options[key]);
       add(name, 'authored', 'authored', {options}, {outcome: record.outcome, calls: record.calls, responses: record.responses}, python, null);

@@ -86,6 +86,7 @@ def resolve(overrides, courses=COURSES):
 def course_matrix():
     """The courses of the comparison workflow: the umbrella's example site and every course's branch."""
     matrix = [{'course': 'examples', 'ref': '', 'profile': ''}]
+    matrix.append({'course':'ctm-stack','ref':'','profile':''})
     for name, spec in COURSES.items():
         course = spec['course']
         if course.get('optional') and branch_tip(spec) is None:
@@ -166,10 +167,19 @@ def main():
         # The example sites (and the umbrella's Python programs) go with the pinned courses.
         run(*build, '--repo', 'https://github.com/Erasmus-CTM/math-exercise.git', '--ref', record['repositories']['math-exercise']['commit'],
             '--dest', out / 'sites/math-exercise')
+        # The Pyodide authored pass requires source-bound native variant
+        # receipts, resolved read-only by the installed component producer.
+        run(sys.executable, HERE / 'native-authored.py', '--root', out / 'sites/math-exercise')
         built.update(python='umbrella',
                      sites=[{'name': 'umbrella', 'dir': 'ws/site/_site', 'corpus': 'umbrella'},
                             {'name': 'math-exercise', 'dir': 'sites/math-exercise/_site', 'corpus': 'math-exercise'}],
                      sources=[{'name': 'umbrella', 'dir': 'umbrella'}, {'name': 'math-exercise', 'dir': 'sites/math-exercise'}])
+        # This harness owns both builds; use its compatibility builder for a
+        # package from before U6 as well as the new packaged component.
+        run(sys.executable, HERE.parents[1] / 'scripts/build-stack-site.py', '--umbrella', umbrella,
+            '--dest', out / 'sites/ctm-stack', '--workspace', out / 'sites/stack-ws')
+        built['sites'].append({'name':'ctm-stack','dir':'sites/ctm-stack/_site','corpus':'ctm-stack'})
+        shutil.rmtree(out / 'sites/stack-ws', ignore_errors=True)
     for name, spec in courses.items():
         if refs[name] is None:
             continue
@@ -179,6 +189,7 @@ def main():
             *(['--profile', first] if first else []))
         for profile in others:
             run('quarto', 'render', *(['--profile', profile] if profile else []), cwd=dest)
+        run(sys.executable, HERE / 'native-authored.py', '--root', dest)
         built['sites'].append({'name': name, 'dir': f'sites/{name}/_site', 'corpus': name})
         for profile in spec['course'].get('profiles', []):
             folder = output_dir(dest, profile)

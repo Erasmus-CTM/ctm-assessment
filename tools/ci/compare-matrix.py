@@ -86,7 +86,7 @@ def entries(event, inputs):
     found = []
     for entry in courses():
         entry = {'base_ref': '', 'base': '', 'head': '', 'convert': False, 'expect': '', 'browser': False, **entry}
-        if entry['course'] != 'examples':
+        if entry['course'] not in ('examples', 'ctm-stack'):
             entry['base'] = 'pin'
         found.append(entry)
     found.append({**FIXTURE, 'ref': '', 'base_ref': '', 'profile': '', 'base': 'pin', 'head': '', 'convert': True,

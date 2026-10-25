@@ -54,12 +54,16 @@
     },
     {
       "id": "jsxgraph",
-      "integrity": "sha512-TrjfzohP5hkw4ZYqFjxrPD3w7hjZFct8lqGv6RlbgyUoOqIw6Z2Io3q7nVpO+FPK7KEOfH/xcf0Y2xotoQQQMA==",
-      "metadata_url": "https://registry.npmjs.org/jsxgraph/1.14.1",
-      "npm": "jsxgraph",
-      "reported_licence": "(MIT OR LGPL-3.0-or-later)",
-      "url": "https://registry.npmjs.org/jsxgraph/-/jsxgraph-1.14.1.tgz",
-      "version": "1.14.1"
+      "kind": "git-build",
+      "repository": "aacchhee/jsxgraph-quarto",
+      "version": "5a1847cbcdd22b1f167f5bb9a901d47cb43e3a23",
+      "url": "https://codeload.github.com/aacchhee/jsxgraph-quarto/tar.gz/5a1847cbcdd22b1f167f5bb9a901d47cb43e3a23",
+      "sha256": "fdc178ee998251dc73bc0ba7a9b93aae0282fd633d834022dc8da4310646a1a8",
+      "runtime_manifest_sha256": "56c53e680162f886c28ee147709965cee923c1d6ef909e30df43e9b53ce49e69",
+      "upstream": {
+        "repository": "jsxgraph/jsxgraph",
+        "commit": "a3867ae130323b1bdc182674b03ebbdeb3c8d8f5"
+      }
     },
     {
       "id": "mathjax4",

@@ -6,6 +6,7 @@ import {createHash} from 'node:crypto';
 const repository = 'jsxgraph/jsxgraph-quarto';
 export const RENDERERS = Object.freeze({
   before: {commit:'17de83e006cf8907a146cc6a2366f42a35463c6e', lua:'7208ad6e15359d71bba086ed06dccb87da4e3c1497304e553235e8897374d8e0'},
+  git: {repository:'aacchhee/jsxgraph-quarto',commit:'e31b5d19cb7f282e220634c0e21304067910efff',lua:'e134658ae4cddfa543567e787fa9df7cc40afdc0c9ec2968f6a4a82e5eecaecf'},
   after: {commit:'e4ad81d82e1b56f86765026a3dd26f6975d29d57', lua:'f7c234ba4e3a778f7362af702040cbc4adef39776c1abb34fd159d6bbdd9e5d4'}
 });
 const graphHash = '3aa43338142a78eca94a91efdc55ef32abe7081464b8905d743e418d8bfecf2e';
@@ -19,13 +20,13 @@ export function rendererSource(project,pins,side) {
   const expected = RENDERERS[side];
   insist(expected,'Unknown renderer side');
   const pin = pins.repositories?.jsxgraph;
-  insist(pin?.repository === repository && pin.commit === expected.commit,'Renderer pin identity mismatch: '+side);
+  insist(pin?.repository === (expected.repository||repository) && pin.commit === expected.commit,'Renderer pin identity mismatch: '+side);
   const records = recordPaths.map(file=>path.join(project,file)).filter(file=>fs.existsSync(file)).map(file=>JSON.parse(fs.readFileSync(file,'utf8')));
   insist(records.length,'Missing installed renderer record: '+side);
   const result = [];
   for(const record of records) {
     const actual = record.repositories?.jsxgraph;
-    insist(actual?.repository === repository && actual.commit === pin.commit && !actual.local_override && !(actual.dirty_files||[]).length,'Installed renderer identity mismatch: '+side);
+    insist(actual?.repository === (expected.repository||repository) && actual.commit === pin.commit && !actual.local_override && !(actual.dirty_files||[]).length,'Installed renderer identity mismatch: '+side);
     const source = {};
     for(const [file,digest] of [['lua/jsxgraph.lua',expected.lua],['graph-editor.js',graphHash]]) {
       const bytes = fs.readFileSync(path.join(project,'_extensions/jsxgraph',file));
@@ -47,10 +48,11 @@ export function loadRendererSources(beforeProject,beforePinsFile,afterProject,af
   insist(Boolean(beforeProject)===Boolean(beforePinsFile),'--renderer-before-sources and --renderer-before-pins must be supplied together');
   if(!beforeProject)return null;
   const afterPins = JSON.parse(fs.readFileSync(afterPinsFile,'utf8'));
-  if(afterPins.repositories?.jsxgraph?.commit!==RENDERERS.after.commit)return null;
+  const afterSide=afterPins.repositories?.jsxgraph?.commit===RENDERERS.git.commit?'git':'after';
+  if(afterPins.repositories?.jsxgraph?.commit!==RENDERERS[afterSide].commit)return null;
   const beforePins = JSON.parse(fs.readFileSync(beforePinsFile,'utf8'));
   if(beforePins.repositories?.jsxgraph?.commit!==RENDERERS.before.commit)return null;
-  return {before:rendererSource(beforeProject,beforePins,'before'),after:rendererSource(afterProject,afterPins,'after')};
+  return {before:rendererSource(beforeProject,beforePins,'before'),after:rendererSource(afterProject,afterPins,afterSide)};
 }
 
 const quote = '("(?:\\\\.|[^"\\\\])*")';
@@ -86,7 +88,7 @@ function decoded(frame) {
   return value.startsWith('data:text/html;base64,') ? 'data:text/html;decoded,'+norm(Buffer.from(value.slice(22),'base64').toString('utf8').replace(randomId,'JXG*')) : null;
 }
 
-export function proveRendererPair(item,sources,document) {
+export function proveRendererPair(item,sources,document,resourcePairs=[]) {
   const prefix = 'data:text/html;decoded,';
   insist(item.before.startsWith(prefix)&&item.after.startsWith(prefix),'Board delivery encoding changed');
   let before=item.before.slice(prefix.length),after=item.after.slice(prefix.length);
@@ -108,6 +110,7 @@ export function proveRendererPair(item,sources,document) {
     for(let index=0;index<3;index++)value=value.replace(list[index][0],'<script>VALIDATED_'+index+'</script>');
     if(side==='before')before=value;else after=value;
   }
+  for(const {historical,target} of resourcePairs)before=before.replace(historical,target);
   insist(before===after,'Board frame changed beyond the exact renderer transition');
   return {beforeCommit:sources.before.commit,afterCommit:sources.after.commit,beforeLua:sources.before.luaSha256,afterLua:sources.after.luaSha256,
     graphSha256:graphHash,assessmentId:fresh.id,provisional:old.provisional,beforeSha256:hash(item.before),afterSha256:hash(item.after),allOtherNormalizedFrameBytesEqual:true};

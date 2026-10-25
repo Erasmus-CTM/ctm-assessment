@@ -13,7 +13,7 @@ spec = importlib.util.spec_from_file_location('install_project', Path(__file__).
 installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
 
-KNOWN = {'ctm-libs', 'math-exercise', 'ctm-checkers', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'}
+KNOWN = {'ctm-stack', 'ctm-libs', 'math-exercise', 'ctm-checkers', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'}
 RENAMED = {'ai-feedback': 'ctm-libs'}
 A, B = 'a' * 40, 'b' * 40
 

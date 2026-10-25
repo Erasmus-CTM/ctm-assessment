@@ -2,7 +2,7 @@ name: Pyodide parity and goldens
 
 # The parity harness (integration/pyodide-parity) over the example site,
 # math-exercise's example site and the courses of corpora.json (the one course
-# list) with a pinned commit (ctm-demo with its review build, ingmat3a):
+# list) with a pinned commit (ctm-demo and ingmat3a):
 # - parity: every exercise graded under Pyodide 0.27.2 and 0.28.3 (D4 gate;
 #   any difference in status or score fails), with the golden capture for
 #   ctm-checkers (step-2 design §6, §13): artifact goldens-export (the rows
@@ -223,7 +223,7 @@ jobs:
       - name: Exercise real materialized triangle fixtures and negative coverage canaries
         env:
           CTM_PARITY_VARIANT_BUILD: ${{ runner.temp }}/builds/head
-        run: node --test tests/parity-variants.test.cjs
+        run: node --test tests/parity-variants.test.cjs tests/parity-stack-h1.test.cjs
       - name: Grade every exercise of both builds under Pyodide 0.28.3
         env:
           # The differences this pull request causes on purpose, if any (docs/development.md).

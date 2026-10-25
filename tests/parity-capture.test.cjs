@@ -241,3 +241,22 @@ test('an incomplete run writes no export/ and says why in the manifest', () => {
     assert.match(JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')).exportWithheld, /harness error/);
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
 });
+
+test('native authored capture keys each concrete context and still detects real conflicts', () => {
+  const collect = capture.collector();
+  const native = (n, calls = [true]) => ({input: {options: {mode: 'custom', checker: 'def check(response, symbols): return True'},
+    context: {variant: {n, id: 'seed=' + n, hash: String(n).repeat(16)}}, teacherInputs: {a: String(n)}},
+    output: {outcome: 'pass', calls, responses: [{raw: [String(n)]}]}});
+  for (const python of ['3.12', '3.13']) {
+    collect.authored('math-exercise', JSON.stringify({nativeRecords: [native(1), native(2)]}), python);
+  }
+  const result = collect.suites();
+  assert.equal(result.conflicts.length, 0);
+  const found = result.suites['math-exercise'].authored.map(line => JSON.parse(line));
+  assert.equal(found.length, 2);
+  assert.ok(found.every(row => row.call === 'authored_native'));
+  assert.deepEqual(found.map(row => row.input.context.variant.n).sort(), [1, 2]);
+  assert.ok(found.every(row => row.input.options.checker.$source));
+  collect.authored('math-exercise', JSON.stringify({nativeRecords: [native(1, [false])]}), '3.13');
+  assert.equal(collect.suites().conflicts.length, 1);
+});
