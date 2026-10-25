@@ -206,11 +206,13 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     await page.waitForTimeout(400);
     const panel = await probe('panel');
     assert.ok(panel.w === panel.cw && panel.cw > 0, 'panel: ' + JSON.stringify(panel));
-    // Hidden boards run while the page is parsed, as upstream, at a provisional
-    // pixel size instead of a zero-size, invalid one.
+    // JSXGraph 1.14.1 starts hidden boards without a valid view. The extension
+    // preserves the requested view until their first real size. Check that
+    // their code ran here; the finite view and exact dimensions are checked
+    // after showing them below, alongside assessment while still hidden.
     for (const id of ['tabbed', 'collapsed']) {
       const hidden = await probe(id);
-      assert.ok(hidden && hidden.w > 0 && hidden.bbox.every(Number.isFinite), id + ' hidden start: ' + JSON.stringify(hidden));
+      assert.ok(hidden, id + ' hidden board code did not run');
     }
 
     // An assessment request starts a hidden board and is answered.
