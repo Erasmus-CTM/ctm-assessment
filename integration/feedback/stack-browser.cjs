@@ -15,7 +15,7 @@ fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\nfilter
 fs.writeFileSync(path.join(dir,'index.qmd'),'---\ntitle: Mixed runtime test\n---\n\n'
   +'```{math-exercise}\n#| label: mixed-math\nCompute two plus two: _[4]\n```\n\n'
   +'```{pyodide-python}\nprint("mixed Python ready")\n```\n\n'
-  +'```{#mixed-stack .stack-question}\n#| label: mixed-stack\n#| file: question.xml\n#| question: Expand a product (form-sensitive)\n#| review: true\n```\n');
+  +'```{#mixed-stack .stack-question}\n#| label: mixed-stack\n#| file: question.xml\n#| question: Expand a product (form-sensitive)\n#| checker: |\n#|   def check(response, symbols):\n#|       return bool(response["answers"]["ans"] == response["teacher"]["ans"])\n#| checker-value: 2\n#| review: true\n```\n');
 const render = spawnSync(process.env.QUARTO_BIN || 'quarto',['render'],{cwd:dir,encoding:'utf8',timeout:300000,
   env:{...process.env,CTM_VARIANTS:'review'}});
 assert.equal(render.status,0,render.stderr);
@@ -51,9 +51,19 @@ const server = http.createServer((req,res)=>{
     await stack.locator('.stack-result[data-state=correct]').waitFor({timeout:180000});
     await stack.locator('.stack-answer').fill('!!!');await stack.locator('.stack-validate').click();
     await stack.locator('.stack-result[data-state=invalid]').waitFor({timeout:180000});
+    const teacher=await stack.evaluate(card=>{
+      const data=JSON.parse(card.querySelector('.ctm-stack-data').textContent);
+      if(!data.common.checker || data.common.checker.value!==2)throw new Error('Mixed page needs the real H1 checker');
+      const current=data.variants.find(v=>v.id===card.dataset.stackVariantId) || data.variants[0];
+      return current.plan.env.ta;
+    });
+    await stack.locator('.stack-answer').fill(teacher);await stack.locator('.stack-validate').click();
+    await stack.locator('.stack-result[data-state=valid]').waitFor({timeout:180000});
+    await stack.locator('.stack-check').click();
+    await stack.locator('.stack-result[data-state=correct]').waitFor({timeout:180000});
     assert.equal(await page.evaluate(()=>mainPyodide===__mixedPublished&&__mixedRestarts===0),true,'STACK preserves the published runtime');
     await page.locator('.qpyodide-button-run').first().click();
     await page.waitForFunction(()=>document.querySelector('.qpyodide-output-code-area').innerText.includes('mixed Python ready'),null,{timeout:180000});
-    console.log('Mixed page: math checks, Python runs before/after STACK, STACK qtests and validation pass; published runtime preserved.');
+    console.log('Mixed page: math checks, Python runs before/after STACK, STACK H1 grading, qtests and validation pass; published runtime preserved.');
   } finally {await browser.close();server.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

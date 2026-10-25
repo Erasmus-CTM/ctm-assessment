@@ -294,6 +294,15 @@ jobs:
         env:
           CTM_COMPARE_CALIBRATION_REPORTS: ${{ runner.temp }}/reports/calibration
         run: node tests/compare-rendered-store-calibration.cjs "$RUNNER_TEMP/out/before/_site" "$RUNNER_TEMP/out/after/_site" --asset-sources "$RUNNER_TEMP/ws-after/site" --asset-pins "$RUNNER_TEMP/after/integration/feedback/repos.json" --renderer-before-sources "$RUNNER_TEMP/ws-before/site" --renderer-before-pins "$RUNNER_TEMP/before/integration/feedback/repos.json"
+      - name: Reject H1 DOM, configuration and source mutations
+        if: matrix.course == 'ctm-stack' && steps.build.outcome == 'success'
+        env:
+          CTM_STACK_H1_BEFORE: ${{ runner.temp }}/out/before
+          CTM_STACK_H1_AFTER: ${{ runner.temp }}/out/after
+        run: |
+          if [ -f tests/compare-rendered-stack-h1.test.cjs ]; then
+            node --test tests/compare-rendered-stack-h1.test.cjs
+          fi
       - name: Compare the rendered pages
         id: compare
         continue-on-error: ${{ matrix.informational == true }}
@@ -301,6 +310,7 @@ jobs:
           name=$(basename "$COURSE")
           expect=(--expect tools/compare-rendered/expect/step4.yml --expect tools/compare-rendered/expect/step2.yml --expect tools/compare-rendered/expect/step3.yml --expect tools/compare-rendered/expect/step6-a1.yml)
           if [ "$COURSE" = ctm-stack ]; then
+            [ ! -f tools/compare-rendered/expect/step6-h1.yml ] || expect+=(--expect tools/compare-rendered/expect/step6-h1.yml)
             if [ -f "$RUNNER_TEMP/out/after/_extensions/ctm-stack/question-variants.py" ]; then
               expect+=(--expect tools/compare-rendered/expect/step6-v5.yml)
             else

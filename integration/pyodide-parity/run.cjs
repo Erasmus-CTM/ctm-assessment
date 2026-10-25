@@ -63,6 +63,7 @@ const {pageCases, pagesUnder, authoredSources, ANSWERS} = require('./cases.cjs')
 const capture = require('./capture.cjs');
 const variantCoverage = require('./variant-coverage.cjs');
 const stack = require('./stack.cjs');
+const stackH1 = require('./stack-h1.cjs');
 
 function parse(argv) {
   const options = {site: [], sources: [], versions: null, builds: null, timeout: 240, python: null, extensions: null, out: null, capture: null,
@@ -222,12 +223,13 @@ function compare(runs, jobs, results, inventories, strict) {
   for (const id of [...new Set([...idsA, ...idsB])].sort()) {
     const c = casesB.get(id) || casesA.get(id) || null;
     const where = pathOf(id, c);
+    const witness=c?.kind==='stack'?{stackEvidence:stackH1.evidence(casesA.get(id),casesB.get(id),before.get(id),after.get(id))}:{};
     if (!idsA.has(id) || !idsB.has(id)) {
-      differences.push({id, path: where, why: 'only in ' + (idsA.has(id) ? runs[0].name : runs[1].name), case: c});
+      differences.push({id, path: where, why: 'only in ' + (idsA.has(id) ? runs[0].name : runs[1].name), case: c,...witness});
       continue;
     }
     if (casesA.has(id) && caseContent(casesA.get(id)) !== caseContent(casesB.get(id))) {
-      differences.push({id, path: where, why: 'the builds grade different responses', case: {[runs[0].name]: casesA.get(id), [runs[1].name]: casesB.get(id)}});
+      differences.push({id, path: where, why: 'the builds grade different responses', case: {[runs[0].name]: casesA.get(id), [runs[1].name]: casesB.get(id)},...witness});
       continue;
     }
     const a = before.get(id), b = after.get(id);
@@ -236,7 +238,7 @@ function compare(runs, jobs, results, inventories, strict) {
     const ga = graded(a), gb = graded(b);
     const same = ga.length === gb.length && ga.every((x, i) => x.status === gb[i].status && sameScore(x.score, gb[i].score));
     const identical = isDeepStrictEqual(a.results, b.results) && isDeepStrictEqual(a.feedback, b.feedback) && isDeepStrictEqual(a.responses, b.responses);
-    const entry = {id, path: where, case: c, [runs[0].name]: {results: a.results, feedback: a.feedback}, [runs[1].name]: {results: b.results, feedback: b.feedback}};
+    const entry = {id, path: where, case: c, [runs[0].name]: {results: a.results, feedback: a.feedback}, [runs[1].name]: {results: b.results, feedback: b.feedback},...witness};
     if (!same || (strict && !identical)) differences.push(entry);
     else if (!identical) notes.push(entry);
   }
@@ -249,16 +251,17 @@ function readExpected(file) {
   const entries = data.differences;
   if (!Array.isArray(entries)) throw new Error(file + ': {"differences": [...]} expected');
   return entries.map((entry, i) => {
-    const unknown = Object.keys(entry).filter(key => !['path', 'case', 'reason', 'required', 'onlyIn'].includes(key));
+    const unknown = Object.keys(entry).filter(key => !['path', 'case', 'reason', 'required', 'onlyIn', 'witness'].includes(key));
     if (unknown.length || typeof entry.reason !== 'string' || !entry.reason.trim() || !(entry.path || entry.case))
       throw new Error(`${file}: entry ${i + 1} needs a reason and a path or case (path, case, reason, required)`);
     if (entry.onlyIn !== undefined && !['base', 'head'].includes(entry.onlyIn)) throw new Error(file + ': onlyIn must be base or head');
+    if(entry.witness)stackH1.validate(entry);
     const pattern = typeof entry.case === 'string' && /^\/.*\/$/.test(entry.case) ? new RegExp(entry.case.slice(1, -1)) : null;
     // The narrower entry wins a difference: an exact case id, then a case pattern, then a path alone; the longer path, then the
     // longer pattern, then the earlier entry.
     const rank = [entry.case ? (pattern ? 2 : 3) : 1, (entry.path || '').length, (entry.case || '').length];
     return {...entry, required: entry.required !== false, index: i, rank,
-      matches: d => (!entry.onlyIn || d.why === 'only in ' + entry.onlyIn) && (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
+      matches: d => stackH1.matches(entry,d) && (!entry.onlyIn || d.why === 'only in ' + entry.onlyIn) && (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
         && (!entry.case || (pattern ? pattern.test(d.id) : d.id === entry.case))};
   });
 }

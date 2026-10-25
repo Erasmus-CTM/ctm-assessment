@@ -77,3 +77,32 @@ print(json.dumps(card_data(q,[seed_record(q,1)],[],identifier='proof-card',revie
     def test_changed_xml_cannot_be_explained_by_an_old_render(self):
         xml=self.project/'question.xml';xml.write_text(xml.read_text().replace('Expand and collect like terms:', 'Updated teaching prose:'))
         self.assertNotEqual(self.verify(self.card).returncode,0)
+
+    def test_h1_checker_source_weight_and_selected_identity_are_bound(self):
+        source=self.project/'page.qmd'
+        source.write_text(source.read_text().replace('```\n', '''#| checker: |
+#|   def check(response, symbols):
+#|       return bool(response["answers"]["ans"] == response["teacher"]["ans"])
+#| checker-value: 2
+```\n'''))
+        code='''import json,sys
+from pathlib import Path
+root=Path(sys.argv[1]);extension=root/'_extensions/ctm-checkers'
+d=json.loads((extension/'checkers.json').read_text())
+sys.path[:0]=[str(extension/d['wheel']),str(extension/d['parts']['stack']['wheel']),str(extension/'native-authoring')]
+from ctm_variants.stack_component import parse_source,request
+source=(root/'page.qmd').read_text().split('\\n',1)[1].rsplit('```',1)[0].rstrip()
+options,question=parse_source(source)
+result=request(dict(version=1,projectRoot=str(root),file='page.qmd',sourceFile='page.qmd',label='proof-card',manifest='_variants/proof-card.yml',source=source,options=options,question=question,renderMode='review'))
+print(json.dumps(result['payload']))
+'''
+        result=subprocess.run([sys.executable,'-c',code,str(self.project)],text=True,capture_output=True,timeout=30,check=True)
+        card=json.loads(result.stdout)
+        self.assertEqual(self.verify(card).returncode,0)
+        for mutation in ('source','weight','identity'):
+            with self.subTest(mutation=mutation):
+                changed=copy.deepcopy(card)
+                if mutation=='source':changed['common']['checker']['source']+='\n# tampered'
+                elif mutation=='weight':changed['backend']['question']['checker_value']=3
+                else:changed['variants'][0]['plan']['id']='seed=999'
+                self.assertNotEqual(self.verify(changed).returncode,0)

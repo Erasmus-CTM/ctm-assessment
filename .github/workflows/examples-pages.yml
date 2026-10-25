@@ -50,7 +50,8 @@ jobs:
           tests/compare-courses-workflow.test.cjs tests/compare-pyodide-settings.test.cjs
           tests/compare-rendered.test.cjs tests/compare-rendered-store.test.cjs
           tests/compare-rendered-assets.test.cjs tests/parity-capture.test.cjs
-          tests/parity-checkers.test.cjs tests/parity-variants.test.cjs
+          tests/parity-checkers.test.cjs tests/parity-variants.test.cjs tests/parity-stack-h1.test.cjs
+          tests/compare-rendered-stack-h1.test.cjs
 
   build:
     if: ${{ !cancelled() && needs.source.result == 'success' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || needs.campaign.result == 'success') }}

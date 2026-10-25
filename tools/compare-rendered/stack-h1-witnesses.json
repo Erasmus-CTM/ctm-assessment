@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "design": "Step 6 H1: API-v1 checker replacement and rewritten author guides. Exact canonical DOM/configuration/source witnesses; native source/plan checks on both sides and full candidate/hash/test regeneration on head.",
+  "base": {
+    "ctm-checkers": "3f84cdec0848d17fb3b30b62b49662551704dfb7",
+    "ctm-stack": "44d6a98784d14f1d12abeddfd231e6ec2b84ce98"
+  },
+  "head": {
+    "ctm-checkers": "ccbef3d37070d10cdda4b175269ccf1dc442726c",
+    "ctm-stack": "6de422a786e42dd528e99888ed2029364149816e"
+  },
+  "pages": {
+    "corpus.html": [
+      {
+        "dom": "f4bbf576e5c866daebadc8a5f12952118af3583909ecd6578500a57a2ccab45a",
+        "configs": "2bd090240208adf56dbf965f1cd1246cd6fc3d10920d80818a56f47515bc0d4f",
+        "source": "cb2b5a6e730633423e983693234268a8cf9ca1c7290e80fc374cb8fa7f86e8c7"
+      },
+      {
+        "dom": "dc380ac0dc1b1d929d6837a9ae927774a2cbb9d89a540c131f91b49e35f9abea",
+        "configs": "794c8a03c7decc4bb48f3fb6cb996193cb272231dd2b195ed44c0f3842281856",
+        "source": "b4eda61e4f9b8039e8733e2d3213d578e60024cc8a7f8c37032883f7965bd744"
+      }
+    ],
+    "docs/authoring.html": [
+      {
+        "dom": "aa0b4fa233e4c910f48de56c7e3452308a2282fe9192fa737aa490bc562cd71a",
+        "configs": "504daded55883014baa9b55e8c6d4dae03c45c160931103232967e7e6f326d52",
+        "source": "b904f8e45f645f6d22f134123d017ae806b97c0e4b6654432240151f5b4913f3"
+      },
+      {
+        "dom": "da405d0c4839906dc93d5bd1ce77ca115a5ab9aa7475c89acbb1397960f932d4",
+        "configs": "0e5d02777f0c6d9dadb3b2915ee379228730078793eeefacb9c8c45576d91fcc",
+        "source": "ce0dddb5987edf56acf2245e8c6bdd5663feac3b9471ed68abe58df48f804bb9"
+      }
+    ],
+    "docs/backend-contract.html": [
+      {
+        "dom": "799cd1f580d3ee2594f7b82b9f3a0be17575960d2bfdfa5d6eed5ab098934e12",
+        "configs": "45feed0e928c82166c66fb33cd47998b3740406219db639e39306746903fe230",
+        "source": "fc40e9a51ca6f894020eaaecc6fa1ac08ec132351ecd712be89a24ef330f8334"
+      },
+      {
+        "dom": "7e2b1c27d59b1910014314ce59192c513fba1f5189a9873d016283987011326e",
+        "configs": "45feed0e928c82166c66fb33cd47998b3740406219db639e39306746903fe230",
+        "source": "244558af54aae3b795dafa93b30d7bc8c543ac443965d3d756a55a4c3c0d6435"
+      }
+    ],
+    "docs/matrix-input.html": [
+      {
+        "dom": "17931ab0291546fa47d7eff54f04608441f0b7df76c32df7513615f8a6a0c58b",
+        "configs": "45feed0e928c82166c66fb33cd47998b3740406219db639e39306746903fe230",
+        "source": "afc0f0d2e79832b9793614248743aaa6ec413a131e69a6258d10799bd9b8b5c2"
+      },
+      {
+        "dom": "38b3ffb7d496b0e68e9b1d0a875706fd9a7b8c1375cc7d84ee85cc0f3555f9c1",
+        "configs": "45feed0e928c82166c66fb33cd47998b3740406219db639e39306746903fe230",
+        "source": "afc0f0d2e79832b9793614248743aaa6ec413a131e69a6258d10799bd9b8b5c2"
+      }
+    ],
+    "docs/python-answer-tests.html": [
+      {
+        "dom": "edefbd082fb7e61d59da28c981efa2eca89422087828f727ae46e5886ac21bd3",
+        "configs": "45feed0e928c82166c66fb33cd47998b3740406219db639e39306746903fe230",
+        "source": "1675f686681c71861a567bced5b080c3b85b96dd1da465abe575be594199b104"
+      },
+      {
+        "dom": "4cc7bccc7242997e85498e6fde120a8be37b4805e7b0c7733f6e8265b6a9a628",
+        "configs": "45feed0e928c82166c66fb33cd47998b3740406219db639e39306746903fe230",
+        "source": "d13585d54f720a285bd90c6dbf697501634155c5dddbf13fd47cfabd98390754"
+      }
+    ],
+    "docs/python-checker-api.html": [
+      {
+        "dom": "eb46eac0654f7f0c083e7a8aa070b635227c9c06afb5fd7f34c8dd640207e37f",
+        "configs": "6a07d8f6065864bfac4143693bfc847e1faa92a91ec84569c991a19e955f7fc8",
+        "source": "61074a39f953d3b2e07c67cf20b2c55e38a7a6137180f75dd3489f4aa67a3e56"
+      },
+      {
+        "dom": "70404123b8e8e38ef7cf2b4e8a87ffe90a425b287d3476d99492dca9bb18c5e1",
+        "configs": "a8a9e70ea50e9cc394f1e45b48c1ea0e5c1120a96dc50305976fc87e2f70e4bb",
+        "source": "06c841bc4136bf543cf9c55afa62bda9ac69d3c2ce4aef6b25543d5115647316"
+      }
+    ],
+    "examples.html": [
+      {
+        "dom": "f779d2a9dbcac097b31bb04e4235ba3bf539c23fb071980b1c2d4891b3786c76",
+        "configs": "4c0bdc6a84861fddf66cd3eb53f11044a396554043b32ccc09ee8c8d65813cf0",
+        "source": "68932d770a322c83aceecdc7ee756d8820fa0b05e69d8255a1f9090915940a59"
+      },
+      {
+        "dom": "184734566a893a3c1bdf545b250514c27407efff59fdcfa8af8e45bab400df70",
+        "configs": "3c7b0ce067b8f385f3f592697004a836bcdd2c6568610b89d24fdbc2bf5d36e0",
+        "source": "9ba1fffb79d8b6c9a6747f4fcaa6113962938e6524015e28552e372d27a490ef"
+      }
+    ],
+    "index.html": [
+      {
+        "dom": "fa512cff87d5eb73704aa924936391e5d585f11f8e5baeea2a8da2b8a61c689f",
+        "configs": "c470b8ec686f28176702c27033274d7cb7961690fd09fb00bcc6a52f63164080",
+        "source": "13ce4070b12e72751a3756f72cbe56c67844cc13203fbcaeede936f1cbe5d0fa"
+      },
+      {
+        "dom": "26e59430fa9843e04f47ae820dcb0d8d38e6a2001ed8fd1e9e18d8823a36fef7",
+        "configs": "cb9aced040f8b3be18296c636cabf094073e1a5fc413959badab903334c7fecd",
+        "source": "44a66f1ce5005f50188cf8b72999ee808000f6f4c2d4db8d81c4ba6a56daa787"
+      }
+    ]
+  }
+}
