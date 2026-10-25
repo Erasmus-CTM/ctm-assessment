@@ -289,3 +289,20 @@ test('the preload default composes only with the separately validated legacy UI 
    before();assert.equal(run(after().replace('</head>',settings('nb',feedback)+'</head>')).status,1,'an additional settings object stays unexplained');
  }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });
+
+test('an exact Git board transition preserves code, grades and resource attributes',()=>{
+ const f=fixture();try{
+  const sha='a'.repeat(40),git='https://cdn.jsdelivr.net/gh/owner/runtime@'+sha+'/',resource=git+'_extensions/jsxgraph/resources/';
+  const math='https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js';
+  const old=boardDoc('https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraphcore.js',math,'https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraph.css');
+  const current=boardDoc(resource+'js/jsxgraphcore.js',math,resource+'css/jsxgraph.css');
+  const frame=html=>'<iframe id="assessment-triangle" src="data:text/html;base64,'+Buffer.from(html).toString('base64')+'"></iframe>';
+  f.put('ctm-assessment','jsxgraph-pins.yml','jsxgraph:\n  src_jxg: '+resource+'js/jsxgraphcore.js\n  src_css: '+resource+'css/jsxgraph.css\n  src_mjx: '+math+'\n');
+  fs.writeFileSync(path.join(f.project,'resolved-repos.json'),JSON.stringify(f.record));
+  fs.writeFileSync(path.join(f.dir,'before/page.html'),f.after.replaceAll('mathjax@4/','mathjax@4.1.3/').replace('</body>',frame(old)+'</body>'));
+  fs.cpSync(path.join(f.dir,'after/site_libs'),path.join(f.dir,'before/site_libs'),{recursive:true});
+  const make=html=>f.after.replaceAll('https://cdn.jsdelivr.net/npm/jsxgraph@1/',git).replaceAll('mathjax@4/','mathjax@4.1.3/').replace('</body>',frame(html)+'</body>');
+  const good=f.run(make(current),['--expect','tools/compare-rendered/expect/step6-a1.yml']);assert.equal(good.status,0,JSON.stringify(good));
+  for(const bad of [current.replace(sha,'b'.repeat(40)),current.replace('answer:2','answer:3'),current.replace(' async ',' defer '),current.replace('axis:true','axis:false').replace('initBoard(BOARDID,{})','initBoard(BOARDID,{axis:true})')])assert.equal(f.run(make(bad),['--expect','tools/compare-rendered/expect/step6-a1.yml']).status,1);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});

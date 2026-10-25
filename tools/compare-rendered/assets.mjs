@@ -73,7 +73,8 @@ export function loadAssetSources(project,pinsFile,rendererBeforeProject,renderer
   bases.pyodide=py[0][1];
   for(const [key,name] of Object.entries({src_jxg:'jsxgraph',src_css:'jsxgraph',src_mjx:'mathjax4',mjx_fonts:'mathjax-newcm-font'})){
     if(!board[key])continue;
-    const match=/^(https:\/\/cdn\.jsdelivr\.net\/npm\/(?:@[^/]+\/)?[^/@]+@[^/]+\/)/.exec(board[key]);
+    const match=/^(https:\/\/cdn\.jsdelivr\.net\/npm\/(?:@[^/]+\/)?[^/@]+@[^/]+\/)/.exec(board[key]) ||
+      /^(https:\/\/cdn\.jsdelivr\.net\/gh\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40}\/)/.exec(board[key]);
     insist(match,'Malformed canonical board URL');
     insist(!bases[name]||bases[name]===match[1],'Conflicting canonical board bases');
     bases[name]=match[1];
@@ -123,7 +124,20 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
     }
     const ca=configScripts(A.doc),ha=helperScripts(A.doc);
     if(ca.length||ha.length){
-      insist(ca.length===1&&ha.length===1&&ca[0].outerHTML===config.outerHTML&&same(attrs(ha[0],'src'),attrs(helper,'src')),'Existing asset registration changed');
+      insist(ca.length===1&&ha.length===1&&same(attrs(ha[0],'src'),attrs(helper,'src')),'Existing asset registration changed');
+      if(ca[0].outerHTML!==config.outerHTML){
+        const old=/^globalThis\.CTM_ASSETS=(\{[\s\S]*\});$/.exec(ca[0].textContent.trim());
+        const previous=old&&JSON.parse(old[1]),expected=structuredClone(context.config);
+        const prior=previous?.bases?.jsxgraph;
+        insist(/^https:\/\/cdn\.jsdelivr\.net\/gh\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40}\/$/.test(expected.bases.jsxgraph||'') &&
+          ['https://cdn.jsdelivr.net/npm/jsxgraph@1/','https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/'].includes(prior),
+          'Existing asset registration changed beyond the pinned Git runtime');
+        expected.bases.jsxgraph=prior;
+        insist(ca[0].parentElement===A.doc.head && ca[0].attributes.length===0 &&
+          old[1]===JSON.stringify(sorted(expected)), 'Existing asset registration changed beyond the JSXGraph base');
+        const kind=B.inline.find(i=>i.code===config.textContent.trim())?.kind;
+        for(const item of items)if(item.area==='inline'&&item.change==='changed'&&item.what===kind)item.assets='jsxgraph-git-configuration';
+      }
       insist(normalize(raw(ha[0]))===normalize(helperURL)&&!/[?#\\]/.test(raw(ha[0])),'Existing helper URL changed');
       insist(hash(fs.readFileSync(path.resolve(path.dirname(beforeFile),raw(ha[0]))))===context.helperHash,'Existing helper bytes differ');
       const beforeResources=resources(A.doc),afterResources=resources(B.doc);
@@ -204,12 +218,6 @@ function markBoardChanges(A,items,context,page){
        !String(item.before).startsWith('data:text/html;decoded,'))continue;
     try{
       insist(context,'Canonical installed board sources are required');
-      if(context.renderer){
-        const evidence=proveRendererPair(item,context.renderer,A.doc);
-        console.error('Canonical JSXGraph renderer evidence: '+JSON.stringify({page,element:item.element,...evidence}));
-        item.assets='jsxgraph-renderer-1.2';
-        continue;
-      }
       const prefix='data:text/html;decoded,';
       insist(String(item.after).startsWith(prefix),'Board delivery encoding changed');
       let before=item.before.slice(prefix.length),after=item.after.slice(prefix.length);
@@ -219,10 +227,13 @@ function markBoardChanges(A,items,context,page){
       for(const [key,kind]of [['src_jxg','script'],['src_mjx','math'],['src_css','style']]){
         const target=context.board[key];
         const match=/^(https:\/\/cdn\.jsdelivr\.net\/npm\/(?:@[^/]+\/)?[^/@]+@)(\d+)\.\d+\.\d+(\/[^?#]+)$/.exec(target||'');
-        insist(match,'Board target is not an exact canonical release');
-        const historical=match[1]+match[2]+match[3];
-        const old=kind==='style'?[...a.querySelectorAll('head > style')].filter(e=>e.textContent.trim()==='@import url("'+historical+'");'):
-          [...a.querySelectorAll('head > script[src]')].filter(e=>e.getAttribute('src')===historical);
+        const git=/^https:\/\/cdn\.jsdelivr\.net\/gh\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40}\/_extensions\/jsxgraph\/resources\/(?:js\/jsxgraphcore\.js|css\/jsxgraph\.css)$/.test(target||'');
+        insist(match||git,'Board target is not an exact canonical release or Git artifact');
+        const candidates=match?[match[1]+match[2]+match[3],target]:
+          ['1','1.14.1'].map(v=>'https://cdn.jsdelivr.net/npm/jsxgraph@'+v+'/distrib/'+(kind==='style'?'jsxgraph.css':'jsxgraphcore.js')).concat(target);
+        const url=e=>kind==='style'?/^@import url\("([^"\n]+)"\);$/.exec(e.textContent.trim())?.[1]:e.getAttribute('src');
+        const old=[...a.querySelectorAll(kind==='style'?'head > style':'head > script[src]')].filter(e=>candidates.includes(url(e)));
+        const historical=old.length===1?url(old[0]):null;
         const fresh=kind==='style'?[...b.querySelectorAll('head > style')].filter(e=>e.textContent.trim()==='@import url("'+target+'");'):
           [...b.querySelectorAll('head > script[src]')].filter(e=>e.getAttribute('src')===target);
         insist(old.length===1&&fresh.length===1,'Board default resource pair missing or duplicated');
@@ -231,6 +242,12 @@ function markBoardChanges(A,items,context,page){
         insist(before.split(historical).length===2&&after.split(target).length===2,'Ambiguous embedded resource URL');
         evidence.push({historical,target,beforeCount:before.split(historical).length-1,afterCount:after.split(target).length-1});
         before=before.replace(historical,target);changed++;
+      }
+      if(context.renderer){
+        const proof=proveRendererPair(item,context.renderer,A.doc,evidence);
+        console.error('Canonical JSXGraph renderer evidence: '+JSON.stringify({page,element:item.element,...proof,resources:evidence}));
+        item.assets='jsxgraph-renderer-1.2';
+        continue;
       }
       insist(changed===3&&before===after,'Embedded board changed beyond canonical resource pins');
       console.error('Canonical board URL evidence: '+JSON.stringify({page,element:item.element,beforeLength:original.length,afterLength:after.length,beforeSha256:hash(original),afterSha256:hash(after),resources:evidence,exactAfterThreeSubstitutions:before===after}));

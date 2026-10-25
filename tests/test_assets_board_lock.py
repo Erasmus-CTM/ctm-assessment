@@ -16,6 +16,65 @@ import ctm_board_assets as boards
 
 
 class BoardLockTests(unittest.TestCase):
+    def git_fixture(self, *, corrupt_member=False):
+        revision = 'a' * 40
+        base = 'https://cdn.jsdelivr.net/gh/owner/runtime@' + revision + '/_extensions/jsxgraph/resources/'
+        self.pins.write_text(self.pin_text.replace('https://cdn.jsdelivr.net/npm/jsxgraph@1.2.3/distrib/jsxgraphcore.js', base+'js/jsxgraphcore.js').replace('https://cdn.jsdelivr.net/npm/jsxgraph@1.2.3/distrib/jsxgraph.css', base+'css/jsxgraph.css'))
+        canonical = boards.board_sources(self.pins)
+        files = {'resources/js/jsxgraphcore.js': b'Git runtime bytes',
+                 'resources/css/jsxgraph.css': b'Git CSS bytes',
+                 **{'resources/upstream/'+n: (n+' notice').encode() for n in ('LICENSE.MIT','LICENSE.LGPL','COPYRIGHT')}}
+        manifest = {'v':1, 'repository':'jsxgraph/jsxgraph', 'commit':'b'*40,
+                    'sourceArchiveSha256':'c'*64, 'packageLockSha256':'d'*64,
+                    'build':['npm ci --ignore-scripts','npm run buildCore'],
+                    'recipe':'scripts/build-upstream-runtime.py',
+                    'node':'24.19.0','webpack':'5.112.0','runtimeVersion':'1.15.0-dev',
+                    'files':{k:assets.digest(v) for k,v in files.items()}}
+        raw = assets.json_bytes(manifest)
+        members = {'_extensions/jsxgraph/'+k:v for k,v in files.items()}
+        members['_extensions/jsxgraph/upstream-runtime.json'] = raw
+        members[manifest['recipe']] = b'pinned recipe'
+        if corrupt_member: members['_extensions/jsxgraph/resources/js/jsxgraphcore.js'] = b'wrong runtime'
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode='w:gz') as tar:
+            for name,data in members.items():
+                info=tarfile.TarInfo('runtime-'+revision+'/'+name);info.size=len(data);tar.addfile(info,io.BytesIO(data))
+        data=stream.getvalue();url='https://codeload.github.com/owner/runtime/tar.gz/'+revision
+        entry={'id':'jsxgraph','kind':'git-build','repository':'owner/runtime','version':revision,
+               'url':url,'sha256':assets.digest(data),'runtime_manifest_sha256':assets.digest(raw),
+               'upstream':{'repository':'jsxgraph/jsxgraph','commit':'b'*40}}
+        self.metadata['archives']=[entry if x['id']=='jsxgraph' else x for x in self.metadata['archives']]
+        self.archives[url]=data
+        return canonical, files
+
+    def test_git_runtime_bytes_and_provenance_are_carried_without_downloads(self):
+        canonical, files=self.git_fixture()
+        lock=boards.produce_board_lock(self.metadata,self.pins,self.root/'cache',licence_root=self.root)
+        self.assertEqual(lock['versions']['jsxgraph'],'a'*40)
+        archive,=[a for a in lock['archives'] if a['id']=='jsxgraph']
+        self.assertEqual(archive['upstream']['commit'],'b'*40)
+        self.assertEqual(archive['licence'],'MIT')
+        bundle=self.root/'bundle';bundle.mkdir()
+        assets.materialize_bundle(lock,bundle,self.root/'cache')
+        for name,data in files.items():
+            self.assertEqual((bundle/(canonical['jsxgraph']['local']+'_extensions/jsxgraph/'+name)).read_bytes(),data)
+        with patch.object(assets,'download',side_effect=AssertionError('carried install downloaded')):
+            assets.install_carried_bundle(lock,bundle,self.root/'carried')
+        self.assertEqual(assets.inventory(bundle),assets.inventory(self.root/'carried'))
+
+    def test_git_archive_checksum_cannot_hide_a_changed_runtime_member(self):
+        self.git_fixture(corrupt_member=True)
+        with self.assertRaisesRegex(assets.AssetError,'sha256 mismatch'):
+            boards.produce_board_lock(self.metadata,self.pins,self.root/'cache',licence_root=self.root)
+
+    def test_git_pins_reject_branches_short_shas_and_split_sources(self):
+        self.git_fixture();good=self.pins.read_text()
+        for bad in [good.replace('a'*40,'main'),good.replace('a'*40,'a'*7),
+                    good.replace('resources/css/jsxgraph.css','resources/css/other.css'),
+                    good.replace('owner/runtime@'+'a'*40+'/_extensions/jsxgraph/resources/css','owner/other@'+'a'*40+'/_extensions/jsxgraph/resources/css')]:
+            self.pins.write_text(bad)
+            with self.assertRaises(assets.AssetError):boards.board_sources(self.pins)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

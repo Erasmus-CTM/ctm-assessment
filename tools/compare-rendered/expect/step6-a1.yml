@@ -12,3 +12,7 @@ categories:
     title: Generated author notes include STACK's exact copy of the math-exercise policy
     match:
       - {area: config, object: '^generated-policy-yaml$', path: '^/ai-feedback/integrations/stack$', effective: '^stack-copy$'}
+  - id: step6-jsxgraph-git-runtime
+    title: AC-approved immutable JSXGraph Git runtime base with all other asset configuration unchanged
+    match:
+      - {area: inline, change: changed, assets: '^jsxgraph-git-configuration$'}
