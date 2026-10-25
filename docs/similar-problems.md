@@ -68,7 +68,8 @@ The page builds one prompt from:
 - the context AI feedback already resolves: section prose, explicit context refs, variant context (`resolveContexts`, `math-exercise:_extensions/math-exercise/math-exercise.js:973`);
 - the original's mode, variables and number of fields;
 - the direction (`easier`, `harder` or `same`) and the previously generated problem, if any, so repeated clicks move further for easier/harder and preserve difficulty for same;
-- the page language.
+- the page language;
+- a short table of applicable, author-approved supplied checkers, including the original's reusable checker where compatible (§12.9). Each row gives an ID, purpose, admitted problem data, answer shape and restrictions, without Python source or answer keys.
 
 The prompt asks for one new problem on the same topic and method, adjusted in one natural way (numbers, steps, guidance) for easier/harder, or at the same difficulty for same, and forbids copying an example or exercise from the context.
 
@@ -85,8 +86,8 @@ The model returns JSON, validated with the client's `validate` hook (one correct
 ```
 
 - `question` uses math-exercise's marker syntax with numbered slots. The page puts the keys into the markers itself, after validating their content and slot mapping; marker insertion is not a trust boundary (§12.1–§12.2).
-- Each field has a `recipe` (§4.1) where one fits, and always the model's own `answer`.
-- Allowed modes: the typed modes (`equivalent`, `exact`, `numeric`, `string`, `string_ci`, `set`) and fixed `vec[…]`/`mat[…]` answers. `custom`, JSXGraph responses and resizable `mat{…}` are not generated (§8).
+- Each field has a `recipe` (§4.1) where one fits, and always the model's own `answer`. When a supplied checker applies, the reply may select only an ID from the prompt's approved table and supply its admitted mathematical data (§12.9); it cannot define checker code.
+- Allowed modes: the typed modes (`equivalent`, `exact`, `numeric`, `string`, `string_ci`, `set`) and fixed `vec[…]`/`mat[…]` answers. Model-written custom checkers, JSXGraph responses and resizable `mat{…}` are not generated (§8). An existing trusted checker from the original may be reused under §12.9.
 
 ### 3.3 Rendering
 
@@ -134,7 +135,7 @@ Settings:
 
 - **Off by default.** Authors enable it per course or page with `ai-feedback: {similar: true}`, or per exercise with `#| similar: true`. The nearest course/page setting applies unless the exercise overrides it. `#| similar: false` disables it even when the course enables it.
 - AI feedback must also be enabled for that exercise. A build without AI feedback, the exam profile and a page with AI off keep generation off, even with `similar: true` and saved browser API settings. Shared settings stay under `ai-feedback:`.
-- Not offered for `custom` exercises or those with a `response:` source (§8).
+- Not offered for exercises with a `response:` source (§8). An original `custom` exercise is eligible only when its existing trusted checker can be reused without model-written code and its inputs fit the phase-1 restrictions (§12.9).
 
 ## 7. Saving
 
@@ -157,7 +158,7 @@ The store keys records by exercise id from the build manifest and, on page load,
 
 ## 8. Not in phase 1
 
-- `custom` checkers: generating them would mean running model-written Python.
+- Generating or modifying custom Python checkers. Reusing an existing trusted checker from the original is allowed under §12.9; the AI does not supply its code.
 - JSXGraph responses and resizable matrices.
 - Open answers ("show that…") with AI assessment as feedback: a later step, if wanted.
 - A copy-mode flow.
@@ -227,6 +228,26 @@ These answers settle the original §11 questions and apply to phase 1:
    spec and course, with no student answer or identity. This is phase 2 and
    waits until AC starts phase 2. Keep the saved flag format stable so the
    future relay can read it (§12.6); do not add a report transport in G3.
+5. **Result components (A) for phase 1.** Recipes select components into the
+   existing scalar/vector/fixed-matrix fields. No general compound-result
+   assessment framework is added in phase 1 (§12.8).
+6. **Reuse existing checkers.** Existing trusted checkers used by the original
+   problem, such as a basis checker (`isBasis`; math-exercise currently exposes
+   `assess_basis`), may also grade the generated problem. Reuse is distinct from
+   generating checker code (§12.9). Complete B would need additional custom
+   checker logic or a separately designed AI reasoning assessment path; neither
+   is implicitly included in this phase. For phase-1 definite answers, checkers
+   still grade and AI explains (§1.2).
+7. **Compact checker table in the prompt.** Send a short table of applicable
+   supplied checkers in the same generation prompt. The model may select a
+   listed checker and provide its mathematical data. Browser code resolves the
+   ID to trusted code and validates the data; the table does not authorize
+   model-written Python or an unrestricted checker registry (§12.9).
+8. **Useful problems are the goal.** Avoiding junk problems is the main concern.
+   Course authors are responsible for supplying meaningful, nontrivial checkers
+   and task constraints. The Python route is extra control on generated problems
+   (§12.10), not proof of educational quality. Safe rendering and computed keys
+   alone do not establish a well-posed, nontrivial practice problem.
 
 ## 12. Independent design review (25 Oct 2026; binding)
 
@@ -234,7 +255,8 @@ This is a fresh source-to-design review against the four main trees in §0,
 covering model output, recipe admission, store lifecycle and feature gates.
 It is a static design review, not evidence that the unimplemented feature has
 passed tests. The findings below are implementation requirements for G1–G4.
-The open contract question in §12.8 must go to AC before G1.
+AC settled the result contract in §12.8 and the existing-checker exception in
+§12.9 on 25 Oct. These supersede the original blanket exclusion of custom mode.
 
 ### 12.1 Model output is data, including restored specs
 
@@ -249,8 +271,8 @@ path too; never interpolate raw model text into HTML, CSS, attributes or ids.
 Keep math rendering untrusted (no trusted HTML/URL TeX commands).
 
 Validate JSON types, supported mode, variable names, finite sizes and exact
-numbered-slot/field correspondence before rendering. Reject custom checkers,
-`response:` sources, resizable matrices, extra markers and marker-breaking key
+numbered-slot/field correspondence before rendering. Reject model-supplied
+checker code, `response:` sources, resizable matrices, extra markers and marker-breaking key
 text. Construct ids and controls in browser code; do not let model strings set
 `data-checker`, packages, HTML flags, policy or response sources. Fixed matrix
 and vector entries need the same admission and escaping as scalar entries.
@@ -345,7 +367,8 @@ provider and Python calls trapped, including changed originals and clearing.
 G2 must admit and validate both, resolve precedence, and emit them through
 `lua/feedback.lua` (`ctm-libs:_extensions/ctm-libs/lua/feedback.lua:369`).
 Missing `similar` is false. Exercise booleans override course/page `similar`;
-they do not override AI-off or unsupported exercise types.
+they do not override AI-off or unsupported exercise/input types (§12.9 permits
+compatible existing trusted checkers).
 
 Use the existing hard AI-off decision (`ctm-libs:_extensions/ctm-libs/lua/feedback.lua:86`),
 including `CTM_FEEDBACK=off`. The carried exam profile writes
@@ -428,6 +451,9 @@ spec and course, never this whole parent/generated record (§11.4).
   mismatches/two-attempt failure, cancellation/late replies, public setup,
   reload without provider/Python, changed originals, no generated `ctm:result`,
   copy/export, count/byte caps, opt-in/override, copy mode, exam and no-AI builds.
+  Cover trusted-checker reuse, alternative valid answers and rejection of
+  model-supplied checker code, unknown table IDs or incompatible checker data
+  (§12.9).
   Add flag re-check agreement/disagreement/failure, retained flags after reload,
   disputed cached verdicts and regeneration. Hostile output/restore tests must
   exercise the real renderer and actual recipe/checker admission.
@@ -436,20 +462,139 @@ spec and course, never this whole parent/generated record (§11.4).
   course comparisons required by step 1 §12.1. These are later implementation
   gates; Step 0 does not claim them passed or dispatch a deployment.
 
-### 12.8 Contract requiring AC's answer before G1
+### 12.8 Result components: A for phase 1 (AC, 25 Oct; binding)
 
-The operation list does not define how compound SymPy outputs map onto typed
-fields. In particular, `rref` returns a matrix plus pivots; `nullspace` a list
-of vectors; `eigenvals` a value-to-multiplicity map; and system `solve` may
-return dictionaries or tuples. The existing scalar/set checker cannot compare
-all these structures as one equivalent expression. String equality would lose
-mathematical equivalence and is not an implicit replacement.
+AC chose A: recipes explicitly select mathematical result components into the
+existing scalar/vector/fixed-matrix fields. The operation list stays intact;
+G1 defines and tests the operation argument and component-selection contracts,
+without adding general compound result schemas or new checker modes.
 
-**Question for AC:** should recipes explicitly select a mathematical result
-component for each existing scalar/vector/matrix field (for example rref matrix
-entries, a nullspace vector entry, an eigenvalue or its multiplicity, and a
-solution variable), or should G1 define compound result schemas with dedicated
-comparison rules? The first keeps the existing checker modes; the second expands
-the checker contract. Record AC's choice here before implementing G1, including
-how non-unique bases/solution ordering and multiplicity are represented. Do not
-silently narrow the §4.1 list or invent a new checker mode.
+For example, `rref` can supply entries from its reduced matrix or pivot indices;
+`eigenvals` can supply an eigenvalue or its multiplicity; system `solve` can
+supply a variable's value from a selected solution. Selectors must be bounded,
+validated data, never model-supplied Python expressions or attribute paths.
+Specify deterministic ordering/projection for selectable results and reject
+missing, ambiguous or incompatible selections. Do not use string equality as
+a substitute for mathematical equivalence.
+
+A chosen basis or solution ordering is not automatically the only correct
+answer. Without an applicable existing checker (§12.9), generate only questions
+whose accepted answers the existing modes can grade correctly; do not ask for
+"any basis" and then compare against one basis entry by entry. With a compatible
+trusted basis checker already used by the original, retain its ability to accept
+alternative bases instead of imposing SymPy's particular output as the verdict.
+
+Complete B is outside phase 1. As AC notes, arbitrary compound assessment needs
+explicit custom checker logic, or a separately designed AI reasoning assessment
+path. It cannot be obtained merely by serializing compound SymPy values.
+AI-only assessment would change the definite-answer grading decision (§1.2)
+and requires separate authorization/design; it is not an automatic fallback.
+
+### 12.9 Reuse the original's trusted checker (AC, 25 Oct; binding)
+
+The original design excluded all custom mode to prevent model-written Python.
+AC clarifies that an existing trusted checker already used by the original
+may be reused by its generated problems. This exception does not authorize
+new or edited checker code from the model, unrestricted checker selection, or a
+general compound checker framework. AC additionally approves putting a short
+table of supplied specific checkers in the same generation prompt.
+
+Current source evidence: math-exercise exposes `assess_basis` through the custom
+checker namespace
+(`ctm-checkers:src/ctm_checkers/math_exercise/custom.py:16`, `:99`), and documents
+its use in an instructor-authored checker
+(`math-exercise:docs/assess-basis.md:8`). The helper checks membership,
+independence and completeness, permitting bases other than a single model
+answer. Reusing this logic can therefore support non-unique mathematical
+answers without implementing complete B.
+
+Reuse is owned by browser/authored configuration. Build a small, relevant table
+from the author-approved supplied checkers and the original's reusable checker,
+only where their existing contracts fit the permitted inputs. Put it in the
+same generation prompt, alongside the task, context and recipe instructions.
+Each row supplies:
+
+| Prompt column | Content |
+|---|---|
+| ID | Stable, allowlisted selector resolved by browser code |
+| Purpose | The mathematical property it checks, such as being a basis |
+| Problem data | Required givens/target and their mathematical types |
+| Answer shape | Supported scalar/vector/fixed-matrix response contract |
+| Restrictions | Applicable domain, dimensions and other existing limits |
+
+This is a proposed prompt format, not a claim that a named-checker registry
+already exists. Include a basis row only when a supplied trusted wrapper can
+express the relevant subspace and use a phase-1 input shape. A Python helper
+requiring a callback is not by itself an LLM-callable checker contract: the
+callback must already be supplied by trusted authored code.
+
+The model may select a listed ID and supply admitted mathematical problem data
+and candidate answers. Resolve that ID through the exact table supplied for
+this request; reject unknown IDs, undeclared data fields and incompatible
+response shapes. The ID selects trusted code, never an import path or Python
+expression. Never accept checker source, callback source, imports, packages or
+a model-defined response contract from JSON. Do not send Python checker bodies
+or hidden original answer keys in the table. Model-derived data crossing into
+Python receives §12.2 admission, including supplied-checker requests.
+
+The checker must assess the generated task's actual givens and target. Do not
+copy a checker with hard-coded original constants and then change those constants
+only in the generated question text. Reuse is eligible when the original's
+existing contract supports the new admitted data, or the relevant givens are
+preserved. If that contract cannot represent a requested generated task, reject
+the candidate or leave generation unavailable for that original; never rewrite
+the checker using AI. Any extension needed to that authored data contract must
+be reviewed explicitly before implementation, rather than guessed.
+
+For ordinary typed fields, computed/model key agreement still uses
+`math_exercise.check` as in §4.1. For inherited-checker grading, keep its existing
+whole-response semantics: run admitted candidate answers against the selected
+trusted checker with the generated task data, and retain the computed-key or
+independent-solve trust distinction. A checker accepting an answer is evidence
+under its criteria, not proof that the generated prose matches the criteria.
+Non-unique responses must be validated by the inherited mathematical predicate,
+not forced to match one witness answer entry by entry. Hints, local reports,
+restore, storage and score isolation follow the same G3 requirements.
+
+The resizable-matrix and JSXGraph-response exclusions are unchanged. Thus an
+original whose checker depends on a resizable matrix response remains outside
+phase 1; the existence of a basis helper alone does not override that input
+restriction. Fixed inputs may reuse a checker only when the existing response
+contract is compatible. Test a second valid basis/answer, a genuinely invalid
+answer, matching generated givens, unchanged trusted checker bytes, unknown checker IDs, malicious
+checker source/fields in JSON, and restore without executing the checker.
+
+### 12.10 Problem quality and author responsibility (AC, 25 Oct; binding)
+
+The main purpose of admission is to avoid junk problems: inconsistent givens,
+ambiguous or unsatisfiable tasks, accidental trivial cases, and tasks that do
+not exercise the intended method. Correct JSON, safe rendering, an evaluable
+recipe and matching answers are necessary controls, but do not establish these
+properties. A valid answer checker can also accept a trivial problem unless
+the task's constraints rule it out.
+
+Course authors supply the mathematical judgement: relevant supplied checkers,
+their meaningful parameter/domain restrictions and the conditions that make a
+problem nontrivial for this course. The compact prompt table communicates those
+contracts, rather than asking the model to invent an assessment method. For
+example, if the lesson needs a particular rank/nullity or a genuine product-rule
+step, its task constraints must express that; calculating a rank or derivative
+alone does not enforce the teaching goal.
+
+The Python route supplies extra control before display: use the admitted SymPy
+recipes and the applicable trusted, author-supplied checker with the generated
+mathematical data and candidate answer. Enforce the supplied constraints; reject
+an incompatible, degenerate or failing candidate through the same two-attempt
+loop. Neither the generator nor an independent AI solve may override a failed
+Python check. Do not invent model-written Python to compensate for a missing
+checker or missing author contract.
+
+Keep this distinct from security admission (§12.2) and key trust (§4). A computed
+key describes a calculation, and a supplied checker tests its stated criteria;
+neither proves that the generated wording faithfully states a worthwhile
+problem. Independent solves remain another check with the explicit unverified
+label where required. Example pages/reference docs must show authors what their
+chosen checker and restrictions do and do not establish. Implementation tests
+must include a well-formed candidate with agreeing answers that fails an
+applicable author-supplied mathematical constraint, and verify rejection before
+rendering or storage.
