@@ -20,7 +20,7 @@
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "0f8291d89bf79c97a1c93ab924311c00d9fae994"
+      "commit": "a94dc047787fd1c9fc182ba4e48c0eb2b230606e"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",

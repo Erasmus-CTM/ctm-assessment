@@ -329,3 +329,8 @@ The pinned G2 head is stacked on ctm-libs PR48, so the combined preview includes
 its saved-answer controls inside shared Settings and compact navigation. Practice
 writes preserve the original question's navigation credit. Merge PR48 before G2;
 then retarget/rebaseline and compare the resulting tree with the tested head.
+
+Generated matrix responses use the same fixed matrix grid as the original.
+Complete row-major cell recipes can normalize a flat slot run, including during
+restore without AI/Python. Ambiguous scalar-only new matrix answers are rejected
+with a repair instruction; grading and key admission are unchanged.

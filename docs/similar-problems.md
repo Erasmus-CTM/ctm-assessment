@@ -854,3 +854,17 @@ real Pyodide, Settings, credit isolation, keyboard and mobile checks. AC merges
 PR48 first, then retargets/re-baselines PR46 onto main. Before the next merge,
 compare the resulting tree with the tested head and update/retest if different.
 Neither PR48 nor the feature set is merged by this work.
+
+### 12.14. Matrix responses use the fixed matrix input
+
+AC's testbox review requires generated matrix answers to use the proper fixed
+matrix grid, as in the original exercise. A matrix-response original must not
+produce a new answer consisting only of separate scalar blanks. The prompt gives
+`mat[1,2,3;4,5,6;7,8,9]` as a 3-by-3 example and requests row-major answer fields.
+Browser admission enforces the grid and returns the precise format failure for
+repair. Complete row-major recipe selectors can unambiguously normalize a flat
+slot run into a grid without changing the mathematical keys or grading.
+
+The same normalization upgrades identifiable older saved layouts without AI or
+Python and preserves each saved cell answer. Ambiguous historical layouts remain
+readable rather than losing saved work. No resizable matrix support is added.
