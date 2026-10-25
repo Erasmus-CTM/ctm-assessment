@@ -18,7 +18,7 @@ TEMPLATE = ROOT / 'integration' / 'feedback'
 # The components share one copy of ctm-libs' bootstrap (the file that finds
 # ctm-libs); each must equal the canonical copy in the ctm-libs repository.
 BOOTSTRAP = 'ctm-bootstrap.lua'
-BOOTSTRAP_COMPONENTS = ('math-exercise', 'py-exercise', 'pyodide-interaktiv')
+BOOTSTRAP_COMPONENTS = ('math-exercise', 'py-exercise', 'pyodide-interaktiv', 'ctm-stack')
 # Copies that moved into ctm-libs in consolidation step 1; pyodide-interaktiv
 # dropped its loader with 1.9 (step 3), so no component keeps one.
 RETIRED_COPIES = ('feedback-loader.lua', 'shared/pyodide-runtime.js')
@@ -178,6 +178,8 @@ def check_shared_files(config, sources, extensions, hashes, pinned_libs=None):
                 if Path(path).name == BOOTSTRAP:
                     digests[f'{folder}/{path}'] = digest
     for name in BOOTSTRAP_COMPONENTS:
+        if name not in config['repositories']:
+            continue
         digests.setdefault(f'{extensions[name][0]}/{BOOTSTRAP}', None)
     differ = {path: digest for path, digest in digests.items() if digest not in accepted}
     if differ:

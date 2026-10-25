@@ -38,6 +38,11 @@
       "answers": "ingmat3a",
       "licence": "CC-BY-SA-4.0 course repository (its active linear-algebra branch); rows stay in the umbrella",
       "export": false
+    },
+    "ctm-stack": {
+      "repository": "Erasmus-CTM/ctm-stack",
+      "licence": "AGPL-3.0-or-later",
+      "export": false
     }
   }
 }

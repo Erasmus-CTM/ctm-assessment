@@ -70,7 +70,7 @@ test('common page renders the active extensions and keeps local dependencies res
     assert.ok(fs.existsSync(path.resolve(site, resource.split('?')[0])), 'Missing ' + resource);
   }
   const record = JSON.parse(fs.readFileSync(path.join(site, 'resolved-repos.json'), 'utf8'));
-  assert.deepEqual(Object.keys(record.repositories).sort(), ['ctm-assessment', 'ctm-checkers', 'ctm-libs', 'jsxgraph', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
+  assert.deepEqual(Object.keys(record.repositories).sort(), ['ctm-assessment', 'ctm-checkers', 'ctm-libs', 'ctm-stack', 'jsxgraph', 'math-exercise', 'py-exercise', 'pyodide-interaktiv']);
   assert.equal(panels[2].querySelectorAll('.math-exercise-cell').length, 7);
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'repos.json'), 'utf8'));
   for (const [name, source] of Object.entries(record.repositories)) {
