@@ -9,7 +9,7 @@ const path = require('node:path');
 // Dependencies of ctm-libs (feedback, runtime, catalogues) and of the components
 // (math-exercise with ctm-checkers' page script, from math-exercise 0.11).
 const FEEDBACK = ['ai-feedback'];
-const LIBRARY = ['ai-feedback', 'ctm-runtime', 'ctm-locale', 'ctm-locale-math-exercise', 'ctm-locale-py-exercise'];
+const LIBRARY = ['ctm-layout', 'ctm-locale-ui', 'ai-feedback', 'ctm-runtime', 'ctm-locale', 'ctm-locale-math-exercise', 'ctm-locale-py-exercise'];
 // These are actual rendered HTML dependencies used by the shared pool chooser.
 // run() still executes only matching page tags, in document order.
 const MATH = [...LIBRARY, 'ctm-layout', 'ctm-locale-ui', 'ctm-store', 'ctm-variants', 'ctm-matrix-input', 'ctm-checkers', 'math-exercise'];
@@ -36,6 +36,11 @@ function run(w, htmlFile, dependencies = LIBRARY, {config = true, transform = {}
   // This helper evaluates a complete rendered document. Match a browser's
   // after-parse path so shared layout callbacks finish before jsdom closes.
   if (w.document.readyState === 'loading') Object.defineProperty(w.document, 'readyState', {value:'interactive',configurable:true});
+  // jsdom omits native dialog/layout methods; actual modal interaction and
+  // focus are independently exercised by the real browser integration.
+  if (!w.HTMLDialogElement.prototype.showModal) w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
+  if (!w.HTMLDialogElement.prototype.close) w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
+  if (!w.HTMLElement.prototype.scrollIntoView) w.HTMLElement.prototype.scrollIntoView = function () {};
   const loaded = [];
   for (const script of [...w.document.scripts]) {
     const src = script.getAttribute('src');

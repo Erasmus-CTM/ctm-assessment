@@ -128,11 +128,12 @@ const server = http.createServer((req, res) => {
     await page.locator('#spanish-writing pre').waitFor();
     assert.match(await page.locator('#spanish-writing pre').textContent(), /Yo vive en Trondheim/);
     await page.locator('#spanish-writing .ai-feedback-gear').click();
-    assert.equal(await page.locator('dialog.ai-feedback-settings[open]').count(), 1);
+    assert.equal(await page.locator('dialog#ctm-settings[open]').count(), 1);
+    assert.equal(await page.locator('dialog#ctm-settings[open] #ctm-settings-ai .ai-feedback-settings').count(), 1);
     report.checks.push('Shared feedback copy prompt and cogwheel work beside all consumers');
     assert.deepEqual(report.pageErrors, []);
     await page.screenshot({path: path.join(site, 'integration-desktop.png'), fullPage: true});
-    await page.locator('dialog.ai-feedback-settings').getByRole('button', {name: 'Cancel', exact: true}).click();
+    await page.locator('dialog#ctm-settings .ctm-settings-close').click();
     await pythonTab.click();
     const solutions = {
       'practice-price': 'def price_with_tax(price, rate):\n    tax = price * rate\n    return price + tax',
@@ -200,8 +201,9 @@ const server = http.createServer((req, res) => {
       report.checks.push(exercise.label + ': Feedback without execution, fresh checker evidence, passing correction and exact Reset');
     }
     await page.locator('#task-price .ai-feedback-gear').click();
-    assert.equal(await page.locator('dialog.ai-feedback-settings[open]').count(), 1);
-    await page.locator('dialog.ai-feedback-settings').getByRole('button', {name: 'Cancel', exact: true}).click();
+    assert.equal(await page.locator('dialog#ctm-settings[open]').count(), 1);
+    assert.equal(await page.locator('dialog#ctm-settings[open] #ctm-settings-ai .ai-feedback-settings').count(), 1);
+    await page.locator('dialog#ctm-settings .ctm-settings-close').click();
     // Test the real Python button in API mode with a mocked provider response.
     let apiRequest;
     const mathReply = [
@@ -282,8 +284,9 @@ const server = http.createServer((req, res) => {
       report.checks.push(example.id + ': partial draft, real Check, four feedback steps, matching evidence, no feedback execution and LaTeX');
     }
     await page.locator('#task-math-product .ai-feedback-gear').click();
-    assert.equal(await page.locator('dialog.ai-feedback-settings[open]').count(), 1);
-    await page.locator('dialog.ai-feedback-settings').getByRole('button', {name: 'Cancel', exact: true}).click();
+    assert.equal(await page.locator('dialog#ctm-settings[open]').count(), 1);
+    assert.equal(await page.locator('dialog#ctm-settings[open] #ctm-settings-ai .ai-feedback-settings').count(), 1);
+    await page.locator('dialog#ctm-settings .ctm-settings-close').click();
     await page.screenshot({path: path.join(site, 'mathematics-practice-desktop.png'), fullPage: true});
     await page.getByRole('tab', {name: 'Pyodide', exact: true}).click();
     await page.waitForFunction(() => globalThis.qpyodideCellContainer?.cells.length === 3 && qpyodideCellContainer.cells.every(c => c.primaryUnit?.editor));
@@ -338,8 +341,9 @@ const server = http.createServer((req, res) => {
       report.checks.push(example.id+': real worker run, matching stdout, no feedback execution, three hints, LaTeX and Reset');
     }
     await page.locator('#task-pyodide-price .ai-feedback-gear').click();
-    assert.equal(await page.locator('dialog.ai-feedback-settings[open]').count(),1);
-    await page.locator('dialog.ai-feedback-settings').getByRole('button',{name:'Cancel',exact:true}).click();
+    assert.equal(await page.locator('dialog#ctm-settings[open]').count(),1);
+    assert.equal(await page.locator('dialog#ctm-settings[open] #ctm-settings-ai .ai-feedback-settings').count(),1);
+    await page.locator('dialog#ctm-settings .ctm-settings-close').click();
     await page.screenshot({path:path.join(site,'pyodide-practice-desktop.png'),fullPage:true});
     // Local policy overrides enable the same progression in both review integrations.
     await page.evaluate(() => {
