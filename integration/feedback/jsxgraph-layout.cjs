@@ -265,7 +265,8 @@ const contains = (outer, inner) => outer[0] <= inner[0] + 1e-6 && outer[1] >= in
     // A hidden board whose code waits for the page's load event starts when shown.
     await page.getByRole('tab', {name: 'Onload'}).click();
     await (await frame('onload')).waitForFunction(() => typeof window.__probe === 'function');
-    assert.ok(close((await probe('onload')).bbox, [0, 4, 8, 0]), 'onload board');
+    await (await frame('onload')).waitForFunction(() => window.__probe && window.__probe().w > 0 && window.__probe().bbox.every(Number.isFinite));
+    assert.ok(close((await probe('onload')).bbox, [0, 4, 8, 0]), 'onload board: ' + JSON.stringify(await probe('onload')));
 
     // Shown: the intended bounding box at the full width.
     await page.getByRole('tab', {name: 'Outer'}).click();
