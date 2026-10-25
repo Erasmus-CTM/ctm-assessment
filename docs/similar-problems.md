@@ -819,3 +819,14 @@ These corrections complete the YAML contract and override earlier shorthand:
 This review was static and read-only. Its approval settles the design; the
 implementation and tests remain G1–G4 work. No merge, tag or deployment is
 part of the approval.
+
+### 12.12. Original exercise rules also govern generated practice
+
+AC clarified during the phase-1 testbox review that generated problems follow
+the original exercise's grading rules. New generated problems inherit the original
+mode, form/rejection restrictions, precision/tolerance and partial-credit options;
+the generator cannot choose a less restrictive grading mode. Learner responses use
+the ordinary checker's notation transformations, including implicit multiplication
+and function application, after learner-token admission. Strict model-key and
+recipe admission remains separate: a model never supplies the learner-provenance
+flag. Generated practice still emits no scored result event.
