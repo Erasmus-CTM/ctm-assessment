@@ -39,12 +39,33 @@ test('real H1 guide witness rejects HTML, configuration and source mutations',{s
    return {status:result.status,...JSON.parse(fs.readFileSync(report,'utf8'))};
   }
   const baseline=compare();assert.equal(baseline.status,0,JSON.stringify(baseline.summary));assert.equal(baseline.summary.unexpected,0);
+  const witness=JSON.parse(fs.readFileSync(path.join(__dirname,'../tools/compare-rendered/stack-h1-witnesses.json'),'utf8')).pages[relative][1];
+  function sourceProof(){
+   const document=new JSDOM(original).window.document;
+   const cards=[...document.querySelectorAll('script.ctm-stack-data')].map(node=>JSON.parse(node.textContent));
+   assert.equal(cards.length,document.querySelectorAll('section.ctm-stack').length,'the native proof covers every rendered card (the rewritten guide may have none)');
+   const request=path.join(temporary,'source-proof.json');
+   fs.writeFileSync(request,JSON.stringify({page:html,cards,mode:'variants'}));
+   const result=spawnSync(process.env.QUARTO_PYTHON||'python3',
+    [path.join(__dirname,'../tools/compare-rendered/verify-stack-plans.py'),request],
+    {encoding:'utf8',timeout:180000});
+   assert.equal(result.status,0,result.stderr);
+   const receipt=JSON.parse(result.stdout);assert.equal(receipt.verified,true);
+   return receipt;
+  }
+  assert.equal(sourceProof().pageSource,witness.source,'the unmodified source matches the reviewed H1 witness');
   const altered=new JSDOM(original);altered.window.document.querySelector('main h1').textContent='Unexpected changed task';
   fs.writeFileSync(html,altered.serialize());
   const changed=compare();assert.notEqual(changed.status,0);assert.ok(changed.summary.unexpected>0);
   fs.writeFileSync(html,original.replace('</body>','<script type="application/json" class="unexpected-config">{"score":0}</script></body>'));
   assert.ok(compare().summary.unexpected>0);
   fs.writeFileSync(html,original);fs.writeFileSync(source,sourceText+'\nUnexpected source mutation.\n');
-  assert.ok(compare().summary.unexpected>0);
+  // A post-H1 comparison can have identical HTML on both sides: the rendered
+  // comparator then has no transition to admit. Still require the real native
+  // proof to expose the changed source and fail the exact reviewed witness.
+  assert.notEqual(sourceProof().pageSource,witness.source,'a source-only mutation cannot match the reviewed witness');
+  if(baseline.items.some(item=>item.object==='stack-h1')){
+   assert.ok(compare().summary.unexpected>0,'the H1 migration also loses its transition exception');
+  }
  }finally{fs.rmSync(temporary,{recursive:true,force:true});}
 });
