@@ -69,7 +69,7 @@ The page builds one prompt from:
 - the original's mode, variables and number of fields;
 - the direction (`easier`, `harder` or `same`) and the previously generated problem, if any, so repeated clicks move further for easier/harder and preserve difficulty for same;
 - the page language;
-- author-supplied generation guidance from the selected teaching policy, plus the exercise's general and selected-direction addon (§6.1);
+- author-supplied generation guidance from the selected teaching policy, plus the exercise's selected-direction addon (§6.1);
 - a short table of applicable, author-approved supplied checkers, including the original's reusable checker where compatible (§12.9). Each row gives an ID, purpose, admitted problem data, answer shape and restrictions, without Python source or answer keys.
 
 The prompt asks for one new problem on the same topic and method, adjusted in one natural way (numbers, steps, guidance) for easier/harder, or at the same difficulty for same, and forbids copying an example or exercise from the context.
