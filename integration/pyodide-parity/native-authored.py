@@ -18,6 +18,28 @@ LIMIT = 16 * 1024 * 1024
 EXCLUDED = {'_extensions', 'node_modules', '.git', '.quarto', '_site', '_variants-review', '_review-examples', 'work'}
 
 
+def fresh_projection(row, retained, identity):
+    """Bind the receipt to fresh tested data while retaining approval identity.
+
+    History deliberately preserves the original prose and unused variables.
+    Only math, teacher answers and grading semantics define approval content.
+    """
+    from ctm_variants.model import candidate
+    neutral = {key: row[key] for key in ('id', 'hash', 'note', 'snapshot', 'data', 'tests')}
+    rebuilt = candidate(row['id'], row['snapshot'], note=row['note'], data=row['data'], tests=row['tests'])
+    if (neutral != rebuilt or row['tests'].get('passed') is not True
+            or any(row[key] != retained[key] for key in ('id', 'hash'))
+            or any(row['snapshot'][key] != retained['snapshot'][key] for key in ('math', 'teacher', 'grading'))):
+        raise ValueError('native parity record differs from tested approval content')
+    data = row['data']
+    expected_context = dict(data['context'], variant=identity)
+    if (row['options'] != data['options'] or row['teacherInputs'] != data['teacher_inputs']
+            or row['context'] != expected_context):
+        raise ValueError('native parity projections differ from the exact fresh tested record')
+    return {**{key: row[key] for key in ('id', 'hash', 'options', 'context', 'teacherInputs')},
+            'resolvedData': data}
+
+
 def produce(root):
     root = Path(root).resolve()
     files = sorted(path.relative_to(root).as_posix() for path in root.rglob('*.qmd')
@@ -76,18 +98,12 @@ def produce(root):
             if (row['id'] in seen or row.get('tests', {}).get('passed') is not True
                     or not any(item['record']['id'] == row['id'] and item['record']['hash'] == row['hash'] for item in staged['proposals'])):
                 raise ValueError('native parity requires distinct tested retained identities')
-            neutral = {key: row[key] for key in ('id', 'hash', 'note', 'snapshot', 'data', 'tests')}
             retained = next(item['record'] for item in staged['proposals'] if item['record']['id'] == row['id'] and item['record']['hash'] == row['hash'])
             current = by_id.get(row['id'])
             identity = ({'n': current['entry']['n'], 'id': row['id'], 'hash': row['hash']}
                         if current and current['state'] in ('current', 'moved') else None)
-            expected_context = dict(retained['data']['context'], variant=identity)
-            if (neutral != retained or row['options'] != retained['data']['options']
-                    or row['teacherInputs'] != retained['data']['teacher_inputs'] or row['context'] != expected_context):
-                raise ValueError('native parity projections differ from the exact tested retained record')
             seen.add(row['id'])
-            records.append({**{key: row[key] for key in ('id', 'hash', 'options', 'context', 'teacherInputs')},
-                            'resolvedData': retained['data']})
+            records.append(fresh_projection(row, retained, identity))
         if not records:
             raise ValueError('native parity requires resolved teacher candidates')
         result['questions'].append({'file': file, 'label': label,

@@ -514,6 +514,10 @@ def main():
         env = dict(base_env, CTM_INTEGRATION_SITE=str(site / '_site'), CTM_INTEGRATION_RECORD=str(workspace / 'resolved-repos.json'),
                    CTM_LIBS_EXTENSION=str(libs),
                    CTM_CHECKERS_EXTENSION=str(extensions_root / 'ctm-checkers'), CTM_CHECKERS_SOURCE=str(sources['ctm-checkers']))
+        checker_extension = extensions_root / 'ctm-checkers'
+        checker_manifest = json.loads((checker_extension / 'checkers.json').read_text())
+        env['CTM_CHECKERS_WHEEL'] = str(checker_extension / checker_manifest['wheel'])
+        env['CTM_VARIANTS_NATIVE'] = str(checker_extension / 'native-authoring')
         run(['npm', 'ci', '--ignore-scripts'], cwd=ROOT)
         if args.test:
             legacy = snapshot(*LEGACY_AI_FEEDBACK, cache)
