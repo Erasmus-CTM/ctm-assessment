@@ -830,3 +830,23 @@ the ordinary checker's notation transformations, including implicit multiplicati
 and function application, after learner-token admission. Strict model-key and
 recipe admission remains separate: a model never supplies the learner-provenance
 flag. Generated practice still emits no scored result event.
+
+### 12.13. Compact practice controls and plain reporting language
+
+AC approved the compact UI review: one Similar problem disclosure in the
+original toolbar, with Easier / Another one like this / Harder inside. Saved
+practice reopens the section; collapsing never discards work or cancels a request.
+Check remains primary; Feedback and the existing shared settings gear stay next
+to it, with quiet Input help and one Copy answers action including practice.
+Generated cards put reporting and removal in More; a mismatch exposes reporting
+beside the result. The report action reads **I think the expected answer is wrong**.
+A disputed-answer notice offers Create another problem while keeping the reported
+problem and its stable local flag. Busy/Cancel, copy-mode explanation, keyboard
+focus and mobile wrapping remain explicit.
+
+This work coordinates with ctm-libs PR48 at `53579c8`: retain its optional shared
+CTMSettings hooks and both fetched-model selectors. The combined snapshot passes
+Settings/progress/localization/model-selection suites and its Chromium fixture.
+Both branches append catalogue messages; retain both message sets when resolving
+the documented textual merge conflict, then rebaseline and rerun CI before merge.
+Neither PR48 nor the feature set is merged by this work.
