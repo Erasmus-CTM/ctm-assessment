@@ -166,6 +166,9 @@ def main():
         # The example sites (and the umbrella's Python programs) go with the pinned courses.
         run(*build, '--repo', 'https://github.com/Erasmus-CTM/math-exercise.git', '--ref', record['repositories']['math-exercise']['commit'],
             '--dest', out / 'sites/math-exercise')
+        # The Pyodide authored pass requires source-bound native variant
+        # receipts, resolved read-only by the installed component producer.
+        run(sys.executable, HERE / 'native-authored.py', '--root', out / 'sites/math-exercise')
         built.update(python='umbrella',
                      sites=[{'name': 'umbrella', 'dir': 'ws/site/_site', 'corpus': 'umbrella'},
                             {'name': 'math-exercise', 'dir': 'sites/math-exercise/_site', 'corpus': 'math-exercise'}],
@@ -179,6 +182,7 @@ def main():
             *(['--profile', first] if first else []))
         for profile in others:
             run('quarto', 'render', *(['--profile', profile] if profile else []), cwd=dest)
+        run(sys.executable, HERE / 'native-authored.py', '--root', dest)
         built['sites'].append({'name': name, 'dir': f'sites/{name}/_site', 'corpus': name})
         for profile in spec['course'].get('profiles', []):
             folder = output_dir(dest, profile)

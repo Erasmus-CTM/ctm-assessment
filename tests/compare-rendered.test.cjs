@@ -26,7 +26,7 @@ const OLD = page(`<p>Innledning.</p>${OLD_SWITCH}<section id="a" class="level2">
 
 // `ends`: the old course's record of how its <details> ended
 // (migrate-course-html.py --reveal-ends), for uke6.html.
-function compare(after, before = OLD, ends = null) {
+function compare(after, before = OLD, ends = null, extraExpect = []) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'compare-rendered-'));
   try {
     for (const [side, html] of [['before', before], ['after', after]]) {
@@ -37,7 +37,7 @@ function compare(after, before = OLD, ends = null) {
     if (ends) fs.writeFileSync(record, JSON.stringify({version: 1, pages: {'uke6.html': ends}}));
     const report = path.join(dir, 'report.json');
     const result = spawnSync(process.execPath, [TOOL, '--before', path.join(dir, 'before'), '--after', path.join(dir, 'after'),
-      ...EXPECT.flatMap(file => ['--expect', file]), '--report', report, ...(ends ? ['--reveal-ends', record] : [])], {encoding: 'utf8'});
+      ...[...EXPECT, ...extraExpect].flatMap(file => ['--expect', file]), '--report', report, ...(ends ? ['--reveal-ends', record] : [])], {encoding: 'utf8'});
     assert.ok(result.status === 0 || result.status === 1, result.stderr);
     return JSON.parse(fs.readFileSync(report, 'utf8')).items;
   } finally {
@@ -45,6 +45,32 @@ function compare(after, before = OLD, ends = null) {
   }
 }
 const invariants = items => items.filter(item => item.invariant).map(item => item.change + (item.reveal ? ' ' + item.reveal : ''));
+
+test('generated policy notes accept only the sole exact STACK policy copy', () => {
+  const yaml = require('js-yaml');
+  const policy = {'max-words': 120, 'base-prompt': 'Preserve the task.', steps: [{'step-prompt': 'Ask one question.'}]};
+  const data = {'ai-feedback': {defaults: {'max-words': 250}, integrations: {'math-exercise': policy}}};
+  const notes = (value, prose = 'Authored explanation.') => page(`<p>${prose}</p><div class="example-author-notes ai-feedback-ignore">`
+    + `<details><summary>Show policy YAML</summary><pre><code class="language-yaml">${yaml.dump(value)}</code></pre></details></div>`);
+  const after = structuredClone(data);
+  after['ai-feedback'].integrations.stack = structuredClone(policy);
+  const expect = [path.join(ROOT, 'tools/compare-rendered/expect/step6-a1.yml')];
+  const good = compare(notes(after), notes(data), null, expect);
+  assert.equal(good.length, 1);
+  assert.equal(good[0].category, 'step6-stack-policy-notes');
+  for (const mutate of [
+    d => { d['ai-feedback'].integrations.stack['base-prompt'] = 'Different prompt.'; },
+    d => { d['ai-feedback'].defaults['max-words'] = 200; },
+    d => { d['ai-feedback'].integrations['math-exercise']['max-words'] = 99; },
+    d => { delete d['ai-feedback'].integrations['math-exercise']; }
+  ]) {
+    const changed = structuredClone(after); mutate(changed);
+    const items = compare(notes(changed), notes(data), null, expect);
+    assert.ok(items.some(x => x.invariant), JSON.stringify(items));
+    assert.ok(items.every(x => x.category !== 'step6-stack-policy-notes'));
+  }
+  assert.ok(compare(notes(after, 'Changed prose.'), notes(data), null, expect).some(x => !x.category));
+});
 
 test('the migration as expected: no invariant is broken, the reveal is "same"', () => {
   const items = compare(page(`<p>Innledning.</p>${NEW_SWITCH}<section id="a" class="level2"><h2>A</h2>`

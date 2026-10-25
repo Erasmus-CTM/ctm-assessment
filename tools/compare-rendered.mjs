@@ -21,6 +21,7 @@
 // Exit status: 0 when every difference is expected, 1 otherwise, 2 on errors.
 import fs from 'node:fs';
 import path from 'node:path';
+import {isDeepStrictEqual} from 'node:util';
 import {createRequire} from 'node:module';
 import {closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 import {markStoreAdditions} from './compare-rendered/store.mjs';
@@ -726,8 +727,39 @@ function duplicateIds(page, A, B) {
     .map(([id, k]) => ({page, area: 'dom', change: 'duplicate id', line: `id="${id}"`, before: ca.get(id) || 0, after: k, invariant: true}));
 }
 
+// Generated author notes show the entire shipped feedback defaults. L6 adds
+// STACK's copied policy there. Verify that sole addition before comparing the
+// surrounding prose/reveals; any other edit still reaches every invariant.
+function stackPolicyNotes(page, A, B) {
+  const selector = '.example-author-notes.ai-feedback-ignore details pre > code.language-yaml';
+  const old = [...A.doc.querySelectorAll(selector)], now = [...B.doc.querySelectorAll(selector)], items = [];
+  if (old.length !== now.length) return items;
+  for (let i = 0; i < old.length; i++) {
+    if (old[i].textContent === now[i].textContent) continue;
+    try {
+      const a = yaml.load(old[i].textContent), b = yaml.load(now[i].textContent);
+      const integrations = b?.['ai-feedback']?.integrations;
+      if (!integrations || Object.hasOwn(a?.['ai-feedback']?.integrations || {}, 'stack') ||
+          !Object.hasOwn(integrations, 'stack') || !Object.hasOwn(integrations, 'math-exercise') ||
+          !isDeepStrictEqual(integrations.stack, integrations['math-exercise'])) continue;
+      const policy = integrations.stack;
+      delete integrations.stack;
+      if (!isDeepStrictEqual(a, b)) continue;
+      now[i].textContent = old[i].textContent;
+      items.push({page, area: 'config', change: 'added', object: 'generated-policy-yaml',
+        path: '/ai-feedback/integrations/stack', after: policy, effective: 'stack-copy'});
+    } catch (_) { /* Malformed or edited notes stay unexplained. */ }
+  }
+  if (items.length) {
+    B.domNodes = [];
+    B.dom = canonical(B.doc.body, B.domNodes);
+  }
+  return items;
+}
+
 function comparePage(page, before, after, ends, linked, assets) {
   const A = extract(before), B = extract(after), items = [];
+  items.push(...stackPolicyNotes(page, A, B));
   // Additive generated chrome has no authored position. Only a complete,
   // catalogue-verified store bar may leave the invariant's prose accounting.
   markStoreAdditions(A, []);

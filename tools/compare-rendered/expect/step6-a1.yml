@@ -1,0 +1,14 @@
+# Step 6 A1: M6 uses ctm-libs' shared matrix editor (design §16.8).
+# Card data, answers, grading and all other markup remain unexplained.
+categories:
+  - id: step6-shared-matrix
+    title: Matrix editor scripts and styles move from math-exercise to ctm-libs
+    match:
+      - {area: file, change: removed, what: '^script math-exercise/matrix-input\.js$'}
+      - {area: file, change: removed, what: '^css math-exercise/matrix-input\.css$'}
+      - {area: file, change: added, what: '^script ctm-matrix-input/ctm-matrix-input\.js$'}
+      - {area: file, change: added, what: '^css ctm-matrix-input/ctm-matrix-input\.css$'}
+  - id: step6-stack-policy-notes
+    title: Generated author notes include STACK's exact copy of the math-exercise policy
+    match:
+      - {area: config, object: '^generated-policy-yaml$', path: '^/ai-feedback/integrations/stack$', effective: '^stack-copy$'}
