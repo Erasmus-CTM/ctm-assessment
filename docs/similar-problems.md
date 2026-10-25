@@ -69,6 +69,7 @@ The page builds one prompt from:
 - the original's mode, variables and number of fields;
 - the direction (`easier`, `harder` or `same`) and the previously generated problem, if any, so repeated clicks move further for easier/harder and preserve difficulty for same;
 - the page language;
+- author-supplied general guidance and guidance for the selected direction, resolved from course/page settings and exercise options (§6.1);
 - a short table of applicable, author-approved supplied checkers, including the original's reusable checker where compatible (§12.9). Each row gives an ID, purpose, admitted problem data, answer shape and restrictions, without Python source or answer keys.
 
 The prompt asks for one new problem on the same topic and method, adjusted in one natural way (numbers, steps, guidance) for easier/harder, or at the same difficulty for same, and forbids copying an example or exercise from the context.
@@ -137,6 +138,68 @@ Settings:
 - AI feedback must also be enabled for that exercise. A build without AI feedback, the exam profile and a page with AI off keep generation off, even with `similar: true` and saved browser API settings. Shared settings stay under `ai-feedback:`.
 - Not offered for exercises with a `response:` source (§8). An original `custom` exercise is eligible only when its existing trusted checker can be reused without model-written code and its inputs fit the phase-1 restrictions (§12.9).
 
+### 6.1 Author guidance from the first release (AC, 25 Oct; binding)
+
+Author guidance is required in the first Similar problems implementation (AC's
+"version 0.1"), not deferred to phase 2. Support course/project and page YAML
+under `ai-feedback:`, plus the same string options on an individual exercise:
+
+```yaml
+ai-feedback:
+  similar: true
+  similar-prompt: |
+    Keep every vector at length 5 or less.
+  similar-harder-prompt: |
+    Make linear-independence questions harder by varying the number of
+    vectors and the dependencies between them, rather than lengthening them.
+```
+
+```text
+#| similar: true
+#| similar-prompt: |
+#|   Keep every vector at length 5 or less.
+#| similar-harder-prompt: |
+#|   Vary the number of vectors and their dependencies.
+```
+
+`similar-prompt` applies to all three directions. `similar-easier-prompt`,
+`similar-harder-prompt` and `similar-same-prompt` apply only to their respective
+directions. They are optional author instructions; their absence preserves the
+generic generator prompt. Supplying guidance does not enable the button.
+`similar` remains a boolean, preserving §11.1's opt-in/override contract.
+
+Compose applicable guidance additively in course/project, directory, page and
+exercise order, using the shared settings layers. Include the general guidance
+and only the selected direction's guidance. Exercise guidance refines the
+inherited instructions; it does not silently discard a course restriction.
+Reject invalid option types and over-budget guidance with an author-facing
+configuration error; never silently truncate a limit. Bound the complete prompt
+before calling the provider. This is configuration text, never Python source.
+
+Send the resolved guidance in the same generation request as the original task,
+context and compact checker table. Identify it as author instructions, separate
+from quoted learning material, learner input and previous model output. It
+cannot override fixed safety rules, supported-input restrictions, hard
+mathematical constraints or checker results. Apply it to both candidate attempts;
+requesting another harder problem does not relax inherited restrictions.
+
+Prose can steer what "harder" means, but sending a prompt alone cannot guarantee
+a numerical bound. For a hard requirement such as vector length <= 5, the
+admitted structured task data and an applicable trusted author-supplied
+constraint/checker must also enforce that bound before display (§12.10).
+Do not claim arbitrary prose has been compiled into a Python validator or that
+agreement between models proves compliance. Semantic guidance (such as varying
+dependencies) remains author-defined; Python validates the properties for which
+an explicit trusted check is supplied.
+
+G2 adds the YAML settings and layer resolution; G3 parses the exercise options,
+assembles the request and enforces the applicable checks; G4 documents both
+forms with an example. Tests cover direction selection, additive inheritance,
+per-exercise refinement, opt-out/AI-off gates, both attempts retaining guidance,
+and a candidate with a matching answer key rejected for exceeding an authored
+vector-length bound. Restore uses the accepted saved spec without re-requesting
+or revalidating it with AI/Python, as in §7.
+
 ## 7. Saving
 
 The store keys records by exercise id from the build manifest and, on page load, deletes this page's records whose id is not in the manifest (`ctm-libs:_extensions/ctm-libs/ui/ctm-store.js:375`). A generated problem therefore cannot have a record of its own. Instead it lives in the original's record, whose `inputs` belong to the component (step 4 §3.2):
@@ -196,8 +259,8 @@ head tree. See step 1 §12.1 for the complete checks.
 | # | Repository | What |
 |---|---|---|
 | G1 | ctm-checkers | `math_exercise.compute_key` with the recipe list and its admission; tests including hostile recipe text |
-| G2 | ctm-libs | per-call generation options (§5), generator-model setting, `similar` setting, strings |
-| G3 | math-exercise | button, panel, generation flow, checks, `#| similar:`, store nesting, copy/export and local key reports/re-check (§11), public `setupCell`; Playwright with a mocked provider |
+| G2 | ctm-libs | per-call generation options (§5), generator-model setting, `similar` and author-guidance settings (§6.1), strings |
+| G3 | math-exercise | button, panel, generation flow, author guidance (§6.1), checks, `#| similar:`, store nesting, copy/export and local key reports/re-check (§11), public `setupCell`; Playwright with a mocked provider |
 | G4 | ctm-assessment | re-pin, example page, reference docs, browser tests, log line in `docs/consolidation/README.md` |
 | R1 | rag_app | `/retrieve`, the relay and its hardening |
 | R2 | ctm-libs, math-exercise | retrieval as a context provider (`ai-feedback: retrieval:`), docs |
@@ -248,6 +311,12 @@ These answers settle the original §11 questions and apply to phase 1:
    and task constraints. The Python route is extra control on generated problems
    (§12.10), not proof of educational quality. Safe rendering and computed keys
    alone do not establish a well-posed, nontrivial practice problem.
+9. **Author difficulty guidance from version 0.1.** Authors can add course/page
+   YAML and per-exercise prompts defining what easier/harder/same should mean,
+   such as varying the number of vectors without making them longer than five.
+   Include this guidance in the generation request from the first release;
+   hard mathematical limits also need an applicable trusted validation path
+   (§6.1, §12.10).
 
 ## 12. Independent design review (25 Oct 2026; binding)
 
@@ -446,14 +515,14 @@ spec and course, never this whole parent/generated record (§11.4).
   through the real checker, in native Python and the browser dispatcher.
 - **G2:** per-call generation timeout/output/reasoning/cancel tests alongside
   unchanged feedback defaults and STACK request tests; settings precedence and
-  catalogue/sync checks.
+  catalogue/sync checks. Include the §6.1 guidance options and additive layers.
 - **G3:** Playwright with a mocked provider for computed and unverified keys,
   mismatches/two-attempt failure, cancellation/late replies, public setup,
   reload without provider/Python, changed originals, no generated `ctm:result`,
   copy/export, count/byte caps, opt-in/override, copy mode, exam and no-AI builds.
   Cover trusted-checker reuse, alternative valid answers and rejection of
   model-supplied checker code, unknown table IDs or incompatible checker data
-  (§12.9).
+  (§12.9). Include §6.1 direction/inheritance and authored-bound rejection tests.
   Add flag re-check agreement/disagreement/failure, retained flags after reload,
   disputed cached verdicts and regeneration. Hostile output/restore tests must
   exercise the real renderer and actual recipe/checker admission.
