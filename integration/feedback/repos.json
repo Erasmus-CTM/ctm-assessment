@@ -4,7 +4,7 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "865d8b04b797a601ae010ad7c3c1395f68a0fdc6",
+      "commit": "4a63de66108bc5a89be4b9b6f7717cfcb6eb357c",
       "extensions": [
         "ctm-libs"
       ],
@@ -37,11 +37,10 @@
       ]
     },
     "jsxgraph": {
-      "repository": "jsxgraph/jsxgraph-quarto",
-      "branch": "main",
-      "commit": "e4ad81d82e1b56f86765026a3dd26f6975d29d57",
-      "extension": "jsxgraph",
-      "pin-outside-branch": "AC-approved upstream pull request #2 head e4ad81d82e1b56f86765026a3dd26f6975d29d57 (jsxgraph-quarto 1.2.0, optional src_mjx_preload); not yet on upstream main"
+      "repository": "aacchhee/jsxgraph-quarto",
+      "branch": "fix/2026-10-jsxgraph-115-runtime",
+      "commit": "e31b5d19cb7f282e220634c0e21304067910efff",
+      "extension": "jsxgraph"
     },
     "ctm-assessment": {
       "repository": "Erasmus-CTM/ctm-assessment",
