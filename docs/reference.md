@@ -318,3 +318,9 @@ count/byte limits, copy/export and reload without re-solving or grading. A flag
 starts one independent re-check; disagreement marks the key disputed and replaces
 wrong verdicts with “Can't confirm against the generated key”. Reports stay local.
 Phase 2 and the rag_app reporting relay remain out of scope.
+
+Generation tolerates a JSON code fence, numeric JSON answers and variable-name
+arrays, with omitted mode/variables inheriting the original exercise contract.
+Every normalized candidate still passes the same admission and mathematical
+checks. Repair requests include the concrete format failure; **Details** in the
+practice panel exposes the final reason locally when both attempts fail.
