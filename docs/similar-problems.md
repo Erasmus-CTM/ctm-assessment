@@ -69,7 +69,7 @@ The page builds one prompt from:
 - the original's mode, variables and number of fields;
 - the direction (`easier`, `harder` or `same`) and the previously generated problem, if any, so repeated clicks move further for easier/harder and preserve difficulty for same;
 - the page language;
-- author-supplied general guidance and guidance for the selected direction, resolved from course/page settings and exercise options (§6.1);
+- author-supplied generation guidance from the selected teaching policy, plus the exercise's general and selected-direction addon (§6.1);
 - a short table of applicable, author-approved supplied checkers, including the original's reusable checker where compatible (§12.9). Each row gives an ID, purpose, admitted problem data, answer shape and restrictions, without Python source or answer keys.
 
 The prompt asks for one new problem on the same topic and method, adjusted in one natural way (numbers, steps, guidance) for easier/harder, or at the same difficulty for same, and forbids copying an example or exercise from the context.
@@ -138,67 +138,72 @@ Settings:
 - AI feedback must also be enabled for that exercise. A build without AI feedback, the exam profile and a page with AI off keep generation off, even with `similar: true` and saved browser API settings. Shared settings stay under `ai-feedback:`.
 - Not offered for exercises with a `response:` source (§8). An original `custom` exercise is eligible only when its existing trusted checker can be reused without model-written code and its inputs fit the phase-1 restrictions (§12.9).
 
-### 6.1 Author guidance from the first release (AC, 25 Oct; binding)
+### 6.1 Reuse teaching policies and short exercise addons (AC, 25 Oct; binding)
 
-Author guidance is required in the first Similar problems implementation (AC's
-"version 0.1"), not deferred to phase 2. Support course/project and page YAML
-under `ai-feedback:`, plus the same string options on an individual exercise:
+Ship author guidance in the first Similar problems release (AC's "version 0.1").
+Keep authoring to two levels: shared guidance defined once in the existing
+project teaching policies, plus an optional one-line refinement in an exercise.
+Do not add a parallel course/page prompt system or a separate per-quiz spec.
+Existing page policy selection can already specialize a quiz page when needed.
+
+Extend the existing named policy with a small generation block:
 
 ```yaml
+# feedback.yml, loaded and selected through the existing policy settings
+ai-feedback:
+  policies:
+    linear-algebra-practice:
+      generation:
+        base-prompt: Keep every vector at length 5 or less.
+        harder: Use more vectors or less obvious dependencies.
+        easier: Use fewer vectors and simpler dependencies.
+        same: Keep the same level of linear-independence reasoning.
+```
+
+```yaml
+# _quarto.yml
 ai-feedback:
   similar: true
-  similar-prompt: |
-    Keep every vector at length 5 or less.
-  similar-harder-prompt: |
-    Make linear-independence questions harder by varying the number of
-    vectors and the dependencies between them, rather than lengthening them.
+  policy-files: feedback.yml
+  policy: linear-algebra-practice
 ```
+
+The exercise can simply add:
 
 ```text
-#| similar: true
-#| similar-prompt: |
-#|   Keep every vector at length 5 or less.
-#| similar-harder-prompt: |
-#|   Vary the number of vectors and their dependencies.
+#| harder: Give more vectors.
+#| simpler: Give fewer vectors.
 ```
 
-`similar-prompt` applies to all three directions. `similar-easier-prompt`,
-`similar-harder-prompt` and `similar-same-prompt` apply only to their respective
-directions. They are optional author instructions; their absence preserves the
-generic generator prompt. Supplying guidance does not enable the button.
-`similar` remains a boolean, preserving §11.1's opt-in/override contract.
+Use the existing `#|` option marker; the current parser does not recognize `#!`.
+`harder` appends to the resolved harder guidance, `simpler` appends to easier
+(internal direction `easier`), and optional `#| same:` appends to same-difficulty
+guidance. These are text addons, using the existing multiline form if needed;
+they do not replace the policy or enable Similar problems. No second synonym
+set, general exercise prompt option or new selection mechanism is needed.
 
-Compose applicable guidance additively in course/project, directory, page and
-exercise order, using the shared settings layers. Include the general guidance
-and only the selected direction's guidance. Exercise guidance refines the
-inherited instructions; it does not silently discard a course restriction.
-Reject invalid option types and over-budget guidance with an author-facing
-configuration error; never silently truncate a limit. Bound the complete prompt
-before calling the provider. This is configuration text, never Python source.
+Reuse `policy-files`, `policy`, `extends`, existing exercise-ID overrides and
+`feedback-policy` resolution. Resolve supplied `generation` fields by key using
+that existing precedence, with omitted values inherited. Build the request from
+the resolved generation base, the selected direction and its exercise addon.
+Send it with the task/context/checker table on both candidate attempts. Do not
+reuse ordinary feedback `base-prompt` or hint-step instructions for generation,
+or let generation advance feedback steps. The existing schema needs an explicit
+G2 extension for `generation`; these are not already accepted settings
+(`ctm-libs:docs/feedback-policies.md:1`;
+`ctm-libs:_extensions/ctm-libs/feedback/feedback-core.js:17`).
 
-Send the resolved guidance in the same generation request as the original task,
-context and compact checker table. Identify it as author instructions, separate
-from quoted learning material, learner input and previous model output. It
-cannot override fixed safety rules, supported-input restrictions, hard
-mathematical constraints or checker results. Apply it to both candidate attempts;
-requesting another harder problem does not relax inherited restrictions.
+Guidance cannot override checker failures or supported-input/security rules.
+A prose instruction such as vector length <= 5 steers the model; the applicable
+trusted author-supplied constraint/checker enforces a hard bound before display
+(§12.10). Do not imply arbitrary prose is automatically executable validation.
+Validate the new policy fields and addon types and preserve request size limits.
 
-Prose can steer what "harder" means, but sending a prompt alone cannot guarantee
-a numerical bound. For a hard requirement such as vector length <= 5, the
-admitted structured task data and an applicable trusted author-supplied
-constraint/checker must also enforce that bound before display (§12.10).
-Do not claim arbitrary prose has been compiled into a Python validator or that
-agreement between models proves compliance. Semantic guidance (such as varying
-dependencies) remains author-defined; Python validates the properties for which
-an explicit trusted check is supplied.
-
-G2 adds the YAML settings and layer resolution; G3 parses the exercise options,
-assembles the request and enforces the applicable checks; G4 documents both
-forms with an example. Tests cover direction selection, additive inheritance,
-per-exercise refinement, opt-out/AI-off gates, both attempts retaining guidance,
-and a candidate with a matching answer key rejected for exceeding an authored
-vector-length bound. Restore uses the accepted saved spec without re-requesting
-or revalidating it with AI/Python, as in §7.
+G2 extends the policy schema/resolver; G3 reads the short addons and assembles
+the prompt; G4 supplies the authoring example. Test existing policy inheritance,
+addons/direction selection, unchanged feedback behavior, guidance in both
+attempts, and rejection of a candidate exceeding an authored vector-length
+bound despite an agreeing key. Restore remains provider/Python free.
 
 ## 7. Saving
 
@@ -259,7 +264,7 @@ head tree. See step 1 §12.1 for the complete checks.
 | # | Repository | What |
 |---|---|---|
 | G1 | ctm-checkers | `math_exercise.compute_key` with the recipe list and its admission; tests including hostile recipe text |
-| G2 | ctm-libs | per-call generation options (§5), generator-model setting, `similar` and author-guidance settings (§6.1), strings |
+| G2 | ctm-libs | per-call generation options (§5), generator-model and `similar` settings, generation guidance in existing teaching policies (§6.1), strings |
 | G3 | math-exercise | button, panel, generation flow, author guidance (§6.1), checks, `#| similar:`, store nesting, copy/export and local key reports/re-check (§11), public `setupCell`; Playwright with a mocked provider |
 | G4 | ctm-assessment | re-pin, example page, reference docs, browser tests, log line in `docs/consolidation/README.md` |
 | R1 | rag_app | `/retrieve`, the relay and its hardening |
@@ -312,11 +317,17 @@ These answers settle the original §11 questions and apply to phase 1:
    (§12.10), not proof of educational quality. Safe rendering and computed keys
    alone do not establish a well-posed, nontrivial practice problem.
 9. **Author difficulty guidance from version 0.1.** Authors can add course/page
-   YAML and per-exercise prompts defining what easier/harder/same should mean,
+   teaching-policy YAML and per-exercise addons defining what easier/harder/same should mean,
    such as varying the number of vectors without making them longer than five.
    Include this guidance in the generation request from the first release;
    hard mathematical limits also need an applicable trusted validation path
    (§6.1, §12.10).
+10. **Reuse teaching-policy files.** Put shared guidance in the existing named
+    policies with a `generation` block. Exercises can add `#| harder:` and
+    `#| simpler:` one-liners (`simpler` maps to direction `easier`). Reuse the
+    current `#|` marker and policy machinery. Keep this to project-wide policies
+    plus short exercise refinements; no separate `#!` parser, per-quiz spec or
+    parallel prompt configuration is needed (§6.1).
 
 ## 12. Independent design review (25 Oct 2026; binding)
 
@@ -515,14 +526,14 @@ spec and course, never this whole parent/generated record (§11.4).
   through the real checker, in native Python and the browser dispatcher.
 - **G2:** per-call generation timeout/output/reasoning/cancel tests alongside
   unchanged feedback defaults and STACK request tests; settings precedence and
-  catalogue/sync checks. Include the §6.1 guidance options and additive layers.
+  catalogue/sync checks. Include §6.1 policy generation fields, inheritance and unchanged feedback steps.
 - **G3:** Playwright with a mocked provider for computed and unverified keys,
   mismatches/two-attempt failure, cancellation/late replies, public setup,
   reload without provider/Python, changed originals, no generated `ctm:result`,
   copy/export, count/byte caps, opt-in/override, copy mode, exam and no-AI builds.
   Cover trusted-checker reuse, alternative valid answers and rejection of
   model-supplied checker code, unknown table IDs or incompatible checker data
-  (§12.9). Include §6.1 direction/inheritance and authored-bound rejection tests.
+  (§12.9). Include §6.1 policy/addon direction/inheritance and authored-bound rejection tests.
   Add flag re-check agreement/disagreement/failure, retained flags after reload,
   disputed cached verdicts and regeneration. Hostile output/restore tests must
   exercise the real renderer and actual recipe/checker admission.
