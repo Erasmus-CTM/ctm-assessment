@@ -537,7 +537,7 @@ def main():
             # umbrella's own _extensions/ctm-assessment, so tests of "no package
             # installed" would see one: they get a temporary folder outside.
             component_tmp = Path(tempfile.mkdtemp(prefix='ctm-component-tests-'))
-            component_env = dict(env, TMPDIR=str(component_tmp))
+            component_env = dict(env, TMPDIR=str(component_tmp), CTM_COMPONENT_DEV='1')
             try:
                 for consumer in ('ctm-libs', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'):
                     run(['npm', 'ci', '--ignore-scripts'], cwd=sources[consumer])
