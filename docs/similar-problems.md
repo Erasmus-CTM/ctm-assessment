@@ -138,48 +138,31 @@ Settings:
 - AI feedback must also be enabled for that exercise. A build without AI feedback, the exam profile and a page with AI off keep generation off, even with `similar: true` and saved browser API settings. Shared settings stay under `ai-feedback:`.
 - Not offered for exercises with a `response:` source (§8). An original `custom` exercise is eligible only when its existing trusted checker can be reused without model-written code and its inputs fit the phase-1 restrictions (§12.9).
 
-### 6.1 Reuse teaching policies and short exercise addons (AC, 25 Oct; binding)
+### 6.1 One policy dictionary for teaching and generation (AC, 25 Oct; binding)
 
 Ship author guidance in the first Similar problems release (AC's "version 0.1").
-Keep authoring to two levels: shared guidance defined once in the existing
-project teaching policies, plus an optional one-line refinement in an exercise.
-Do not add a parallel course/page prompt system or a separate per-quiz spec.
-Existing page policy selection can already specialize a quiz page when needed.
+Use one dictionary of named policies, one schema, the same YAML parser and the
+same selection, validation, inheritance and replacement rules irrespective of
+use. A policy is not typed as teaching-only or generation-only. The author
+chooses which policy to use for each purpose; the same named policy may serve
+both. This supersedes the earlier proposal for a nested `generation` block.
 
-Reuse the same YAML parsing, policy selection, validation conventions and
-inheritance/replacement rules. The generation block has no `steps`: its fields
-are `base-prompt`, `harder`, `easier` and `same`. It defines one generation request,
-not a progression of hints. Do not add a generation step schema or counter.
-
-Ship a distinct generation `base-prompt` in the existing ctm-libs defaults
-source (`ctm-libs:_extensions/ctm-libs/feedback/feedback-defaults.yml:1`), under
-`defaults.generation.base-prompt`, and generate the browser defaults through the
-existing sync machinery. G3 consumes the resolved value; it does not duplicate
-the shipped prompt in its own JavaScript. No author policy or generation block
-is required to obtain this baseline once Similar problems is explicitly enabled.
-
-The shipped prompt asks for one self-contained, well-posed, nontrivial problem
-on the original topic/method at the requested difficulty, respecting authored
-constraints and the supplied checker contracts, without copying context
-exercises. It is separate from the shipped teaching/feedback prompt and contains
-no hint steps. An author-supplied generation `base-prompt` replaces this default
-through the same policy rules; omitted fields inherit. Fixed JSON/protocol,
-safety, admission and checker requirements remain enforced outside the
-replaceable base prompt.
-
-Extend the existing named policy with that small generation block:
+For example, define a shared policy once:
 
 ```yaml
-# feedback.yml, loaded and selected through the existing policy settings
+# feedback.yml
 ai-feedback:
   policies:
     linear-algebra-practice:
-      generation:
-        base-prompt: Keep every vector at length 5 or less.
-        harder: Use more vectors or less obvious dependencies.
-        easier: Use fewer vectors and simpler dependencies.
-        same: Keep the same level of linear-independence reasoning.
+      base-prompt: Use course notation. Keep every vector at length 5 or less.
+      harder: Use more vectors or less obvious dependencies.
+      easier: Use fewer vectors and simpler dependencies.
+      same: Keep the same level of linear-independence reasoning.
+      steps:
+        - step-prompt: Give a conceptual hint.
 ```
+
+Choose it for both purposes, or choose different names:
 
 ```yaml
 # _quarto.yml
@@ -187,46 +170,69 @@ ai-feedback:
   similar: true
   policy-files: feedback.yml
   policy: linear-algebra-practice
+  generation-policy: linear-algebra-practice
 ```
 
-The exercise can simply add:
+`generation-policy` is an optional selector using the existing policy-selection
+machinery. It does not define a second policy dictionary or parser. Omitted,
+generation uses its distinct shipped generation baseline; it does not silently
+adopt the selected feedback policy. An author explicitly selects the same name
+when both uses should share instructions. Exercise-specific selection can use
+`#| generation-policy:` through the same resolution rules as `feedback-policy`.
+Existing page selection already covers quiz pages; no separate quiz spec is
+needed. Policy loading never enables Similar problems.
+
+The exercise can add only the refinement it needs:
 
 ```text
 #| harder: Give more vectors.
 #| simpler: Give fewer vectors.
 ```
 
-Use the existing `#|` option marker; the current parser does not recognize `#!`.
-`harder` appends to the resolved harder guidance, `simpler` appends to easier
-(internal direction `easier`), and optional `#| same:` appends to same-difficulty
-guidance. These are text addons, using the existing multiline form if needed;
-they do not replace the policy or enable Similar problems. No second synonym
-set, general exercise prompt option or new selection mechanism is needed.
+Use the existing `#|` marker, not a new `#!` parser. `harder` appends to resolved
+harder guidance, `simpler` appends to easier guidance (internal direction
+`easier`), and optional `#| same:` appends to same-difficulty guidance. These
+text addons preserve the selected base instructions and do not enable the
+feature. Reuse the existing multiline form when necessary.
 
-Reuse `policy-files`, `policy`, `extends`, existing exercise-ID overrides and
-`feedback-policy` resolution. Resolve supplied `generation` fields by key using
-that existing precedence, with omitted values inherited. Build the request from
-the resolved generation base, the selected direction and its exercise addon.
-Send it with the task/context/checker table on both candidate attempts. Do not
-reuse ordinary feedback `base-prompt` or hint-step instructions for generation,
-or let generation advance feedback steps. The existing schema needs an explicit
-G2 extension for `generation`; these are not already accepted settings
+Add `harder`, `easier` and `same` as optional string fields of the common policy
+schema. Reuse `policy-files`, named `extends`, existing exercise-ID overrides
+and explicit exercise selections in the same resolution order; omitted fields
+inherit and strings replace. Generation consumes the resolved `base-prompt`,
+the selected direction and its exercise addon. It ignores `steps` and other
+feedback-only controls and never advances a hint counter. A shared policy may
+contain steps for teaching; a generation-only policy can simply omit them.
+Teaching feedback ignores difficulty-direction fields. Do not infer a policy's
+purpose from its name or reject it because it also contains fields for the
+other use. These are planned schema/selector additions in G2, not settings
+already supported by current main
 (`ctm-libs:docs/feedback-policies.md:1`;
 `ctm-libs:_extensions/ctm-libs/feedback/feedback-core.js:17`).
 
-Guidance cannot override checker failures or supported-input/security rules.
-A prose instruction such as vector length <= 5 steers the model; the applicable
-trusted author-supplied constraint/checker enforces a hard bound before display
-(§12.10). Do not imply arbitrary prose is automatically executable validation.
-Validate the new policy fields and addon types and preserve request size limits.
+Ship a separate generation baseline as an ordinary policy dictionary in the
+existing defaults source
+(`ctm-libs:_extensions/ctm-libs/feedback/feedback-defaults.yml:1`), generated
+through the existing browser-default sync machinery. It has a generation
+`base-prompt` and needs no steps; no nested generation-specific policy schema
+is introduced. The prompt asks for a self-contained, well-posed, nontrivial
+problem on the same topic/method at the requested difficulty, respecting the
+authored constraints and supplied checkers without copying context exercises.
+Apply authored policy fields over that baseline by the same rules as teaching
+policies. G3 consumes the resolved dictionary without duplicating prompt text.
 
-G2 adds the shipped generation prompt and extends the policy schema/resolver;
-G3 reads the short addons and assembles
-the prompt; G4 supplies the authoring example. Test existing policy inheritance,
-the shipped generation fallback and author replacement, generated-default sync,
-addons/direction selection, unchanged feedback behavior, guidance in both
-attempts, and rejection of a candidate exceeding an authored vector-length
-bound despite an agreeing key. Restore remains provider/Python free.
+Send the resolved instructions with the task/context/checker table on both
+attempts. Fixed JSON/protocol, supported inputs, admission and checker
+requirements remain enforced outside the replaceable base prompt. A prose
+bound steers the model; an applicable trusted author-supplied constraint/checker
+must enforce a hard vector-length limit before display (§12.10).
+
+G2 extends the common policy schema and adds the selector and shipped baseline;
+G3 reads the addons and assembles the request; G4 supplies the authoring example.
+Test the same dictionary selected for both uses, separate selections, defaults,
+inheritance/overrides, generated-default sync, addons/directions, ignored steps
+and unchanged feedback behavior. Also test guidance in both attempts and
+rejection of a candidate exceeding an authored bound despite an agreeing key.
+Restore remains provider/Python free.
 
 ## 7. Saving
 
@@ -345,13 +351,13 @@ These answers settle the original §11 questions and apply to phase 1:
    Include this guidance in the generation request from the first release;
    hard mathematical limits also need an applicable trusted validation path
    (§6.1, §12.10).
-10. **Reuse teaching-policy files.** Put shared guidance in the existing named
-    policies with a `generation` block. Exercises can add `#| harder:` and
-    `#| simpler:` one-liners (`simpler` maps to direction `easier`). Reuse the
-    current `#|` marker and policy machinery. Keep this to project-wide policies
-    plus short exercise refinements; no separate `#!` parser, per-quiz spec or
-    parallel prompt configuration is needed (§6.1). Use the same parsing and
-    policy rules; generation has no steps or hint progression.
+10. **One common policy dictionary.** Reuse the existing named `policies`
+    dictionary and schema for both teaching and generation. Authors choose
+    policies by name for either use, and one policy may serve both. There is
+    no nested `generation` policy type; this supersedes that earlier proposal.
+    Generation ignores steps; teaching ignores difficulty-direction fields.
+    Exercises can append `#| harder:` and `#| simpler:` one-liners. Keep the
+    existing parser and rules, with no separate quiz spec (§6.1).
 11. **Separate shipped generation base prompt.** Supply a generation-specific
     default through ctm-libs' existing shipped-default and sync machinery.
     Authors inherit or replace it through the same policy rules; it is distinct
@@ -554,7 +560,8 @@ spec and course, never this whole parent/generated record (§11.4).
   through the real checker, in native Python and the browser dispatcher.
 - **G2:** per-call generation timeout/output/reasoning/cancel tests alongside
   unchanged feedback defaults and STACK request tests; settings precedence and
-  catalogue/sync checks. Include §6.1 policy generation fields, inheritance and unchanged feedback steps.
+  catalogue/sync checks. Include §6.1 common policy dictionaries, independent
+  selections, shared inheritance rules and unchanged feedback steps.
 - **G3:** Playwright with a mocked provider for computed and unverified keys,
   mismatches/two-attempt failure, cancellation/late replies, public setup,
   reload without provider/Python, changed originals, no generated `ctm:result`,
