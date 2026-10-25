@@ -55,55 +55,44 @@ test('identical wrong fixture grades in both runs still violate their authored e
   assert.deepEqual(fixtureMismatches(job, runs, results), [{id: job.cases[0].id, expected: ['correct'], got: [['wrong'], ['wrong']]}]);
 });
 
-// The combined gate supplies a real installed package and rendered math site.
-// This exercises the source producer, real page adapter and real Pyodide wheel.
-if (process.env.CTM_PARITY_VARIANT_BUILD) test('real numeric/derived triangle: every concrete case passes; dropped and bad fixtures fail', async () => {
-  const {pageCases, pagesUnder, openPage, prepare} = require('../integration/pyodide-parity/cases.cjs');
-  const {checkersWheel} = require('../integration/pyodide-parity/run.cjs');
+// The combined gate supplies the current native recipe and its exact receipt.
+if (process.env.CTM_PARITY_VARIANT_BUILD) test('native triangle: real Pyodide replay passes and forged projections fail', async () => {
   const {boot} = require('../integration/pyodide-parity/runtime.cjs');
   const {ensureWheels} = require('../integration/pyodide-parity/wheels.cjs');
+  const {AUTHORED} = require('../integration/pyodide-parity/authored.cjs');
   const build = path.resolve(process.env.CTM_PARITY_VARIANT_BUILD);
-  const built = JSON.parse(fs.readFileSync(path.join(build, 'corpora-built.json'), 'utf8'));
-  const extensions = path.resolve(build, built.extensions), extension = path.join(extensions, 'math-exercise');
+  const built = JSON.parse(fs.readFileSync(path.join(build, 'corpora-built.json')));
   const source = path.resolve(build, built.sources.find(tree => tree.name === 'math-exercise').dir);
-  const site = path.resolve(build, built.sites.find(tree => tree.name === 'math-exercise').dir);
-  const file = pagesUnder(site).find(file => fs.readFileSync(path.join(site, file), 'utf8').includes('data-label="variant-triangle"'));
-  assert.ok(file, 'triangle is rendered');
-  const absolute = path.join(site, file), relative = 'math-exercise/' + file.split(path.sep).join('/');
-  const found = pageCases(absolute, relative);
-  const cells = found.generated.filter(cell => cell.label === 'variant-triangle').map(cell => ({...cell, corpus: 'math-exercise'}));
-  const triangleCases = found.cases.filter(c => c.label === 'variant-triangle' && c.kind === 'fixture');
-  const recipe = coverage(source, ['_includes/variants/triangle.qmd'], 'math-exercise', extension, checkersWheel(extensions), cells, triangleCases)[0];
-  assert.match(recipe.source, /derived:/);
-  assert.equal(recipe.materializations[0].variants.length, 6);
-  assert.equal(triangleCases.length, 18);
-  assert.ok(recipe.materializations[0].variants.every(record => !JSON.stringify(record.tests).includes('{{')));
-  const damaged = structuredClone(cells);
-  damaged[0].manifest.variants[0].tests.pop();
-  assert.throws(() => coverage(source, ['_includes/variants/triangle.qmd'], 'math-exercise', extension, checkersWheel(extensions), damaged, triangleCases), /concrete tests differ/);
-  assert.throws(() => coverage(source, ['_includes/variants/triangle.qmd'], 'math-exercise', extension, checkersWheel(extensions), cells, triangleCases.slice(0, -1)), /no matching grading case/);
-
+  const receipt = JSON.parse(fs.readFileSync(path.join(source, '.ctm-parity-native.json')));
+  const question = receipt.questions.find(q => q.label === 'variant-triangle');
+  assert.ok(question && question.records.length, 'native triangle has a source-bound receipt');
+  const extensions = path.resolve(build, built.extensions);
+  const checkerDir = path.join(extensions, 'ctm-checkers');
+  const manifest = JSON.parse(fs.readFileSync(path.join(checkerDir, 'checkers.json')));
   const wheels = await ensureWheels('0.28.3', path.resolve(build, '../variant-regression-wheels'));
   const {py} = await boot('0.28.3', wheels, 0);
-  const {w, api} = openPage(absolute, 'http://localhost/' + relative, py);
-  try {
-    let slot = w.document.querySelectorAll('.math-exercise-cell')[cells[0].position];
-    const pristine = slot.outerHTML, records = new Map();
-    for (const [index, record] of cells[0].manifest.variants.entries()) {
-      slot = prepare(w, api, slot, pristine, 'variant-triangle', {kind: 'generated', id: record.id, index});
-      for (const c of triangleCases.filter(c => c.variant.id === record.id)) {
-        const results = await slot.mathExercise.checkFixture(record, record.tests[c.fixture]);
-        records.set(c.id, {results: Array.from(results)});
-      }
-    }
-    const runs = [{name: 'actual'}], results = {actual: records};
-    assert.deepEqual(fixtureMismatches({cases: triangleCases}, runs, results), []);
-    const c = triangleCases[0], record = cells[0].manifest.variants[0];
-    slot = prepare(w, api, slot, pristine, 'variant-triangle', {kind: 'generated', id: record.id, index: 0});
-    const bad = {...record.tests[0], answers: ['0']};
-    const badResults = await slot.mathExercise.checkFixture(record, bad);
-    assert.deepEqual(Array.from(badResults, result => result.status), ['wrong']);
-    records.set(c.id, {results: Array.from(badResults)});
-    assert.equal(fixtureMismatches({cases: triangleCases}, runs, results).length, 1, 'real bad answer fails the same expectation gate as the CLI');
-  } finally { w.close(); }
+  await py.loadPackage('sympy');
+  py.FS.mkdirTree('/ctm-parity');
+  py.FS.writeFile('/ctm-parity/authored_record.py', fs.readFileSync(path.join(__dirname, '../integration/pyodide-parity/authored_record.py')));
+  const wheel = '/ctm-parity/' + manifest.wheel;
+  py.FS.writeFile(wheel, fs.readFileSync(path.join(checkerDir, manifest.wheel)));
+  py.globals.set('_ctm_parity_wheel', wheel);
+  py.runPython(AUTHORED);
+  const root = '/ctm-native-triangle';
+  py.FS.mkdirTree(path.posix.dirname(root + '/' + question.file));
+  py.FS.writeFile(root + '/' + question.file, fs.readFileSync(path.join(source, question.file)));
+  const replay = value => {
+    py.FS.writeFile(root + '/.ctm-parity-native.json', JSON.stringify({version:1,questions:[value]}));
+    return JSON.parse(py.globals.get('_ctm_authored')(root,py.toPy([question.file]))).map(JSON.parse);
+  };
+  const [record] = replay(question);
+  assert.equal(record.outcome,'pass');
+  assert.equal(record.nativeCandidates.length, question.records.length);
+  assert.ok(record.nativeCandidates.every(c => c.teacherChecked && c.authoredTests === 3));
+  const forged=structuredClone(question), first=forged.records[0];
+  first.teacherInputs[Object.keys(first.teacherInputs)[0]]='0';
+  assert.throws(()=>replay(forged),/context\/options differ from tested data/);
+  const changed=structuredClone(question);
+  changed.sourceSHA256='0'.repeat(64);
+  assert.throws(()=>replay(changed),/source changed after resolution/);
 });
