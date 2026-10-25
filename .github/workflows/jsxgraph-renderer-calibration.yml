@@ -15,6 +15,15 @@ concurrency:
 jobs:
   exact:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - side: after
+            repository: jsxgraph/jsxgraph-quarto
+            commit: e4ad81d82e1b56f86765026a3dd26f6975d29d57
+          - side: git
+            repository: aacchhee/jsxgraph-quarto
+            commit: e31b5d19cb7f282e220634c0e21304067910efff
     steps:
       - uses: actions/checkout@v7
         with:
@@ -28,8 +37,8 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v7
         with:
-          repository: jsxgraph/jsxgraph-quarto
-          ref: e4ad81d82e1b56f86765026a3dd26f6975d29d57
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.commit }}
           path: _ci/jsxgraph-after
           persist-credentials: false
       - uses: actions/setup-node@v7
@@ -42,12 +51,8 @@ jobs:
         env:
           JSXGRAPH_BEFORE_SOURCE: ${{ github.workspace }}/_ci/jsxgraph-before
           JSXGRAPH_AFTER_SOURCE: ${{ github.workspace }}/_ci/jsxgraph-after
+          JSXGRAPH_AFTER_SIDE: ${{ matrix.side }}
         run: |
           set -o pipefail
           node --check tools/compare-rendered/jsxgraph-renderer.mjs
-          node tests/compare-rendered-jsxgraph.cjs 2>&1 | tee "$RUNNER_TEMP/renderer-contract.log"
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: jsxgraph-renderer-contract
-          path: ${{ runner.temp }}/renderer-contract.log
+          node tests/compare-rendered-jsxgraph.cjs
