@@ -14,6 +14,16 @@ const raw=el=>el.getAttribute(el.tagName==='LINK'?'href':'src');
 const mathJaxScripts=doc=>[...doc.scripts].filter(e=>e.id==='MathJax-script'||/(?:^|\/)mathjax(?:[@\/.-]|$)/i.test(e.getAttribute('src')||''));
 const resources=doc=>[...doc.querySelectorAll('script[src],link[rel="stylesheet"]')];
 const normalize=u=>u.split('?')[0].replace(/(?:^|.*\/)(?:site_libs\/|[^/]*_files\/libs\/)/,'').replace(/quarto-contrib\/([\w-]+?)-\d+\.\d+\.\d+[^/]*\//,'$1/');
+// The umbrella registers its unchanged asset helper before STACK prepares
+// feedback. Permit only that earlier move across the four feedback resources.
+function stackHelperMove(a,b) {
+ if(!b.ctmStackTransition)return false;
+ const x=resources(a).map(e=>e.tagName+'\0'+normalize(raw(e))),y=resources(b).map(e=>e.tagName+'\0'+normalize(raw(e)));
+ const retained=new Set(x.filter(k=>y.includes(k))),before=x.filter(k=>retained.has(k)),after=y.filter(k=>retained.has(k));
+ const helper='SCRIPT\0ctm-assets/assets.js',i=before.indexOf(helper),j=after.indexOf(helper);
+ return i>j&&j>=0&&same(before.filter(k=>k!==helper),after.filter(k=>k!==helper))&&
+   before.slice(j,i).every(k=>/^(?:SCRIPT\0ai-feedback\/(?:feedback-core|feedback-dom|ai-feedback)\.js|LINK\0ai-feedback\/ai-feedback\.css)$/.test(k));
+}
 const monacoCode=(s,expression)=>new RegExp('^// Configure the Monaco Editor\'s loader\\s+require\\.config\\(\\{\\s*paths\\s*:\\s*\\{\\s*[\'"]vs[\'"]\\s*:\\s*'+expression+'\\s*\\}\\s*\\}\\);$').test(s.trim());
 const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 export function loadAssetSources(project,pinsFile,rendererBeforeProject,rendererBeforePinsFile) {
@@ -126,7 +136,8 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
       }
       for(const [a,b]of pairs)for(const x of beforeResources){
         const match=afterResources.filter(y=>raw(y)===raw(x));
-        if(match.length===1)insist((beforeResources.indexOf(a)<beforeResources.indexOf(x))===(afterResources.indexOf(b)<afterResources.indexOf(match[0])),'Existing asset order changed');
+        if(match.length===1)insist((beforeResources.indexOf(a)<beforeResources.indexOf(x))===(afterResources.indexOf(b)<afterResources.indexOf(match[0]))||
+          (a===ha[0]&&stackHelperMove(A.doc,B.doc)&&/^ai-feedback\//.test(normalize(raw(x)))),'Existing asset order changed');
       }
       return;
     }
@@ -243,7 +254,7 @@ function checkRetainedResources(a,b,items,page){
  };
  const oldGroups=groups(before),newGroups=groups(after);
  const retained=new Set([...oldGroups.keys()].filter(k=>newGroups.has(k)));
- if(!same(before.map(key).filter(k=>retained.has(k)),after.map(key).filter(k=>retained.has(k)))){
+ if(!same(before.map(key).filter(k=>retained.has(k)),after.map(key).filter(k=>retained.has(k)))&&!stackHelperMove(a,b)){
    const identity=e=>({key:key(e),url:raw(e),attributes:attrs(e,e.tagName==='LINK'?'href':'src')});
    const evidence={page,before:before.filter(e=>retained.has(key(e))).map(identity),after:after.filter(e=>retained.has(key(e))).map(identity)};
    console.error('Retained resource order evidence: '+JSON.stringify(evidence));

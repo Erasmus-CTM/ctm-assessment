@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 
 const HASH = /^[0-9a-f]{16}$/;
-const COMPONENTS = new Set(['math-exercise', 'py-exercise', 'pyodide-interaktiv']);
+const COMPONENTS = new Set(['math-exercise', 'py-exercise', 'pyodide-interaktiv', 'ctm-stack']);
 const MESSAGE_KEYS = ('savingNotice savingDisabled savingOffNotice clearFailed storageUnavailable recordTooLarge saveOff saveOn confirmSaveOff confirmClearCourse lastResult sourceChanged showSaved outdated variantChanged variantWithdrawn statusCorrect statusPartial statusWrong statusInvalid confirmNewVariant progressTitle exercise correct partial wrong unattempted total exportTitle copyAll downloadMarkdown downloadHTML exportClose locale').split(' ');
 const plain = x => x && typeof x === 'object' && !Array.isArray(x);
 const keys = (x, required, optional = []) => plain(x) &&
@@ -74,7 +74,7 @@ function inspect(B) {
       });
       if (!present) return null;
     } else {
-      const present = [...B.doc.querySelectorAll('.' + e.component + '-cell')].some(node =>
+      const present = [...B.doc.querySelectorAll(e.component==='ctm-stack'?'.ctm-stack':'.' + e.component + '-cell')].some(node =>
         node.getAttribute('data-ctm-component') === e.component && node.getAttribute('data-ctm-id') === e.id &&
         node.getAttribute('data-ctm-runtime-id') === e.runtimeId && node.getAttribute('data-ctm-source') === e.source &&
         node.getAttribute('data-ctm-save') === String(e.save));
@@ -124,8 +124,8 @@ function matchingEntry(m, component, id, source, save) {
   return m.exercises.some(e => e.component === component && e.id === id && e.source === source && e.save === save);
 }
 function rootMetadata(node, m) {
-  if (!node?.matches('.math-exercise-cell, .py-exercise-cell')) return false;
-  const component = node.classList.contains('math-exercise-cell') ? 'math-exercise' : 'py-exercise';
+  if (!node?.matches('.math-exercise-cell, .py-exercise-cell, .ctm-stack')) return false;
+  const component = node.classList.contains('ctm-stack') ? 'ctm-stack' : node.classList.contains('math-exercise-cell') ? 'math-exercise' : 'py-exercise';
   const authored = node.getAttribute('data-label');
   if (component === 'math-exercise') {
     const id = node.getAttribute('data-ctm-id');

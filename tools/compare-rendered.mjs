@@ -25,6 +25,7 @@ import {isDeepStrictEqual} from 'node:util';
 import {createRequire} from 'node:module';
 import {closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 import {markStoreAdditions} from './compare-rendered/store.mjs';
+import {stackTransition,markStackChanges} from './compare-rendered/stack.mjs';
 import {loadAssetSources, markAssetChanges} from './compare-rendered/assets.mjs';
 const require = createRequire(import.meta.url);
 const vm = require('node:vm');
@@ -316,17 +317,17 @@ function pageContexts(B, json) {
 // Whether two policy configurations give every selection on the page the same
 // effective policy, resolved by the after page's feedback-core.js (the browser
 // contract reads the old and the new keys' JSON alike).
-function samePolicies(coreFile, before, after, selections) {
+function samePolicies(coreFile, before, after, selections, stackMove = false) {
   if (!coreFile || !fs.existsSync(coreFile)) return 'unknown';
   const context = vm.createContext({window: {}, console});
   context.globalThis = context;
   vm.runInContext(fs.readFileSync(coreFile, 'utf8'), context);
   const core = context.AIFeedbackCore || context.window.AIFeedbackCore || context.AIFeedback || context.window.AIFeedback;
   if (!core || typeof core.resolvePolicy !== 'function') return 'unknown';
-  const all = [...selections, ...['plain-text', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'].map(name => [name, {}])];
+  const all = stackMove ? selections : [...selections, ...['plain-text', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'].map(name => [name, {}])];
   for (const [integration, selection] of all) {
     let a, b;
-    try { a = JSON.stringify(core.resolvePolicy(integration, 'en', {}, before, selection)); } catch (error) { a = 'error ' + error.message; }
+    try { a = JSON.stringify(core.resolvePolicy(stackMove ? 'math-exercise' : integration, 'en', {}, before, selection)); } catch (error) { a = 'error ' + error.message; }
     try { b = JSON.stringify(core.resolvePolicy(integration, 'en', {}, after, selection)); } catch (error) { b = 'error ' + error.message; }
     if (a !== b) return 'different';
   }
@@ -759,6 +760,7 @@ function stackPolicyNotes(page, A, B) {
 
 function comparePage(page, before, after, ends, linked, assets) {
   const A = extract(before), B = extract(after), items = [];
+  if(stackTransition(A,B))items.push({page,area:'config',change:'changed',object:'stack-card-shell',path:'/',effective:'identical-engine-data'});
   items.push(...stackPolicyNotes(page, A, B));
   // Additive generated chrome has no authored position. Only a complete,
   // catalogue-verified store bar may leave the invariant's prose accounting.
@@ -780,7 +782,9 @@ function comparePage(page, before, after, ends, linked, assets) {
     if (!a || !b) { items.push({page, area: 'config', change: a ? 'removed' : 'added', object, path: '/', before: a, after: b}); continue; }
     const differences = jsonDiff(sorted(a), sorted(b));
     const effective = object === '__aiFeedbackPolicies' && differences.length
-      ? samePolicies(Object.entries(B.sources).find(([url]) => url.endsWith('/feedback-core.js'))?.[1], a[0], b[0], B.selections) : undefined;
+      ? samePolicies(Object.entries(B.sources).find(([url]) => url.endsWith('/feedback-core.js'))?.[1], a[0], b[0],
+          B.stackTransitionCards ? [...B.stackTransitionCards].map(card => ['stack', JSON.parse(card.dataset.stackFeedback || '{}').policySelection || {exercise:card.dataset.stackId,name:''}]) : B.selections,
+          Boolean(B.stackTransitionCards)) : undefined;
     for (const d of differences) items.push({page, area: 'config', change: 'changed', object, ...d, effective, item: (b[d.path.split('/')[1]] ?? a[d.path.split('/')[1]])});
   }
   const dom = [];
@@ -798,6 +802,7 @@ function comparePage(page, before, after, ends, linked, assets) {
     Object.assign(item, features);
     delete item.index;
   }
+  markStackChanges(B,items);
   const contextual = contextItems(items, B, page);
   markStoreAdditions(B, contextual);
   markAssetChanges(A, B, contextual, assets, page, after, before);
@@ -823,7 +828,7 @@ function test(pattern, value) {
 function matches(rule, item) {
   if (rule.area && rule.area !== item.area) return false;
   for (const field of ['change', 'what', 'object', 'path', 'tag', 'element', 'attribute', 'before', 'after', 'line', 'page', 'effective', 'context',
-    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes', 'reveal', 'switchOrder', 'store', 'assets'])
+    'ancestors', 'content', 'to', 'lost', 'gained', 'tabsets', 'reveals', 'embeds', 'modes', 'reveal', 'switchOrder', 'store', 'stack', 'assets'])
     if (rule[field] !== undefined && !test(rule[field], item[field])) return false;
   for (const [field, pattern] of Object.entries(rule.where || {})) {
     const value = field.split('.').reduce((v, k) => (v == null ? v : v[k]), item.item ?? item.attrs);

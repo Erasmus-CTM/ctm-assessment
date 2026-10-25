@@ -44,7 +44,7 @@ const server = http.createServer((req,res)=>{
     await page.waitForFunction(()=>document.querySelector('.qpyodide-output-code-area').innerText.includes('mixed Python ready'),null,{timeout:180000});
     const math = page.locator('.math-exercise-cell');
     await math.locator('input').first().fill('4');await math.locator('.math-check-btn').click();
-    await math.locator('.math-fb-correct').first().waitFor({timeout:180000});
+    await math.locator('.math-fb-ok').first().waitFor({timeout:180000});
     const stack = page.locator('.ctm-stack');
     await stack.locator('.stack-tests').click();
     await stack.locator('.stack-result[data-state=correct]').waitFor({timeout:180000});

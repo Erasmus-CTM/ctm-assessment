@@ -1,0 +1,22 @@
+categories:
+  - id: step6-stack-shell
+    title: Lua card shell with byte-equivalent opaque engine plans and shared runtime metadata
+    match:
+      - {area: config, object: '^stack-card-shell$', effective: '^identical-engine-data$'}
+      - {area: dom, stack: '^(shell|identity|json-order|auto-feedback)$'}
+      - {area: dom, change: added, line: '^(<span hidden="" id="ctm-layout-ready">|</span id="ctm-layout-ready">)$'}
+      - {area: file, change: removed, what: '^(script|css) ctm-stack/matrix-input\.(js|css)$'}
+      - {area: file, change: removed, what: '^script https://cdnjs\.cloudflare\.com/polyfill/v3/polyfill\.min\.js$'}
+      - {area: file, change: added, what: '^(script (ctm-worker/pyodide-worker\.js|ctm-locale/(ctm-locale|common)\.js|ctm-locale-ctm-stack/ctm-stack\.js|ctm-layout/ctm-layout\.js|(?:\./|\.\./)coi-serviceworker\.js|quarto-contrib/ctm-coi-frame-startup-1/coi-frame-startup\.js))$'}
+      - {area: config, change: added, object: '^__mathExerciseConfig$', after: '^\[{"lang":"en","stopAfter":20}\]$'}
+  - id: step6-stack-feedback
+    title: STACK feedback defaults to auto and preserves the effective mathematics policy
+    match:
+      - {area: file, change: added, what: '^(script ai-feedback/(feedback-core|feedback-dom|ai-feedback)\.js|css ai-feedback/ai-feedback\.css)$'}
+      - {area: config, object: '^__aiFeedbackPolicies$', change: changed, effective: '^equal$'}
+      - {area: config, object: '^(__aiFeedbackConfig|__aiFeedbackPolicies)$', change: added, page: '^(corpus|docs/(matrix-input|python-answer-tests|python-checker-api))\.html$'}
+      - {area: dom, attribute: '^data-ai-feedback-context$', change: attribute added, ancestors: 'main#quarto-document-content'}
+  - id: step6-backend-contract-documentation
+    title: New backend adapter contract page
+    match:
+      - {area: page, change: added, page: '^docs/backend-contract\.html$'}
