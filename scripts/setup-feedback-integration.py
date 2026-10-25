@@ -541,7 +541,12 @@ def main():
             try:
                 for consumer in ('ctm-libs', 'math-exercise', 'py-exercise', 'pyodide-interaktiv'):
                     run(['npm', 'ci', '--ignore-scripts'], cwd=sources[consumer])
-                    run(['npm', 'test'], cwd=sources[consumer], env=component_env)
+                    consumer_env = dict(component_env)
+                    # The library tests exercise the package gate itself and
+                    # explicitly enable development mode only in that case.
+                    if consumer == 'ctm-libs':
+                        consumer_env.pop('CTM_COMPONENT_DEV', None)
+                    run(['npm', 'test'], cwd=sources[consumer], env=consumer_env)
                 run(['python', '-m', 'unittest', 'discover', '-s', 'tests'], cwd=sources['py-exercise'], env=component_env)
             finally:
                 shutil.rmtree(component_tmp, ignore_errors=True)
