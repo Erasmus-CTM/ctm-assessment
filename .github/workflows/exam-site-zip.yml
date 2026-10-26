@@ -320,8 +320,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-latest, engine: chromium, version: '139.0.7258.138', profile: cef139}
-          - {os: ubuntu-latest, engine: chromium, version: '147.0.7727.117', profile: cef147}
+          - {os: ubuntu-24.04, engine: chromium, version: '139.0.7258.138', profile: cef139}
+          - {os: ubuntu-24.04, engine: chromium, version: '147.0.7727.117', profile: cef147}
           - {os: macos-15, engine: webkit, version: '', profile: apple-webkit}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -332,7 +332,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - uses: actions/setup-python@v7
         with:
@@ -354,11 +354,13 @@ jobs:
           shutil.copytree(root / 'deployed', root / 'hosted/dept/python')
           PYTHON
       - name: Install the exact CEF release-branch Chromium profile
+        timeout-minutes: 5
         if: matrix.engine == 'chromium'
         env:
           P13_CHROME_VERSION: ${{ matrix.version }}
         run: |
           python scripts/install-p13-chromium.py "$P13_CHROME_VERSION" "$RUNNER_TEMP/chrome"
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
           npx playwright install-deps chromium
       - name: Install pinned Playwright WebKit on macOS
         if: matrix.engine == 'webkit'
