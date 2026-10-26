@@ -38,6 +38,15 @@ jobs:
           version: '1.8.27'
       - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'
       - run: npm ci --ignore-scripts
+      - name: Require AC-approved complete lock for the exact application pins
+        run: |
+          python - <<'PYTHON'
+          import json
+          refs = json.load(open('integration/feedback/repos.json'))['repositories']
+          receipt = json.load(open('integration/p13-complete-assets.json'))
+          expected = {name:refs[name]['commit'] for name in ('ctm-libs','pyodide-interaktiv')}
+          assert receipt['application_refs'] == expected, 'P13 complete lock awaits AC approval; review the unapproved-p13-lock-review artifact before changing the receipt'
+          PYTHON
       - name: Download AC-approved #80 vendor baseline
         uses: actions/download-artifact@v7
         with:
