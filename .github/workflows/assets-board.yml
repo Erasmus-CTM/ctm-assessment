@@ -31,11 +31,11 @@ jobs:
   contracts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Board tar bytes, exact pins, licence evidence and carried bundle
@@ -44,14 +44,14 @@ jobs:
     needs: [contracts, campaign]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .asset-cache/boards
           key: ctm-board-archives-${{ hashFiles('integration/assets-board-metadata.json') }}
@@ -108,7 +108,7 @@ jobs:
           pathlib.Path('.private-extensions/board-summary.json').write_bytes(assets.json_bytes(summary))
           print(json.dumps(summary))
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: partial-board-lock-and-summary
           path: |
