@@ -70,7 +70,7 @@ try {
           assert.ok(await page.evaluate(()=>__p13Ticks)>ticks,'main thread stays responsive');
           await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('# preserved after Stop'));
           await page.evaluate(()=>{globalThis.__p13MaxTickGap=0;});
-          const stop=Date.now();await control(page,'.qpyodide-button-run').first().click({noWaitAfter:true});
+          const stop=Date.now();await control(page,'.qpyodide-button-run').first().click();
           await ready(page);await finished(page);
           const maxMainThreadGapMs=await page.evaluate(()=>__p13MaxTickGap);
           evidence.runaways.push({program,stopRecoveryMs:Date.now()-stop,maxMainThreadGapMs});
