@@ -15,12 +15,12 @@
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "main",
-      "commit": "00e31334a11830c1cb371cb73342444d56d1c23e"
+      "commit": "2a8d59f638dee1c4ae1961aa5ed966a2b959dbc8"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "d186ffe74b62461e36535b639077c3f0cc5ed811"
+      "commit": "a7af4ed51eb9e707e5ae8c42e311259b9f3ed1d3"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",

@@ -1,7 +1,7 @@
 name: Rendered offline Python website ZIP
 on:
   pull_request:
-    paths: [integration/offline-ide/**, integration/feedback/repos.json, integration/p13-assets-reviewed-digests.json, integration/assets-licences/**, scripts/p13_assets.py, scripts/build-p13-assets.py, scripts/ctm_assets.py, tools/p13-seb-profile.mjs, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
+    paths: [integration/offline-ide/**, integration/feedback/repos.json, integration/p13*.json, integration/assets-licences/**, scripts/*p13*.py, tools/p13-loading.cjs, scripts/ctm_assets.py, tools/p13-seb-profile.mjs, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
   workflow_dispatch:
 permissions:
   contents: read
@@ -57,6 +57,8 @@ jobs:
           ref: ${{ steps.workers.outputs.pyodide-interaktiv }}
           path: _ci/p13-ide
           persist-credentials: false
+      - name: Reject altered deployed and compressed worker files
+        run: python -m unittest discover -s tests -p test_p13_assets.py
       - name: Reproduce the reviewed complete assets including worker sources
         run: |
           python scripts/build-p13-assets.py --library-root _ci/p13-libs --ide-root _ci/p13-ide \
