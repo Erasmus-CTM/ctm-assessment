@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   pinned-stack:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -37,7 +37,11 @@ jobs:
           version: '1.8.27'
       - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6' pytest
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium from the supported browser platform
+        timeout-minutes: 5
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
       - name: Build exactly the reviewed component pins
         run: python scripts/setup-feedback-integration.py --workspace .similar-workspace --package-only
       - name: Test the canonical generation stack
