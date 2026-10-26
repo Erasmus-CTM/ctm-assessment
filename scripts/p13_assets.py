@@ -26,6 +26,7 @@ SOURCES = {
         "_extensions/pyodide-interaktiv/qpyodide-worker-plugin.js",
         "_extensions/pyodide-interaktiv/qpyodide-worker-module.js",
         "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js",
     ],
 }
 

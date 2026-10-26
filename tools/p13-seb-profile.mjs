@@ -178,7 +178,7 @@ try {
       assert.equal(await control(page,'.qpyodide-button-run').first().isDisabled(),true);
       assert.deepEqual(errors,[]);
       await page.evaluate(()=>{globalThis.__p13AllowWorker=true;});
-      await control(page,'.ctm-python-status button','Retry').click();
+      await page.getByRole('button',{name:'Retry',exact:true}).click();
       await ready(page);await run(page,'print("P13_RETRY_OK")','P13_RETRY_OK');
       assert.equal(await control(page,'.ctm-python-status').count(),1,'Retry retains one shared status owner');
       assert.deepEqual(errors,[]);

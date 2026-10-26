@@ -13,8 +13,8 @@ measurements establish the observed effect; no speed threshold is assumed.
 
 The workflow reproduces the reviewed vendor selections with the canonical
 composer, then binds the worker, plugin and service worker to exact component
-pins. The complete 2,800-file lock has SHA256
-`8582339840b0c1f147b567d6f4c2e61a641b4de395ead628dc595c94f0a6c412`.
+pins. The complete 2,802-file lock has SHA256
+`df5e032dc396334537e38b8f2d0a6af293aba36cbf9a3bcece528f68102ed362`.
 The small receipt is `integration/p13-complete-assets.json`; raw locks and logs
 remain CI artifacts. The frozen older inspector and its receipts are retained.
 Deployment verification checks the actual scripts Quarto emits, including any

@@ -1,37 +1,61 @@
 // Main-world DOM reads plus native input. WebKit's isolated selector world can
 // stall after terminating a busy Wasm worker while the page remains responsive.
-export function control(page,selector,text=null) {
-  const key={selector,text};
-  const find=({selector,text})=>Array.from(document.querySelectorAll(selector)).find(e=>text===null||e.textContent.includes(text));
-  const read=fn=>page.evaluate('('+fn.toString()+')('+JSON.stringify(key)+')');
-  const attached=()=>page.waitForFunction(({selector,text})=>Array.from(document.querySelectorAll(selector)).some(e=>text===null||e.textContent.includes(text)),key,{timeout:30000});
-  const ready=async(enabled=false)=>page.waitForFunction(({selector,text,enabled})=>{
-    const e=Array.from(document.querySelectorAll(selector)).find(e=>text===null||e.textContent.includes(text));
-    return !!e&&e.getClientRects().length>0&&getComputedStyle(e).visibility!=='hidden'&&(!enabled||!e.matches(':disabled'));
-  },{...key,enabled},{timeout:30000});
-  const api={
-    first(){return api;},filter({hasText}){return control(page,selector,hasText);},
-    waitFor(){return ready();},
-    count(){return page.evaluate(selector=>document.querySelectorAll(selector).length,selector);},
-    async isDisabled(){await attached();return read(k=>Array.from(document.querySelectorAll(k.selector)).find(e=>k.text===null||e.textContent.includes(k.text)).matches(':disabled'));},
-    async textContent(){await attached();return read(k=>Array.from(document.querySelectorAll(k.selector)).find(e=>k.text===null||e.textContent.includes(k.text)).textContent);},
-    async inputValue(){await attached();return read(k=>Array.from(document.querySelectorAll(k.selector)).find(e=>k.text===null||e.textContent.includes(k.text)).value);},
-    async click(){
-      await ready(true);
-      const point=await page.evaluate(({selector,text})=>{
-        const e=Array.from(document.querySelectorAll(selector)).find(e=>text===null||e.textContent.includes(text));
-        e.scrollIntoView({block:'center',inline:'center',behavior:'instant'});
-        const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;
-        if(!r.width||!r.height||!e.contains(document.elementFromPoint(x,y)))throw new Error('Control is covered: '+selector);
-        return {x,y};
-      },key);
-      await page.mouse.click(point.x,point.y);
-    },
-    async fill(value){await ready(true);await page.evaluate(({selector,value})=>{
-      const e=document.querySelector(selector);e.focus();e.value=value;e.dispatchEvent(new Event('input',{bubbles:true}));
-    },{selector,value});},
-    async press(value){await ready(true);await page.evaluate(selector=>document.querySelector(selector).focus(),selector);await page.keyboard.press(value);},
-    async evaluate(fn){await attached();return page.evaluate('('+fn.toString()+')(('+find.toString()+')('+JSON.stringify(key)+'))');}
+function dom({selector,text,first,operation,enabled=false}) {
+  const normalize=s=>s.replace(/\s+/g,' ').trim().toLowerCase();
+  const matches=Array.from(document.querySelectorAll(selector)).filter(e=>text===null||normalize(e.textContent).includes(normalize(text)));
+  if(operation==='count')return first?Math.min(matches.length,1):matches.length;
+  if(!first&&matches.length>1)throw new Error('Strict control lookup matched multiple elements: '+selector);
+  const e=matches[0];
+  if(!e)return false;
+  const disabled=()=>{
+    if(e.matches(':disabled'))return true;
+    for(let n=e;n;n=n.parentElement){
+      const aria=n.getAttribute('aria-disabled');
+      if(aria==='true')return true;
+      if(aria==='false')return false;
+    }
+    return false;
   };
-  return api;
+  if(operation==='attached')return true;
+  if(operation==='ready')return e.getClientRects().length>0&&getComputedStyle(e).visibility!=='hidden'&&(!enabled||!disabled());
+  if(operation==='disabled')return disabled();
+  if(operation==='text')return e.textContent;
+  if(operation==='value'){
+    if(!(e instanceof HTMLInputElement||e instanceof HTMLTextAreaElement))throw new Error('Control has no input value: '+selector);
+    return e.value;
+  }
+  if(operation==='element')return e;
+  if(operation==='pointer'){
+    if(disabled())throw new Error('Control is disabled: '+selector);
+    e.scrollIntoView({block:'center',inline:'center',behavior:'instant'});
+    const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;
+    if(!r.width||!r.height||!e.contains(document.elementFromPoint(x,y)))throw new Error('Control is covered: '+selector);
+    return {x,y};
+  }
+  if(operation==='edit'){
+    if(!(e instanceof HTMLInputElement||e instanceof HTMLTextAreaElement)||e.readOnly||e.getAttribute('aria-readonly')==='true')throw new Error('Control is not editable: '+selector);
+    if(disabled())throw new Error('Control is disabled: '+selector);
+    e.focus();if(document.activeElement!==e)throw new Error('Control could not receive focus: '+selector);
+    e.select();return true;
+  }
+  if(operation==='focus'){e.focus();return true;}
+  throw new Error('Unknown control operation');
+}
+export function control(page,selector,text=null,first=false) {
+  const key={selector,text,first};
+  const read=operation=>page.evaluate(dom,{...key,operation});
+  const wait=(operation='ready',enabled=false,timeout=30000)=>page.waitForFunction(dom,{...key,operation,enabled},{timeout});
+  return {
+    first(){return control(page,selector,text,true);},
+    filter({hasText}){if(first)throw new Error('Filter before selecting the first control');return control(page,selector,hasText,false);},
+    waitFor({timeout=30000}={}){return wait('ready',false,timeout);},
+    count(){return read('count');},
+    async isDisabled(){await wait('attached');return read('disabled');},
+    async textContent(){await wait('attached');return read('text');},
+    async inputValue(){await wait('attached');return read('value');},
+    async click({timeout=30000}={}){await wait('ready',true,timeout);const point=await read('pointer');await page.mouse.click(point.x,point.y);},
+    async fill(value,{timeout=30000}={}){await wait('ready',true,timeout);await read('edit');if(value==='')await page.keyboard.press('Backspace');else await page.keyboard.insertText(value);},
+    async press(value,{timeout=30000}={}){await wait('ready',true,timeout);await read('focus');await page.keyboard.press(value);},
+    async evaluate(fn){await wait('attached');const handle=await page.evaluateHandle(dom,{...key,operation:'element'});try{return await handle.evaluate(fn);}finally{await handle.dispose();}}
+  };
 }
