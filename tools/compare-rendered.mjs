@@ -25,7 +25,7 @@ import {isDeepStrictEqual} from 'node:util';
 import {createRequire} from 'node:module';
 import {closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 import {markStoreAdditions} from './compare-rendered/store.mjs';
-import {stackTransition,markStackChanges} from './compare-rendered/stack.mjs';
+import {stackTransition,stackVariantsTransition,markStackChanges} from './compare-rendered/stack.mjs';
 import {loadAssetSources, markAssetChanges} from './compare-rendered/assets.mjs';
 const require = createRequire(import.meta.url);
 const vm = require('node:vm');
@@ -152,7 +152,7 @@ function extract(file) {
   for (const exercise of configs.__pyExercises || []) if (exercise && exercise.policySelection) selections.push(['py-exercise', exercise.policySelection]);
   for (const cell of configs.qpyodideCellDetails || []) if (cell?.options?.policySelection) selections.push(['pyodide-interaktiv', cell.options.policySelection]);
   const domNodes = [];
-  return {doc, files, inline, configs, sources, selections, dom: canonical(doc.body, domNodes), domNodes};
+  return {file,doc, files, inline, configs, sources, selections, dom: canonical(doc.body, domNodes), domNodes};
 }
 
 // Feedback context: the prose an exercise sends is that of its own section,
@@ -761,6 +761,10 @@ function stackPolicyNotes(page, A, B) {
 function comparePage(page, before, after, ends, linked, assets) {
   const A = extract(before), B = extract(after), items = [];
   if(stackTransition(A,B))items.push({page,area:'config',change:'changed',object:'stack-card-shell',path:'/',effective:'identical-engine-data'});
+  if(stackVariantsTransition(A,B)) {
+    items.push({page,area:'config',change:'changed',object:'stack-variants',path:'/',effective:'native-verified-seeds-and-history'});
+    B.domNodes=[];B.dom=canonical(B.doc.body,B.domNodes);
+  }
   items.push(...stackPolicyNotes(page, A, B));
   // Additive generated chrome has no authored position. Only a complete,
   // catalogue-verified store bar may leave the invariant's prose accounting.
@@ -802,7 +806,7 @@ function comparePage(page, before, after, ends, linked, assets) {
     Object.assign(item, features);
     delete item.index;
   }
-  markStackChanges(B,items);
+  markStackChanges(B,items,(card,text,refs)=>contextVerdict(B.doc,card,text,null,refs,false)==='own-section');
   const contextual = contextItems(items, B, page);
   markStoreAdditions(B, contextual);
   markAssetChanges(A, B, contextual, assets, page, after, before);

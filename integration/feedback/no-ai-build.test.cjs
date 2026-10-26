@@ -38,7 +38,7 @@ function project(source) {
 function render(dir, args = [], env = {}) {
   fs.rmSync(path.join(dir, '_site'), {recursive: true, force: true});
   fs.rmSync(path.join(dir, '.quarto'), {recursive: true, force: true});
-  const result = spawnSync(QUARTO, ['render', ...args], {cwd: dir, encoding: 'utf8', timeout: 300000, env: {...process.env, ...env}});
+  const result = spawnSync(QUARTO, ['render', ...args], {cwd: dir, encoding: 'utf8', timeout: 300000, env: {...process.env, CTM_VARIANTS:'review', ...env}});
   assert.equal(result.status, 0, result.stderr);
   return result.stderr.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '');
 }
