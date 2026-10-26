@@ -1,0 +1,66 @@
+name: P13 unapproved complete lock review
+on:
+  push:
+    branches: [p13/exam-integration]
+    paths: [scripts/review-p13-assets.py, .github/workflows/p13-lock-review.yml, integration/feedback/repos.json, integration/p13-assets-reviewed-digests.json]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Read exact P13 application pins
+        id: pins
+        run: |
+          python - <<'PY'
+          import json, os
+          refs = json.load(open('integration/feedback/repos.json'))['repositories']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              for name in ('ctm-libs','pyodide-interaktiv'):
+                  out.write(name+'='+refs[name]['commit']+'\n')
+          PY
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: ${{ steps.pins.outputs.ctm-libs }}
+          path: _ci/p13-libs
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/pyodide-interaktiv
+          ref: ${{ steps.pins.outputs.pyodide-interaktiv }}
+          path: _ci/p13-ide
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: prebuilt-offline-assets
+          run-id: '40389684095'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/approved-assets
+      - uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/asset-cache
+          key: p13-lock-review-${{ hashFiles('integration/assets-metadata.json', 'integration/assets-board-metadata.json') }}
+      - name: Rebuild unapproved lock, full diff and zero-network carry evidence
+        run: |
+          python scripts/review-p13-assets.py \
+            --baseline "$RUNNER_TEMP/approved-assets/inspection/complete-lock.json" \
+            --library-root _ci/p13-libs --ide-root _ci/p13-ide \
+            --cache "$RUNNER_TEMP/asset-cache" --output "$RUNNER_TEMP/p13-lock-review"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: unapproved-p13-lock-review
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/p13-lock-review/review-summary.json
+            ${{ runner.temp }}/p13-lock-review/complete-lock.diff
+            ${{ runner.temp }}/p13-lock-review/proposed-complete-lock.json
