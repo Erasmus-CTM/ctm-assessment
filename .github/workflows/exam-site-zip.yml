@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      ASSET_RUN_ID: '40387028513'
-      ASSET_LIBS_COMMIT: '626b546604f51c9cb738210c56d054d421581e02'
+      ASSET_RUN_ID: '40389684095'
+      ASSET_LIBS_COMMIT: '6f464e687e47282b3faebed27317c48dd8ad70ff'
       IDE_PYODIDE_COMMIT: '16561e6604a8047027a4b053ad0d7b8e140efe7f'
-      REVIEWED_LOCK_SHA256: e2ebd44e1492a2ead3f170a3922cb925d12014caee0e2c92356a0ce4fa4636bc
+      REVIEWED_LOCK_SHA256: 73d8b6fb0de3cd5b8d3ec8e7932d96f854bedf07ab7b7af43013d3cd1f347b3b
     steps:
       - uses: actions/checkout@v7
         with:
