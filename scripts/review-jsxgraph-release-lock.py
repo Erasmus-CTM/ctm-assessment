@@ -24,7 +24,7 @@ spec = importlib.util.spec_from_file_location('canonical_assets', args.composer 
 assets = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(assets)
 old_raw = (args.baseline / 'inspection/complete-lock.json').read_bytes()
-assets.verify_bytes(old_raw, sha256='6f8a64b5a24ffdeda87f7cd83a6eee23ee87f7752bf027fbb68174a60d5359fe')
+assets.verify_bytes(old_raw, sha256='e2ebd44e1492a2ead3f170a3922cb925d12014caee0e2c92356a0ce4fa4636bc')
 old = json.loads(old_raw)
 index = (args.baseline / 'assets-imports.json').read_bytes()
 assets.verify_bytes(index, sha256=old['private']['import_index']['sha256'])

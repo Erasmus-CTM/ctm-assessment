@@ -23,13 +23,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-libs
-          ref: 626b546604f51c9cb738210c56d054d421581e02
+          ref: 6f464e687e47282b3faebed27317c48dd8ad70ff
           path: .asset-sources/libs
           persist-credentials: false
       - uses: actions/download-artifact@v7
         with:
           name: prebuilt-offline-assets
-          run-id: '40081864918'
+          run-id: '40387028513'
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/approved-assets
       - name: Regenerate canonical Python, npm and release board subsets
