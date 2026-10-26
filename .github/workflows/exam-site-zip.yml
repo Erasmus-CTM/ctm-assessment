@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   website:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       ASSET_RUN_ID: '40389684095'
@@ -122,7 +122,11 @@ jobs:
           shutil.copytree(deployed, root / 'hosted/dept/python')
           print('Website ZIP sha256:', a.digest(output.read_bytes()))
           PY
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium from the supported browser platform
+        timeout-minutes: 5
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
       - name: Serve the extracted website using ordinary static hosting and optional headers
         run: |
           python -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/deployed" > "$RUNNER_TEMP/plain.log" 2>&1 &
