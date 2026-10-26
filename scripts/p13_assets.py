@@ -35,6 +35,10 @@ def bind_application(lock, roots, refs, cache):
     """Extend a canonical lock with exact immutable application source records."""
     if set(roots) != set(SOURCES) or set(refs) != set(SOURCES):
         raise assets.AssetError("Both exact application sources are required")
+    current = assets.version_sources(Path(roots["ctm-libs"]) / "_extensions/ctm-libs")
+    provenance = lock.get("provenance", {})
+    if any(provenance.get(key) != current[key] for key in ("runtime_sha256", "table_sha256")):
+        raise assets.AssetError("Compose the vendor lock against the current canonical runtime and asset table before binding application assets")
     result = json.loads(json.dumps(lock))
     if "application" in result:
         raise assets.AssetError("Application assets are already bound")

@@ -7,7 +7,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import ctm_assets as a
-from p13_assets import SOURCES, verify_deployment
+from p13_assets import SOURCES, bind_application, verify_deployment
 
 
 class Deployment(unittest.TestCase):
@@ -48,6 +48,31 @@ class Deployment(unittest.TestCase):
         (self.site / 'site_libs/pyodide-worker-core.js').unlink()
         with self.assertRaisesRegex(a.AssetError, 'Missing deployed worker'):
             verify_deployment(self.site, self.lock)
+
+
+class ApplicationProvenance(unittest.TestCase):
+    def test_stale_composition_cannot_be_rebound_to_new_runtime_or_asset_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            library = root / '_extensions/ctm-libs'
+            (library / 'runtime').mkdir(parents=True)
+            table = library / 'assets.json'
+            runtime = library / 'runtime/pyodide-runtime.js'
+            table.write_text('{"v":1,"assets":{}}')
+            runtime.write_text("var indexURL = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';")
+            current = a.version_sources(library)
+            lock = {'provenance': {k:current[k] for k in ('runtime_sha256','table_sha256')}}
+            roots = {'ctm-libs':root, 'pyodide-interaktiv':root}
+            refs = {name:'a'*40 for name in roots}
+            for target in (runtime, table):
+                with self.subTest(source=target.name):
+                    before = target.read_bytes()
+                    target.write_bytes(before + b'\n')
+                    with self.assertRaisesRegex(a.AssetError, 'Compose the vendor lock against the current canonical runtime'):
+                        bind_application(lock, roots, refs, root/'cache')
+                    target.write_bytes(before)
+            with self.assertRaisesRegex(a.AssetError, 'Compose the vendor lock against the current canonical runtime'):
+                bind_application({}, roots, refs, root/'cache')
 
 
 if __name__ == '__main__':
