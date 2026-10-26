@@ -1,5 +1,5 @@
-// Main-world DOM reads plus native input. WebKit's isolated selector world can
-// stall after terminating a busy Wasm worker while the page remains responsive.
+// Main-world DOM reads plus native input. Poll actual control state independently
+// of rendering frames, with strict selection and finite read deadlines.
 function dom({selector,text,first,operation,enabled=false}) {
   const normalize=s=>s.replace(/\s+/g,' ').trim().toLowerCase();
   const matches=Array.from(document.querySelectorAll(selector)).filter(e=>text===null||normalize(e.textContent).includes(normalize(text)));
