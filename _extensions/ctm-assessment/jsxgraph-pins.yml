@@ -1,9 +1,9 @@
 # Exact browser-library asset pins (approved offline design Q5/Q16/Q18).
-# AC approved the immutable Git build on 25 Oct (upstream a3867ae).
+# Released JSXGraph 1.14.2 replaces the approved development Git build.
 # This is the sole board asset version home, separate from the JSXGraph
 # extension commit. Its generic local-URL/fork acceptance gate remains separate.
 jsxgraph:
-  src_jxg: https://cdn.jsdelivr.net/gh/aacchhee/jsxgraph-quarto@5a1847cbcdd22b1f167f5bb9a901d47cb43e3a23/_extensions/jsxgraph/resources/js/jsxgraphcore.js
-  src_css: https://cdn.jsdelivr.net/gh/aacchhee/jsxgraph-quarto@5a1847cbcdd22b1f167f5bb9a901d47cb43e3a23/_extensions/jsxgraph/resources/css/jsxgraph.css
+  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.2/distrib/jsxgraphcore.js
+  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.2/distrib/jsxgraph.css
   src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js
   mjx_fonts: https://cdn.jsdelivr.net/npm/@mathjax/mathjax-newcm-font@4.1.3/

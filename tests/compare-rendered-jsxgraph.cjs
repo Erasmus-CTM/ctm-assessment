@@ -10,13 +10,13 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'renderer-transition-'));
 
 (async()=>{
  const M=await import(pathToFileURL(path.join(root,'tools/compare-rendered/jsxgraph-renderer.mjs')));
- const afterSide=process.env.JSXGRAPH_AFTER_SIDE||'after';
+ const afterSide=process.env.JSXGRAPH_AFTER_SIDE||'after',beforeSide=process.env.JSXGRAPH_BEFORE_SIDE||'before';
  const sources={},projects={},pins={};let checks=0;
  try {
   for(const side of ['before','after']) {
    const checkout=process.env[side==='before'?'JSXGRAPH_BEFORE_SOURCE':'JSXGRAPH_AFTER_SOURCE'];
    assert.ok(checkout,'Both exact upstream checkout paths are required');
-   const selected=side==='after'?afterSide:'before',expected=M.RENDERERS[selected];
+   const selected=side==='after'?afterSide:beforeSide,expected=M.RENDERERS[selected];
    assert.equal(run('git',['rev-parse','HEAD'],checkout),expected.commit);
    const dir=projects[side]=path.join(tmp,side);fs.mkdirSync(dir,{recursive:true});
    fs.cpSync(path.join(checkout,'_extensions/jsxgraph'),path.join(dir,'_extensions/jsxgraph'),{recursive:true});
@@ -27,7 +27,7 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'renderer-transition-'));
    fs.writeFileSync(path.join(dir,'resolved-repos.json'),JSON.stringify(record));
    fs.writeFileSync(path.join(dir,'pins.json'),JSON.stringify(pins[side]));
    sources[side]=M.rendererSource(dir,pins[side],selected);checks++;
-   fs.writeFileSync(path.join(dir,'page.qmd'),`---\ntitle: Renderer regression\nfilters: [jsxgraph]\njsxgraph:\n  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraphcore.js\n  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/distrib/jsxgraph.css\n  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js\n---\n\n\`\`\`{.jsxgraph assessment_id="strict-board" width="760" height="440" unit="px"}\n'use strict';\nvar board=JXG.JSXGraph.initBoard(BOARDID,{boundingbox:[-5,5,5,-5]});\nboard.create('point',[1,2]);\n\`\`\`\n\n\`\`\`{.jsxgraph assessment_id="relative-board" width="100" height="50" unit="%"}\nvar board=JXG.JSXGraph.initBoard(BOARDID,{boundingbox:[-4,4,4,-4]});\nboard.create('point',[2,1]);\n\`\`\`\n`);
+   fs.writeFileSync(path.join(dir,'page.qmd'),`---\ntitle: Renderer regression\nfilters: [jsxgraph]\njsxgraph:\n  src_jxg: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.2/distrib/jsxgraphcore.js\n  src_css: https://cdn.jsdelivr.net/npm/jsxgraph@1.14.2/distrib/jsxgraph.css\n  src_mjx: https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-mml-svg.js\n---\n\n\`\`\`{.jsxgraph assessment_id="strict-board" width="760" height="440" unit="px"}\n'use strict';\nvar board=JXG.JSXGraph.initBoard(BOARDID,{boundingbox:[-5,5,5,-5]});\nboard.create('point',[1,2]);\n\`\`\`\n\n\`\`\`{.jsxgraph assessment_id="relative-board" width="100" height="50" unit="%"}\nvar board=JXG.JSXGraph.initBoard(BOARDID,{boundingbox:[-4,4,4,-4]});\nboard.create('point',[2,1]);\n\`\`\`\n`);
    run(process.env.QUARTO||'quarto',['render','page.qmd','--to','html'],dir);
   }
   const frames=side=>[...fs.readFileSync(path.join(projects[side],'page.html'),'utf8').matchAll(/<iframe\b[^>]*>/g)].map(match=>{
@@ -48,12 +48,13 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'renderer-transition-'));
   reject('MathJax URL',s=>s.replace('mathjax@4.1.3','mathjax@4.1.4'));
   reject('MathJax async lifecycle',s=>s.replace('id="MathJax-script" async','id="MathJax-script" defer'));
   reject('extra pre-loader',s=>s.replace('<script id="MathJax-script"','<script src="pre-loader.js"></script><script id="MathJax-script"'));
+  if(afterSide==='release')reject('iframe overflow policy',s=>s.replace('overflow:hidden;}.jxgbox','overflow:visible;}.jxgbox'));
   reject('stylesheet',s=>s.replace('jsxgraph.css','other.css'));
   reject('inner frame DOM',s=>s.replace('class="jxgbox"','class="jxgbox changed"'));
   reject('board identity',s=>s.replace('const assessmentId = "strict-board"','const assessmentId = "other-board"'));
-  reject('original provisional dimensions',s=>s.replace('const provisionalSize = [760, 440]','const provisionalSize = [760, 441]'),'before');
+  if(beforeSide==='before')reject('original provisional dimensions',s=>s.replace('const provisionalSize = [760, 440]','const provisionalSize = [760, 441]'),'before');
   const wrongGeometry={querySelectorAll:()=>old.map(frame=>({getAttribute:name=>name==='style'?'width:760px; height:441px;':frame.getAttribute(name)}))};
-  assert.throws(()=>M.proveRendererPair(original,sources,wrongGeometry));checks++;
+  if(beforeSide==='before'){assert.throws(()=>M.proveRendererPair(original,sources,wrongGeometry));checks++;}
   const record=path.join(projects.after,'resolved-repos.json'),saved=fs.readFileSync(record);
   const bad=JSON.parse(saved);bad.repositories.jsxgraph.local_override=true;fs.writeFileSync(record,JSON.stringify(bad));
   assert.throws(()=>M.rendererSource(projects.after,pins.after,afterSide));checks++;fs.writeFileSync(record,saved);
@@ -71,6 +72,6 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'renderer-transition-'));
   const fork=JSON.parse(JSON.stringify(pins.after));fork.repositories.jsxgraph.repository='wrong-owner/jsxgraph-quarto';
   assert.throws(()=>M.rendererSource(projects.after,fork,afterSide));checks++;
   assert.ok(M.loadRendererSources(projects.before,path.join(projects.before,'pins.json'),projects.after,path.join(projects.after,'pins.json')));checks++;
-  console.log(JSON.stringify({checks,actualQuartoFrames:items.length,before:M.RENDERERS.before.commit,after:M.RENDERERS[afterSide].commit,allNegativeMutationsRejected:true}));
+  console.log(JSON.stringify({checks,actualQuartoFrames:items.length,before:M.RENDERERS[beforeSide].commit,after:M.RENDERERS[afterSide].commit,allNegativeMutationsRejected:true}));
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

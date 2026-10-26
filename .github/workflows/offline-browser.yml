@@ -51,8 +51,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/offline-jxg"
-          npm view jsxgraph@1.14.1 dist.integrity --registry=https://registry.npmjs.org > "$RUNNER_TEMP/offline-jxg/integrity.txt"
-          npm pack jsxgraph@1.14.1 --registry=https://registry.npmjs.org --pack-destination "$RUNNER_TEMP/offline-jxg" --json > "$RUNNER_TEMP/offline-jxg/package.json"
+          npm view jsxgraph@1.14.2 dist.integrity --registry=https://registry.npmjs.org > "$RUNNER_TEMP/offline-jxg/integrity.txt"
+          npm pack jsxgraph@1.14.2 --registry=https://registry.npmjs.org --pack-destination "$RUNNER_TEMP/offline-jxg" --json > "$RUNNER_TEMP/offline-jxg/package.json"
           node --input-type=module <<'JS'
           import fs from 'node:fs';
           import crypto from 'node:crypto';
@@ -61,10 +61,10 @@ jobs:
           const metadata = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))[0];
           const expected = fs.readFileSync(path.join(dir, 'integrity.txt'), 'utf8').trim();
           const actual = 'sha512-' + crypto.createHash('sha512').update(fs.readFileSync(path.join(dir, metadata.filename))).digest('base64');
-          if (metadata.version !== '1.14.1' || actual !== expected || metadata.integrity !== expected) throw new Error('fixture package integrity mismatch');
+          if (metadata.version !== '1.14.2' || actual !== expected || metadata.integrity !== expected) throw new Error('fixture package integrity mismatch');
           console.log(JSON.stringify({version: metadata.version, integrity: actual}));
           JS
-          tar -xzf "$RUNNER_TEMP/offline-jxg/jsxgraph-1.14.1.tgz" -C "$RUNNER_TEMP/offline-jxg"
+          tar -xzf "$RUNNER_TEMP/offline-jxg/jsxgraph-1.14.2.tgz" -C "$RUNNER_TEMP/offline-jxg"
       - name: Run positive, negative and real hidden-frame controls
         env:
           CTM_OFFLINE_SERVER: server-source/scripts/serve-offline.py
