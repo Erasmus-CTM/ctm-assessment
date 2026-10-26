@@ -47,6 +47,25 @@ test('only ten structurally verified asset rows are eligible',()=>{
     assert.equal(r.report.items.length,10);assert.ok(r.report.items.every(i=>i.category==='assets'));
   }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });
+
+test('P13 permits only exact pinned worker bytes; code and attribute mutations stay unexplained',()=>{
+ const f=fixture();try{
+  f.put('ctm-libs','runtime/pyodide-runtime.js',"var indexURL = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';\nroot.CTMWorker.page({});");
+  for(const name of ['pyodide-worker.js','coi-serviceworker.js','coi-frame-startup.js'])f.put('ctm-libs','runtime/'+name,'/* canonical '+name+' */');
+  fs.writeFileSync(path.join(f.project,'resolved-repos.json'),JSON.stringify(f.record));
+  const file=path.join(f.dir,'after/site_libs/quarto-contrib/ctm-worker-0.9.0/pyodide-worker.js');
+  fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'/* canonical pyodide-worker.js */');
+  const tag='<script src="site_libs/quarto-contrib/ctm-worker-0.9.0/pyodide-worker.js"></script>';
+  const html=f.after.replace('</head>',tag+'</head>'),expect=['--expect','tools/compare-rendered/expect/step5-p13.yml'];
+  let result=f.run(html,expect);
+  assert.equal(result.status,0,result.stderr+JSON.stringify(result.report));
+  assert.equal(result.report.items.filter(i=>i.category==='p13-worker-delivery').length,1);
+  fs.writeFileSync(file,'/* altered executable worker */');
+  result=f.run(html,expect);assert.equal(result.status,1);
+  fs.writeFileSync(file,'/* canonical pyodide-worker.js */');
+  result=f.run(html.replace(tag,tag.replace('<script ','<script async ')),expect);assert.equal(result.status,1);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
 const mutations={
   'missing helper':s=>s.replace(/<script src="site_libs[^"]+assets.js"><\/script>/,''),
   'duplicate helper':s=>s.replace(/(<script src="site_libs[^"]+assets.js"><\/script>)/,'$1$1'),

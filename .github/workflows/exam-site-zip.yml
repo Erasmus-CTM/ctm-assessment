@@ -1,7 +1,7 @@
 name: Rendered offline Python website ZIP
 on:
   pull_request:
-    paths: [integration/offline-ide/**, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
+    paths: [integration/offline-ide/**, integration/feedback/repos.json, integration/p13-assets-reviewed-digests.json, integration/assets-licences/**, scripts/p13_assets.py, scripts/build-p13-assets.py, scripts/ctm_assets.py, tools/p13-seb-profile.mjs, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,10 +13,6 @@ jobs:
   website:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      ASSET_RUN_ID: '40081864918'
-      IDE_PYODIDE_COMMIT: '16561e6604a8047027a4b053ad0d7b8e140efe7f'
-      REVIEWED_LOCK_SHA256: 6f8a64b5a24ffdeda87f7cd83a6eee23ee87f7752bf027fbb68174a60d5359fe
     steps:
       - uses: actions/checkout@v7
         with:
@@ -39,18 +35,36 @@ jobs:
           version: '1.8.27'
       - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'
       - run: npm ci --ignore-scripts
-      - uses: actions/download-artifact@v7
-        with:
-          name: prebuilt-offline-assets
-          run-id: ${{ env.ASSET_RUN_ID }}
-          github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/prebuilt-assets
-      - name: Install the existing Python frontend
+      - name: Read the exact worker source pins
+        id: workers
         run: |
-          IDE_REVIEW_REFS="$(python -c 'import json,os; print(json.dumps({**json.loads(os.environ.get("CTM_REVIEW_REFS") or "{}"), "pyodide-interaktiv": os.environ["IDE_PYODIDE_COMMIT"]}))')"
+          python - <<'PYTHON'
+          import json, os
+          refs = json.load(open('integration/feedback/repos.json'))['repositories']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              for name in ('ctm-libs', 'pyodide-interaktiv'):
+                  out.write(name + '=' + refs[name]['commit'] + '\n')
+          PYTHON
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: ${{ steps.workers.outputs.ctm-libs }}
+          path: _ci/p13-libs
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/pyodide-interaktiv
+          ref: ${{ steps.workers.outputs.pyodide-interaktiv }}
+          path: _ci/p13-ide
+          persist-credentials: false
+      - name: Reproduce the reviewed complete assets including worker sources
+        run: |
+          python scripts/build-p13-assets.py --library-root _ci/p13-libs --ide-root _ci/p13-ide \
+            --cache "$RUNNER_TEMP/assets-cache" --output "$RUNNER_TEMP/prebuilt-assets"
+      - name: Install the pinned Python frontend and exercise components
+        run: |
           python scripts/build-course.py --path integration/offline-ide \
-            --dest "$RUNNER_TEMP/python-site" --workspace "$RUNNER_TEMP/package" \
-            --review-refs "$IDE_REVIEW_REFS" --no-render
+            --dest "$RUNNER_TEMP/python-site" --workspace "$RUNNER_TEMP/package" --no-render
       - name: Verify and copy prebuilt assets; create standard profiles
         run: |
           python - <<'PY'
@@ -61,14 +75,13 @@ jobs:
           import ctm_assets as a
           root = Path(os.environ['RUNNER_TEMP'])
           carried, project = root / 'prebuilt-assets', root / 'python-site'
-          raw = (carried / 'inspection/complete-lock.json').read_bytes()
+          raw = (carried / 'complete-lock.json').read_bytes()
           lock = json.loads(raw)
-          assert a.digest(raw) == os.environ['REVIEWED_LOCK_SHA256'], 'unreviewed complete lock'
           assert raw == a.json_bytes(lock) and lock['kind'] == 'ctm-assets-lock'
           versions = a.validate_version_homes(lock, project / '_extensions/ctm-libs',
               project / '_extensions/ctm-assessment/jsxgraph-pins.yml')
           assert lock['scope'] == sorted(versions)
-          bundle = carried / 'inspection/complete-built'
+          bundle = carried / 'complete-built'
           a.verify_bundle(bundle, lock)
           index = (carried / 'assets-imports.json').read_bytes()
           base = bundle / 'pyodide' / versions['pyodide']
@@ -91,11 +104,12 @@ jobs:
           from pathlib import Path
           sys.path.insert(0, 'scripts')
           import ctm_assets as a
+          from p13_assets import verify_deployment
           root = Path(os.environ['RUNNER_TEMP'])
           site = root / 'python-site/_site-exam'
           assert (site / 'index.html').is_file() and (site / 'nested/index.html').is_file()
-          lock = json.loads((root / 'prebuilt-assets/inspection/complete-lock.json').read_bytes())
-          a.verify_bundle(site / '_ctm-assets', lock)
+          lock = json.loads((root / 'prebuilt-assets/complete-lock.json').read_bytes())
+          verify_deployment(site, lock)
           readme = Path('docs/exam-site-zip.md').read_text().split('<!-- IT -->\n', 1)[1].split('\n<!-- /IT -->', 1)[0]
           (site / 'README-IT.txt').write_text(readme + '\n', encoding='utf-8')
           output = root / 'python-offline-website.zip'
@@ -117,11 +131,17 @@ jobs:
               assert archive.testzip() is None
               assert 'index.html' in archive.namelist() and '_site-exam/index.html' not in archive.namelist()
               archive.extractall(deployed)
-          a.verify_bundle(deployed / '_ctm-assets', lock)
+          verify_deployment(deployed, lock)
           shutil.copytree(deployed, root / 'hosted/dept/python')
           print('Website ZIP sha256:', a.digest(output.read_bytes()))
           PY
       - run: npx playwright install --with-deps chromium
+      - name: Measure P16 startup strategies without changing production defaults
+        run: |
+          python scripts/prepare-p13-timing.py "$RUNNER_TEMP/python-site"
+          (cd "$RUNNER_TEMP/python-site" && quarto render timing-math.qmd --profile offline && quarto render timing-python.qmd --profile offline)
+          CTM_TIMING_P13=1 CTM_INTEGRATION_SITE="$RUNNER_TEMP/python-site/_site" \
+            node integration/feedback/loading-timing.cjs "$RUNNER_TEMP/p13-loading-timing.json"
       - name: Serve the extracted website using ordinary static hosting and optional headers
         run: |
           python -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/deployed" > "$RUNNER_TEMP/plain.log" 2>&1 &
@@ -264,8 +284,81 @@ jobs:
           name: python-offline-website-evidence
           path: |
             ${{ runner.temp }}/python-offline-checks.json
+            ${{ runner.temp }}/p13-loading-timing.json
             ${{ runner.temp }}/python-ide.png
             ${{ runner.temp }}/plain.log
             ${{ runner.temp }}/subdirectory.log
             ${{ runner.temp }}/headers.log
             ${{ runner.temp }}/subdirectory-headers.log
+
+  seb-engine-profile:
+    needs: [website]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, engine: chromium, version: '139.0.7258.138', profile: cef139}
+          - {os: ubuntu-latest, engine: chromium, version: '147.0.7727.117', profile: cef147}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v7
+        with:
+          name: python-offline-website
+          path: ${{ runner.temp }}/zip
+      - name: Extract the actual website ZIP
+        run: |
+          python - <<'PYTHON'
+          import os, zipfile
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          with zipfile.ZipFile(root / 'zip/python-offline-website.zip') as archive:
+              assert archive.testzip() is None
+              archive.extractall(root / 'deployed')
+          PYTHON
+      - name: Install the exact CEF release-branch Chromium profile
+        if: matrix.engine == 'chromium'
+        env:
+          P13_CHROME_VERSION: ${{ matrix.version }}
+        run: |
+          python scripts/install-p13-chromium.py "$P13_CHROME_VERSION" "$RUNNER_TEMP/chrome"
+          npx playwright install-deps chromium
+      - name: Install pinned Playwright WebKit on macOS
+        if: matrix.engine == 'webkit'
+        run: npx playwright install webkit
+      - name: Serve plain LAN HTTP and a server with isolation headers
+        run: |
+          python -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/deployed" > "$RUNNER_TEMP/plain.log" 2>&1 &
+          python scripts/serve-offline.py "$RUNNER_TEMP/deployed" --port 8766 > "$RUNNER_TEMP/headers.log" 2>&1 &
+      - name: Check Run, Stop, input, NumPy, inert HTML and saved-answer restore
+        env:
+          P13_BROWSER: ${{ matrix.engine }}
+          P13_EXPECT_BROWSER_VERSION: ${{ matrix.version }}
+          P13_REPORT: ${{ runner.temp }}/seb-profile.json
+        run: |
+          if [ "$P13_BROWSER" = chromium ]; then
+            export P13_BROWSER_EXECUTABLE="$RUNNER_TEMP/chrome/chrome-linux64/chrome"
+          fi
+          node tools/p13-seb-profile.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: p13-seb-${{ matrix.profile }}
+          path: |
+            ${{ runner.temp }}/seb-profile.json
+            ${{ runner.temp }}/chrome/receipt.json
+            ${{ runner.temp }}/plain.log
+            ${{ runner.temp }}/headers.log

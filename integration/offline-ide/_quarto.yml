@@ -17,3 +17,4 @@ filters: [ctm-assessment]
 pyodide:
   feedback: false
   preload-packages: false
+  output-mode: exam

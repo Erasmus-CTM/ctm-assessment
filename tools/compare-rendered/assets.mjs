@@ -58,6 +58,11 @@ export function loadAssetSources(project,pinsFile,rendererBeforeProject,renderer
   const table=JSON.parse(read('ctm-libs','assets.json')), helper=read('ctm-libs','assets.js');
   insist(table.v===1&&table.assets&&typeof table.assets==='object','Invalid canonical asset table');
   const runtime=read('ctm-libs','runtime/pyodide-runtime.js').toString('utf8');
+  const p13 = runtime.includes('root.CTMWorker.page({') ? Object.fromEntries([
+    ['ctm-worker/pyodide-worker.js','runtime/pyodide-worker.js'],
+    ['coi-serviceworker.js','runtime/coi-serviceworker.js'],
+    ['ctm-coi-frame-startup/coi-frame-startup.js','runtime/coi-frame-startup.js'],
+  ].map(([url,file])=>[url,hash(read('ctm-libs',file))])) : null;
   const py=[...runtime.matchAll(/var indexURL = '(https:\/\/cdn\.jsdelivr\.net\/pyodide\/v[^'\/]+\/full\/)';/g)];
   insist(py.length===1,'Ambiguous canonical Pyodide URL');
   // Assessment-owned board defaults are read from the installed after package.
@@ -83,9 +88,10 @@ export function loadAssetSources(project,pinsFile,rendererBeforeProject,renderer
   const body=/<script type="module" id="qpyodide-monaco-editor-init">([\s\S]*?)<\/script>/.exec(template);
   insist(body&&monacoCode(body[1],"CTMAssets\\.url\\('monaco-editor', 'min/vs'\\)"),'Unexpected canonical Monaco initializer');
   return {config:{v:1,mode:'cdn',bases},helperHash:hash(helper),table,board,
-    renderer:loadRendererSources(rendererBeforeProject,rendererBeforePinsFile,project,pinsFile)};
+    p13,renderer:loadRendererSources(rendererBeforeProject,rendererBeforePinsFile,project,pinsFile)};
 }
 export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
+  markP13Changes(A,B,items,context);
   markBoardChanges(A,items,context,page);
   markPreloadDefault(A,B,items,context);
   const configScripts=doc=>[...doc.querySelectorAll('script:not([src])')].filter(s=>s.textContent.includes('CTM_ASSETS'));
@@ -206,6 +212,25 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
       if(item.area==='inline'&&item.change==='changed'&&item.what===initKind)item.assets='monaco';
     }
   }catch(error){fail(error.message);}
+}
+
+// P13 explains only new canonical worker delivery and inert defaults. Every
+// authored cell, grade setting, resource attribute and other value is retained.
+function markP13Changes(A,B,items,context){
+ if(!context?.p13)return;
+ for(const item of items){
+  if(item.area==='file'&&item.change==='added'&&item.what.startsWith('script ')){
+   const url=item.what.slice(7),key=url.replace(/^(?:\.\.\/|\.\/)+/,'');
+   const wanted=context.p13[key];if(!wanted)continue;
+   const tags=[...B.doc.scripts].filter(e=>normalize(e.getAttribute('src')||'')===url);
+   if(tags.length!==1||attrs(tags[0],'src').length||/[?#]/.test(tags[0].getAttribute('src')))continue;
+   const source=B.sources[url];
+   if(source&&fs.existsSync(source)&&hash(fs.readFileSync(source))===wanted)item.assets='p13-worker-delivery';
+  }
+  if(item.area==='config'&&item.change==='changed'&&item.object==='qpyodideSettings'&&item.before===undefined&&
+     ((item.path==='/0/qpyodideExamOutput'&&item.after===false)||
+      (item.path==='/0/qpyodideStopAfter'&&item.after===20)))item.assets='p13-inert-defaults';
+ }
 }
 
 // Only the three default resource URLs may differ inside a generated board.

@@ -288,6 +288,7 @@ async function runtimeScenario(browser, version, profile, base) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch({headless: true,
+    ...(process.env.CTM_TIMING_P13 === '1' ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1','--no-proxy-server','--disable-background-networking']} : {}),
     ...(process.env.CHROMIUM_EXECUTABLE ? {executablePath: process.env.CHROMIUM_EXECUTABLE} : {})});
   const results = {generated: new Date().toISOString(), runs: RUNS, slow_runs: SLOW_RUNS, slow_profile: SLOW, scenarios: []};
   // Results are written after every scenario, so a cancelled job keeps them.
@@ -298,6 +299,11 @@ async function runtimeScenario(browser, version, profile, base) {
     console.log(process.env.GITHUB_ACTIONS ? '::notice title=Loading::' + text.replace(/%/g, '%25').replace(/\r?\n/g, '%0A') : text);
   };
   try {
+    if (process.env.CTM_TIMING_P13 === '1') {
+      results.scope = 'P16 measurement-only check/idle/interaction prototypes; production defaults unchanged';
+      await require('../../tools/p13-loading.cjs')(browser, base, site, firstGradeable, record);
+      return;
+    }
     const pages = [
       ['Combined example page (all components), mathematics', '/example.html', 'math'],
       ['Combined example page (all components), Python exercise', '/example.html', 'python'],

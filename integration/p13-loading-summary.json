@@ -1,0 +1,137 @@
+{
+  "browser": "Chromium 154.0.8037.57",
+  "profile": "local assets; 1500 ms think time; one cold/warm pair per mode",
+  "cache": "same browser context per pair; routing disabled to preserve HTTP cache",
+  "scope": "measurement-only prototypes; production defaults unchanged",
+  "external_requests": 0,
+  "rows": [
+    {
+      "component": "math",
+      "mode": "existing",
+      "samples": 2,
+      "python_ready_ms": 2528,
+      "check_latency_ms": 4558,
+      "long_tasks_supported": true,
+      "long_task_count": [
+        1,
+        2
+      ],
+      "long_task_max_ms": [
+        140,
+        125
+      ]
+    },
+    {
+      "component": "math",
+      "mode": "check",
+      "samples": 2,
+      "python_ready_ms": 4038,
+      "check_latency_ms": 6146,
+      "long_tasks_supported": true,
+      "long_task_count": [
+        1,
+        2
+      ],
+      "long_task_max_ms": [
+        131,
+        174
+      ]
+    },
+    {
+      "component": "math",
+      "mode": "idle",
+      "samples": 2,
+      "python_ready_ms": 2316,
+      "check_latency_ms": 4450,
+      "long_tasks_supported": true,
+      "long_task_count": [
+        1,
+        1
+      ],
+      "long_task_max_ms": [
+        111,
+        120
+      ]
+    },
+    {
+      "component": "math",
+      "mode": "interaction",
+      "samples": 2,
+      "python_ready_ms": 2245,
+      "check_latency_ms": 4296,
+      "long_tasks_supported": true,
+      "long_task_count": [
+        1,
+        1
+      ],
+      "long_task_max_ms": [
+        115,
+        119
+      ]
+    },
+    {
+      "component": "python",
+      "mode": "existing",
+      "samples": 2,
+      "python_ready_ms": 2311,
+      "check_latency_ms": 86,
+      "long_tasks_supported": true,
+      "long_task_count": [
+        3,
+        3
+      ],
+      "long_task_max_ms": [
+        335,
+        362
+      ]
+    },
+    {
+      "component": "python",
+      "mode": "check",
+      "samples": 2,
+      "python_ready_ms": 4104,
+      "check_latency_ms": 1882,
+      "long_tasks_supported": true,
+      "long_task_count": [
+        3,
+        3
+      ],
+      "long_task_max_ms": [
+        196,
+        182
+      ]
+    },
+    {
+      "component": "python",
+      "mode": "idle",
+      "samples": 2,
+      "python_ready_ms": 2221,
+      "check_latency_ms": 74,
+      "long_tasks_supported": true,
+      "long_task_count": [
+        3,
+        4
+      ],
+      "long_task_max_ms": [
+        315,
+        382
+      ]
+    },
+    {
+      "component": "python",
+      "mode": "interaction",
+      "samples": 2,
+      "python_ready_ms": 2765,
+      "check_latency_ms": 526,
+      "long_tasks_supported": true,
+      "long_task_count": [
+        3,
+        3
+      ],
+      "long_task_max_ms": [
+        178,
+        181
+      ]
+    }
+  ]
+}
