@@ -295,7 +295,7 @@ async function runtimeScenario(browser, version, profile, base) {
   const record = r => {
     results.scenarios.push(r);
     fs.writeFileSync(out, JSON.stringify(results, null, 2) + '\n');
-    const text = (r.name + ' · ' + r.profile + (r.serviceWorkers === 'allow' ? ' · service worker allowed' : '') + ' | ' + JSON.stringify(r.summary)).slice(0, 3500);
+    const text = (r.name + ' · ' + r.profile + (r.serviceWorkers === 'allow' ? ' · service worker allowed' : '') + ' | ' + JSON.stringify(r.summary || {mode:r.mode,cache:r.cache,pythonReadyMs:r.pythonReadyMs,checkLatencyMs:r.checkLatencyMs,longTasksSupported:r.longTasksSupported,longTasks:r.longTasks?.length})).slice(0, 3500);
     console.log(process.env.GITHUB_ACTIONS ? '::notice title=Loading::' + text.replace(/%/g, '%25').replace(/\r?\n/g, '%0A') : text);
   };
   try {

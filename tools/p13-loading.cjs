@@ -1,6 +1,9 @@
 // Measurement-only preload prototypes. Production defaults are unchanged.
 const fs=require('node:fs'),path=require('node:path');
 module.exports=async function measureP13(browser,base,site,firstGradeable,record){
+  const receipt=path.join(path.dirname(site),'.private-extensions/resolved-repos.json');
+  const installed=JSON.parse(fs.readFileSync(receipt,'utf8'));
+  const source_refs=Object.fromEntries(['ctm-libs','pyodide-interaktiv','math-exercise','py-exercise'].map(name=>[name,installed.repositories[name].commit]));
   for(const [file,kind] of [['timing-math.html','math'],['timing-python.html','python']]) {
     if(!fs.existsSync(path.join(site,file)))throw new Error('P13 needs rendered '+file);
     for(const mode of ['existing','check','idle','interaction']) {
@@ -52,7 +55,7 @@ module.exports=async function measureP13(browser,base,site,firstGradeable,record
           if(mode==='check')await page.evaluate(()=>__p13Release());
           const grade=await firstGradeable(page,kind);
           const metrics=await page.evaluate(()=>({...__p13Loading,domReadyMs:performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd,ready:mainPyodide?.isWorkerProxy===true}));
-          const item={name:'P16 '+kind,mode,cache,profile:'local assets',browser:browser.version(),...metrics,
+          const item={name:'P16 '+kind,mode,cache,profile:'local assets',browser:browser.version(),source_refs,...metrics,
             checkLatencyMs:grade.graded-checkStart,totalMs:Date.now()-start,status:grade.status,external,errors};
           record(item);await page.close();
           if(external.length||errors.length||metrics.error||!metrics.ready||grade.status!=='graded')throw new Error('P13 timing scenario failed: '+JSON.stringify(item));

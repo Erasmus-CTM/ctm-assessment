@@ -1,9 +1,9 @@
 {
   "v": 1,
-  "sha256": "a1d87361f422230fb3555c64d779495e4daf093c410d07cdc91f5e6d40e3e68f",
+  "sha256": "8582339840b0c1f147b567d6f4c2e61a641b4de395ead628dc595c94f0a6c412",
   "files": 2800,
   "application_refs": {
-    "ctm-libs": "d3145bd3b963ac5a0a7af2c83bca9c06d6c66838",
-    "pyodide-interaktiv": "c516303b09b42a9170a7cad645e513f4391c5598"
+    "ctm-libs": "1bc21d3ad381b98a28c3aee3c65275b1dbd9fc69",
+    "pyodide-interaktiv": "0deed9ce09399827c68fb297b4b01d2f91fd2bad"
   }
 }

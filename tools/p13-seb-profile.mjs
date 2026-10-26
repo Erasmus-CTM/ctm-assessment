@@ -17,14 +17,14 @@ const ports=JSON.parse(process.env.P13_PORTS || '{"plain":8765,"headers":8766}')
 const prefix=process.env.P13_PATH_PREFIX || '/';
 const timeout=180000;
 async function ready(page) {
-  await page.waitForFunction(()=>qpyodideCellsReady && qpyodideCellContainer.cells[0]?.primaryUnit?.editor,null,{timeout});
+  await page.waitForFunction(()=>globalThis.qpyodideCellsReady && globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.editor,null,{timeout});
   await page.locator('.qpyodide-button-run').first().waitFor();
 }
 async function code(page,text) {
   await page.evaluate(text=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue(text),text);
 }
 async function finished(page) {
-  await page.waitForFunction(()=>qpyodideCellContainer.cells[0].primaryUnit.runButton.title === QP_L.runTitle && !qpyodideCellContainer.cells[0].primaryUnit.runButton.disabled,null,{timeout});
+  await page.waitForFunction(()=>globalThis.QP_L && globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.runButton.title === globalThis.QP_L.runTitle && !globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.runButton.disabled,null,{timeout});
 }
 async function run(page,text,expected) {
   await code(page,text);await page.locator('.qpyodide-button-run').first().click();
@@ -62,7 +62,8 @@ try {
         evidence.runaways=[];
         for(const program of ['while True: pass','while True: print("flood")','while True: print("")','while True:\n    try:\n        while True: pass\n    except KeyboardInterrupt: pass']) {
           const ticks=await page.evaluate(()=>__p13Ticks);
-          await code(page,program);await page.locator('.qpyodide-button-run').first().click();
+          await page.evaluate(()=>{globalThis.__p13BeforeProxy=mainPyodide;});
+          await code(page,'P13_SESSION_MARKER=42\n'+program);await page.locator('.qpyodide-button-run').first().click();
           await page.waitForTimeout(300);
           assert.ok(await page.evaluate(()=>__p13Ticks)>ticks,'main thread stays responsive');
           await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('# preserved after Stop'));
@@ -70,7 +71,11 @@ try {
           await ready(page);await finished(page);
           evidence.runaways.push({program,stopRecoveryMs:Date.now()-stop});
           assert.equal(await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.getValue()),'# preserved after Stop');
-          await run(page,'print("P13_AFTER_STOP",42)','P13_AFTER_STOP 42');
+          const retained=await page.evaluate(()=>__p13BeforeProxy===mainPyodide);
+          if(!retained)assert.ok((await page.locator('.qpyodide-output-code-area').first().textContent()).includes(await page.evaluate(()=>QP_L.abortedRestart)),'hard restart explains reset');
+          await run(page,'print("P13_AFTER_STOP",42)\nprint("P13_SESSION_STATE", "P13_SESSION_MARKER" in globals())','P13_AFTER_STOP 42');
+          assert.ok((await page.locator('.qpyodide-output-code-area').first().textContent()).includes('P13_SESSION_STATE '+(retained?'True':'False')));
+          if(!isolated)assert.equal(retained,false);
         }
         if(isolated) {
           await code(page,'answer=input("P13_NAME: ")\nprint("P13_INPUT",answer)');
@@ -153,7 +158,7 @@ try {
     await context.addInitScript(()=>{
       const NativeWorker=globalThis.Worker;
       globalThis.Worker=class extends NativeWorker {
-        constructor(url,options){if(String(url).includes('pyodide-worker-core.js'))throw new Error('P13 intentionally blocked worker');super(url,options);}
+        constructor(url,options){if(String(url).includes('pyodide-worker-core.js')&&!globalThis.__p13AllowWorker)throw new Error('P13 intentionally blocked worker');super(url,options);}
       };
     });
     const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
@@ -165,7 +170,12 @@ try {
       assert.ok((await page.evaluate(()=>CTMExport.open().markdown)).includes('# editable when worker is blocked'));
       assert.equal(await page.locator('.qpyodide-button-run').first().isDisabled(),true);
       assert.deepEqual(errors,[]);
-      report.results.push({case:'worker blocked',prefix,editing:true,export:true,ok:true});
+      await page.evaluate(()=>{globalThis.__p13AllowWorker=true;});
+      await page.getByRole('button',{name:'Retry',exact:true}).click();
+      await ready(page);await run(page,'print("P13_RETRY_OK")','P13_RETRY_OK');
+      assert.equal(await page.locator('.ctm-python-status').count(),1,'Retry retains one shared status owner');
+      assert.deepEqual(errors,[]);
+      report.results.push({case:'worker blocked and explicit Retry',prefix,editing:true,export:true,recovered:true,ok:true});
     } finally {await context.close();}
   }
 } finally {
