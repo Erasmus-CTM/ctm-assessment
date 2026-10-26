@@ -38,6 +38,9 @@ lock = assets.compose_asset_lock(partials, args.library,
     reviewed_partial_sha256=digests, private_index_bytes=index,
     reviewed_index_sha256=old['private']['import_index']['sha256'],
     reviewed_availability_sha256=old['private']['import_index']['availability_sha256'])
+expected = json.loads(old_raw)
+expected['provenance']['runtime_sha256'] = assets.version_sources(args.library)['runtime_sha256']
+assert lock == expected, 'Unexpected change beyond the current library runtime provenance binding'
 raw = assets.json_bytes(lock)
 args.out.mkdir(parents=True, exist_ok=True)
 (args.out / 'proposed-complete-lock.json').write_bytes(raw)
