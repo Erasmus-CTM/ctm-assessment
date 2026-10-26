@@ -121,7 +121,7 @@ jobs:
           c="$RUNNER_TEMP/corpora"
           node integration/pyodide-parity/run.cjs --hash-seed 1 \
             --site umbrella="$c/ws/site/_site" --site math-exercise="$c/sites/math-exercise/_site" \
-            --sources umbrella=. --sources math-exercise="$c/sites/math-exercise" \
+            --sources umbrella="$c/ws/site" --sources math-exercise="$c/sites/math-exercise" \
             --extensions "$c/ws/site/_extensions" --out "$RUNNER_TEMP/parity-seed1" --capture "$RUNNER_TEMP/goldens-seed1" \
             > "$RUNNER_TEMP/parity-seed1.log" 2>&1 || { tail -80 "$RUNNER_TEMP/parity-seed1.log"; exit 1; }
           cd "$RUNNER_TEMP/goldens-seed1"

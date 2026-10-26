@@ -167,13 +167,10 @@ def main():
         # The example sites (and the umbrella's Python programs) go with the pinned courses.
         run(*build, '--repo', 'https://github.com/Erasmus-CTM/math-exercise.git', '--ref', record['repositories']['math-exercise']['commit'],
             '--dest', out / 'sites/math-exercise')
-        # The Pyodide authored pass requires source-bound native variant
-        # receipts, resolved read-only by the installed component producer.
-        run(sys.executable, HERE / 'native-authored.py', '--root', out / 'sites/math-exercise')
         built.update(python='umbrella',
                      sites=[{'name': 'umbrella', 'dir': 'ws/site/_site', 'corpus': 'umbrella'},
                             {'name': 'math-exercise', 'dir': 'sites/math-exercise/_site', 'corpus': 'math-exercise'}],
-                     sources=[{'name': 'umbrella', 'dir': 'umbrella'}, {'name': 'math-exercise', 'dir': 'sites/math-exercise'}])
+                     sources=[{'name': 'umbrella', 'dir': 'ws/site'}, {'name': 'math-exercise', 'dir': 'sites/math-exercise'}])
         # This harness owns both builds; use its compatibility builder for a
         # package from before U6 as well as the new packaged component.
         run(sys.executable, HERE.parents[1] / 'scripts/build-stack-site.py', '--umbrella', umbrella,
@@ -189,7 +186,6 @@ def main():
             *(['--profile', first] if first else []))
         for profile in others:
             run('quarto', 'render', *(['--profile', profile] if profile else []), cwd=dest)
-        run(sys.executable, HERE / 'native-authored.py', '--root', dest)
         built['sites'].append({'name': name, 'dir': f'sites/{name}/_site', 'corpus': name})
         for profile in spec['course'].get('profiles', []):
             folder = output_dir(dest, profile)
@@ -198,6 +194,11 @@ def main():
             else:
                 notice('Profile not graded', f'{name}: profile {profile} has no output folder of its own')
         built['sources'].append({'name': name, 'dir': f'sites/{name}'})
+    # Every published authored source tree needs a receipt from its own
+    # installed component, including the umbrella's copied example sources.
+    # Resolve read-only; source/history and all grading assertions stay intact.
+    for source in built['sources']:
+        run(sys.executable, HERE / 'native-authored.py', '--root', out / source['dir'])
     shutil.rmtree(out / 'sites/ws', ignore_errors=True)
     (out / 'corpora-built.json').write_text(json.dumps(built, indent=1) + '\n')
     print(json.dumps({'umbrella': str(umbrella), 'courses': refs}), flush=True)

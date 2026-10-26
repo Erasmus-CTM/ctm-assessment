@@ -56,16 +56,19 @@ test('identical wrong fixture grades in both runs still violate their authored e
 });
 
 // The combined gate supplies the current native recipe and its exact receipt.
-if (process.env.CTM_PARITY_VARIANT_BUILD) test('native triangle: real Pyodide replay passes and forged projections fail', async () => {
+if (process.env.CTM_PARITY_VARIANT_BUILD) for (const fixture of [
+  {source:'math-exercise', label:'variant-triangle', tests:3},
+  {source:'umbrella', label:'similar-independence', tests:2}
+]) test('native '+fixture.label+': real Pyodide replay passes and forged projections fail', async () => {
   const {boot} = require('../integration/pyodide-parity/runtime.cjs');
   const {ensureWheels} = require('../integration/pyodide-parity/wheels.cjs');
   const {AUTHORED} = require('../integration/pyodide-parity/authored.cjs');
   const build = path.resolve(process.env.CTM_PARITY_VARIANT_BUILD);
   const built = JSON.parse(fs.readFileSync(path.join(build, 'corpora-built.json')));
-  const source = path.resolve(build, built.sources.find(tree => tree.name === 'math-exercise').dir);
+  const source = path.resolve(build, built.sources.find(tree => tree.name === fixture.source).dir);
   const receipt = JSON.parse(fs.readFileSync(path.join(source, '.ctm-parity-native.json')));
-  const question = receipt.questions.find(q => q.label === 'variant-triangle');
-  assert.ok(question && question.records.length, 'native triangle has a source-bound receipt');
+  const question = receipt.questions.find(q => q.label === fixture.label);
+  assert.ok(question && question.records.length, fixture.label+' has a source-bound receipt');
   const extensions = path.resolve(build, built.extensions);
   const checkerDir = path.join(extensions, 'ctm-checkers');
   const manifest = JSON.parse(fs.readFileSync(path.join(checkerDir, 'checkers.json')));
@@ -78,7 +81,7 @@ if (process.env.CTM_PARITY_VARIANT_BUILD) test('native triangle: real Pyodide re
   py.FS.writeFile(wheel, fs.readFileSync(path.join(checkerDir, manifest.wheel)));
   py.globals.set('_ctm_parity_wheel', wheel);
   py.runPython(AUTHORED);
-  const root = '/ctm-native-triangle';
+  const root = '/ctm-native-'+fixture.label;
   py.FS.mkdirTree(path.posix.dirname(root + '/' + question.file));
   py.FS.writeFile(root + '/' + question.file, fs.readFileSync(path.join(source, question.file)));
   const replay = value => {
@@ -88,7 +91,7 @@ if (process.env.CTM_PARITY_VARIANT_BUILD) test('native triangle: real Pyodide re
   const [record] = replay(question);
   assert.equal(record.outcome,'pass');
   assert.equal(record.nativeCandidates.length, question.records.length);
-  assert.ok(record.nativeCandidates.every(c => c.teacherChecked && c.authoredTests === 3));
+  assert.ok(record.nativeCandidates.every(c => c.teacherChecked && c.authoredTests === fixture.tests));
   const forged=structuredClone(question), first=forged.records[0];
   first.teacherInputs[Object.keys(first.teacherInputs)[0]]='0';
   assert.throws(()=>replay(forged),/context\/options differ from tested data/);
