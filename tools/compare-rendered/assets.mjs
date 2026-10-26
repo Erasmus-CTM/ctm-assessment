@@ -302,7 +302,8 @@ function checkRetainedResources(A,B,items,page,context){
  const i=oldOrder.indexOf(worker),j=newOrder.indexOf(worker),source=B.sources['ctm-worker/pyodide-worker.js'];
  const crossed=new Set(['SCRIPT\0ctm-checkers/ctm-checkers.js','SCRIPT\0ctm-locale-math-exercise/math-exercise.js',
    'LINK\0ctm-matrix-input/ctm-matrix-input.css','LINK\0math-exercise/math-exercise.css','SCRIPT\0ctm-variants/variants.js',
-   'SCRIPT\0ctm-copy/ctm-copy.js','SCRIPT\0ctm-store/ctm-store.js','SCRIPT\0ctm-locale-py-exercise/py-exercise.js']);
+   'SCRIPT\0ctm-copy/ctm-copy.js','SCRIPT\0ctm-store/ctm-store.js','SCRIPT\0ctm-locale-py-exercise/py-exercise.js',
+   'LINK\0py-exercise/py-exercise.css']);
  const workerMove=context?.p13&&newOrder.indexOf(runtime)>=0&&
    oldOrder.filter(k=>k===runtime).length===1&&newOrder.filter(k=>k===runtime).length===1&&
    oldOrder.filter(k=>k===worker).length===1&&newOrder.filter(k=>k===worker).length===1&&

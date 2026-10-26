@@ -47,7 +47,7 @@ try {
       const page=await context.newPage();page.on('pageerror',e=>evidence.errors.push(e.message));
       try {
         await page.addInitScript(()=>{globalThis.__p13Ticks=0;setInterval(()=>__p13Ticks++,20);});
-        await page.goto(new URL(name,base).href);await ready(page);
+        await page.goto(new URL(name,base).href,{waitUntil:"domcontentloaded"});await ready(page);
         assert.equal(await page.evaluate(()=>qpyodideExamOutput),true);
         assert.equal(await page.evaluate(()=>qpyodidePreloadPackages),false);
         assert.equal(await page.evaluate(()=>crossOriginIsolated),isolated);
@@ -134,7 +134,7 @@ try {
         evidence.export='current code remains selectable when downloads are denied';
         for(const key of ['external','errors','failed','responses'])assert.deepEqual(evidence[key],[],key);
         evidence.ok=true;
-      } catch(error) {evidence.error=String(error.stack||error);throw error;}
+      } catch(error) {evidence.error=String(error.stack||error);console.error(JSON.stringify(evidence));throw error;}
       finally {report.results.push(evidence);await context.close();}
     }
   }
@@ -146,7 +146,7 @@ try {
     const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
     let navigations=0;page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++;});
     try {
-      await page.goto(`http://127.0.0.1:${ports.plain}${prefix}index.html`);await ready(page);
+      await page.goto(`http://127.0.0.1:${ports.plain}${prefix}index.html`,{waitUntil:"domcontentloaded"});await ready(page);
       await run(page,'print("P13_COI_OK")','P13_COI_OK');
       assert.ok(navigations<=3,'COI must not reload indefinitely');
       assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
@@ -163,7 +163,7 @@ try {
     });
     const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
     try {
-      await page.goto(`http://127.0.0.1:${ports.headers}${prefix}index.html`);
+      await page.goto(`http://127.0.0.1:${ports.headers}${prefix}index.html`,{waitUntil:"domcontentloaded"});
       await page.waitForFunction(()=>qpyodideCellContainer.cells[0]?.primaryUnit?.editor,null,{timeout});
       await page.waitForFunction(()=>document.querySelector('#qpyodide-status-message-text')?.textContent.includes('P13 intentionally blocked worker'),null,{timeout});
       await code(page,'# editable when worker is blocked');

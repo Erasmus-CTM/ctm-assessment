@@ -342,6 +342,13 @@ test('P13 worker order move is exact and preserves all other resource order',()=
   const html=f.after.replace('</head>',runtime+worker+checker+locale+'</head>');
   let result=f.run(html,expected);assert.equal(result.status,0,result.stderr+JSON.stringify(result.report));
   assert.equal(result.report.items.filter(i=>i.category==='p13-worker-order').length,1);
+  const pyStyle='<link rel="stylesheet" href="site_libs/quarto-contrib/py-exercise-0.5.0/py-exercise.css">';
+  fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',runtime+checker+pyStyle+worker+locale+'</head>'));
+  result=f.run(html.replace(checker+locale,checker+pyStyle+locale),expected);
+  assert.equal(result.status,0,result.stderr+JSON.stringify(result.report));
+  result=f.run(html.replace(checker+locale,pyStyle+checker+locale),expected);
+  assert.equal(result.status,1,'moving the stylesheet itself remains unexplained');
+  fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',runtime+checker+worker+locale+'</head>'));
   result=f.run(html.replace(checker+locale,locale+checker),expected);assert.equal(result.status,1,'unrelated order mutation stays unexplained');
   fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',checker+worker+locale+'</head>'));
   result=f.run(html.replace(runtime,''),expected);assert.equal(result.status,1,'a missing runtime cannot justify moving worker to slot zero');
