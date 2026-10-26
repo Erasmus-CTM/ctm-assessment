@@ -27,21 +27,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-assessment
           # Exact reviewed server head from merged PR27; dependency pins use reviewed heads.
           ref: 7b1903d1c4f4b2fcf0cc29f2773c9d2857144cf9
           path: server-source
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: npm ci
@@ -97,7 +97,7 @@ jobs:
           JS
       - name: Upload exact evidence even on failure
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: offline-browser-controls-${{ github.sha }}
           path: offline-browser-report.json

@@ -26,14 +26,14 @@ jobs:
     needs: [campaign]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .asset-cache/boards
           key: ctm-board-archives-${{ hashFiles('integration/assets-board-metadata.json') }}
@@ -130,7 +130,7 @@ jobs:
               print('CTM_BOARD_LICENCES ' + json.dumps({'chunk': i // 3000, 'base64': encoded[i:i+3000]}))
           print('CTM_BOARD_LICENCES ' + json.dumps({'complete': True}))
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: verified-board-archive-inspection
           path: |
