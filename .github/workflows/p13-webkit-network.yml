@@ -1,0 +1,21 @@
+name: P13 WebKit transport probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  transport:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install webkit
+      - name: Probe direct and proxied local origins
+        run: node tools/p13-webkit-network.mjs
