@@ -13,8 +13,8 @@ KINDS = {"python": "private-partial-python-assets-lock",
          "npm": "private-partial-npm-assets-lock",
          "board": "private-partial-board-assets-lock"}
 SOURCES = {"composer": "63980a231771f63a4d20000f9fafadea73b136c9",
-           "board": "56b36b43d602eda3971afc144e65a73f9f6cfcbb",
-           "ctm-libs": "626b546604f51c9cb738210c56d054d421581e02"}
+           "board": "bf56684f53885c74ee2f7a2aa5827758b436fc12",
+           "ctm-libs": "6f464e687e47282b3faebed27317c48dd8ad70ff"}
 
 
 def main(argv=None):

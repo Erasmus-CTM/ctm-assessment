@@ -38,8 +38,8 @@
     },
     "jsxgraph": {
       "repository": "aacchhee/jsxgraph-quarto",
-      "branch": "fix/2026-10-jsxgraph-115-runtime",
-      "commit": "e31b5d19cb7f282e220634c0e21304067910efff",
+      "branch": "audit/2026-10",
+      "commit": "49a1c7d575e08b2133e39098e8f9deda61567287",
       "extension": "jsxgraph"
     },
     "ctm-assessment": {

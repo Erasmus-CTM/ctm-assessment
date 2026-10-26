@@ -11,12 +11,13 @@ concurrency:
   cancel-in-progress: true
 jobs:
   website:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      ASSET_RUN_ID: '40081864918'
+      ASSET_RUN_ID: '40389684095'
+      ASSET_LIBS_COMMIT: '6f464e687e47282b3faebed27317c48dd8ad70ff'
       IDE_PYODIDE_COMMIT: '16561e6604a8047027a4b053ad0d7b8e140efe7f'
-      REVIEWED_LOCK_SHA256: 6f8a64b5a24ffdeda87f7cd83a6eee23ee87f7752bf027fbb68174a60d5359fe
+      REVIEWED_LOCK_SHA256: 73d8b6fb0de3cd5b8d3ec8e7932d96f854bedf07ab7b7af43013d3cd1f347b3b
     steps:
       - uses: actions/checkout@v7
         with:
@@ -47,7 +48,7 @@ jobs:
           path: ${{ runner.temp }}/prebuilt-assets
       - name: Install the existing Python frontend
         run: |
-          IDE_REVIEW_REFS="$(python -c 'import json,os; print(json.dumps({**json.loads(os.environ.get("CTM_REVIEW_REFS") or "{}"), "pyodide-interaktiv": os.environ["IDE_PYODIDE_COMMIT"]}))')"
+          IDE_REVIEW_REFS="$(python -c 'import json,os; print(json.dumps({**json.loads(os.environ.get("CTM_REVIEW_REFS") or "{}"), "pyodide-interaktiv": os.environ["IDE_PYODIDE_COMMIT"], "ctm-libs": os.environ["ASSET_LIBS_COMMIT"]}))')"
           python scripts/build-course.py --path integration/offline-ide \
             --dest "$RUNNER_TEMP/python-site" --workspace "$RUNNER_TEMP/package" \
             --review-refs "$IDE_REVIEW_REFS" --no-render
@@ -121,7 +122,11 @@ jobs:
           shutil.copytree(deployed, root / 'hosted/dept/python')
           print('Website ZIP sha256:', a.digest(output.read_bytes()))
           PY
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium from the supported browser platform
+        timeout-minutes: 5
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
       - name: Serve the extracted website using ordinary static hosting and optional headers
         run: |
           python -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/deployed" > "$RUNNER_TEMP/plain.log" 2>&1 &

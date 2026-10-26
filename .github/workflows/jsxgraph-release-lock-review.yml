@@ -1,0 +1,49 @@
+name: JSXGraph 1.14.2 complete lock review candidate
+on:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-assessment
+          ref: 63980a231771f63a4d20000f9fafadea73b136c9
+          path: .asset-sources/composer
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: 6f464e687e47282b3faebed27317c48dd8ad70ff
+          path: .asset-sources/libs
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: prebuilt-offline-assets
+          run-id: '40387028513'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/approved-assets
+      - name: Regenerate canonical Python, npm and release board subsets
+        run: |
+          python .asset-sources/composer/scripts/ctm_assets.py python-lock --metadata .asset-sources/composer/integration/assets-metadata.json --cache "$RUNNER_TEMP/asset-cache" --licence-policy .asset-sources/composer/integration/assets-python-licences.json --output "$RUNNER_TEMP/partials/python-lock.json"
+          python .asset-sources/composer/scripts/ctm_assets.py npm-lock --metadata .asset-sources/composer/integration/assets-metadata.json --libs .asset-sources/libs/_extensions/ctm-libs --cache "$RUNNER_TEMP/asset-cache" --output "$RUNNER_TEMP/partials/npm-lock.json"
+          python scripts/ctm_board_assets.py --metadata integration/assets-board-metadata.json --pins _extensions/ctm-assessment/jsxgraph-pins.yml --cache "$RUNNER_TEMP/asset-cache" --output "$RUNNER_TEMP/partials/board-lock.json"
+      - name: Generate unapproved complete preview, full diff and zero-download carry evidence
+        run: |
+          python scripts/review-jsxgraph-release-lock.py --composer .asset-sources/composer --library .asset-sources/libs/_extensions/ctm-libs --baseline "$RUNNER_TEMP/approved-assets" --partials "$RUNNER_TEMP/partials" --cache "$RUNNER_TEMP/asset-cache" --out "$RUNNER_TEMP/lock-review"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: unapproved-lock-review
+          path: |
+            ${{ runner.temp }}/lock-review/review-summary.json
+            ${{ runner.temp }}/lock-review/complete-lock.diff
+            ${{ runner.temp }}/lock-review/proposed-partial-digests.json
+            ${{ runner.temp }}/lock-review/proposed-complete-lock.json

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
-import {loadRendererSources,proveRendererPair} from './jsxgraph-renderer.mjs';
+import {loadRendererSources,proveRendererPair,RENDERERS} from './jsxgraph-renderer.mjs';
 const require=createRequire(import.meta.url), yaml=require('js-yaml');
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const insist=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -129,14 +129,15 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
         const old=/^globalThis\.CTM_ASSETS=(\{[\s\S]*\});$/.exec(ca[0].textContent.trim());
         const previous=old&&JSON.parse(old[1]),expected=structuredClone(context.config);
         const prior=previous?.bases?.jsxgraph;
-        insist(/^https:\/\/cdn\.jsdelivr\.net\/gh\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40}\/$/.test(expected.bases.jsxgraph||'') &&
+        const release=context.renderer?.before.commit===RENDERERS.git.commit && context.renderer?.after.commit===RENDERERS.release.commit;
+        insist(release ? expected.bases.jsxgraph==='https://cdn.jsdelivr.net/npm/jsxgraph@1.14.2/' && prior==='https://cdn.jsdelivr.net/gh/aacchhee/jsxgraph-quarto@5a1847cbcdd22b1f167f5bb9a901d47cb43e3a23/' : /^https:\/\/cdn\.jsdelivr\.net\/gh\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40}\/$/.test(expected.bases.jsxgraph||'') &&
           ['https://cdn.jsdelivr.net/npm/jsxgraph@1/','https://cdn.jsdelivr.net/npm/jsxgraph@1.14.1/'].includes(prior),
           'Existing asset registration changed beyond the pinned Git runtime');
         expected.bases.jsxgraph=prior;
         insist(ca[0].parentElement===A.doc.head && ca[0].attributes.length===0 &&
           old[1]===JSON.stringify(sorted(expected)), 'Existing asset registration changed beyond the JSXGraph base');
         const kind=B.inline.find(i=>i.code===config.textContent.trim())?.kind;
-        for(const item of items)if(item.area==='inline'&&item.change==='changed'&&item.what===kind)item.assets='jsxgraph-git-configuration';
+        for(const item of items)if(item.area==='inline'&&item.change==='changed'&&item.what===kind)item.assets=release?'jsxgraph-release-configuration':'jsxgraph-git-configuration';
       }
       insist(normalize(raw(ha[0]))===normalize(helperURL)&&!/[?#\\]/.test(raw(ha[0])),'Existing helper URL changed');
       insist(hash(fs.readFileSync(path.resolve(path.dirname(beforeFile),raw(ha[0]))))===context.helperHash,'Existing helper bytes differ');
@@ -229,7 +230,8 @@ function markBoardChanges(A,items,context,page){
         const match=/^(https:\/\/cdn\.jsdelivr\.net\/npm\/(?:@[^/]+\/)?[^/@]+@)(\d+)\.\d+\.\d+(\/[^?#]+)$/.exec(target||'');
         const git=/^https:\/\/cdn\.jsdelivr\.net\/gh\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40}\/_extensions\/jsxgraph\/resources\/(?:js\/jsxgraphcore\.js|css\/jsxgraph\.css)$/.test(target||'');
         insist(match||git,'Board target is not an exact canonical release or Git artifact');
-        const candidates=match?[match[1]+match[2]+match[3],target]:
+        const previousRelease=context.renderer?.before.commit===RENDERERS.git.commit && context.renderer?.after.commit===RENDERERS.release.commit && key!=='src_mjx' ? ['https://cdn.jsdelivr.net/gh/aacchhee/jsxgraph-quarto@5a1847cbcdd22b1f167f5bb9a901d47cb43e3a23/_extensions/jsxgraph/resources/'+(kind==='style'?'css/jsxgraph.css':'js/jsxgraphcore.js')] : [];
+        const candidates=match?[match[1]+match[2]+match[3],target,...previousRelease]:
           ['1','1.14.1'].map(v=>'https://cdn.jsdelivr.net/npm/jsxgraph@'+v+'/distrib/'+(kind==='style'?'jsxgraph.css':'jsxgraphcore.js')).concat(target);
         const url=e=>kind==='style'?/^@import url\("([^"\n]+)"\);$/.exec(e.textContent.trim())?.[1]:e.getAttribute('src');
         const old=[...a.querySelectorAll(kind==='style'?'head > style':'head > script[src]')].filter(e=>candidates.includes(url(e)));

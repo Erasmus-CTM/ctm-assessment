@@ -28,13 +28,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-assessment
-          ref: 56b36b43d602eda3971afc144e65a73f9f6cfcbb
+          ref: bf56684f53885c74ee2f7a2aa5827758b436fc12
           path: .asset-sources/board
           persist-credentials: false
       - uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-libs
-          ref: 626b546604f51c9cb738210c56d054d421581e02
+          ref: 6f464e687e47282b3faebed27317c48dd8ad70ff
           path: .asset-sources/libs
           persist-credentials: false
       - uses: actions/cache@v6
