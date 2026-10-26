@@ -8,6 +8,7 @@ project:
     - index.qmd
     - example.qmd
     - examples.qmd
+    - examples/similar-problems.qmd
 website:
   title: CTM Assessment
   navbar:

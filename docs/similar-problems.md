@@ -819,3 +819,52 @@ These corrections complete the YAML contract and override earlier shorthand:
 This review was static and read-only. Its approval settles the design; the
 implementation and tests remain G1–G4 work. No merge, tag or deployment is
 part of the approval.
+
+### 12.12. Original exercise rules also govern generated practice
+
+AC clarified during the phase-1 testbox review that generated problems follow
+the original exercise's grading rules. New generated problems inherit the original
+mode, form/rejection restrictions, precision/tolerance and partial-credit options;
+the generator cannot choose a less restrictive grading mode. Learner responses use
+the ordinary checker's notation transformations, including implicit multiplication
+and function application, after learner-token admission. Strict model-key and
+recipe admission remains separate: a model never supplies the learner-provenance
+flag. Generated practice still emits no scored result event.
+
+### 12.13. Compact practice controls and plain reporting language
+
+AC approved the compact UI review: one Similar problem disclosure in the
+original toolbar, with Easier / Another one like this / Harder inside. Saved
+practice reopens the section; collapsing never discards work or cancels a request.
+Check remains primary; Feedback and the existing shared settings gear stay next
+to it, with quiet Input help and one Copy answers action including practice.
+Generated cards put reporting and removal in More; a mismatch exposes reporting
+beside the result. The report action reads **I think the expected answer is wrong**.
+A disputed-answer notice offers Create another problem while keeping the reported
+problem and its stable local flag. Busy/Cancel, copy-mode explanation, keyboard
+focus and mobile wrapping remain explicit.
+
+G2 is stacked directly on ctm-libs PR48 at `53579c8`, and PR46 targets that
+branch. The published package must include PR48's complete saved-answer Settings
+panel and compact navigator along with generation, not merely test compatibility
+on a separate snapshot. Both fetched-model selectors and all catalogue messages
+are retained. Practice-only saves preserve the original navigation credit and
+answered marker. The actual combined page passes all 33 browser cases, including
+real Pyodide, Settings, credit isolation, keyboard and mobile checks. AC merges
+PR48 first, then retargets/re-baselines PR46 onto main. Before the next merge,
+compare the resulting tree with the tested head and update/retest if different.
+Neither PR48 nor the feature set is merged by this work.
+
+### 12.14. Matrix responses use the fixed matrix input
+
+AC's testbox review requires generated matrix answers to use the proper fixed
+matrix grid, as in the original exercise. A matrix-response original must not
+produce a new answer consisting only of separate scalar blanks. The prompt gives
+`mat[1,2,3;4,5,6;7,8,9]` as a 3-by-3 example and requests row-major answer fields.
+Browser admission enforces the grid and returns the precise format failure for
+repair. Complete row-major recipe selectors can unambiguously normalize a flat
+slot run into a grid without changing the mathematical keys or grading.
+
+The same normalization upgrades identifiable older saved layouts without AI or
+Python and preserves each saved cell answer. Ambiguous historical layouts remain
+readable rather than losing saved work. No resizable matrix support is added.

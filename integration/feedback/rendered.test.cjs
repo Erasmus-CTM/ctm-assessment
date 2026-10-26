@@ -115,17 +115,14 @@ test('shared text feedback works on the combined page without running Python or 
   for (const script of w.document.scripts) if (script.textContent.includes('window.__aiFeedbackPolicies =')) w.eval(script.textContent);
   w.AbortController = AbortController;
   w.fetch = () => { throw new Error('Copy mode must not call a provider'); };
-  for (const name of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) {
-    const script = [...w.document.scripts].find(s => s.src.endsWith('/' + name));
-    w.eval(fs.readFileSync(path.resolve(site, script.getAttribute('src')), 'utf8'));
-  }
+  page.run(w, path.join(site, 'example.html'), ['ctm-locale', 'ctm-locale-ui', 'ctm-layout', 'ai-feedback']);
   w.AIFeedback.initialize();
   const activity = w.document.querySelector('#spanish-writing');
   activity.querySelector('button').click();
   for (let i = 0; i < 20 && !activity.querySelector('pre'); i++) await new Promise(resolve => setImmediate(resolve));
   assert.match(activity.querySelector('pre').textContent, /Yo vive en Trondheim/);
   assert.doesNotMatch(activity.querySelector('pre').textContent, /assert add|submissionKey|integration-math/);
-  assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length, 1);
+  assert.equal(w.document.querySelectorAll('dialog#ctm-settings #ctm-settings-ai .ai-feedback-settings').length, 1);
   dom.window.close();
 });
 
@@ -286,7 +283,7 @@ test('individually listed math-exercise loads one usable runtime; an old ai-feed
       const prompt = cell.querySelector('pre')?.textContent;
       assert.ok(prompt, filters.join(', ')); assert.match(prompt, /x\^2/); assert.doesNotMatch(prompt, /SECRET_ANSWER/);
       w.AIFeedback.openSettings();
-      assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length, 1);
+      assert.equal(w.document.querySelectorAll('dialog#ctm-settings #ctm-settings-ai .ai-feedback-settings').length, 1);
       dom.window.close();
     }
   } finally { fs.rmSync(dir, {recursive: true, force: true}); }
@@ -311,9 +308,9 @@ test('Pyodide through ctm-libs without the alias: [pyodide-interaktiv], [ctm-ass
       for (const name of ['feedback-core.js', 'feedback-dom.js', 'ai-feedback.js']) {
         const scripts = [...w.document.scripts].filter(s => s.src.endsWith('/' + name));
         assert.equal(scripts.length, feedback ? 1 : 0, `${filters}: ${name}`);
-        if (feedback) w.eval(fs.readFileSync(path.join(dir, scripts[0].getAttribute('src')), 'utf8'));
       }
-      if (feedback) { assert.equal(w.AIFeedback.version, sharedVersion); w.AIFeedback.openSettings(); assert.equal(w.document.querySelectorAll('dialog.ai-feedback-settings').length, 1); }
+      if (feedback) page.run(w, file, ['ctm-locale', 'ctm-locale-ui', 'ctm-layout', 'ai-feedback']);
+      if (feedback) { assert.equal(w.AIFeedback.version, sharedVersion); w.AIFeedback.openSettings(); assert.equal(w.document.querySelectorAll('dialog#ctm-settings #ctm-settings-ai .ai-feedback-settings').length, 1); }
       // The worker and the cells' scripts are ctm-libs' and pyodide-interaktiv's files, each once (D1).
       for (const [name, script] of [['ctm-worker', 'pyodide-worker.js'], ['pyodide-interaktiv', 'qpyodide-cell-classes.js']])
         assert.equal(page.scriptsOf(w.document, name, script).length, 1, `${filters}: ${name}/${script}`);

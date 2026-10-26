@@ -3,3 +3,10 @@ ai-feedback:
   policies:
     course-feedback:
       reset-on-run: true
+    similar-practice:
+      base-prompt: >-
+        Use the course notation and exact givens. Keep each vector at length
+        at most five; vary vector count or dependencies to change difficulty.
+      harder: Increase the reasoning by one natural step.
+      easier: Reduce the number of steps or provide more guidance.
+      same: Keep the same method and effort with fresh givens.

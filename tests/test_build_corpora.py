@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'integration/pyodide-parity/build-corpora.py'
 
@@ -74,6 +75,34 @@ class BuildCorpora(unittest.TestCase):
                 del os.environ['GITHUB_OUTPUT']
             matrix = json.loads(output.read_text().removeprefix('matrix='))
         self.assertEqual([m.get('informational') for m in matrix], [None, None, False, False, True])
+
+    def test_every_published_authored_source_tree_gets_its_own_native_receipt(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            umbrella, output = root / 'umbrella', root / 'corpora'
+            umbrella.mkdir()
+            calls = []
+
+            def run(*command, **kwargs):
+                calls.append(command)
+                if str(command[1]).endswith('setup-feedback-integration.py'):
+                    site = output / 'ws/site'
+                    (site / '_extensions/math-exercise').mkdir(parents=True)
+                    (output / 'ws/resolved-repos.json').write_text(json.dumps({
+                        'repositories': {'math-exercise': {'commit': 'a' * 40}}}))
+
+            with patch.object(self.module, 'run', run), patch.object(self.module, 'selection', return_value={}), \
+                    patch.object(self.module, 'resolve', return_value={}), \
+                    patch('sys.argv', ['build-corpora', '--umbrella', str(umbrella), '--out', str(output), '--courses', 'pinned']):
+                self.run_quietly(self.module.main)
+            built = json.loads((output / 'corpora-built.json').read_text())
+            sources = {source['name']: output / source['dir'] for source in built['sources']}
+            self.assertEqual(sources['umbrella'], output / 'ws/site')
+            self.assertTrue((sources['umbrella'] / '_extensions/math-exercise').is_dir(),
+                            'umbrella recipes use the installed canonical producer')
+            receipts = [Path(command[-1]) for command in calls if str(command[1]).endswith('native-authored.py')]
+            self.assertCountEqual(receipts, sources.values(),
+                                  'each published source tree, including umbrella, gets its own receipt')
 
     def test_a_course_that_is_not_optional_fails_when_its_branch_is_gone(self):
         self.module.COURSES['ingmat3a-linalg'] = dict(self.module.COURSES['ingmat3a-linalg'], course={'branch': 'linalg-branch'})
