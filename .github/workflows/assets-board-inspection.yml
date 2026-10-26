@@ -7,6 +7,11 @@ on:
         type: string
         required: true
 
+      release-lock-review:
+        description: Also build the unapproved complete-lock diff for AC
+        type: boolean
+        default: false
+
 permissions:
   contents: read
 jobs:
@@ -137,3 +142,8 @@ jobs:
             .private-extensions/board-inspection.json
             .private-extensions/board-font-records.json
             .private-extensions/board-primary-licences.json
+
+  release-lock-review:
+    needs: [campaign]
+    if: inputs.release-lock-review
+    uses: ./.github/workflows/jsxgraph-release-lock-review.yml
