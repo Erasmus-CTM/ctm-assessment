@@ -69,7 +69,7 @@ try {
           assert.ok(await page.evaluate(()=>__p13Ticks)>ticks,'main thread stays responsive');
           await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('# preserved after Stop'));
           await page.evaluate(()=>{globalThis.__p13MaxTickGap=0;});
-          const stop=Date.now();await page.locator('.qpyodide-button-run').first().click();
+          const stop=Date.now();await page.locator('.qpyodide-button-run').first().click({noWaitAfter:true});
           await ready(page);await finished(page);
           evidence.runaways.push({program,stopRecoveryMs:Date.now()-stop,maxMainThreadGapMs:await page.evaluate(()=>__p13MaxTickGap)});
           assert.equal(await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.getValue()),'# preserved after Stop');
@@ -137,7 +137,7 @@ try {
         for(const key of ['external','errors','failed','responses'])assert.deepEqual(evidence[key],[],key);
         evidence.ok=true;
       } catch(error) {evidence.error=String(error.stack||error);evidence.pending=[...pending].slice(-20);
-        evidence.startup=await page.evaluate(()=>({state:document.readyState,status:document.querySelector('#qpyodide-status-message-text')?.textContent,cellsReady:globalThis.qpyodideCellsReady,hasEditor:!!globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.editor})).catch(()=>null);
+        evidence.startup=await page.evaluate(()=>({state:document.readyState,status:document.querySelector('#qpyodide-status-message-text')?.textContent,maxMainThreadGapMs:globalThis.__p13MaxTickGap,ticks:globalThis.__p13Ticks,cellsReady:globalThis.qpyodideCellsReady,hasEditor:!!globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.editor})).catch(()=>null);
         console.error(JSON.stringify(evidence));throw error;}
       finally {report.results.push(evidence);await context.close();}
     }
@@ -168,7 +168,7 @@ try {
     const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
     try {
       await page.goto(`http://127.0.0.1:${ports.headers}${prefix}index.html`,{waitUntil:"commit"});
-      await page.waitForFunction(()=>qpyodideCellContainer.cells[0]?.primaryUnit?.editor,null,{timeout});
+      await page.waitForFunction(()=>globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.editor,null,{timeout});
       await page.waitForFunction(()=>document.querySelector('#qpyodide-status-message-text')?.textContent.includes('P13 intentionally blocked worker'),null,{timeout});
       await code(page,'# editable when worker is blocked');
       assert.ok((await page.evaluate(()=>CTMExport.open().markdown)).includes('# editable when worker is blocked'));
