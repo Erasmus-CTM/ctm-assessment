@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 60
     env:
       ASSET_RUN_ID: '40387028513'
+      ASSET_LIBS_COMMIT: '626b546604f51c9cb738210c56d054d421581e02'
       IDE_PYODIDE_COMMIT: '16561e6604a8047027a4b053ad0d7b8e140efe7f'
       REVIEWED_LOCK_SHA256: e2ebd44e1492a2ead3f170a3922cb925d12014caee0e2c92356a0ce4fa4636bc
     steps:
@@ -47,7 +48,7 @@ jobs:
           path: ${{ runner.temp }}/prebuilt-assets
       - name: Install the existing Python frontend
         run: |
-          IDE_REVIEW_REFS="$(python -c 'import json,os; print(json.dumps({**json.loads(os.environ.get("CTM_REVIEW_REFS") or "{}"), "pyodide-interaktiv": os.environ["IDE_PYODIDE_COMMIT"]}))')"
+          IDE_REVIEW_REFS="$(python -c 'import json,os; print(json.dumps({**json.loads(os.environ.get("CTM_REVIEW_REFS") or "{}"), "pyodide-interaktiv": os.environ["IDE_PYODIDE_COMMIT"], "ctm-libs": os.environ["ASSET_LIBS_COMMIT"]}))')"
           python scripts/build-course.py --path integration/offline-ide \
             --dest "$RUNNER_TEMP/python-site" --workspace "$RUNNER_TEMP/package" \
             --review-refs "$IDE_REVIEW_REFS" --no-render
