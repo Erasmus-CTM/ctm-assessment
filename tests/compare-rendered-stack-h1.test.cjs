@@ -30,9 +30,12 @@ test('real H1 guide witness rejects HTML, configuration and source mutations',{s
   let sequence=0;
   function compare(){
    const report=path.join(temporary,'report-'+sequence+++'.json');
+   const rendererBefore=process.env.CTM_STACK_H1_BEFORE_PINS;
    const result=spawnSync(process.execPath,[path.join(__dirname,'../tools/compare-rendered.mjs'),
     '--before',path.join(before,'_site'),'--after',path.join(project,'_site'),'--pages',relative,
-    '--asset-sources',after,'--asset-pins',path.join(__dirname,'../integration/feedback/repos.json'),
+    '--asset-sources',after,'--asset-pins',process.env.CTM_STACK_H1_AFTER_PINS||path.join(__dirname,'../integration/feedback/repos.json'),
+    ...(rendererBefore?['--renderer-before-sources',before,'--renderer-before-pins',rendererBefore,
+      '--expect',path.join(__dirname,'../tools/compare-rendered/expect/step4.yml')]:[]),
     '--expect',path.join(__dirname,'../tools/compare-rendered/expect/step6-h1.yml'),'--report',report],
     {encoding:'utf8',timeout:90000});
    assert.ok(fs.existsSync(report),result.stderr);
