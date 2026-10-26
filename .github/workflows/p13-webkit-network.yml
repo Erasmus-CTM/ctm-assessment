@@ -1,5 +1,8 @@
 name: P13 WebKit transport probe
 on:
+  push:
+    branches: [p13/exam-integration]
+    paths: [.github/workflows/p13-webkit-network.yml, tools/p13-webkit-network.mjs, tools/p13-local-proxy.mjs]
   pull_request:
     paths: [.github/workflows/p13-webkit-network.yml, tools/p13-webkit-network.mjs, tools/p13-local-proxy.mjs]
   workflow_dispatch:
