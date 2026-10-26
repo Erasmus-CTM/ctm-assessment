@@ -18,12 +18,24 @@ jobs:
     strategy:
       matrix:
         include:
-          - side: after
+          - before_repository: jsxgraph/jsxgraph-quarto
+            before: before
+            before_commit: 17de83e006cf8907a146cc6a2366f42a35463c6e
+            side: after
             repository: jsxgraph/jsxgraph-quarto
             commit: e4ad81d82e1b56f86765026a3dd26f6975d29d57
-          - side: git
+          - before_repository: jsxgraph/jsxgraph-quarto
+            before: before
+            before_commit: 17de83e006cf8907a146cc6a2366f42a35463c6e
+            side: release
             repository: aacchhee/jsxgraph-quarto
-            commit: e31b5d19cb7f282e220634c0e21304067910efff
+            commit: 49a1c7d575e08b2133e39098e8f9deda61567287
+          - before_repository: aacchhee/jsxgraph-quarto
+            before: git
+            before_commit: e31b5d19cb7f282e220634c0e21304067910efff
+            side: release
+            repository: aacchhee/jsxgraph-quarto
+            commit: 49a1c7d575e08b2133e39098e8f9deda61567287
     steps:
       - uses: actions/checkout@v7
         with:
@@ -31,8 +43,8 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v7
         with:
-          repository: jsxgraph/jsxgraph-quarto
-          ref: 17de83e006cf8907a146cc6a2366f42a35463c6e
+          repository: ${{ matrix.before_repository }}
+          ref: ${{ matrix.before_commit }}
           path: _ci/jsxgraph-before
           persist-credentials: false
       - uses: actions/checkout@v7
@@ -43,7 +55,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
       - uses: quarto-dev/quarto-actions/setup@v2
         with:
           version: '1.8.27'
@@ -51,6 +63,7 @@ jobs:
         env:
           JSXGRAPH_BEFORE_SOURCE: ${{ github.workspace }}/_ci/jsxgraph-before
           JSXGRAPH_AFTER_SOURCE: ${{ github.workspace }}/_ci/jsxgraph-after
+          JSXGRAPH_BEFORE_SIDE: ${{ matrix.before }}
           JSXGRAPH_AFTER_SIDE: ${{ matrix.side }}
         run: |
           set -o pipefail

@@ -11,8 +11,11 @@ concurrency:
   cancel-in-progress: true
 jobs:
   website:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      ASSET_RUN_ID: '40389684095'
+      REVIEWED_LOCK_SHA256: 73d8b6fb0de3cd5b8d3ec8e7932d96f854bedf07ab7b7af43013d3cd1f347b3b
     steps:
       - uses: actions/checkout@v7
         with:
@@ -28,13 +31,34 @@ jobs:
           python-version: '3.12'
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - uses: quarto-dev/quarto-actions/setup@v2
         with:
           version: '1.8.27'
       - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'
       - run: npm ci --ignore-scripts
+      - name: Download AC-approved #80 vendor baseline
+        uses: actions/download-artifact@v7
+        with:
+          name: prebuilt-offline-assets
+          run-id: ${{ env.ASSET_RUN_ID }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/approved-base-assets
+      - name: Verify the approved baseline lock and carried bytes
+        run: |
+          python - <<'PYTHON'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          import ctm_assets as a
+          base = Path(os.environ['RUNNER_TEMP'])/'approved-base-assets/inspection'
+          raw = (base/'complete-lock.json').read_bytes()
+          a.verify_bytes(raw, sha256=os.environ['REVIEWED_LOCK_SHA256'])
+          lock = json.loads(raw)
+          assert raw == a.json_bytes(lock)
+          a.verify_bundle(base/'complete-built', lock)
+          PYTHON
       - name: Read the exact worker source pins
         id: workers
         run: |
@@ -112,7 +136,11 @@ jobs:
           shutil.copytree(deployed, root / 'hosted/dept/python')
           print('Website ZIP sha256:', a.digest(output.read_bytes()))
           PY
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium from the supported browser platform
+        timeout-minutes: 5
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
       - name: Measure P16 startup strategies without changing production defaults
         run: |
           python scripts/prepare-p13-timing.py "$RUNNER_TEMP/python-site"

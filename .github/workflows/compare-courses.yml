@@ -256,7 +256,7 @@ jobs:
           done
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - uses: quarto-dev/quarto-actions/setup@v2
         with:
@@ -299,6 +299,8 @@ jobs:
         env:
           CTM_STACK_H1_BEFORE: ${{ runner.temp }}/out/before
           CTM_STACK_H1_AFTER: ${{ runner.temp }}/out/after
+          CTM_STACK_H1_BEFORE_PINS: ${{ runner.temp }}/before/integration/feedback/repos.json
+          CTM_STACK_H1_AFTER_PINS: ${{ runner.temp }}/after/integration/feedback/repos.json
         run: |
           if [ -f tests/compare-rendered-stack-h1.test.cjs ]; then
             node --test tests/compare-rendered-stack-h1.test.cjs
@@ -402,7 +404,7 @@ jobs:
           python-version: '3.12'
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts
       - uses: actions/download-artifact@v7

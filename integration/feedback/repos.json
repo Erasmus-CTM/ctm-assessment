@@ -4,7 +4,7 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "a9635ad4a37acff7723211a74cf6c1d8e3516e21",
+      "commit": "34af5e71defb65f4ff2d686266cc9c2612624fc2",
       "extensions": [
         "ctm-libs"
       ],
@@ -15,12 +15,12 @@
     "py-exercise": {
       "repository": "Erasmus-CTM/py-exercise",
       "branch": "main",
-      "commit": "7f65e743181ba95c4c6455829e487fb5c949b670"
+      "commit": "349601491e1da57e00ff7a11d7201e3d400e946a"
     },
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "8d110f3728b85b425f1ed4ba73d560297abaa489"
+      "commit": "0c80f3311acdde5a80347be4adbbd8364bf83c5d"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
@@ -30,7 +30,7 @@
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",
       "branch": "feature/shared-feedback-integration",
-      "commit": "063b12593d4a2c27aeda86dc011353a2aaa58e32",
+      "commit": "d9a539f6d07a2ed546ee45a53d8a590e48280bd9",
       "ships-copies": [
         "ai-feedback",
         "ctm-libs"
@@ -38,8 +38,8 @@
     },
     "jsxgraph": {
       "repository": "aacchhee/jsxgraph-quarto",
-      "branch": "fix/2026-10-jsxgraph-115-runtime",
-      "commit": "e31b5d19cb7f282e220634c0e21304067910efff",
+      "branch": "audit/2026-10",
+      "commit": "49a1c7d575e08b2133e39098e8f9deda61567287",
       "extension": "jsxgraph"
     },
     "ctm-assessment": {

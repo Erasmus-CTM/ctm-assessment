@@ -9,35 +9,35 @@ jobs:
   official-candidate-inspection:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '22'
-      - uses: actions/checkout@v4
+          node-version: '24'
+      - uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-assessment
           ref: 63980a231771f63a4d20000f9fafadea73b136c9
           path: .asset-sources/composer
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-assessment
-          ref: 56b36b43d602eda3971afc144e65a73f9f6cfcbb
+          ref: bf56684f53885c74ee2f7a2aa5827758b436fc12
           path: .asset-sources/board
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-libs
-          ref: 626b546604f51c9cb738210c56d054d421581e02
+          ref: 6f464e687e47282b3faebed27317c48dd8ad70ff
           path: .asset-sources/libs
           persist-credentials: false
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .asset-cache/complete
           key: ctm-complete-archives-${{ hashFiles('.asset-sources/composer/integration/assets-metadata.json', '.asset-sources/board/integration/assets-board-metadata.json') }}
@@ -59,7 +59,7 @@ jobs:
         run: |
           python scripts/ctm_complete_assets_candidate.py --composer-root .asset-sources/composer --board-root .asset-sources/board --library .asset-sources/libs/_extensions/ctm-libs --pins .asset-sources/board/_extensions/ctm-assessment/jsxgraph-pins.yml --cache .asset-cache/complete --python-lock .private-extensions/complete-candidate/python-lock.json --npm-lock .private-extensions/complete-candidate/npm-lock.json --board-lock .private-extensions/complete-candidate/board-lock.json --private-index .private-extensions/complete-candidate/assets-imports.json --availability .private-extensions/complete-candidate/availability.json --output .private-extensions/complete-candidate/inspection --reviewed-digests integration/assets-complete-reviewed-digests.json
       - name: Preserve the verified prebuilt asset bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: prebuilt-offline-assets
           include-hidden-files: true
