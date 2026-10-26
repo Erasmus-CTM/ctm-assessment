@@ -34,12 +34,25 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Exercise the unchanged locked website candidate
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/pyodide-interaktiv
+          ref: f33425079a70fb5c816d570eb308e71c07cfe888
+          path: _p13-ide-source
+          persist-credentials: false
+      - name: Diagnose the pinned clipboard guard with the prior locked vendor assets
         env:
           P13_BROWSER: webkit
           P13_REPORT: ${{ runner.temp }}/webkit-full-site.json
         run: |
           python -m zipfile -e "$RUNNER_TEMP/zip/python-offline-website.zip" "$RUNNER_TEMP/deployed"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          files=list((Path(os.environ['RUNNER_TEMP'])/'deployed').rglob('qpyodide-cell-classes.js'))
+          assert len(files)==1
+          files[0].write_bytes(Path('_p13-ide-source/_extensions/pyodide-interaktiv/qpyodide-cell-classes.js').read_bytes())
+          PY
           node tools/p13-serve.mjs "$RUNNER_TEMP/deployed" 8765 > "$RUNNER_TEMP/plain.log" 2>&1 &
           node tools/p13-serve.mjs "$RUNNER_TEMP/deployed" 8766 --isolated > "$RUNNER_TEMP/headers.log" 2>&1 &
           curl --noproxy '*' --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 -I http://127.0.0.1:8765/index.html

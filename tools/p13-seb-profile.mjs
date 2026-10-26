@@ -47,7 +47,7 @@ try {
       const pending=new Set();context.on('request',r=>pending.add(r.url()));context.on('requestfinished',r=>pending.delete(r.url()));context.on('requestfailed',r=>pending.delete(r.url()));
       const page=await context.newPage();page.on('pageerror',e=>evidence.errors.push(e.message));
       try {
-        await page.addInitScript(()=>{globalThis.__p13Ticks=0;setInterval(()=>__p13Ticks++,20);});
+        await page.addInitScript(()=>{globalThis.__p13Ticks=0;globalThis.__p13MaxTickGap=0;let last=performance.now();setInterval(()=>{const now=performance.now();__p13MaxTickGap=Math.max(__p13MaxTickGap,now-last);last=now;__p13Ticks++;},20);});
         await page.goto(new URL(name,base).href,{waitUntil:"commit"});await ready(page);
         assert.equal(await page.evaluate(()=>qpyodideExamOutput),true);
         assert.equal(await page.evaluate(()=>qpyodidePreloadPackages),false);
@@ -68,9 +68,10 @@ try {
           await page.waitForTimeout(300);
           assert.ok(await page.evaluate(()=>__p13Ticks)>ticks,'main thread stays responsive');
           await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('# preserved after Stop'));
+          await page.evaluate(()=>{globalThis.__p13MaxTickGap=0;});
           const stop=Date.now();await page.locator('.qpyodide-button-run').first().click();
           await ready(page);await finished(page);
-          evidence.runaways.push({program,stopRecoveryMs:Date.now()-stop});
+          evidence.runaways.push({program,stopRecoveryMs:Date.now()-stop,maxMainThreadGapMs:await page.evaluate(()=>__p13MaxTickGap)});
           assert.equal(await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.getValue()),'# preserved after Stop');
           const retained=await page.evaluate(()=>__p13BeforeProxy===mainPyodide);
           if(!retained)assert.ok((await page.locator('.qpyodide-output-code-area').first().textContent()).includes(await page.evaluate(()=>QP_L.abortedRestart)),'hard restart explains reset');
@@ -107,7 +108,7 @@ try {
         const saved='print("P13_SAVED_ANSWER",42)';await code(page,saved);
         // Shared answer saving is enabled by the exam profile. Wait for the
         // real debounce and reload without executing restored learner code.
-        await page.waitForTimeout(1200);await page.reload();await ready(page);
+        await page.waitForTimeout(1200);await page.reload({waitUntil:"commit"});await ready(page);
         assert.equal(await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.getValue()),saved);
         assert.ok(!await page.locator('.qpyodide-output-code-area').first().textContent().then(t=>t.includes('P13_SAVED_ANSWER 42')),'reload never autoruns saved code');
         evidence.restore='editor restored without autorun';
