@@ -8,10 +8,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   transport:
     runs-on: macos-15
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -24,3 +25,29 @@ jobs:
       - run: npx playwright install webkit
       - name: Probe direct and proxied local origins
         run: node tools/p13-webkit-network.mjs
+      - uses: actions/download-artifact@v7
+        with:
+          name: p13-zip-candidate
+          run-id: 40350736282
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/zip
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Exercise the unchanged locked website candidate
+        env:
+          P13_BROWSER: webkit
+          P13_REPORT: ${{ runner.temp }}/webkit-full-site.json
+        run: |
+          python -m zipfile -e "$RUNNER_TEMP/zip/python-offline-website.zip" "$RUNNER_TEMP/deployed"
+          python -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/deployed" > "$RUNNER_TEMP/plain.log" 2>&1 &
+          python scripts/serve-offline.py "$RUNNER_TEMP/deployed" --port 8766 > "$RUNNER_TEMP/headers.log" 2>&1 &
+          node tools/p13-seb-profile.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: p13-webkit-probe
+          path: |
+            ${{ runner.temp }}/webkit-full-site.json
+            ${{ runner.temp }}/plain.log
+            ${{ runner.temp }}/headers.log
