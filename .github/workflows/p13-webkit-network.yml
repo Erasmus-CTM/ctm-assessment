@@ -37,8 +37,14 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/pyodide-interaktiv
-          ref: f33425079a70fb5c816d570eb308e71c07cfe888
+          ref: 063b12593d4a2c27aeda86dc011353a2aaa58e32
           path: _p13-ide-source
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: a9635ad4a37acff7723211a74cf6c1d8e3516e21
+          path: _p13-libs-source
           persist-credentials: false
       - name: Diagnose the pinned clipboard guard with the prior locked vendor assets
         env:
@@ -49,9 +55,11 @@ jobs:
           python - <<'PY'
           import os
           from pathlib import Path
-          files=list((Path(os.environ['RUNNER_TEMP'])/'deployed').rglob('qpyodide-cell-classes.js'))
-          assert len(files)==1
-          files[0].write_bytes(Path('_p13-ide-source/_extensions/pyodide-interaktiv/qpyodide-cell-classes.js').read_bytes())
+          root=Path(os.environ['RUNNER_TEMP'])/'deployed'
+          for name,source in [('qpyodide-cell-classes.js','_p13-ide-source/_extensions/pyodide-interaktiv/qpyodide-cell-classes.js'),('pyodide-runtime.js','_p13-libs-source/_extensions/ctm-libs/runtime/pyodide-runtime.js')]:
+              files=[p for p in root.rglob(name) if '_ctm-assets' not in p.parts]
+              assert len(files)==1
+              files[0].write_bytes(Path(source).read_bytes())
           PY
           node tools/p13-serve.mjs "$RUNNER_TEMP/deployed" 8765 > "$RUNNER_TEMP/plain.log" 2>&1 &
           node tools/p13-serve.mjs "$RUNNER_TEMP/deployed" 8766 --isolated > "$RUNNER_TEMP/headers.log" 2>&1 &
