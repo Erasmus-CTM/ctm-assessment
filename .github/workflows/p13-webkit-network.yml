@@ -42,7 +42,23 @@ jobs:
           python -m zipfile -e "$RUNNER_TEMP/zip/python-offline-website.zip" "$RUNNER_TEMP/deployed"
           python -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/deployed" > "$RUNNER_TEMP/plain.log" 2>&1 &
           python scripts/serve-offline.py "$RUNNER_TEMP/deployed" --port 8766 > "$RUNNER_TEMP/headers.log" 2>&1 &
+          curl --noproxy '*' --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 -I http://127.0.0.1:8765/index.html
+          node --input-type=module <<'JS'
+          import http from 'node:http';import os from 'node:os';
+          const lan=Object.values(os.networkInterfaces()).flat().find(x=>x.family==='IPv4'&&!x.internal).address;
+          await new Promise(resolve=>{const r=http.get(`http://${lan}:8765/index.html`,res=>{console.log('LAN HTTP server',res.statusCode,res.headers);res.resume();res.on('end',resolve);});r.setTimeout(5000,()=>r.destroy(new Error('LAN server timed out')));r.on('error',e=>{console.log('LAN HTTP server',String(e));resolve();});});
+          JS
           node tools/p13-seb-profile.mjs
+      - name: Show bounded server diagnostics
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          for name in ['plain.log','headers.log']:
+              path=Path(os.environ['RUNNER_TEMP'])/name
+              print(name, path.read_text()[:6000] if path.exists() else 'missing')
+          PY
       - uses: actions/upload-artifact@v7
         if: always()
         with:
