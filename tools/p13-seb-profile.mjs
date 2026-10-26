@@ -140,7 +140,7 @@ try {
         for(const key of ['external','errors','failed','responses'])assert.deepEqual(evidence[key],[],key);
         evidence.ok=true;
       } catch(error) {evidence.error=String(error.stack||error);evidence.pending=[...pending].slice(-20);
-        evidence.startup=await page.evaluate(()=>({state:document.readyState,status:document.querySelector('#qpyodide-status-message-text')?.textContent,maxMainThreadGapMs:globalThis.__p13MaxTickGap,ticks:globalThis.__p13Ticks,cellsReady:globalThis.qpyodideCellsReady,hasEditor:!!globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.editor})).catch(()=>null);
+        evidence.startup=await page.evaluate(()=>({state:document.readyState,url:location.href,status:document.querySelector('#qpyodide-status-message-text')?.textContent,maxMainThreadGapMs:globalThis.__p13MaxTickGap,ticks:globalThis.__p13Ticks,cellsReady:globalThis.qpyodideCellsReady,hasEditor:!!globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.editor,runButtons:document.querySelectorAll('.qpyodide-button-run').length,buttonConnected:globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.runButton?.isConnected,button:globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.runButton?.outerHTML})).catch(()=>null);
         console.error(JSON.stringify(evidence));throw error;}
       finally {report.results.push(evidence);await context.close();}
     }

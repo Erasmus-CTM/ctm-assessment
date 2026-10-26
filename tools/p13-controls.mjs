@@ -44,7 +44,19 @@ function dom({selector,text,first,operation,enabled=false}) {
 export function control(page,selector,text=null,first=false) {
   const key={selector,text,first};
   const read=operation=>page.evaluate(dom,{...key,operation});
-  const wait=(operation='ready',enabled=false,timeout=30000)=>page.waitForFunction(dom,{...key,operation,enabled},{timeout});
+  const wait=async(operation='ready',enabled=false,timeout=30000)=>{
+    const deadline=Date.now()+timeout;
+    for(;;){
+      const remaining=deadline-Date.now();
+      if(remaining<=0)throw new Error('Timeout '+timeout+'ms waiting for control: '+selector);
+      let timer;
+      try {
+        const found=await Promise.race([page.evaluate(dom,{...key,operation,enabled}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Timeout '+timeout+'ms reading control: '+selector)),remaining);})]);
+        if(found)return;
+      }finally{clearTimeout(timer);}
+      await new Promise(resolve=>setTimeout(resolve,Math.min(50,Math.max(0,deadline-Date.now()))));
+    }
+  };
   return {
     first(){return control(page,selector,text,true);},
     filter({hasText}){if(first)throw new Error('Filter before selecting the first control');return control(page,selector,hasText,false);},
