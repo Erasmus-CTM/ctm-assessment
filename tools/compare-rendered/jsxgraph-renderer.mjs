@@ -54,7 +54,7 @@ export function loadRendererSources(beforeProject,beforePinsFile,afterProject,af
   if(afterPins.repositories?.jsxgraph?.commit!==RENDERERS[afterSide].commit)return null;
   const beforePins = JSON.parse(fs.readFileSync(beforePinsFile,'utf8'));
   const beforeSide=Object.keys(RENDERERS).find(side=>beforePins.repositories?.jsxgraph?.commit===RENDERERS[side].commit);
-  if(!beforeSide)return null;
+  if(beforeSide!=='before' && !(beforeSide==='git' && afterSide==='release'))return null;
   return {before:rendererSource(beforeProject,beforePins,beforeSide),after:rendererSource(afterProject,afterPins,afterSide)};
 }
 
