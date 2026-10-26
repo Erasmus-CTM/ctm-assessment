@@ -159,7 +159,7 @@ merged by AC.
   - Pending checklists appear on unrelated PRs (on #29, a guide), and ticks are refused once that PR is merged ("recording requires an open same-repository PR"). Nothing warns the author before the merge.
   - The Variants workflow runs only when a PR changes `**/*.qmd` or `_variants/**`. A PR without such a change (#30) needed a manual dispatch with the exact head before any checklist appeared.
   - Generation takes about 16 minutes before checklists appear, and the comments are very large (about 95 KB for four questions).
-  - Ticks in quick succession start one decide run each in a shared concurrency group. Queued runs are cancelled, so it is unclear whether a tick was recorded without checking the checklist again.
+  - Ticks in quick succession start one decide run each in a shared concurrency group. Queued runs are cancelled, and a run that starts after the first recording commit fails ("exact-head records producer did not succeed") until a new 16-minute records run finishes. On #30 four ticks recorded only stack-angle, and the other three checklists still showed ticked boxes.
   - Recording commits to the PR branch and needs another green `variants / check` before merging. Merging first loses the decisions.
 
   The rework needs a design before code. Requirements: approve or reject from the review page, or from one place per question, independent of unrelated PRs; every decision queued and confirmed, never silently dropped; pending questions visible without an ad-hoc PR; and a merge that never discards decisions. The approval semantics stay: exact candidate and content hash, and unapproved questions stay out of student publication. Variants decisions 1–23 stand unless the design proposes a change for AC.
