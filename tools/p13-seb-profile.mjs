@@ -3,17 +3,22 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import {chromium,webkit} from 'playwright';
+import {localProxy} from './p13-local-proxy.mjs';
 
 const engine=process.env.P13_BROWSER || 'chromium';
 const lan=Object.values(os.networkInterfaces()).flat().find(x=>x.family==='IPv4'&&!x.internal)?.address;
 assert.ok(lan,'non-loopback LAN address required');
+const ports=JSON.parse(process.env.P13_PORTS || '{"plain":8765,"headers":8766}');
+// WebKit's macOS networking does not reliably honor a LAN proxy bypass.
+// Forward only these exact local destinations instead of bypassing refusal.
+const proxy=engine==='webkit'?await localProxy(['127.0.0.1',lan],Object.values(ports)):null;
 const browser=await ({chromium,webkit}[engine]).launch({headless:true,
   ...(engine==='chromium'?{executablePath:process.env.P13_BROWSER_EXECUTABLE||undefined,
     args:['--no-sandbox','--no-proxy-server','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE '+lan]}:
-    {proxy:{server:'http://127.0.0.1:9',bypass:'127.0.0.1,'+lan}})});
+    {proxy:{server:proxy.url}})});
 const version=browser.version(), report={engine,version,realSEB:false,results:[]};
 if(process.env.P13_EXPECT_BROWSER_VERSION)assert.equal(version,process.env.P13_EXPECT_BROWSER_VERSION);
-const ports=JSON.parse(process.env.P13_PORTS || '{"plain":8765,"headers":8766}');
+if(proxy)report.networkPolicy='local destination allowlist proxy';
 const prefix=process.env.P13_PATH_PREFIX || '/';
 const timeout=180000;
 async function ready(page) {
@@ -178,7 +183,10 @@ try {
       report.results.push({case:'worker blocked and explicit Retry',prefix,editing:true,export:true,recovered:true,ok:true});
     } finally {await context.close();}
   }
+  if(proxy)assert.deepEqual(proxy.denied,[],'no request outside the local bundle');
 } finally {
+  if(proxy)report.deniedRequests=proxy.denied;
   fs.writeFileSync(process.env.P13_REPORT || '/tmp/p13-seb-profile.json',JSON.stringify(report,null,2)+'\n');
   await browser.close();
+  if(proxy)await proxy.close();
 }

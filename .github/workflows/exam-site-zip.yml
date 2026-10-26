@@ -1,7 +1,7 @@
 name: Rendered offline Python website ZIP
 on:
   pull_request:
-    paths: [integration/offline-ide/**, integration/p13-worker/**, tools/p13-shared-worker.mjs, integration/feedback/repos.json, integration/p13*.json, integration/assets-licences/**, scripts/*p13*.py, tools/p13-loading.cjs, scripts/ctm_assets.py, tools/p13-seb-profile.mjs, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
+    paths: [integration/offline-ide/**, integration/p13-worker/**, tools/p13-shared-worker.mjs, integration/feedback/repos.json, integration/p13*.json, integration/assets-licences/**, scripts/*p13*.py, tools/p13-loading.cjs, scripts/ctm_assets.py, tools/p13-seb-profile.mjs, tools/p13-local-proxy.mjs, tests/p13-local-proxy.test.mjs, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
   workflow_dispatch:
 permissions:
   contents: read
@@ -332,6 +332,8 @@ jobs:
           python scripts/serve-offline.py "$RUNNER_TEMP/deployed" --port 8766 > "$RUNNER_TEMP/headers.log" 2>&1 &
           python -m http.server 8767 --bind 0.0.0.0 --directory "$RUNNER_TEMP/hosted" > "$RUNNER_TEMP/subdirectory.log" 2>&1 &
           python scripts/serve-offline.py "$RUNNER_TEMP/hosted" --port 8768 > "$RUNNER_TEMP/subdirectory-headers.log" 2>&1 &
+      - name: Verify the local-only WebKit transport
+        run: node --test tests/p13-local-proxy.test.mjs
       - name: Check Run, Stop, input, NumPy, inert HTML and saved-answer restore
         env:
           P13_BROWSER: ${{ matrix.engine }}
