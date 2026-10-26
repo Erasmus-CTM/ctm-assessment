@@ -98,7 +98,7 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
   const helperScripts=doc=>resources(doc).filter(e=>normalize(raw(e))==='ctm-assets/assets.js');
   const active=configScripts(A.doc).length||configScripts(B.doc).length||helperScripts(A.doc).length||helperScripts(B.doc).length;
   if(!active&&!context)return;
-  checkRetainedResources(A.doc,B.doc,items,page);
+  checkRetainedResources(A,B,items,page,context);
   if(!active){
     const consumer=doc=>[...doc.scripts].some(e=>e.textContent.includes('CTMAssets.url(')||
       /^(?:ctm-runtime|math-exercise|py-exercise|pyodide-interaktiv)\//.test(normalize(e.getAttribute('src')||''))||
@@ -285,7 +285,8 @@ function markBoardChanges(A,items,context,page){
 
 // Keep queries and attributes that the general render-noise URL normalization
 // does not expose. A canonical asset migration never excuses another loader.
-function checkRetainedResources(a,b,items,page){
+function checkRetainedResources(A,B,items,page,context){
+ const a=A.doc,b=B.doc;
  const before=resources(a),after=resources(b);
  const url=e=>{const u=raw(e),q=u.indexOf('?');return normalize(u)+(q<0?'':u.slice(q));};
  const key=e=>e.tagName+'\0'+normalize(raw(e));
@@ -296,7 +297,22 @@ function checkRetainedResources(a,b,items,page){
  };
  const oldGroups=groups(before),newGroups=groups(after);
  const retained=new Set([...oldGroups.keys()].filter(k=>newGroups.has(k)));
- if(!same(before.map(key).filter(k=>retained.has(k)),after.map(key).filter(k=>retained.has(k)))&&!stackHelperMove(a,b)){
+ const oldOrder=before.map(key).filter(k=>retained.has(k)),newOrder=after.map(key).filter(k=>retained.has(k));
+ const worker='SCRIPT\0ctm-worker/pyodide-worker.js',runtime='SCRIPT\0ctm-runtime/pyodide-runtime.js';
+ const i=oldOrder.indexOf(worker),j=newOrder.indexOf(worker),source=B.sources['ctm-worker/pyodide-worker.js'];
+ const crossed=new Set(['SCRIPT\0ctm-checkers/ctm-checkers.js','SCRIPT\0ctm-locale-math-exercise/math-exercise.js',
+   'LINK\0ctm-matrix-input/ctm-matrix-input.css','LINK\0math-exercise/math-exercise.css','SCRIPT\0ctm-variants/variants.js',
+   'SCRIPT\0ctm-copy/ctm-copy.js','SCRIPT\0ctm-store/ctm-store.js','SCRIPT\0ctm-locale-py-exercise/py-exercise.js']);
+ const workerMove=context?.p13&&newOrder.indexOf(runtime)>=0&&
+   oldOrder.filter(k=>k===runtime).length===1&&newOrder.filter(k=>k===runtime).length===1&&
+   oldOrder.filter(k=>k===worker).length===1&&newOrder.filter(k=>k===worker).length===1&&
+   i>j&&j===newOrder.indexOf(runtime)+1&&
+   oldOrder[i+1]==='SCRIPT\0ctm-locale-pyodide-interaktiv/pyodide-interaktiv.js'&&
+   same(oldOrder.filter(k=>k!==worker),newOrder.filter(k=>k!==worker))&&
+   oldOrder.slice(j,i).every(k=>crossed.has(k))&&source&&fs.existsSync(source)&&
+   hash(fs.readFileSync(source))===context.p13['ctm-worker/pyodide-worker.js'];
+ if(workerMove)items.push({page,area:'assets',change:'changed',what:'Page worker precedes checker consumers',assets:'p13-worker-order'});
+ if(!same(oldOrder,newOrder)&&!stackHelperMove(a,b)&&!workerMove){
    const identity=e=>({key:key(e),url:raw(e),attributes:attrs(e,e.tagName==='LINK'?'href':'src')});
    const evidence={page,before:before.filter(e=>retained.has(key(e))).map(identity),after:after.filter(e=>retained.has(key(e))).map(identity)};
    console.error('Retained resource order evidence: '+JSON.stringify(evidence));

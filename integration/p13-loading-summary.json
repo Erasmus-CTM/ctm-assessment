@@ -19,6 +19,10 @@
       "long_task_max_ms": [
         140,
         125
+      ],
+      "long_task_total_ms": [
+        140,
+        176
       ]
     },
     {
@@ -35,6 +39,10 @@
       "long_task_max_ms": [
         131,
         174
+      ],
+      "long_task_total_ms": [
+        131,
+        226
       ]
     },
     {
@@ -49,6 +57,10 @@
         1
       ],
       "long_task_max_ms": [
+        111,
+        120
+      ],
+      "long_task_total_ms": [
         111,
         120
       ]
@@ -67,6 +79,10 @@
       "long_task_max_ms": [
         115,
         119
+      ],
+      "long_task_total_ms": [
+        115,
+        119
       ]
     },
     {
@@ -83,6 +99,10 @@
       "long_task_max_ms": [
         335,
         362
+      ],
+      "long_task_total_ms": [
+        643,
+        661
       ]
     },
     {
@@ -99,6 +119,10 @@
       "long_task_max_ms": [
         196,
         182
+      ],
+      "long_task_total_ms": [
+        465,
+        445
       ]
     },
     {
@@ -115,6 +139,10 @@
       "long_task_max_ms": [
         315,
         382
+      ],
+      "long_task_total_ms": [
+        591,
+        777
       ]
     },
     {
@@ -131,7 +159,18 @@
       "long_task_max_ms": [
         178,
         181
+      ],
+      "long_task_total_ms": [
+        442,
+        443
       ]
     }
-  ]
+  ],
+  "source_refs": {
+    "ctm-libs": "79f6b192d4f676edcb9fbcbc0d00307c61fdbaaa",
+    "pyodide-interaktiv": "fb05d094e53d6c1ef68f4eaaa2127ca8ca5ccad0",
+    "py-exercise": "00e31334a11830c1cb371cb73342444d56d1c23e",
+    "math-exercise": "d186ffe74b62461e36535b639077c3f0cc5ed811"
+  },
+  "default_decision": "AC: keep current interpreter startup and exam package preload opt-out; network-profile default change deferred"
 }

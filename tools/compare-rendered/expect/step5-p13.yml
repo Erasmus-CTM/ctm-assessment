@@ -9,3 +9,7 @@ categories:
     title: Explicit rich output and existing 20-second Stop offer on ordinary IDE pages
     match:
       - {area: config, change: changed, assets: '^p13-inert-defaults$'}
+  - id: p13-worker-order
+    title: The exact pinned page worker moves immediately after its runtime and ahead of checker consumers
+    match:
+      - {area: assets, change: changed, assets: '^p13-worker-order$'}

@@ -5,12 +5,14 @@ import os from 'node:os';
 import {chromium,webkit} from 'playwright';
 
 const engine=process.env.P13_BROWSER || 'chromium';
-const browser=await ({chromium,webkit}[engine]).launch({headless:true,
-  ...(engine==='chromium'?{executablePath:process.env.P13_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--no-proxy-server']}: {})});
-const version=browser.version(), report={engine,version,realSEB:false,results:[]};
-if(process.env.P13_EXPECT_BROWSER_VERSION)assert.equal(version,process.env.P13_EXPECT_BROWSER_VERSION);
 const lan=Object.values(os.networkInterfaces()).flat().find(x=>x.family==='IPv4'&&!x.internal)?.address;
 assert.ok(lan,'non-loopback LAN address required');
+const browser=await ({chromium,webkit}[engine]).launch({headless:true,
+  ...(engine==='chromium'?{executablePath:process.env.P13_BROWSER_EXECUTABLE||undefined,
+    args:['--no-sandbox','--no-proxy-server','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE '+lan]}:
+    {proxy:{server:'http://127.0.0.1:9',bypass:'127.0.0.1,'+lan}})});
+const version=browser.version(), report={engine,version,realSEB:false,results:[]};
+if(process.env.P13_EXPECT_BROWSER_VERSION)assert.equal(version,process.env.P13_EXPECT_BROWSER_VERSION);
 const ports=JSON.parse(process.env.P13_PORTS || '{"plain":8765,"headers":8766}');
 const prefix=process.env.P13_PATH_PREFIX || '/';
 const timeout=180000;
@@ -33,9 +35,9 @@ try {
   for(const isolated of [false,true]) {
     const base=isolated?`http://127.0.0.1:${ports.headers}${prefix}`:`http://${lan}:${ports.plain}${prefix}`;
     for(const name of ['index.html','nested/index.html']) {
-      const context=await browser.newContext({serviceWorkers:'block'});
+      const context=await browser.newContext({serviceWorkers:'block',acceptDownloads:false});
       const evidence={base,name,isolated,external:[],errors:[],failed:[],responses:[]};
-      context.on('requestfailed',r=>evidence.failed.push({url:r.url(),error:r.failure()?.errorText}));
+      context.on('requestfailed',r=>{if(!r.url().startsWith('blob:'))evidence.failed.push({url:r.url(),error:r.failure()?.errorText});});
       context.on('response',r=>{if(r.status()>=400)evidence.responses.push({url:r.url(),status:r.status()});});
       await context.route('**/*',route=>{
         if(new URL(route.request().url()).origin!==new URL(base).origin){evidence.external.push(route.request().url());return route.abort();}
@@ -52,26 +54,46 @@ try {
         assert.equal(await page.evaluate(()=>mainPyodide.isWorkerProxy),true);
         assert.equal(await page.evaluate(()=>isSecureContext),isolated);
         await run(page,'print("P13_RUN",6*7)','P13_RUN 42');
-        await run(page,'import numpy as np\nprint("P13_NUMPY",int(np.array([20,22]).sum()))','P13_NUMPY 42');
-        const ticks=await page.evaluate(()=>__p13Ticks);
-        await code(page,'while True: pass');await page.locator('.qpyodide-button-run').first().click();
-        await page.waitForTimeout(300);
-        assert.ok(await page.evaluate(()=>__p13Ticks)>ticks,'main thread stays responsive');
-        await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('# preserved after Stop'));
-        const stop=Date.now();await page.locator('.qpyodide-button-run').first().click();
-        await ready(page);await finished(page);
-        evidence.stopRecoveryMs=Date.now()-stop;
-        assert.equal(await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.getValue()),'# preserved after Stop');
-        await run(page,'print("P13_AFTER_STOP",42)','P13_AFTER_STOP 42');
+        const numpyCode='import numpy as np\nprint("P13_NUMPY",int(np.array([20,22]).sum()))';
+        let numpyStart=Date.now();await run(page,numpyCode,'P13_NUMPY 42');evidence.numpyColdMs=Date.now()-numpyStart;
+        numpyStart=Date.now();await run(page,numpyCode,'P13_NUMPY 42');evidence.numpyWarmMs=Date.now()-numpyStart;
+        assert.equal(await page.evaluate(()=>typeof globalThis.loadPyodide),'undefined','no main-thread Pyodide loader');
+        assert.equal(await page.evaluate(async()=>await MathExerciseRuntime.ensurePyodide()===mainPyodide),true);
+        evidence.runaways=[];
+        for(const program of ['while True: pass','while True: print("flood")','while True: print("")','while True:\n    try:\n        while True: pass\n    except KeyboardInterrupt: pass']) {
+          const ticks=await page.evaluate(()=>__p13Ticks);
+          await code(page,program);await page.locator('.qpyodide-button-run').first().click();
+          await page.waitForTimeout(300);
+          assert.ok(await page.evaluate(()=>__p13Ticks)>ticks,'main thread stays responsive');
+          await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('# preserved after Stop'));
+          const stop=Date.now();await page.locator('.qpyodide-button-run').first().click();
+          await ready(page);await finished(page);
+          evidence.runaways.push({program,stopRecoveryMs:Date.now()-stop});
+          assert.equal(await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.getValue()),'# preserved after Stop');
+          await run(page,'print("P13_AFTER_STOP",42)','P13_AFTER_STOP 42');
+        }
         if(isolated) {
           await code(page,'answer=input("P13_NAME: ")\nprint("P13_INPUT",answer)');
           await page.locator('.qpyodide-button-run').first().click();
+          await page.locator('.qpyodide-terminal-input').fill('æ'.repeat(3000));
+          await page.locator('.qpyodide-terminal-input').press('Enter');
+          assert.ok(await page.locator('.qpyodide-terminal-input').evaluate(input=>input.validationMessage));
           await page.locator('.qpyodide-terminal-input').fill('Norsk æøå');
           await page.locator('.qpyodide-terminal-input').press('Enter');
           await page.waitForFunction(()=>document.querySelector('.qpyodide-output-code-area')?.textContent.includes('P13_INPUT Norsk æøå'),null,{timeout});
           await finished(page);
-          evidence.input='Unicode round trip';
-        } else evidence.input='unsupported; no isolation on plain LAN HTTP';
+          await code(page,'input("P13_WAIT:")');await page.locator('.qpyodide-button-run').first().click();
+          await page.locator('.qpyodide-terminal-input').waitFor();
+          await page.locator('.qpyodide-button-run').first().click();await ready(page);await finished(page);
+          assert.equal(await page.locator('.qpyodide-terminal-input').count(),0);
+          await run(page,'print("P13_INPUT_STOP_OK")','P13_INPUT_STOP_OK');
+          evidence.input='Unicode round trip, overlong UTF-8 rejected, waiting prompt Stop/recovery';
+        } else {
+          await code(page,'input("Unavailable")');
+          assert.equal(await page.locator('.qpyodide-button-run').first().isDisabled(),true);
+          assert.equal(await page.evaluate(()=>qpyodideInputState),'unavailable');
+          evidence.input='explained unavailable gate on plain LAN HTTP';
+        }
         await run(page,'"<script>while(true){}</script>"','<script>while(true){}</script>');
         assert.equal(await page.locator('.qpyodide-output-code-area script').count(),0);
         await run(page,'import matplotlib.pyplot as plt\nplt.plot([0,1],[0,1])\nplt.show()\nprint("P13_PNG")','P13_PNG');
@@ -90,15 +112,61 @@ try {
           assert.equal(await selection.inputValue(),saved);
           await page.locator('.ctm-copy-dialog button').click();
         }
-        evidence.copy='copy control completed or supplied selectable text; cross-window SEB paste remains manual';
+        await page.evaluate(()=>{
+          Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('clipboard denied by test policy');}}});
+          document.execCommand=()=>false;
+        });
+        await page.locator('.qpyodide-button-copy').first().click();
+        assert.equal(await page.locator('.ctm-copy-dialog textarea').inputValue(),saved);
+        await page.locator('.ctm-copy-dialog button').click();
+        evidence.copy='copy control and denied-clipboard selectable fallback pass; cross-window SEB paste remains manual';
         const exported=await page.evaluate(()=>CTMExport.open().markdown);
         assert.ok(exported.includes(saved),'export retains the current answer');
-        evidence.export='current code present in the export view';
+        const denied=page.waitForEvent('download');
+        await page.locator('#ctm-export-view button').filter({hasText:'Download .md'}).click();
+        assert.ok(await (await denied).failure(),'download denied by browser context policy');
+        assert.ok((await page.locator('#ctm-export-view textarea').inputValue()).includes(saved));
+        evidence.export='current code remains selectable when downloads are denied';
         for(const key of ['external','errors','failed','responses'])assert.deepEqual(evidence[key],[],key);
         evidence.ok=true;
       } catch(error) {evidence.error=String(error.stack||error);throw error;}
       finally {report.results.push(evidence);await context.close();}
     }
+  }
+  // Secure loopback without server headers: observe COI activation (or its
+  // bounded capability fallback), with network refusal covering SW subrequests.
+  {
+    const context=await browser.newContext({serviceWorkers:'allow'}),errors=[],external=[];
+    context.on('request',r=>{if(new URL(r.url()).origin!==`http://127.0.0.1:${ports.plain}`)external.push(r.url());});
+    const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+    let navigations=0;page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++;});
+    try {
+      await page.goto(`http://127.0.0.1:${ports.plain}${prefix}index.html`);await ready(page);
+      await run(page,'print("P13_COI_OK")','P13_COI_OK');
+      assert.ok(navigations<=3,'COI must not reload indefinitely');
+      assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
+      report.results.push({case:'COI service worker',prefix,navigations,...await page.evaluate(()=>({isolated:crossOriginIsolated,inputState:qpyodideInputState})),ok:true});
+    } finally {await context.close();}
+  }
+  {
+    const context=await browser.newContext({serviceWorkers:'block'}),errors=[];
+    await context.addInitScript(()=>{
+      const NativeWorker=globalThis.Worker;
+      globalThis.Worker=class extends NativeWorker {
+        constructor(url,options){if(String(url).includes('pyodide-worker-core.js'))throw new Error('P13 intentionally blocked worker');super(url,options);}
+      };
+    });
+    const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+    try {
+      await page.goto(`http://127.0.0.1:${ports.headers}${prefix}index.html`);
+      await page.waitForFunction(()=>qpyodideCellContainer.cells[0]?.primaryUnit?.editor,null,{timeout});
+      await page.waitForFunction(()=>document.querySelector('#qpyodide-status-message-text')?.textContent.includes('P13 intentionally blocked worker'),null,{timeout});
+      await code(page,'# editable when worker is blocked');
+      assert.ok((await page.evaluate(()=>CTMExport.open().markdown)).includes('# editable when worker is blocked'));
+      assert.equal(await page.locator('.qpyodide-button-run').first().isDisabled(),true);
+      assert.deepEqual(errors,[]);
+      report.results.push({case:'worker blocked',prefix,editing:true,export:true,ok:true});
+    } finally {await context.close();}
   }
 } finally {
   fs.writeFileSync(process.env.P13_REPORT || '/tmp/p13-seb-profile.json',JSON.stringify(report,null,2)+'\n');

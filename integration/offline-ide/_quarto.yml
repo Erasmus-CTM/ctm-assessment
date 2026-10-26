@@ -3,6 +3,7 @@ project:
   render: [index.qmd, nested/index.qmd]
 website:
   title: Python IDE
+  favicon: favicon.svg
   navbar:
     left:
       - href: index.qmd
