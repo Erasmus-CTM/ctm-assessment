@@ -1,0 +1,141 @@
+{
+  "design": "Step 6 section 11 and section 16.10; exact H1 result witnesses, no same-question verdict changes",
+  "differences": [
+    {
+      "path": "ctm-stack/docs/python-checker-api.html",
+      "case": "stack:ctm-stack/docs/python-checker-api.html#2|seed=1|one",
+      "reason": "H1 adds the implicit checker response tree and its feedback; the guide also adds declarative tests. Existing verdicts and numeric scores are unchanged.",
+      "witness": {
+        "before": {
+          "request": "5febd59355138e175a6ce79f86901d79df95f7baf2da98536c573a33499be3cf",
+          "result": "90a7f51d017b69830581657c73c57ae3607ea0e403c141f624e6941b89397db7"
+        },
+        "after": {
+          "request": "a388b694b7f504596d08f5227d0d523b1ad2a4868694d11f8cde33d046e9669e",
+          "result": "8294c813361fc009da9432c1011e8333c76ecad46b0fe765d067f0ec66a95c5a"
+        },
+        "sameQuestion": true,
+        "verdictsUnchanged": true
+      }
+    },
+    {
+      "path": "ctm-stack/docs/python-checker-api.html",
+      "case": "stack:ctm-stack/docs/python-checker-api.html#2|seed=1|teacher",
+      "reason": "H1 adds the implicit checker response tree and its feedback; the guide also adds declarative tests. Existing verdicts and numeric scores are unchanged.",
+      "witness": {
+        "before": {
+          "request": "055ec1973192b96412584537b08c7fa421738bfc88bcfaaf67ce8f86d9f72e6f",
+          "result": "a2c80230757bc5902ac08a6f4eb8348b309a3ec70fe466ce3b03618f6de368f0"
+        },
+        "after": {
+          "request": "61bb375a3e440c819952a9d47feabb7bbd0cc98fc2dd6008882329507cfecaeb",
+          "result": "78f0d3ca4ced0be04ff8951d207691e39d25f48cd520596bdc998222eaf438ed"
+        },
+        "sameQuestion": true,
+        "verdictsUnchanged": true
+      }
+    },
+    {
+      "path": "ctm-stack/docs/python-checker-api.html",
+      "case": "stack:ctm-stack/docs/python-checker-api.html#2|seed=1|tests",
+      "reason": "H1 adds the implicit checker response tree and its feedback; the guide also adds declarative tests. Existing verdicts and numeric scores are unchanged.",
+      "witness": {
+        "before": {
+          "request": "38de2a1199f7d313b5afbcca35ec0918731c73c9ef30bc9a21611bf9fc912e48",
+          "result": "0fe925ca3970e1c9d82a474af5e72fcabe20b55da79aa32a15cfab52f05f3134"
+        },
+        "after": {
+          "request": "d3566ec14392528c5a44e921160fb0edd5fcc2f8baaea4330ee1ced4ce585608",
+          "result": "1e251a4fead3224e3493e48bb5620f9b17aa8f973288c0e58b33aa4638fb8c82"
+        },
+        "sameQuestion": true,
+        "verdictsUnchanged": true
+      }
+    },
+    {
+      "path": "ctm-stack/docs/python-checker-api.html",
+      "case": "stack:ctm-stack/docs/python-checker-api.html#2|seed=1|zero",
+      "reason": "H1 adds the implicit checker response tree and its feedback; the guide also adds declarative tests. Existing verdicts and numeric scores are unchanged.",
+      "witness": {
+        "before": {
+          "request": "0f7a32b6fae598bf4d086fd34cd872633d68d887b0117698ccc7c706357ad806",
+          "result": "e9df51b3d2139e61145c8783fcbcb51d70a62328eed9902e2485577a9a816403"
+        },
+        "after": {
+          "request": "7d657a6406151c11bb47245ecc15dfaf71e2328b14c67cc4550cce4339c1ea01",
+          "result": "d26eb66e22b43910b90999c0a1aef074348ed5fcfa714657840f6902d8d2ede8"
+        },
+        "sameQuestion": true,
+        "verdictsUnchanged": true
+      }
+    },
+    {
+      "path": "ctm-stack/examples.html",
+      "case": "stack:ctm-stack/examples.html#17|seed=1|one",
+      "reason": "H1 adds the implicit checker response tree and its feedback; the guide also adds declarative tests. Existing verdicts and numeric scores are unchanged.",
+      "witness": {
+        "before": {
+          "request": "5febd59355138e175a6ce79f86901d79df95f7baf2da98536c573a33499be3cf",
+          "result": "90a7f51d017b69830581657c73c57ae3607ea0e403c141f624e6941b89397db7"
+        },
+        "after": {
+          "request": "f1fd804e6b34e9bdf116a503a6258b59b5f820d9ea4f312c5ba76266df6927a2",
+          "result": "8294c813361fc009da9432c1011e8333c76ecad46b0fe765d067f0ec66a95c5a"
+        },
+        "sameQuestion": true,
+        "verdictsUnchanged": true
+      }
+    },
+    {
+      "path": "ctm-stack/examples.html",
+      "case": "stack:ctm-stack/examples.html#17|seed=1|teacher",
+      "reason": "H1 adds the implicit checker response tree and its feedback; the guide also adds declarative tests. Existing verdicts and numeric scores are unchanged.",
+      "witness": {
+        "before": {
+          "request": "055ec1973192b96412584537b08c7fa421738bfc88bcfaaf67ce8f86d9f72e6f",
+          "result": "a2c80230757bc5902ac08a6f4eb8348b309a3ec70fe466ce3b03618f6de368f0"
+        },
+        "after": {
+          "request": "045d7691ffd7f67f0ff64bbf4d8f85de40f9e2b452ba35309923684b4a647faf",
+          "result": "78f0d3ca4ced0be04ff8951d207691e39d25f48cd520596bdc998222eaf438ed"
+        },
+        "sameQuestion": true,
+        "verdictsUnchanged": true
+      }
+    },
+    {
+      "path": "ctm-stack/examples.html",
+      "case": "stack:ctm-stack/examples.html#17|seed=1|tests",
+      "reason": "H1 adds the implicit checker response tree and its feedback; the guide also adds declarative tests. Existing verdicts and numeric scores are unchanged.",
+      "witness": {
+        "before": {
+          "request": "38de2a1199f7d313b5afbcca35ec0918731c73c9ef30bc9a21611bf9fc912e48",
+          "result": "0fe925ca3970e1c9d82a474af5e72fcabe20b55da79aa32a15cfab52f05f3134"
+        },
+        "after": {
+          "request": "471f388482ca5be68f0c57d643b19c844b11ad160f04f172e37e8a185c48da19",
+          "result": "1fa62c02d909c7d28649029f75f8039e7a1660f1e8244574c6c7f051706c3b14"
+        },
+        "sameQuestion": true,
+        "verdictsUnchanged": true
+      }
+    },
+    {
+      "path": "ctm-stack/examples.html",
+      "case": "stack:ctm-stack/examples.html#17|seed=1|zero",
+      "reason": "H1 adds the implicit checker response tree and its feedback; the guide also adds declarative tests. Existing verdicts and numeric scores are unchanged.",
+      "witness": {
+        "before": {
+          "request": "0f7a32b6fae598bf4d086fd34cd872633d68d887b0117698ccc7c706357ad806",
+          "result": "e9df51b3d2139e61145c8783fcbcb51d70a62328eed9902e2485577a9a816403"
+        },
+        "after": {
+          "request": "45c00743ef90aa5a5f3489e0d8df4a1ba6e4f3f40a2da546fcaf8dc994bc3fd6",
+          "result": "d26eb66e22b43910b90999c0a1aef074348ed5fcfa714657840f6902d8d2ede8"
+        },
+        "sameQuestion": true,
+        "verdictsUnchanged": true
+      }
+    }
+  ]
+}

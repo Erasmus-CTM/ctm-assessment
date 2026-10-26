@@ -1,0 +1,5 @@
+categories:
+  - id: step6-stack-h1
+    title: H1 checker migration and rewritten guides with exact DOM/config/source witnesses and native verification
+    match:
+      - {area: config, object: '^stack-h1$', effective: '^exact-render-witnesses-and-native-plans$'}

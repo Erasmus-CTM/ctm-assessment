@@ -31,7 +31,7 @@ function project(source) {
     const record=JSON.parse(fs.readFileSync(path.join(workspace,'resolved-repos.json')));
     fs.copyFileSync(path.join(workspace,'src','ctm-checkers-'+record.repositories['ctm-checkers'].commit.slice(0,12),
       'examples/stack/polynomial-expansion.xml'),path.join(dir,'question.xml'));
-    fs.appendFileSync(path.join(dir,'all.qmd'),'\n```{#no-ai-stack .stack-question}\n#| label: no-ai-stack\n#| file: question.xml\n#| question: Expand a product (form-sensitive)\n#| feedback: true\n```\n');
+    fs.appendFileSync(path.join(dir,'all.qmd'),'\n```{#no-ai-stack .stack-question}\n#| label: no-ai-stack\n#| file: question.xml\n#| question: Expand a product (form-sensitive)\n#| checker: |\n#|   def check(response, symbols):\n#|       return bool(response["answers"]["ans"] == response["teacher"]["ans"])\n#| feedback: true\n```\n');
   }
   return dir;
 }

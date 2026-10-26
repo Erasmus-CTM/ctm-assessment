@@ -26,6 +26,7 @@ import {createRequire} from 'node:module';
 import {closedBySection, loadRevealEnds} from './compare-rendered/reveal-ends.mjs';
 import {markStoreAdditions} from './compare-rendered/store.mjs';
 import {stackTransition,stackVariantsTransition,markStackChanges} from './compare-rendered/stack.mjs';
+import {stackCheckerTransition} from './compare-rendered/stack-h1.mjs';
 import {loadAssetSources, markAssetChanges} from './compare-rendered/assets.mjs';
 const require = createRequire(import.meta.url);
 const vm = require('node:vm');
@@ -760,6 +761,7 @@ function stackPolicyNotes(page, A, B) {
 
 function comparePage(page, before, after, ends, linked, assets) {
   const A = extract(before), B = extract(after), items = [];
+  if(stackCheckerTransition(A,B,page,canonical))items.push({page,area:'config',change:'changed',object:'stack-h1',path:'/',effective:'exact-render-witnesses-and-native-plans'});
   if(stackTransition(A,B))items.push({page,area:'config',change:'changed',object:'stack-card-shell',path:'/',effective:'identical-engine-data'});
   if(stackVariantsTransition(A,B)) {
     items.push({page,area:'config',change:'changed',object:'stack-variants',path:'/',effective:'native-verified-seeds-and-history'});
