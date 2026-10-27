@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   campaign:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Confirm the explicitly requested broad campaign
         env:
@@ -56,7 +56,7 @@ jobs:
   courses:
     needs: [campaign]
     name: cells ${{ matrix.course }} @ ${{ matrix.ref }}${{ matrix.informational && ' (informational)' || '' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 150
     strategy:
       fail-fast: false
@@ -81,7 +81,11 @@ jobs:
         with:
           version: '1.8.27'
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium
+      - name: Install supported browsers with the mainline mirror fix
+        timeout-minutes: 5
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
       - name: Build the course with the old and the new package
         id: build
         continue-on-error: ${{ matrix.informational == true }}
@@ -131,7 +135,7 @@ jobs:
   engines:
     needs: [campaign]
     name: example cells in Firefox and WebKit against Chromium
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -149,7 +153,11 @@ jobs:
         with:
           version: '1.8.27'
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Install supported browsers with the mainline mirror fix
+        timeout-minutes: 5
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium firefox webkit
       - name: Build the example site
         run: python scripts/setup-feedback-integration.py
       - name: Run its cells in each engine and compare with Chromium
