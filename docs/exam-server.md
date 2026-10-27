@@ -5,8 +5,11 @@ Render with `quarto render --profile offline,exam` and copy the complete
 browser answers belong to that origin. Do not mix a host name and IP address,
 clear browser data during the session, or redeploy during an exam.
 
-The profiles and vendored asset builder are separate Step 5 work. This server
-serves an already built tree; it does not fetch dependencies or build profiles.
+The `offline` and `exam` profiles are written by CTM Assessment's offline
+asset preparation (`docs/offline-install-preparation.md`), which has no public
+installer option yet; today only the offline Python website ZIP
+(`docs/exam-site-zip.md`) is built this way. This server serves an already
+built tree; it does not fetch dependencies or build profiles.
 
 ## Local checks and an administrator dry run
 
