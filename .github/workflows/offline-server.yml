@@ -18,10 +18,14 @@ jobs:
   http:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    strategy:
+      matrix:
+        # Exam hosts run whatever Python 3.12 or newer they have.
+        python: ['3.12', '3.13']
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
       - name: Test actual HTTP responses
         run: python -m unittest discover -s tests -p test_serve_offline.py -v

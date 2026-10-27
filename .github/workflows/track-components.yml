@@ -1,11 +1,14 @@
 name: Track component branches
 
-# Early warning: build and test the combined examples against the branch tips
-# named in integration/feedback/repos.json instead of the pinned commits.
-# Never deploys. A failure means the pins cannot be advanced yet. A pin that
-# its branch does not contain stays (the log says so): the JSXGraph pin is the
-# fork commit of upstream pull request #2, which upstream main lacks.
+# Early warning, nightly: build and test the combined examples against the
+# branch tips named in integration/feedback/repos.json instead of the pinned
+# commits, and report component CI pins that differ from repos.json. Never
+# deploys and blocks nothing. A failure means the pins cannot be advanced yet.
+# A pin that its branch does not contain stays (the log says so): the JSXGraph
+# pin is the fork commit of upstream pull request #2, which upstream main lacks.
 on:
+  schedule:
+    - cron: '47 3 * * *'
   workflow_dispatch:
     inputs:
       confirmation:
@@ -22,6 +25,7 @@ concurrency:
 
 jobs:
   campaign:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Confirm the explicitly requested broad campaign
@@ -35,9 +39,13 @@ jobs:
 
   follow-branches:
     needs: [campaign]
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || needs.campaign.result == 'success') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
+      - name: Component CI pins that differ from repos.json (warnings only)
+        run: python tools/ci/check-component-pins.py
       - uses: actions/setup-node@v7
         with:
           node-version: '24'

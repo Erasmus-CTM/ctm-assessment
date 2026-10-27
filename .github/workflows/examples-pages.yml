@@ -32,10 +32,24 @@ jobs:
             exit 1
           fi
 
+  # The fast tier: every unit and source-contract test that needs no Quarto,
+  # no browser and no download (about two minutes).
   source:
     runs-on: ubuntu-latest
+    outputs:
+      repin: ${{ steps.changes.outputs.repin }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Does this pull request change the package's pins or builder?
+        id: changes
+        if: github.event_name == 'pull_request'
+        run: |
+          # The pull request's merge commit: its first parent is the base.
+          if git diff --name-only HEAD^1 HEAD | grep -qxE 'integration/feedback/repos\.json|scripts/setup-feedback-integration\.py|scripts/test-package\.py'; then
+            echo repin=true >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -44,17 +58,15 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci --ignore-scripts
-      - name: Source contracts without rendering or browser downloads
-        run: >-
-          node --test tests/ci-policy.test.cjs tests/compare-browser.test.cjs
-          tests/compare-courses-workflow.test.cjs tests/compare-pyodide-settings.test.cjs
-          tests/compare-rendered.test.cjs tests/compare-rendered-store.test.cjs
-          tests/compare-rendered-assets.test.cjs tests/parity-capture.test.cjs
-          tests/parity-checkers.test.cjs tests/parity-variants.test.cjs tests/parity-stack-h1.test.cjs
-          tests/compare-rendered-stack-h1.test.cjs
+      - name: Unit and source-contract tests without rendering or browser downloads
+        run: npm test
+      - name: Python unit tests without rendering or downloads
+        run: python -m unittest discover -s tests -p 'test_*.py'
 
+  # main renders and publishes; a confirmed campaign and a pull request that
+  # re-pins the package also run every component's tests (--test).
   build:
-    if: ${{ !cancelled() && needs.source.result == 'success' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || needs.campaign.result == 'success') }}
+    if: ${{ !cancelled() && needs.source.result == 'success' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || needs.campaign.result == 'success' || (github.event_name == 'pull_request' && needs.source.outputs.repin == 'true')) }}
     needs: [source, campaign]
     runs-on: ubuntu-latest
     steps:
@@ -80,7 +92,7 @@ jobs:
       - name: Render and exercise the examples
         run: |
           set -o pipefail
-          tests=(); [ "${{ github.event_name }}" != workflow_dispatch ] || tests=(--test)
+          tests=(); [ "${{ github.event_name }}" = push ] || tests=(--test)
           python scripts/setup-feedback-integration.py --review-refs "$CTM_REVIEW_REFS" "${tests[@]}" 2>&1 | tee "$RUNNER_TEMP/build.log"
       - name: Install Chromium
         if: github.event_name == 'workflow_dispatch'

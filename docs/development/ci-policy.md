@@ -22,13 +22,25 @@ must stay stable. This policy does not authorize changing or deploying that main
 
 ## Automatic coverage
 
-- `examples-pages.yml` runs selected source contracts, including comparison,
-  persistence-comparator and variant-coverage negatives, without Quarto renders
-  or browser downloads. The main publication path still renders, uploads and
-  deploys the example site; its full component-test/browser tail is manual.
+- **Fast tier, every pull request and every push to main:** `examples-pages.yml`
+  runs `npm test` (every `tests/*.test.cjs`, including the comparison,
+  persistence-comparator and variant-coverage negatives) and the Python unit
+  tests, without Quarto renders or browser downloads (about two minutes). The
+  main publication path still renders, uploads and deploys the example site.
+- **Re-pins:** a pull request that changes `integration/feedback/repos.json`,
+  `scripts/setup-feedback-integration.py` or `scripts/test-package.py` also
+  builds the package and runs every component's tests (`--test`, about 15
+  minutes). The browser tail stays manual.
+- **Nightly, warnings only:** `track-components.yml` builds and tests against
+  the component branch tips (`--follow-branches --test` and the browser
+  tabs, about 25 minutes) and reports component CI pins that differ from
+  `repos.json` (`tools/ci/check-component-pins.py`). It never deploys and
+  blocks nothing.
 - The fixture-contract jobs in `assets.yml`, `assets-board.yml`, `assets-npm.yml`
-  and `assets-compose.yml` stay automatic. Official archive resolution,
-  materialization, provenance renders and runtime probes are manual.
+  and `assets-compose.yml` stay automatic, on pull requests and main (a branch
+  push without a pull request runs nothing, so no commit is tested twice).
+  Official archive resolution, materialization, provenance renders and runtime
+  probes are manual.
 - `offline-server.yml` retains its narrow HTTP contract triggers.
 - `jsxgraph-renderer-calibration.yml` retains its scoped PR contract: two actual
   Quarto frames and source/identity/geometry negative mutations. Its duplicate
@@ -41,9 +53,9 @@ must stay stable. This policy does not authorize changing or deploying that main
 Confirmed dispatch retains the existing assertions and artifacts for examples
 and component integration; actual store persistence in all three browsers;
 course rendered/browser comparison and its baseline replay; Pyodide parity,
-goldens and cells; loading measurements; Quarto versions; branch-tip tracking;
+goldens and cells; loading measurements; Quarto versions; branch-tip tracking (also nightly);
 offline browser controls; and official asset inspection/materialization.
-Automatic broad PR/push triggers and weekly schedules are removed.
+Other broad PR/push triggers and weekly schedules are removed.
 
 `compare-courses.yml` keeps its dispatch and reusable inputs, including separate
 tooling/package/course refs, browser selection, shards and reviewed component
