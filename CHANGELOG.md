@@ -14,6 +14,14 @@
   extension alias. Keep pyodide-interaktiv's standalone forwarder outside
   the package, and retain the stale-version check with migration advice.
   Tests use `CTM_LIBS_EXTENSION` for shared feedback files.
+- `scripts/serve-offline.py` refuses a symlink loop with 403 on Python 3.13
+  too (3.13 no longer raises on a loop in non-strict path resolution).
+- CI: a fast tier on every pull request (all unit tests, no render), the
+  component tests on re-pin pull requests, and a nightly warning-only run
+  against component branch tips with a report of component CI pins that
+  differ from `repos.json` (`docs/development/ci-policy.md`). Parity
+  expected-difference entries accept a changed verdict only when they name
+  the case or carry a witness.
 
 ## 0.13.0
 

@@ -238,7 +238,8 @@ function compare(runs, jobs, results, inventories, strict) {
     const ga = graded(a), gb = graded(b);
     const same = ga.length === gb.length && ga.every((x, i) => x.status === gb[i].status && sameScore(x.score, gb[i].score));
     const identical = isDeepStrictEqual(a.results, b.results) && isDeepStrictEqual(a.feedback, b.feedback) && isDeepStrictEqual(a.responses, b.responses);
-    const entry = {id, path: where, case: c, [runs[0].name]: {results: a.results, feedback: a.feedback}, [runs[1].name]: {results: b.results, feedback: b.feedback},...witness};
+    // verdict: the status or score changed, which only an entry naming the case (or a witness) may accept.
+    const entry = {id, path: where, case: c, verdict: !same, [runs[0].name]: {results: a.results, feedback: a.feedback}, [runs[1].name]: {results: b.results, feedback: b.feedback},...witness};
     if (!same || (strict && !identical)) differences.push(entry);
     else if (!identical) notes.push(entry);
   }
@@ -262,6 +263,7 @@ function readExpected(file) {
     const rank = [entry.case ? (pattern ? 2 : 3) : 1, (entry.path || '').length, (entry.case || '').length];
     return {...entry, required: entry.required !== false, index: i, rank,
       matches: d => stackH1.matches(entry,d) && (!entry.onlyIn || d.why === 'only in ' + entry.onlyIn) && (!entry.path || d.path === entry.path || d.path.startsWith(entry.path.replace(/\/?$/, '/')))
+        && (!d.verdict || Boolean(entry.case || entry.witness))
         && (!entry.case || (pattern ? pattern.test(d.id) : d.id === entry.case))};
   });
 }

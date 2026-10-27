@@ -21,3 +21,21 @@ test('retired or added cases match only their exact identity and declared direct
   assert.throws(()=>readExpected(file),/onlyIn/);
  } finally {fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('a path-only entry never accepts a changed verdict; an entry naming the case does',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'ctm-parity-expected-'));
+ try {
+  const file=path.join(root,'expected.json');
+  const flip={id:'basic-features.html#q1',path:'math-exercise/basic-features.html',verdict:true,
+   base:{results:[{status:'correct',score:1}]},head:{results:[{status:'incorrect',score:0}]}};
+  fs.writeFileSync(file,JSON.stringify({differences:[{path:'math-exercise',reason:'a new page'}]}));
+  let result=applyExpected(readExpected(file),[flip]);
+  assert.equal(result.accepted.length,0);assert.equal(result.unexpected.length,1);
+  // The same entry still covers a difference that keeps every verdict (feedback text, details).
+  result=applyExpected(readExpected(file),[{...flip,verdict:false}]);
+  assert.equal(result.accepted.length,1);
+  fs.writeFileSync(file,JSON.stringify({differences:[{case:'basic-features.html#q1',reason:'a reviewed grading change'}]}));
+  result=applyExpected(readExpected(file),[flip]);
+  assert.equal(result.accepted.length,1);assert.equal(result.unexpected.length,0);
+ } finally {fs.rmSync(root,{recursive:true,force:true});}
+});

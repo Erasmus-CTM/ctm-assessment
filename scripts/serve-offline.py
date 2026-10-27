@@ -5,6 +5,7 @@ Standard-library-only dry-run/CI server. Production exam deployment still needs
 a trusted TLS certificate and the real browser/configuration dry run.
 """
 import argparse
+import errno
 from functools import partial
 import hashlib
 from http import HTTPStatus
@@ -114,6 +115,12 @@ class OfflineHandler(SimpleHTTPRequestHandler):
             return
         try:
             candidate = (root / request_path.lstrip("/")).resolve()
+            try:
+                # Python 3.13 resolves a symlink loop without an error unless strict.
+                candidate.resolve(strict=True)
+            except OSError as error:
+                if error.errno == errno.ELOOP:
+                    raise
             if not candidate.is_relative_to(root):
                 self.send_error(HTTPStatus.FORBIDDEN)
                 return
