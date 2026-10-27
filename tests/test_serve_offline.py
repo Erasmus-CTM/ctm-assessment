@@ -295,3 +295,54 @@ class OfflineHTTPTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OfflineHTTPSTests(unittest.TestCase):
+    """The --cert/--key server the exam dry run uses."""
+
+    def setUp(self):
+        import shutil
+        import ssl
+        import subprocess
+        if not shutil.which("openssl"):
+            self.skipTest("openssl unavailable")
+        self.temp = tempfile.TemporaryDirectory()
+        root = Path(self.temp.name)
+        (root / "index.html").write_text("<h1>Exam</h1>", encoding="utf-8")
+        cert, key = root / "cert.pem", root / "key.pem"
+        subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                        "-subj", "/CN=127.0.0.1", "-keyout", str(key), "-out", str(cert)],
+                       check=True, capture_output=True)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(str(cert), str(key))
+        self.server = MODULE.TLSServer(("127.0.0.1", 0), partial(QuietHandler, directory=str(root)), context)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=3)
+        self.temp.cleanup()
+
+    def get(self):
+        import ssl
+        client = ssl.create_default_context()
+        client.check_hostname = False
+        client.verify_mode = ssl.CERT_NONE
+        connection = http.client.HTTPSConnection("127.0.0.1", self.server.server_port, timeout=5, context=client)
+        try:
+            connection.request("GET", "/")
+            response = connection.getresponse()
+            return response.status, dict(response.getheaders()), response.read()
+        finally:
+            connection.close()
+
+    def test_an_idle_connection_does_not_stall_other_clients(self):
+        idle = socket.create_connection(("127.0.0.1", self.server.server_port))
+        try:
+            status, headers, body = self.get()  # timed out after 5 s while the handshake ran in accept()
+        finally:
+            idle.close()
+        self.assertEqual((status, body), (200, b"<h1>Exam</h1>"))
+        self.assertEqual(headers["Cross-Origin-Embedder-Policy"], "require-corp")

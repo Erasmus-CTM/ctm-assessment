@@ -11,4 +11,4 @@ Start with the [authoring guide](authoring.md) to adapt an activity to your teac
 
 - [Public example audit: findings and validation, 16 October 2026](audit-2026-10-16.md)
 - [Pre-release audit of the stack, 18 October 2026: findings, proposals, release order](audit-2026-10/README.md)
-- [Similar problems: design draft, 23 October 2026](similar-problems.md)
+- [Similar problems: design, 23 October 2026 (phase 1 merged 26 October)](similar-problems.md)

@@ -5,7 +5,8 @@
 ## Settings for all components
 
 Every CTM section (`ctm-assessment`, `math-exercise`, `py-exercise`,
-`ai-feedback`) is read key by key across the levels Quarto knows, so a page
+`pyodide` for pyodide-interaktiv, `stack` for STACK questions, `ai-feedback`)
+is read key by key across the levels Quarto knows, so a page
 that sets one key keeps the project's other keys of that section:
 
 1. the page's front matter;
@@ -24,11 +25,32 @@ wins over `ctm-assessment:` at any level.
 ```yaml
 ctm-assessment:
   stop-after: 30    # seconds before a long check offers Stop, all components (default 20)
-  lang: nb          # interface language of all components: en, de, nb (nn and no give nb)
+  lang: nb          # interface language of all components (see the table below)
+  save: answers     # keep learners' answers in their browser: answers (default) or none
+  progress: false   # the page's progress panel (default false; quiz panels appear anyway)
+  export: true      # "Export my answers" in Settings (default true)
+  storage-key: my-course  # the course's name in browser storage (default: the site's root path)
+  assets: cdn       # browser libraries from jsDelivr (cdn, default) or the site (local)
+  variants:
+    approval: required  # publish only approved question variants (default required; or optional)
   tab-links: true   # links into tabs and reveals (default true)
   modes: true       # the lecture/reading switch on pages with reading steps (default true)
   markdown-lint: false  # warn about raw HTML that has a Markdown form (default false)
 ```
+
+`stop-after`, `lang` and `save` are shared keys: a component's own spelling
+(`math-exercise: {save: none}`, `#| save: false` on an exercise) wins. Other
+keys under `ctm-assessment:` are reported as unknown. Interface languages per
+component; tags are normalized (`no`, `nb-NO` give `nb`), `nn` falls back to
+`nb`, and any other language to English:
+
+| Component texts | Languages |
+|---|---|
+| shared buttons and messages, math-exercise, py-exercise | en, de, nb |
+| reveals, the switch, Settings and saved answers | en, de, nb, nn |
+| AI feedback | en, de, nb, nn, es |
+| pyodide-interaktiv | en, de, nb, sv, da |
+| STACK questions | en, de, nb, nn, sv, da |
 
 `ai-feedback: enabled: false` at any level (or `CTM_FEEDBACK=off`) builds the
 site without AI feedback; no level can turn it back on
@@ -325,10 +347,9 @@ Every normalized candidate still passes the same admission and mathematical
 checks. Repair requests include the concrete format failure; **Details** in the
 practice panel exposes the final reason locally when both attempts fail.
 
-The pinned G2 head is stacked on ctm-libs PR48, so the combined preview includes
-its saved-answer controls inside shared Settings and compact navigation. Practice
-writes preserve the original question's navigation credit. Merge PR48 before G2;
-then retarget/rebaseline and compare the resulting tree with the tested head.
+Practice problems are saved with the other answers in shared Settings; practice
+writes preserve the original question's navigation credit. Similar problems are
+available for math-exercise only.
 
 Generated matrix responses use the same fixed matrix grid as the original.
 Complete row-major cell recipes can normalize a flat slot run, including during
