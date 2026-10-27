@@ -1,7 +1,7 @@
 name: Rendered offline Python website ZIP
 on:
   pull_request:
-    paths: [integration/offline-ide/**, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
+    paths: [integration/offline-ide/**, integration/p13-worker/**, tools/p13-shared-worker.mjs, integration/feedback/repos.json, integration/p13*.json, integration/assets-licences/**, scripts/*p13*.py, tools/p13-loading.cjs, scripts/ctm_assets.py, tools/p13-seb-profile.mjs, tools/p13-controls.mjs, tools/p13-serve.mjs, tests/p13-serve.test.cjs, tests/p13-controls.browser.cjs, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,8 +15,6 @@ jobs:
     timeout-minutes: 60
     env:
       ASSET_RUN_ID: '40389684095'
-      ASSET_LIBS_COMMIT: '6f464e687e47282b3faebed27317c48dd8ad70ff'
-      IDE_PYODIDE_COMMIT: '16561e6604a8047027a4b053ad0d7b8e140efe7f'
       REVIEWED_LOCK_SHA256: 73d8b6fb0de3cd5b8d3ec8e7932d96f854bedf07ab7b7af43013d3cd1f347b3b
     steps:
       - uses: actions/checkout@v7
@@ -40,48 +38,72 @@ jobs:
           version: '1.8.27'
       - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'
       - run: npm ci --ignore-scripts
-      - uses: actions/download-artifact@v7
+      - name: Require AC-approved complete lock for the exact application pins
+        run: |
+          python - <<'PYTHON'
+          import json
+          refs = json.load(open('integration/feedback/repos.json'))['repositories']
+          receipt = json.load(open('integration/p13-complete-assets.json'))
+          expected = {name:refs[name]['commit'] for name in ('ctm-libs','pyodide-interaktiv')}
+          assert receipt['application_refs'] == expected, 'P13 complete lock awaits AC approval; review the unapproved-p13-lock-review artifact before changing the receipt'
+          PYTHON
+      - name: Download AC-approved #80 vendor baseline
+        uses: actions/download-artifact@v7
         with:
           name: prebuilt-offline-assets
           run-id: ${{ env.ASSET_RUN_ID }}
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/prebuilt-assets
-      - name: Install the existing Python frontend
+          path: ${{ runner.temp }}/approved-base-assets
+      - name: Verify the approved baseline lock and carried bytes
         run: |
-          IDE_REVIEW_REFS="$(python -c 'import json,os; print(json.dumps({**json.loads(os.environ.get("CTM_REVIEW_REFS") or "{}"), "pyodide-interaktiv": os.environ["IDE_PYODIDE_COMMIT"], "ctm-libs": os.environ["ASSET_LIBS_COMMIT"]}))')"
-          python scripts/build-course.py --path integration/offline-ide \
-            --dest "$RUNNER_TEMP/python-site" --workspace "$RUNNER_TEMP/package" \
-            --review-refs "$IDE_REVIEW_REFS" --no-render
-      - name: Verify and copy prebuilt assets; create standard profiles
-        run: |
-          python - <<'PY'
+          python - <<'PYTHON'
           import json, os, sys
           from pathlib import Path
-          from unittest.mock import patch
           sys.path.insert(0, 'scripts')
           import ctm_assets as a
-          root = Path(os.environ['RUNNER_TEMP'])
-          carried, project = root / 'prebuilt-assets', root / 'python-site'
-          raw = (carried / 'inspection/complete-lock.json').read_bytes()
+          base = Path(os.environ['RUNNER_TEMP'])/'approved-base-assets/inspection'
+          raw = (base/'complete-lock.json').read_bytes()
+          a.verify_bytes(raw, sha256=os.environ['REVIEWED_LOCK_SHA256'])
           lock = json.loads(raw)
-          assert a.digest(raw) == os.environ['REVIEWED_LOCK_SHA256'], 'unreviewed complete lock'
-          assert raw == a.json_bytes(lock) and lock['kind'] == 'ctm-assets-lock'
-          versions = a.validate_version_homes(lock, project / '_extensions/ctm-libs',
-              project / '_extensions/ctm-assessment/jsxgraph-pins.yml')
-          assert lock['scope'] == sorted(versions)
-          bundle = carried / 'inspection/complete-built'
-          a.verify_bundle(bundle, lock)
-          index = (carried / 'assets-imports.json').read_bytes()
-          base = bundle / 'pyodide' / versions['pyodide']
-          a.validate_bound_import_index(index, lock['private']['import_index'],
-              public_files=a.inventory(bundle), subset_bytes=(base / 'pyodide-lock.json').read_bytes())
-          a.release_version((base / 'package.json').read_bytes(), versions['pyodide'])
-          with patch.object(a, 'download', side_effect=AssertionError('carried install attempted network')):
-              a.install_carried_bundle(lock, bundle, project / '_ctm-assets')
-          (project / '.private-extensions/assets-imports.json').write_bytes(index)
-          a.write_profiles(project, course_key='python-ide')
-          print('Verified prebuilt files:', len(lock['files']))
-          PY
+          assert raw == a.json_bytes(lock)
+          a.verify_bundle(base/'complete-built', lock)
+          PYTHON
+      - name: Read the exact worker source pins
+        id: workers
+        run: |
+          python - <<'PYTHON'
+          import json, os
+          refs = json.load(open('integration/feedback/repos.json'))['repositories']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              for name in ('ctm-libs', 'pyodide-interaktiv'):
+                  out.write(name + '=' + refs[name]['commit'] + '\n')
+          PYTHON
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: ${{ steps.workers.outputs.ctm-libs }}
+          path: _ci/p13-libs
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/pyodide-interaktiv
+          ref: ${{ steps.workers.outputs.pyodide-interaktiv }}
+          path: _ci/p13-ide
+          persist-credentials: false
+      - name: Reject altered deployed and compressed worker files
+        run: python -m unittest discover -s tests -p test_p13_assets.py
+      - name: Reproduce the reviewed complete assets including worker sources
+        run: |
+          python scripts/build-p13-assets.py --library-root _ci/p13-libs --ide-root _ci/p13-ide \
+            --cache "$RUNNER_TEMP/assets-cache" --output "$RUNNER_TEMP/prebuilt-assets"
+      - name: Install the pinned Python frontend and exercise components
+        run: |
+          python scripts/build-course.py --path integration/offline-ide \
+            --dest "$RUNNER_TEMP/python-site" --workspace "$RUNNER_TEMP/package" --no-render
+      - name: Verify and install complete assets; create standard profiles
+        run: |
+          python scripts/install-p13-site-assets.py --assets-dir "$RUNNER_TEMP/prebuilt-assets" \
+            --project "$RUNNER_TEMP/python-site" --course-key python-ide
       - name: Render the offline exam website
         working-directory: ${{ runner.temp }}/python-site
         run: quarto render --profile offline,exam
@@ -92,11 +114,12 @@ jobs:
           from pathlib import Path
           sys.path.insert(0, 'scripts')
           import ctm_assets as a
+          from p13_assets import verify_deployment
           root = Path(os.environ['RUNNER_TEMP'])
           site = root / 'python-site/_site-exam'
           assert (site / 'index.html').is_file() and (site / 'nested/index.html').is_file()
-          lock = json.loads((root / 'prebuilt-assets/inspection/complete-lock.json').read_bytes())
-          a.verify_bundle(site / '_ctm-assets', lock)
+          lock = json.loads((root / 'prebuilt-assets/complete-lock.json').read_bytes())
+          verify_deployment(site, lock)
           readme = Path('docs/exam-site-zip.md').read_text().split('<!-- IT -->\n', 1)[1].split('\n<!-- /IT -->', 1)[0]
           (site / 'README-IT.txt').write_text(readme + '\n', encoding='utf-8')
           output = root / 'python-offline-website.zip'
@@ -118,7 +141,7 @@ jobs:
               assert archive.testzip() is None
               assert 'index.html' in archive.namelist() and '_site-exam/index.html' not in archive.namelist()
               archive.extractall(deployed)
-          a.verify_bundle(deployed / '_ctm-assets', lock)
+          verify_deployment(deployed, lock)
           shutil.copytree(deployed, root / 'hosted/dept/python')
           print('Website ZIP sha256:', a.digest(output.read_bytes()))
           PY
@@ -127,6 +150,21 @@ jobs:
         run: |
           sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
           npx playwright install --with-deps chromium
+      - name: Measure P16 startup strategies without changing production defaults
+        run: |
+          python scripts/prepare-p13-timing.py "$RUNNER_TEMP/python-site"
+          (cd "$RUNNER_TEMP/python-site" && quarto render timing-math.qmd --profile offline && quarto render timing-python.qmd --profile offline)
+          CTM_TIMING_P13=1 CTM_INTEGRATION_SITE="$RUNNER_TEMP/python-site/_site" \
+            node integration/feedback/loading-timing.cjs "$RUNNER_TEMP/p13-loading-timing.json"
+      - name: Build and test concurrent IDE, Python and mathematics consumers
+        run: |
+          python scripts/build-course.py --path integration/p13-worker --dest "$RUNNER_TEMP/p13-mixed" \
+            --workspace "$RUNNER_TEMP/mixed-package" --no-render
+          python scripts/install-p13-site-assets.py --assets-dir "$RUNNER_TEMP/prebuilt-assets" \
+            --project "$RUNNER_TEMP/p13-mixed" --course-key p13-mixed
+          (cd "$RUNNER_TEMP/p13-mixed" && quarto render --profile offline,exam)
+          P13_MIXED_SITE="$RUNNER_TEMP/p13-mixed/_site-exam" P13_MIXED_REPORT="$RUNNER_TEMP/p13-shared-worker.json" \
+            node tools/p13-shared-worker.mjs
       - name: Serve the extracted website using ordinary static hosting and optional headers
         run: |
           python -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/deployed" > "$RUNNER_TEMP/plain.log" 2>&1 &
@@ -254,13 +292,12 @@ jobs:
             await browser.close();
           }
           JS
-      - name: Publish the rendered website ZIP
+      - name: Carry the candidate ZIP to the engine gates
         uses: actions/upload-artifact@v7
         with:
-          name: python-offline-website
+          name: p13-zip-candidate
           path: ${{ runner.temp }}/python-offline-website.zip
           compression-level: 0
-          archive: false
           if-no-files-found: error
       - name: Preserve acceptance evidence
         if: always()
@@ -269,8 +306,118 @@ jobs:
           name: python-offline-website-evidence
           path: |
             ${{ runner.temp }}/python-offline-checks.json
+            ${{ runner.temp }}/p13-loading-timing.json
+            ${{ runner.temp }}/p13-shared-worker.json
             ${{ runner.temp }}/python-ide.png
             ${{ runner.temp }}/plain.log
             ${{ runner.temp }}/subdirectory.log
             ${{ runner.temp }}/headers.log
             ${{ runner.temp }}/subdirectory-headers.log
+
+  seb-engine-profile:
+    needs: [website]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, engine: chromium, version: '139.0.7258.138', profile: cef139}
+          - {os: ubuntu-24.04, engine: chromium, version: '147.0.7727.117', profile: cef147}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v7
+        with:
+          name: p13-zip-candidate
+          path: ${{ runner.temp }}/zip
+      - name: Extract the actual website ZIP
+        run: |
+          python - <<'PYTHON'
+          import os, zipfile, shutil
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          with zipfile.ZipFile(root / 'zip/python-offline-website.zip') as archive:
+              assert archive.testzip() is None
+              archive.extractall(root / 'deployed')
+          shutil.copytree(root / 'deployed', root / 'hosted/dept/python')
+          PYTHON
+      - name: Install the exact CEF release-branch Chromium profile
+        timeout-minutes: 5
+        if: matrix.engine == 'chromium'
+        env:
+          P13_CHROME_VERSION: ${{ matrix.version }}
+        run: |
+          python scripts/install-p13-chromium.py "$P13_CHROME_VERSION" "$RUNNER_TEMP/chrome"
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          npx playwright install-deps chromium
+      - name: Install pinned Playwright WebKit on macOS
+        if: matrix.engine == 'webkit'
+        run: npx playwright install webkit
+      - name: Serve plain LAN HTTP and a server with isolation headers
+        run: |
+          node tools/p13-serve.mjs "$RUNNER_TEMP/deployed" 8765 > "$RUNNER_TEMP/plain.log" 2>&1 &
+          node tools/p13-serve.mjs "$RUNNER_TEMP/deployed" 8766 --isolated > "$RUNNER_TEMP/headers.log" 2>&1 &
+          node tools/p13-serve.mjs "$RUNNER_TEMP/hosted" 8767 > "$RUNNER_TEMP/subdirectory.log" 2>&1 &
+          node tools/p13-serve.mjs "$RUNNER_TEMP/hosted" 8768 --isolated > "$RUNNER_TEMP/subdirectory-headers.log" 2>&1 &
+          for p13_port in 8765 8766 8767 8768; do
+            p13_path=/index.html
+            if [ "$p13_port" -ge 8767 ]; then p13_path=/dept/python/index.html; fi
+            curl --noproxy '*' --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 --silent --show-error --fail -I "http://127.0.0.1:$p13_port$p13_path" > /dev/null
+          done
+      - name: Verify the byte-preserving host and native-control negative cases
+        env:
+          P13_BROWSER: ${{ matrix.engine }}
+        run: |
+          if [ "$P13_BROWSER" = chromium ]; then export P13_BROWSER_EXECUTABLE="$RUNNER_TEMP/chrome/chrome-linux64/chrome"; fi
+          node --test tests/p13-serve.test.cjs tests/p13-controls.browser.cjs
+      - name: Check Run, Stop, input, NumPy, inert HTML and saved-answer restore
+        env:
+          P13_BROWSER: ${{ matrix.engine }}
+          P13_EXPECT_BROWSER_VERSION: ${{ matrix.version }}
+          P13_REPORT: ${{ runner.temp }}/seb-profile*.json
+        run: |
+          if [ "$P13_BROWSER" = chromium ]; then
+            export P13_BROWSER_EXECUTABLE="$RUNNER_TEMP/chrome/chrome-linux64/chrome"
+          fi
+          P13_REPORT="$RUNNER_TEMP/seb-profile-root.json" node tools/p13-seb-profile.mjs
+          P13_PATH_PREFIX=/dept/python/ P13_PORTS='{"plain":8767,"headers":8768}' \
+            P13_REPORT="$RUNNER_TEMP/seb-profile-subdirectory.json" node tools/p13-seb-profile.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: p13-seb-${{ matrix.profile }}
+          path: |
+            ${{ runner.temp }}/seb-profile*.json
+            ${{ runner.temp }}/chrome/receipt.json
+            ${{ runner.temp }}/plain.log
+            ${{ runner.temp }}/headers.log
+            ${{ runner.temp }}/subdirectory.log
+            ${{ runner.temp }}/subdirectory-headers.log
+
+  accepted-website:
+    needs: [website, seb-engine-profile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: p13-zip-candidate
+          path: ${{ runner.temp }}/accepted
+      - name: Preserve the accepted website ZIP without an outer archive
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ runner.temp }}/accepted/python-offline-website.zip
+          archive: false
+          compression-level: 0
+          if-no-files-found: error

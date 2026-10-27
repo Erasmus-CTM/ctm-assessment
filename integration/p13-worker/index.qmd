@@ -1,0 +1,35 @@
+---
+title: Shared worker acceptance
+lang: en
+---
+
+```{pyodide-python}
+#| label: ide-proof
+#| autorun: false
+print("IDE_VISIBLE")
+```
+
+```{py-exercise}
+#| label: python-proof
+print("LEARNER_VISIBLE")
+## TESTS ##
+print("PRIVATE_AUTHORED_SENTINEL")
+assert True
+```
+
+```{math-exercise}
+#| label: math-proof
+#| context: none
+Compute $2+2$: _[4]
+```
+
+```{math-exercise}
+#| label: loop-proof
+#| mode: custom
+#| context: none
+#| checker: |
+#|   def check(response, symbols):
+#|       while True:
+#|           pass
+Enter a value: ___[]
+```

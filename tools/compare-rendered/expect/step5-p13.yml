@@ -1,0 +1,15 @@
+# Only source-bound worker delivery and the unchanged rich/20-second defaults.
+# Authored Python/checkers, verdicts, scores and all other metadata are invariant.
+categories:
+  - id: p13-worker-delivery
+    title: Exact pinned page worker and service worker assets on standalone pages
+    match:
+      - {area: file, change: added, assets: '^p13-worker-delivery$'}
+  - id: p13-inert-defaults
+    title: Explicit rich output and existing 20-second Stop offer on ordinary IDE pages
+    match:
+      - {area: config, change: changed, assets: '^p13-inert-defaults$'}
+  - id: p13-worker-order
+    title: The exact pinned page worker moves immediately after its runtime and ahead of checker consumers
+    match:
+      - {area: assets, change: changed, assets: '^p13-worker-order$'}
