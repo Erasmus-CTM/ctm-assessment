@@ -44,8 +44,6 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
-      - name: Component CI pins that differ from repos.json (warnings only)
-        run: python tools/ci/check-component-pins.py
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -70,3 +68,6 @@ jobs:
       - name: Record resolved branch tips
         if: always()
         run: cat .feedback-workspace/resolved-repos.json || true
+      - name: Component CI pins that differ from repos.json (warnings only)
+        if: always()
+        run: python3 tools/ci/check-component-pins.py

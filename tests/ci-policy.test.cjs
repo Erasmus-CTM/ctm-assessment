@@ -134,7 +134,7 @@ test('nightly branch-tip tracking runs without confirmation, warns only and neve
   assert.equal(evaluate('workflow_dispatch', 'failure'), false);
   assert.equal(evaluate('workflow_dispatch', 'success'), true);
   assert.ok(job['timeout-minutes'] <= 40);
-  assert.ok(job.steps.some(step => step.run === 'python tools/ci/check-component-pins.py'), 'pin report, warnings only');
+  assert.ok(job.steps.some(step => step.run === 'python3 tools/ci/check-component-pins.py' && step.if === 'always()'), 'pin report, warnings only');
   assert.ok(job.steps.every(step => !String(step.uses || '').includes('pages') && !String(step.run || '').includes('--strict')));
 });
 
