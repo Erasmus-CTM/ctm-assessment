@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Pins py-exercise 5682787, ctm-checkers 57823df (shared STACK expression
+  admission, ctm-checkers#41), ctm-stack 37f1561 (README and authoring guide)
+  and pyodide-interaktiv 793a872 (standalone install names the integration
+  branch; ships ctm-libs 33fd5a5, the commit the package pins). ctm-libs
+  33fd5a5, math-exercise bf29269 and the JSXGraph fork are unchanged. The P13
+  lock receipt changes only after AC approves the lock for pyodide-interaktiv
+  793a872.
 - Pins ctm-libs 33fd5a5 and math-exercise bf29269. Similar-problem generation
   gets 300 seconds per provider request, and a corrective retry gets a fresh
   budget instead of the rest of the first call (ctm-libs#58). Generated and
