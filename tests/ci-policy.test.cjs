@@ -155,3 +155,27 @@ test('bounded default contracts remain automatic; dispatch refs and expected fil
   assert.equal(grade.env.EXPECTED, '${{ inputs.expected }}');
   assert.ok(grade.run.includes('[ ! -f "$EXPECTED" ]'));
 });
+
+test('the weekly campaign builds with every test and re-renders the demo site, warning only', () => {
+  const workflow = checkGuard('weekly.yml');
+  assert.deepEqual(Object.keys(workflow.on).sort(), ['schedule', 'workflow_dispatch']);
+  assert.equal(workflow.on.schedule.length, 1);
+  assert.match(workflow.on.schedule[0].cron, /^\S+ \S+ \* \* [0-6]$/, 'once a week');
+  assert.deepEqual(workflow.permissions, {contents: 'read'});
+  assert.equal(workflow.jobs.campaign.if, "github.event_name == 'workflow_dispatch'");
+  for (const name of ['examples', 'demo']) {
+    const job = workflow.jobs[name];
+    assert.ok(needs(job).includes('campaign'), name);
+    const evaluate = (event, result) => Boolean(value(job.if, {github: {event_name: event}, needs: {campaign: {result}}}));
+    assert.equal(evaluate('schedule', 'skipped'), true, name);
+    assert.equal(evaluate('workflow_dispatch', 'failure'), false, name);
+    assert.equal(evaluate('workflow_dispatch', 'success'), true, name);
+  }
+  assert.ok(workflow.jobs.examples.steps.some(step => step.run === 'python scripts/setup-feedback-integration.py --test'));
+  assert.ok(workflow.jobs.examples.steps.some(step => step.run === 'npm run test:browser'));
+  const demo = workflow.jobs.demo;
+  assert.equal(demo.uses, './.github/workflows/compare-courses.yml');
+  assert.deepEqual({course: demo.with.course, base: demo.with.base, head: demo.with.head, tooling: demo.with['tooling-ref']},
+    {course: 'aacchhee/ctm-demo', base: 'pin', head: '${{ github.sha }}', tooling: '${{ github.sha }}'});
+  assert.ok(!JSON.stringify(workflow).includes('pages'), 'never deploys');
+});

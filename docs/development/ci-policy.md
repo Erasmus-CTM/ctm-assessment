@@ -31,11 +31,17 @@ must stay stable. This policy does not authorize changing or deploying that main
   `scripts/setup-feedback-integration.py` or `scripts/test-package.py` also
   builds the package and runs every component's tests (`--test`, about 15
   minutes). The browser tail stays manual.
-- **Nightly, warnings only:** `track-components.yml` builds and tests against
-  the component branch tips (`--follow-branches --test` and the browser
-  tabs, about 25 minutes) and reports component CI pins that differ from
-  `repos.json` (`tools/ci/check-component-pins.py`). It never deploys and
+- **Nightly at 02:30 UTC, warnings only:** `track-components.yml` builds and
+  tests against the component branch tips (`--follow-branches --test` and the
+  browser tabs, about 25 minutes) and reports component CI pins that differ
+  from `repos.json` (`tools/ci/check-component-pins.py`). It never deploys and
   blocks nothing.
+- **Weekly on Sundays at 03:30 UTC, warnings only:** `weekly.yml` builds the
+  package at its pins with every component's tests and the browser tabs, and
+  re-renders ctm-demo's `main` with the package it pins and with umbrella
+  `main`, comparing the pages (`compare-courses.yml`, Chromium). It never
+  deploys and blocks nothing; a failure means umbrella `main` would change or
+  break the demo site.
 - The fixture-contract jobs in `assets.yml`, `assets-board.yml`, `assets-npm.yml`
   and `assets-compose.yml` stay automatic, on pull requests and main (a branch
   push without a pull request runs nothing, so no commit is tested twice).

@@ -8,7 +8,7 @@ name: Track component branches
 # pin is the fork commit of upstream pull request #2, which upstream main lacks.
 on:
   schedule:
-    - cron: '47 3 * * *'
+    - cron: '30 2 * * *'
   workflow_dispatch:
     inputs:
       confirmation:

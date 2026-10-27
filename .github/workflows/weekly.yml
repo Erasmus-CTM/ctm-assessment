@@ -1,0 +1,77 @@
+name: Weekly full campaign
+
+# Heavy, warnings only, once a week: the package at main built with every
+# component's tests and the browser tabs, and ctm-demo's main re-rendered with
+# the package it pins and with this main, compared page by page
+# (compare-courses.yml, Chromium). A failure means main would change or break
+# the demo site; it never deploys and blocks nothing.
+on:
+  schedule:
+    - cron: '30 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type broad testing campaign to authorize the broad jobs'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ctm-assessment-weekly
+  cancel-in-progress: false
+
+jobs:
+  campaign:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the explicitly requested broad campaign
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != 'broad testing campaign' ]; then
+            echo '::error::Broad jobs require the exact confirmation: broad testing campaign'
+            exit 1
+          fi
+
+  examples:
+    needs: [campaign]
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || needs.campaign.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'  # SymPy: the version Pyodide 0.28.3 ships
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - name: Build the package at its pins and run every component's tests
+        run: python scripts/setup-feedback-integration.py --test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test all five integration tabs
+        env:
+          CTM_INTEGRATION_SITE: ${{ github.workspace }}/.feedback-workspace/site/_site
+        run: npm run test:browser
+
+  demo:
+    needs: [campaign]
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || needs.campaign.result == 'success') }}
+    uses: ./.github/workflows/compare-courses.yml
+    with:
+      tooling-ref: ${{ github.sha }}
+      course: aacchhee/ctm-demo
+      course-ref: main
+      base: pin
+      head: ${{ github.sha }}
+      browser: true
+      browsers: chromium
