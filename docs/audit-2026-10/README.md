@@ -661,7 +661,7 @@ stack-sympy was not changed. Checked against every change in this audit:
 
 **Upstream Quarto issue** (AC to file): [quarto-issue-hyphenated-chunks.md](quarto-issue-hyphenated-chunks.md).
 
-**Branches to delete after merging** (this session cannot delete remote branches):
+**Branches to delete after merging** (this session cannot delete remote branches). Superseded by the [24 October branch triage](../consolidation/2026-10-24-branch-triage.md): the fork's `audit/2026-10` is now the branch the package pins for JSXGraph, and `issue-1-webagg` is contained in pyodide-interaktiv's integration branch.
 - `audit/2026-10` in ai-feedback, math-exercise, py-exercise, pyodide-interaktiv, ctm-assessment, ctm-demo, ingmat3a_ntnu and the fork aacchhee/jsxgraph-quarto.
 - Stale branches found during the audit (check before deleting):
   - math-exercise: `demo`, `feature/ai-feedback-context`, `feature/vector-matrix-input`

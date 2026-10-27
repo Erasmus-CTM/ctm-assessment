@@ -223,6 +223,31 @@ class OfflineHandler(SimpleHTTPRequestHandler):
                     count -= len(data)
 
 
+class TLSServer(ThreadingHTTPServer):
+    """HTTPS with the TLS handshake in each request's own thread: done in
+    accept() on the main thread, one client that connects and sends nothing
+    would stall every other client."""
+
+    handshake_timeout = 30
+
+    def __init__(self, address, handler, context):
+        self.context = context
+        super().__init__(address, handler)
+
+    def get_request(self):
+        connection, address = self.socket.accept()
+        return self.context.wrap_socket(connection, server_side=True, do_handshake_on_connect=False), address
+
+    def finish_request(self, request, client_address):
+        request.settimeout(self.handshake_timeout)
+        try:
+            request.do_handshake()
+        except (OSError, ssl.SSLError):
+            return
+        request.settimeout(None)
+        super().finish_request(request, client_address)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", nargs="?", default="_site-exam")
@@ -236,13 +261,14 @@ def main():
     directory = Path(args.directory).resolve()
     if not directory.is_dir():
         parser.error(f"not a directory: {directory}")
-    with ThreadingHTTPServer((args.bind, args.port), partial(OfflineHandler, directory=str(directory))) as server:
-        scheme = "http"
-        if args.cert:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            context.load_cert_chain(args.cert, args.key)
-            server.socket = context.wrap_socket(server.socket, server_side=True)
-            scheme = "https"
+    handler = partial(OfflineHandler, directory=str(directory))
+    if args.cert:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(args.cert, args.key)
+        server, scheme = TLSServer((args.bind, args.port), handler, context), "https"
+    else:
+        server, scheme = ThreadingHTTPServer((args.bind, args.port), handler), "http"
+    with server:
         print(f"Serving {directory} at {scheme}://{args.bind}:{server.server_port}", flush=True)
         try:
             server.serve_forever()

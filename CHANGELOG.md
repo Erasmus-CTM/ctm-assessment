@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- `scripts/serve-offline.py --cert/--key` does the TLS handshake in each
+  request's thread, with a 30 s limit: before, one client that connected and
+  sent nothing stalled every other client of the exam dry run.
+- Docs: the installation guide and reference name ctm-stack, its build-time
+  SymPy, the exact browser-library versions, the JSXGraph fork, the branch for
+  standalone pyodide-interaktiv, the `ctm-assessment:` saving, export, progress,
+  storage, asset and variant keys, the languages per component, and what a
+  build without AI feedback needs; no release is claimed before one is tagged.
 - Complete consolidation U3c: ctm-libs no longer ships the ai-feedback
   extension alias. Keep pyodide-interaktiv's standalone forwarder outside
   the package, and retain the stale-version check with migration advice.
