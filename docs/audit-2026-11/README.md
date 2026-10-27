@@ -51,8 +51,9 @@ Out of scope:
     - ctm-libs has said `0.9.0` since 19 October;
     - API levels stopped tracking interfaces;
     - the package CHANGELOG stops at 22 October.
-  - **Automatic cross-repository testing:** nothing that runs on its own catches a ctm-libs change that breaks a
-    consumer before it reaches umbrella `main`. ingmat3a, a live course, builds from umbrella `main`.
+  - **Enforced cross-repository testing:** AC tests every umbrella merge by hand, and nothing untested has reached
+    a course. But no automatic check catches a ctm-libs change that breaks a consumer, and no protected branch or
+    required check makes AC's gate mandatory. ingmat3a, a live course, builds from umbrella `main`.
   - **Several user-facing documents:** an install command printed by a render error installs the September version;
     ctm-stack's README example fails to render.
 - The process put most of its effort into making the merged trees equal the tested trees, and that works. The cost:
@@ -68,22 +69,23 @@ Out of scope:
 
 | # | Sev. | Finding | Repo |
 |---|---|---|---|
-| H1 | high | No automatic workflow tests consumers against a ctm-libs change before it reaches umbrella `main`. Umbrella PRs skip the build and `--test` job. ingmat3a follows umbrella `main` | ctm-libs, ctm-assessment, ingmat3a |
 | H2 | high | ctm-checkers' grading-regression gate (golden replay and mutations) runs only on manual dispatch, and has not run since 23 Oct. Two grading mutations passed the PR gate (reproduced) | ctm-checkers |
 | H3 | high | Component CI tests other dependency commits than the package ships. Nothing compares `pins.json` files with `repos.json` | all components |
 | H4 | high | pyodide-interaktiv's render error and three install guides say `quarto add Erasmus-CTM/pyodide-interaktiv`. Without a ref this installs `main`, which is 1.6.1 (30 Sep): a downgrade | pyodide-interaktiv, ctm-libs, ctm-assessment |
 | H5 | high (latent) | JSXGraph boards cannot load MathJax in local/exam builds (`data:` iframe plus a relative asset path). The render neither stops nor warns | jsxgraph-quarto, ctm-libs |
 | H6 | high | ctm-stack's README example fails to render (`seed:` removed, `label:` missing). Its documented defaults are wrong | ctm-stack |
 | H7 | high (legal, opinion) | pyodide-interaktiv's own docs say the code carried over from coatless-quarto/pyodide has no licence. The package ships it as AGPL | pyodide-interaktiv, ctm-assessment |
+| M0 | medium (was H1) | Consumer testing before umbrella `main` relies on AC's manual campaign. Umbrella PRs skip the build and `--test` job, and no `main` is protected, so nothing enforces or records the gate. ingmat3a follows umbrella `main` | ctm-libs, ctm-assessment, ingmat3a |
 | M1 | medium | AI-feedback maths loads a floating `katex@0.16` from jsDelivr, outside the asset resolver and lock, also in `assets: local` builds | ctm-libs |
 | M2 | medium | In local/exam mode, learner code calling `micropip.install` goes to pypi.org (reproduced with real Pyodide 0.28.3) | ctm-libs |
 | M3 | medium | The "fixed" learner-answer admission (`__` rule) still runs arbitrary Python (`exec(...)`) and can patch grading for the rest of the page. In SEB exams this answer box is the learner's only code channel | ctm-checkers |
 | M4–M6 | medium | ctm-libs is frozen at version 0.9.0, so the "two installations" guard cannot fire. API levels lag. No release exists, and `release-check.py --tag v0.13.0` passes today with notes from 22 Oct | ctm-libs, ctm-checkers, ctm-assessment |
 
 **Recommended order** (all small except the last):
-1. Make cheap cross-repo tests automatic (H1, H2, H3, M11). Protect `main` (M9).
+1. Make AC's manual gate a required check and protect `main` (M0, M9). Make the cheap cross-repo tests automatic
+   (H2, H3, M11).
 2. Fix the user-facing commands and docs (H4, H6, DOC items).
-3. Pin ingmat3a to a commit or tag instead of umbrella `main` until H1 is done.
+3. Once releases exist, pin ingmat3a to a release tag for the semester (M0, M6).
 4. Bump versions and API levels, write the CHANGELOG, tag a release (M4–M6).
 5. Settle the licence question (H7).
 6. Route feedback KaTeX through `CTMAssets` (M1). Neuter micropip's index in local mode (M2). Use the existing
@@ -156,35 +158,6 @@ Type: **R** = defect reproduced by running code; **C** = defect shown from code 
 
 ### High
 
-#### H1. No automatic workflow catches a ctm-libs change that breaks a consumer before it reaches umbrella `main` and live courses (C)
-**Where:**
-- ctm-libs `.github/workflows/test.yml:2,49-52`: own tests only; no consumer is checked out.
-- ctm-assessment `.github/workflows/examples-pages.yml:57`: `build` runs only on a push to `main` or a confirmed
-  manual campaign. Asserted by `tests/ci-policy.test.cjs:96`.
-- `examples-pages.yml:83-84`: `main` renders without `--test` and deploys.
-- `scripts/setup-feedback-integration.py:544-552`: the consumer loop. It is manual only and leaves out ctm-stack and
-  jsxgraph.
-- `track-components.yml:8-14`: its schedule was removed (`docs/development/ci-policy.md:46`).
-- ingmat3a `quarto-extensions.yml:11` (`ref: main`) and `.github/workflows/quarto.yml:37-55`.
-
-**Trace:** the change below passes every automatic gate at each stage.
-
-| Stage | What runs automatically |
-|---|---|
-| The ctm-libs PR renames a key in `locales/math-exercise.js` or changes `ui/ctm-matrix-input.js` | ctm-libs' own tests only |
-| The change merges to ctm-libs `main` | nothing downstream; math-exercise keeps testing its pin |
-| An umbrella re-pin PR | source contracts, plus `similar-problems.yml`, which runs 2 checker test files, 4 ctm-libs files and one page |
-| The umbrella re-pin merges to `main` | render and publish, without component tests |
-| ingmat3a's next push | publishes with the change |
-
-**Impact:** regressions surface only when someone runs a campaign, or when students hit them.
-
-**Fix:**
-- On umbrella PRs that change `repos.json`, run the consumer loop automatically, plus `pytest` for ctm-stack. Without
-  Quarto this takes minutes; the render tests skip themselves.
-- Restore a nightly `track-components` that only warns.
-- Until then, pin ingmat3a to an umbrella commit or tag.
-
 #### H2. ctm-checkers' grading-regression gate runs only by hand; grading mutations pass the PR gate (R)
 **Where:** ctm-checkers `.github/workflows/test.yml:99-107`. All three golden and mutation steps are
 `if: workflow_dispatch && confirmation == 'broad testing campaign'`. `tests/test_mutations.py:270-271` skips the
@@ -204,8 +177,10 @@ module, including the "unchanged copy reproduces the tables" test (`:300-303`). 
 - `main` is fine today: 8,939 of 8,939 rows reproduce locally.
 - 133 of the 137 skips per CI run are the mutation module. The other 4 are covered by `native-stack.yml`.
 
-**Impact:** a change that silently alters grades merges green. This is the regression class the goldens exist to stop,
-and step 7 is about to add grading options.
+**Impact:** a change that silently alters grades merges green in ctm-checkers. This is the regression class the
+goldens exist to stop, and step 7 is about to add grading options. The umbrella's manual parity campaign does exercise
+grading before an umbrella merge (7,206 graded responses with zero differences on 26 Oct), so the change would be seen
+there, but only at the next campaign and only for the corpora it covers.
 
 **Fix:** run `golden.py verify --adapter wheel` (exported, recorded and STACK tables; 2–4 minutes) on every PR that
 touches `src/`. Keep only the mutation suite manual.
@@ -228,7 +203,7 @@ The package (`integration/feedback/repos.json`) ships ctm-libs `6f464e6`, ctm-ch
 - No umbrella script reads any `pins.json`.
 
 **Impact:** "component CI green" says little about the combination students get. Only a manual umbrella campaign tests
-it (H1).
+it (M0).
 
 **Fix:**
 - Add a source-job check that each pinned component's `pins.json` (or `ctm-libs-source.json`) at its pinned commit
@@ -309,6 +284,50 @@ the README, the file headers and the shipped `licenses/pyodide-interaktiv.txt`.
 The reviewer could not reach the upstream repository, so this rests on the repository's own statement.
 
 ### Medium
+
+#### M0. Consumer testing before umbrella `main` relies on AC's manual campaign; nothing enforces or records it (C)
+This was H1 in the first version of this report. AC has stated that every pull request to umbrella `main` so far was
+merged by hand after AC's own testing. The consolidation log agrees: for example, the 26 Oct re-pin merged only after the
+combined gate, full parity and the course comparisons were green. So no untested combination has reached a course. The
+finding is that this safeguard is a person's discipline, not a check.
+
+**Where:**
+- ctm-libs `.github/workflows/test.yml:2,49-52`: own tests only; no consumer is checked out.
+- ctm-assessment `.github/workflows/examples-pages.yml:57`: `build` runs only on a push to `main` or a confirmed
+  manual campaign. Asserted by `tests/ci-policy.test.cjs:96`.
+- `examples-pages.yml:83-84`: `main` renders without `--test` and deploys.
+- `scripts/setup-feedback-integration.py:544-552`: the consumer loop. It is manual only and leaves out ctm-stack and
+  jsxgraph.
+- `track-components.yml:8-14`: its schedule was removed (`docs/development/ci-policy.md:46`).
+- ingmat3a `quarto-extensions.yml:11` (`ref: main`) and `.github/workflows/quarto.yml:37-55`: every push to the
+  course's `main` installs and publishes whatever umbrella `main` holds.
+
+**What the automatic checks alone would let through:**
+
+| Stage | What runs automatically |
+|---|---|
+| The ctm-libs PR renames a key in `locales/math-exercise.js` or changes `ui/ctm-matrix-input.js` | ctm-libs' own tests only |
+| The change merges to ctm-libs `main` | nothing downstream; math-exercise keeps testing its pin |
+| An umbrella re-pin PR | source contracts, plus `similar-problems.yml`, which runs 2 checker test files, 4 ctm-libs files and one page |
+| The umbrella re-pin merges to `main` | render and publish, without component tests |
+| ingmat3a's next push | publishes with the change |
+
+**Why it still matters:**
+- No `main` is protected (M9). A merge without the campaign, by AC on a busy day or by another maintainer, goes
+  straight to ingmat3a's next build.
+- Nothing links a merge to the run that tested it. The evidence is run links in the consolidation log, often for an
+  earlier head of the same set (M10).
+- AC's testing gates the umbrella, not the components' own `main` branches. math-exercise's publish workflow is red on
+  `main` (M8).
+
+**Fix:**
+- Make AC's gate a required check: protect umbrella `main` and require the campaign's result on the exact head being
+  merged, for example a status that the campaign workflow posts on that commit.
+- Run the cheap part automatically on umbrella PRs that change `repos.json`: the consumer loop plus `pytest` for
+  ctm-stack. Without Quarto this takes minutes; the render tests skip themselves.
+- Restore a nightly `track-components` that only warns.
+- Pinning ingmat3a to an umbrella commit or tag is optional while the manual gate holds; it becomes the natural
+  semester pin once releases exist (M6).
 
 #### M1. AI-feedback maths loads a floating KaTeX from jsDelivr, bypassing the asset resolver and lock (R)
 **Where:** ctm-libs `_extensions/ctm-libs/feedback/feedback-dom.js:189-206`: `'https://cdn.jsdelivr.net/npm/katex@0.16/'`,
@@ -765,7 +784,7 @@ No flaky job was found: no workflow both failed and passed on the same commit an
 
 **Other pins.**
 - Course pins: ctm-demo pins umbrella `ac10e6a`, whose package content equals the head. ingmat3a follows umbrella
-  `main` (H1, M6).
+  `main` (M0, M6).
 - The component `pins.json` files and the umbrella commits pinned by ctm-libs, ctm-checkers, math-exercise, ctm-stack
   and pyodide-interaktiv are 5 different commits, 120–390 commits old (H3, M23).
 - A few CI and fixture pins are reachable only from branches the 24 Oct triage marks superseded (L22).
@@ -825,7 +844,8 @@ every `repos.json` entry. The tree check itself is cheap (`git rev-parse <merge>
 
 **What it did not catch.** The protocol is built around tree identity of a set at merge time. The defects this review
 found lie elsewhere:
-- regressions between sets: no automatic consumer tests (H1), a manual grading gate (H2), divergent component pins (H3);
+- regressions between sets: a consumer gate that only AC's discipline enforces (M0), a manual grading gate (H2),
+  divergent component pins (H3);
 - release state: versions, API levels, CHANGELOG, tags (M4–M6);
 - user-facing text: H4, H6, M20, M21;
 - unprotected `main` branches (M9), with a red publish workflow on `main` (M8).
@@ -970,9 +990,10 @@ The rework should:
 
 ## 9. Open questions for AC
 
-1. **ingmat3a and umbrella `main`.** ingmat3a (live) follows umbrella `main`, while umbrella PRs run no render or
-   consumer tests. Pin ingmat3a to a commit or tag until H1 is fixed? Who runs the campaign before each umbrella merge
-   today, and where is that recorded?
+1. **Making the manual gate enforceable.** Every umbrella merge so far followed AC's own testing. Should that become
+   a required check on a protected `main`, with the campaign posting its result on the exact head being merged (M0)?
+   Should anyone other than AC be able to merge to umbrella `main`? Should ingmat3a pin a release tag for the semester
+   once one exists?
 2. **Releases.** Is "versioned releases" still a goal? If yes: bump ctm-libs (0.9.0 since step 1), write the package
    CHANGELOG and tag 0.14.0. If no, remove the release and tag text from the author docs.
 3. **Grading gate.** May the ctm-checkers golden replay (minutes, no browser) become an automatic PR gate again?
