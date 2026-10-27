@@ -3,7 +3,8 @@
 ## Unreleased
 
 - Pins py-exercise 5682787, ctm-checkers 57823df (shared STACK expression
-  admission, ctm-checkers#41), ctm-stack 37f1561 (README and authoring guide)
+  admission, ctm-checkers#41), ctm-stack e8437f1 (README and authoring guide; CI pins and browser tests
+  for the current ctm-libs)
   and pyodide-interaktiv 793a872 (standalone install names the integration
   branch; ships ctm-libs 33fd5a5, the commit the package pins). ctm-libs
   33fd5a5, math-exercise bf29269 and the JSXGraph fork are unchanged. The P13
