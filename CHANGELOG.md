@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Pins ctm-libs 33fd5a5 and math-exercise bf29269. Similar-problem generation
+  gets 300 seconds per provider request, and a corrective retry gets a fresh
+  budget instead of the rest of the first call (ctm-libs#58). Generated and
+  authored math that spans several lines, or a bare `\begin{pmatrix}` without
+  `$`, is typeset instead of shown as raw TeX, and the independent solve may
+  take 180 seconds (math-exercise#43).
 - `scripts/serve-offline.py --cert/--key` does the TLS handshake in each
   request's thread, with a 30 s limit: before, one client that connected and
   sent nothing stalled every other client of the exam dry run.
