@@ -47,6 +47,25 @@ test('only ten structurally verified asset rows are eligible',()=>{
     assert.equal(r.report.items.length,10);assert.ok(r.report.items.every(i=>i.category==='assets'));
   }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });
+
+test('P13 permits only exact pinned worker bytes; code and attribute mutations stay unexplained',()=>{
+ const f=fixture();try{
+  f.put('ctm-libs','runtime/pyodide-runtime.js',"var indexURL = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';\nroot.CTMWorker.page({});");
+  for(const name of ['pyodide-worker.js','coi-serviceworker.js','coi-frame-startup.js'])f.put('ctm-libs','runtime/'+name,'/* canonical '+name+' */');
+  fs.writeFileSync(path.join(f.project,'resolved-repos.json'),JSON.stringify(f.record));
+  const file=path.join(f.dir,'after/site_libs/quarto-contrib/ctm-worker-0.9.0/pyodide-worker.js');
+  fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'/* canonical pyodide-worker.js */');
+  const tag='<script src="site_libs/quarto-contrib/ctm-worker-0.9.0/pyodide-worker.js"></script>';
+  const html=f.after.replace('</head>',tag+'</head>'),expect=['--expect','tools/compare-rendered/expect/step5-p13.yml'];
+  let result=f.run(html,expect);
+  assert.equal(result.status,0,result.stderr+JSON.stringify(result.report));
+  assert.equal(result.report.items.filter(i=>i.category==='p13-worker-delivery').length,1);
+  fs.writeFileSync(file,'/* altered executable worker */');
+  result=f.run(html,expect);assert.equal(result.status,1);
+  fs.writeFileSync(file,'/* canonical pyodide-worker.js */');
+  result=f.run(html.replace(tag,tag.replace('<script ','<script async ')),expect);assert.equal(result.status,1);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
 const mutations={
   'missing helper':s=>s.replace(/<script src="site_libs[^"]+assets.js"><\/script>/,''),
   'duplicate helper':s=>s.replace(/(<script src="site_libs[^"]+assets.js"><\/script>)/,'$1$1'),
@@ -304,5 +323,38 @@ test('an exact Git board transition preserves code, grades and resource attribut
   const make=html=>f.after.replaceAll('https://cdn.jsdelivr.net/npm/jsxgraph@1/',git).replaceAll('mathjax@4/','mathjax@4.1.3/').replace('</body>',frame(html)+'</body>');
   const good=f.run(make(current),['--expect','tools/compare-rendered/expect/step6-a1.yml']);assert.equal(good.status,0,JSON.stringify(good));
   for(const bad of [current.replace(sha,'b'.repeat(40)),current.replace('answer:2','answer:3'),current.replace(' async ',' defer '),current.replace('axis:true','axis:false').replace('initBoard(BOARDID,{})','initBoard(BOARDID,{axis:true})')])assert.equal(f.run(make(bad),['--expect','tools/compare-rendered/expect/step6-a1.yml']).status,1);
+ }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
+});
+
+
+test('P13 worker order move is exact and preserves all other resource order',()=>{
+ const f=fixture();try{
+  f.put('ctm-libs','runtime/pyodide-runtime.js',"var indexURL = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';\nroot.CTMWorker.page({});");
+  for(const name of ['pyodide-worker.js','coi-serviceworker.js','coi-frame-startup.js'])f.put('ctm-libs','runtime/'+name,'/* canonical '+name+' */');
+  fs.writeFileSync(path.join(f.project,'resolved-repos.json'),JSON.stringify(f.record));
+  const source=path.join(f.dir,'after/site_libs/quarto-contrib/ctm-worker-0.9.0/pyodide-worker.js');
+  fs.mkdirSync(path.dirname(source),{recursive:true});fs.writeFileSync(source,'/* canonical pyodide-worker.js */');
+  const script=name=>'<script src="site_libs/quarto-contrib/'+name+'"></script>';
+  const runtime=script('ctm-runtime-0.9.0/pyodide-runtime.js'),worker=script('ctm-worker-0.9.0/pyodide-worker.js');
+  const checker=script('ctm-checkers-0.12.0/ctm-checkers.js'),locale=script('ctm-locale-pyodide-interaktiv-0.9.0/pyodide-interaktiv.js');
+  fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',runtime+checker+worker+locale+'</head>'));
+  const expected=['--expect','tools/compare-rendered/expect/step5-p13.yml'];
+  const html=f.after.replace('</head>',runtime+worker+checker+locale+'</head>');
+  let result=f.run(html,expected);assert.equal(result.status,0,result.stderr+JSON.stringify(result.report));
+  assert.equal(result.report.items.filter(i=>i.category==='p13-worker-order').length,1);
+  const pyStyle='<link rel="stylesheet" href="site_libs/quarto-contrib/py-exercise-0.5.0/py-exercise.css">';
+  fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',runtime+checker+pyStyle+worker+locale+'</head>'));
+  result=f.run(html.replace(checker+locale,checker+pyStyle+locale),expected);
+  assert.equal(result.status,0,result.stderr+JSON.stringify(result.report));
+  result=f.run(html.replace(checker+locale,pyStyle+checker+locale),expected);
+  assert.equal(result.status,1,'moving the stylesheet itself remains unexplained');
+  fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',runtime+checker+worker+locale+'</head>'));
+  result=f.run(html.replace(checker+locale,locale+checker),expected);assert.equal(result.status,1,'unrelated order mutation stays unexplained');
+  fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',checker+worker+locale+'</head>'));
+  result=f.run(html.replace(runtime,''),expected);assert.equal(result.status,1,'a missing runtime cannot justify moving worker to slot zero');
+  fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',runtime+checker+worker+worker+locale+'</head>'));
+  result=f.run(html.replace(runtime+worker,runtime+worker+worker),expected);assert.equal(result.status,1,'duplicate workers cannot justify an order exception');
+  fs.writeFileSync(path.join(f.dir,'before/page.html'),f.before.replace('</head>',runtime+checker+worker+locale+'</head>'));
+  fs.writeFileSync(source,'/* unpinned worker */');result=f.run(html,expected);assert.equal(result.status,1,'worker movement needs canonical source bytes');
  }finally{fs.rmSync(f.dir,{recursive:true,force:true});}
 });

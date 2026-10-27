@@ -68,7 +68,7 @@ jobs:
   build:
     if: ${{ !cancelled() && needs.source.result == 'success' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || needs.campaign.result == 'success' || (github.event_name == 'pull_request' && needs.source.outputs.repin == 'true')) }}
     needs: [source, campaign]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -96,7 +96,10 @@ jobs:
           python scripts/setup-feedback-integration.py --review-refs "$CTM_REVIEW_REFS" "${tests[@]}" 2>&1 | tee "$RUNNER_TEMP/build.log"
       - name: Install Chromium
         if: github.event_name == 'workflow_dispatch'
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
       - name: Test all five integration tabs
         if: github.event_name == 'workflow_dispatch'
         env:

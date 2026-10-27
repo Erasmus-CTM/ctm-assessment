@@ -58,6 +58,11 @@ export function loadAssetSources(project,pinsFile,rendererBeforeProject,renderer
   const table=JSON.parse(read('ctm-libs','assets.json')), helper=read('ctm-libs','assets.js');
   insist(table.v===1&&table.assets&&typeof table.assets==='object','Invalid canonical asset table');
   const runtime=read('ctm-libs','runtime/pyodide-runtime.js').toString('utf8');
+  const p13 = runtime.includes('root.CTMWorker.page({') ? Object.fromEntries([
+    ['ctm-worker/pyodide-worker.js','runtime/pyodide-worker.js'],
+    ['coi-serviceworker.js','runtime/coi-serviceworker.js'],
+    ['ctm-coi-frame-startup/coi-frame-startup.js','runtime/coi-frame-startup.js'],
+  ].map(([url,file])=>[url,hash(read('ctm-libs',file))])) : null;
   const py=[...runtime.matchAll(/var indexURL = '(https:\/\/cdn\.jsdelivr\.net\/pyodide\/v[^'\/]+\/full\/)';/g)];
   insist(py.length===1,'Ambiguous canonical Pyodide URL');
   // Assessment-owned board defaults are read from the installed after package.
@@ -83,16 +88,17 @@ export function loadAssetSources(project,pinsFile,rendererBeforeProject,renderer
   const body=/<script type="module" id="qpyodide-monaco-editor-init">([\s\S]*?)<\/script>/.exec(template);
   insist(body&&monacoCode(body[1],"CTMAssets\\.url\\('monaco-editor', 'min/vs'\\)"),'Unexpected canonical Monaco initializer');
   return {config:{v:1,mode:'cdn',bases},helperHash:hash(helper),table,board,
-    renderer:loadRendererSources(rendererBeforeProject,rendererBeforePinsFile,project,pinsFile)};
+    p13,renderer:loadRendererSources(rendererBeforeProject,rendererBeforePinsFile,project,pinsFile)};
 }
 export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
+  markP13Changes(A,B,items,context);
   markBoardChanges(A,items,context,page);
   markPreloadDefault(A,B,items,context);
   const configScripts=doc=>[...doc.querySelectorAll('script:not([src])')].filter(s=>s.textContent.includes('CTM_ASSETS'));
   const helperScripts=doc=>resources(doc).filter(e=>normalize(raw(e))==='ctm-assets/assets.js');
   const active=configScripts(A.doc).length||configScripts(B.doc).length||helperScripts(A.doc).length||helperScripts(B.doc).length;
   if(!active&&!context)return;
-  checkRetainedResources(A.doc,B.doc,items,page);
+  checkRetainedResources(A,B,items,page,context);
   if(!active){
     const consumer=doc=>[...doc.scripts].some(e=>e.textContent.includes('CTMAssets.url(')||
       /^(?:ctm-runtime|math-exercise|py-exercise|pyodide-interaktiv)\//.test(normalize(e.getAttribute('src')||''))||
@@ -209,6 +215,25 @@ export function markAssetChanges(A,B,items,context,page,afterFile,beforeFile) {
   }catch(error){fail(error.message);}
 }
 
+// P13 explains only new canonical worker delivery and inert defaults. Every
+// authored cell, grade setting, resource attribute and other value is retained.
+function markP13Changes(A,B,items,context){
+ if(!context?.p13)return;
+ for(const item of items){
+  if(item.area==='file'&&item.change==='added'&&item.what.startsWith('script ')){
+   const url=item.what.slice(7),key=url.replace(/^(?:\.\.\/|\.\/)+/,'');
+   const wanted=context.p13[key];if(!wanted)continue;
+   const tags=[...B.doc.scripts].filter(e=>normalize(e.getAttribute('src')||'')===url);
+   if(tags.length!==1||attrs(tags[0],'src').length||/[?#]/.test(tags[0].getAttribute('src')))continue;
+   const source=B.sources[url];
+   if(source&&fs.existsSync(source)&&hash(fs.readFileSync(source))===wanted)item.assets='p13-worker-delivery';
+  }
+  if(item.area==='config'&&item.change==='changed'&&item.object==='qpyodideSettings'&&item.before===undefined&&
+     ((item.path==='/0/qpyodideExamOutput'&&item.after===false)||
+      (item.path==='/0/qpyodideStopAfter'&&item.after===20)))item.assets='p13-inert-defaults';
+ }
+}
+
 // Only the three default resource URLs may differ inside a generated board.
 // Full decoded bytes (after the comparator's existing UUID/space normalization)
 // must otherwise agree, including every authored board statement and element.
@@ -262,7 +287,8 @@ function markBoardChanges(A,items,context,page){
 
 // Keep queries and attributes that the general render-noise URL normalization
 // does not expose. A canonical asset migration never excuses another loader.
-function checkRetainedResources(a,b,items,page){
+function checkRetainedResources(A,B,items,page,context){
+ const a=A.doc,b=B.doc;
  const before=resources(a),after=resources(b);
  const url=e=>{const u=raw(e),q=u.indexOf('?');return normalize(u)+(q<0?'':u.slice(q));};
  const key=e=>e.tagName+'\0'+normalize(raw(e));
@@ -273,7 +299,23 @@ function checkRetainedResources(a,b,items,page){
  };
  const oldGroups=groups(before),newGroups=groups(after);
  const retained=new Set([...oldGroups.keys()].filter(k=>newGroups.has(k)));
- if(!same(before.map(key).filter(k=>retained.has(k)),after.map(key).filter(k=>retained.has(k)))&&!stackHelperMove(a,b)){
+ const oldOrder=before.map(key).filter(k=>retained.has(k)),newOrder=after.map(key).filter(k=>retained.has(k));
+ const worker='SCRIPT\0ctm-worker/pyodide-worker.js',runtime='SCRIPT\0ctm-runtime/pyodide-runtime.js';
+ const i=oldOrder.indexOf(worker),j=newOrder.indexOf(worker),source=B.sources['ctm-worker/pyodide-worker.js'];
+ const crossed=new Set(['SCRIPT\0ctm-checkers/ctm-checkers.js','SCRIPT\0ctm-locale-math-exercise/math-exercise.js',
+   'LINK\0ctm-matrix-input/ctm-matrix-input.css','LINK\0math-exercise/math-exercise.css','SCRIPT\0ctm-variants/variants.js',
+   'SCRIPT\0ctm-copy/ctm-copy.js','SCRIPT\0ctm-store/ctm-store.js','SCRIPT\0ctm-locale-py-exercise/py-exercise.js',
+   'LINK\0py-exercise/py-exercise.css']);
+ const workerMove=context?.p13&&newOrder.indexOf(runtime)>=0&&
+   oldOrder.filter(k=>k===runtime).length===1&&newOrder.filter(k=>k===runtime).length===1&&
+   oldOrder.filter(k=>k===worker).length===1&&newOrder.filter(k=>k===worker).length===1&&
+   i>j&&j===newOrder.indexOf(runtime)+1&&
+   oldOrder[i+1]==='SCRIPT\0ctm-locale-pyodide-interaktiv/pyodide-interaktiv.js'&&
+   same(oldOrder.filter(k=>k!==worker),newOrder.filter(k=>k!==worker))&&
+   oldOrder.slice(j,i).every(k=>crossed.has(k))&&source&&fs.existsSync(source)&&
+   hash(fs.readFileSync(source))===context.p13['ctm-worker/pyodide-worker.js'];
+ if(workerMove)items.push({page,area:'assets',change:'changed',what:'Page worker precedes checker consumers',assets:'p13-worker-order'});
+ if(!same(oldOrder,newOrder)&&!stackHelperMove(a,b)&&!workerMove){
    const identity=e=>({key:key(e),url:raw(e),attributes:attrs(e,e.tagName==='LINK'?'href':'src')});
    const evidence={page,before:before.filter(e=>retained.has(key(e))).map(identity),after:after.filter(e=>retained.has(key(e))).map(identity)};
    console.error('Retained resource order evidence: '+JSON.stringify(evidence));

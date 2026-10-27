@@ -506,6 +506,13 @@ def materialize_bundle(lock: dict, stage: Path, cache: Path, *, accepted_licence
         for name in archive["licence_files"]:
             if not (stage / str(relative_path(name))).is_file():
                 raise AssetError(f"Licence file was not extracted: {name}")
+    for application in lock.get("application_licences", []):
+        licence = stage / str(relative_path(application["path"]))
+        if not licence.is_file() or digest(licence.read_bytes()) != application["sha256"]:
+            raise AssetError("Application licence text differs from the lock")
+        notices.extend(["## " + application["repository"],
+                        "Licence: " + application["licence"], application["path"],
+                        "Corresponding source: " + application["source"], ""])
     (stage / "THIRD-PARTY-NOTICES.md").write_bytes("\n".join(notices).encode("utf-8"))
     precompress(stage)
     manifest = {"v": 1, "versions": lock["versions"], "files": inventory(stage)}

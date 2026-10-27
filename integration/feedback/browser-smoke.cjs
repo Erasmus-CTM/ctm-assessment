@@ -155,6 +155,11 @@ const server = http.createServer((req, res) => {
     });
     for (const exercise of exercises) {
       const cell = page.locator('#py-exercise-' + exercise.id);
+      await cell.scrollIntoViewIfNeeded();
+      await page.waitForFunction(id => {
+        const box = document.querySelector('#py-exercise-' + id + ' .monaco-editor')?.getBoundingClientRect();
+        return box && box.width > 100 && box.height > 40;
+      }, exercise.id);
       const bounds = await cell.locator('.monaco-editor').boundingBox();
       assert.ok(bounds && bounds.width > 100 && bounds.height > 40, exercise.label + ': editor must lay out after opening its tab');
       const result = cell.locator('.py-exercise-result');

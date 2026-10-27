@@ -70,15 +70,13 @@ function serve(root, {isolate, weakWorker = false}) {
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
 
-// Page errors, except Pyodide's own report of an interrupt: the KeyboardInterrupt
-// leaves its event loop as an uncaught error of the worker, which the page sees
-// (the same worker code as pyodide-interaktiv 1.8; the run itself ends normally).
+// Every uncaught page or worker error is an acceptance failure.
 function pageErrors(page) {
   const errors = [];
   // The worker's and the cells' warnings, for a failure's report.
   page.__console = [];
   page.on('console', message => { if (/warning|error/.test(message.type())) page.__console.push(message.type() + ': ' + message.text().slice(0, 600)); });
-  page.on('pageerror', error => { if (!/^Traceback[\s\S]*\nKeyboardInterrupt\s*$/.test(error.message)) errors.push(error.message); });
+  page.on('pageerror', error => errors.push(error.message));
   return errors;
 }
 const unit = (page, i) => ({
@@ -158,13 +156,13 @@ async function status(page) {
       await unit(page, 1).run.click();
       await field.waitFor();
       await unit(page, 1).run.click();
-      await page.waitForFunction(() => /\[Aborted\]/.test(document.querySelectorAll('.qpyodide-output-code-area')[1].innerText));
+      await page.waitForFunction(() => document.querySelectorAll('.qpyodide-output-code-area')[1].innerText.includes(CTMLocales.table('common',qpyodideLang).stopped));
       await idle(page);
-      // Stop by interrupt on a running loop: KeyboardInterrupt, variables kept.
+      // Stop by interrupt on a running loop: localized Stop, variables kept.
       await unit(page, 2).run.click();
       await page.waitForTimeout(1500);
       await unit(page, 2).run.click();
-      await page.waitForFunction(() => /KeyboardInterrupt/.test(document.querySelectorAll('.qpyodide-output-code-area')[2].innerText));
+      await page.waitForFunction(() => document.querySelectorAll('.qpyodide-output-code-area')[2].innerText.includes(CTMLocales.table('common',qpyodideLang).stopped));
       await idle(page);
       await runAndWait(page, 4, /loops kept: True/);
       // A plot.
@@ -223,9 +221,10 @@ async function status(page) {
       // input() cannot run here: its Run is disabled and the hint says why.
       assert.equal(await unit(page, 1).run.isDisabled(), true, 'Run of an input() cell is disabled without isolation');
       assert.equal(await page.locator('.qpyodide-cell-input-hint:not([hidden])').count(), 1, 'the input hint is shown, at the input() cell');
-      // input() from code reads end-of-file (EOFError), the page goes on.
-      await page.evaluate(() => mainPyodide.runPythonAsync('try:\n    input()\n    eof = False\nexcept EOFError:\n    eof = True'));
-      assert.equal(await page.evaluate(() => mainPyodide.runPythonAsync('eof')), true, 'input() without isolation reads end-of-file');
+      // P13 explains unsupported input as a capability failure rather than
+      // letting a checker mistake an EOF result for a completed learner run.
+      await assert.rejects(page.evaluate(() => mainPyodide.runPythonAsync('input()')),
+        /ctm-input-unavailable:|Interactive input needs/);
       await runAndWait(page, 0, /42/);
       // Stop by restart: the run ends with the restart's text; Run waits for the new start.
       await unit(page, 2).run.click();
@@ -237,7 +236,7 @@ async function status(page) {
       await runAndWait(page, 4, /NameError/);
       await runAndWait(page, 0, /42/);
       assert.deepEqual(errors, []);
-      report.push('without isolation: restart during stage 2 is no failure, input() hint and end-of-file, Stop by restart, Run after the new start');
+      report.push('without isolation: restart during stage 2 is no failure, explicit input() capability gate, Stop by restart, Run after the new start');
       await context.close();
       server.close();
     }
