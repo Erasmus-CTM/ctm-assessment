@@ -1,0 +1,12 @@
+project:
+  type: website
+  render: [index.qmd]
+filters: [ctm-assessment]
+format: html
+ctm-assessment:
+  stop-after: 0.2
+  save: answers
+  export: true
+pyodide:
+  preload-packages: false
+  output-mode: exam
