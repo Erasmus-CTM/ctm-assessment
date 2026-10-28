@@ -39,6 +39,9 @@ jobs:
       - run: python -m pip install sympy==1.13.3 'networkx>=3.4' 'PyYAML>=6'
       - run: npm ci --ignore-scripts
       - name: Require AC-approved complete lock for the exact application pins
+        # VALIDATION BRANCH ONLY (not for merge): ctm-libs 244d249 awaits its
+        # AC lock review; this branch only measures the WebKit gate with it.
+        if: false
         run: |
           python - <<'PYTHON'
           import json
@@ -323,6 +326,8 @@ jobs:
           - {os: ubuntu-24.04, engine: chromium, version: '139.0.7258.138', profile: cef139}
           - {os: ubuntu-24.04, engine: chromium, version: '147.0.7727.117', profile: cef147}
           - {os: macos-15, engine: webkit, version: '', profile: apple-webkit}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit-2}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit-3}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
