@@ -111,7 +111,11 @@ async function wkapp() {
   return {
     version: 'WKWebView (system WebKit)',
     async start() {},
-    async open(url) { child = spawn(process.env.WKZ_APP, [url], {stdio: ['ignore', 'inherit', 'inherit']}); },
+    async open(url) {
+      const env = {...process.env};
+      for (const [k, v] of Object.entries(extraEnv)) { env[k] = String(v); env['__XPC_' + k] = String(v); }
+      child = spawn(process.env.WKZ_APP, [url], {stdio: ['ignore', 'inherit', 'inherit'], env});
+    },
     async closeTab() { const t = Date.now(); child.kill('SIGTERM'); return Date.now() - t; },
     async stop() { if (child) child.kill('SIGKILL'); child = null; }
   };

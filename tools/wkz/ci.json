@@ -1,11 +1,7 @@
 {
   "jobs": [
-    {"name": "r3-safari-mac15-host", "os": "macos-15", "backend": "safari", "plan": "landhost,pyhost", "minutes": 75},
-    {"name": "r3-safari-mac15-warm", "os": "macos-15", "backend": "safari", "plan": "pywarm", "minutes": 60},
-    {"name": "r3-pw155-mac15-host", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "landhost,pyhost", "repro": true, "minutes": 75},
-    {"name": "r3-pw155-mac15-warm", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "pywarm", "minutes": 60},
-    {"name": "r3-safari-mac26-host", "os": "macos-26", "backend": "safari", "plan": "landhost"},
-    {"name": "r3-chromium-mac15-host", "os": "macos-15", "backend": "playwright-chromium", "pw": "1.55.1", "plan": "landhost"},
-    {"name": "r3-pw163-linux-host", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.63.0", "plan": "landhost,pyhost", "minutes": 60}
+    {"name": "r3b-wkapp-canary", "os": "macos-15", "backend": "wkapp", "plan": "info", "env": {"JSC_useWasm": "0"}},
+    {"name": "r3b-wkapp-polling", "os": "macos-15", "backend": "wkapp", "plan": "options,landing", "env": {"JSC_usePollingTraps": "1"}},
+    {"name": "r3b-wkapp-default", "os": "macos-15", "backend": "wkapp", "plan": "options,landing"}
   ]
 }
