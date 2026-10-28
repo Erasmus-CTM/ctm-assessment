@@ -50,8 +50,9 @@ async function safariDriver(){
     async open(url){await wd('POST',`/session/${session}/url`,{url});},
     exec,
     async click(selector){
-      const element=await wd('POST',`/session/${session}/execute/sync`,{script:'return document.querySelector(arguments[0])',args:[selector]});
-      await wd('POST',`/session/${session}/element/${element[ELEMENT]}/click`,{});
+      const element=await wd('POST',`/session/${session}/execute/sync`,{script:'return qpyodideCellContainer.cells[0].primaryUnit.runButton',args:[]});
+      try {await wd('POST',`/session/${session}/element/${element[ELEMENT]}/click`,{});}
+      catch(error){console.log('[probe] WebDriver click failed, using element.click():',String(error).slice(0,120));await exec(()=>qpyodideCellContainer.cells[0].primaryUnit.runButton.click());}
     },
     close:()=>wd('DELETE',`/session/${session}`).catch(()=>{})
   };
@@ -62,29 +63,39 @@ async function until(b,fn,arg,limit,what){
   const deadline=Date.now()+limit;
   for(;;){if(await b.exec(fn,arg))return;if(Date.now()>deadline)throw new Error('Timeout waiting for '+what);await sleep(100);}
 }
-const results={backend,micro:[],runaway:[],idle:[]};
+// Phases (P13_PROBE_PHASES): patched = 8x runaway Stop against a copy of the
+// site whose worker sets a non-shared interrupt buffer (port 8769); runaway /
+// idle = the shipped worker (port 8765); micro = wasm workers on 127.0.0.1
+// (a separate site, so real Safari gives it its own WebContent process).
+const phases=(process.env.P13_PROBE_PHASES||'patched,runaway,idle,micro').split(',');
+const results={backend,micro:[],runaway:[],idle:[],patched:[]};
 const b=backend==='safari'?await safariDriver():await playwrightDriver(backend);
 console.log('[probe] browser',backend,b.version);
 p13diag.startSampler(2000);
 try {
-  for(const variant of [{label:'spin-256MB',spin:true,pages:4096},{label:'idle-256MB',spin:false,pages:4096},{label:'spin-16MB',spin:true,pages:256}]) {
-    p13diag.setLabel('micro '+variant.label);
-    await b.open(base+'__p13diag/micro.html');
-    await b.exec(v=>{runMicro(v);},variant);
-    let out;
-    for(;;){await sleep(500);out=await b.exec(()=>__micro.at(-1));if(out.done)break;}
-    const s=await p13diag.sample('micro-end');
-    results.micro.push(out);
-    console.log('[probe] micro',variant.label,'readyMs',out.rounds.map(r=>r.readyMs+(r.error?'!'+r.error:'')).join(' '),'| workerMs',out.rounds.map(r=>r.workerMs).join(' '));
-    console.log('[probe]   ps',p13diag.brief(s));
-    await sleep(5000);
-    console.log('[probe]   ps +5s',p13diag.brief(await p13diag.sample('micro-after')));
-  }
-  for(const mode of process.env.P13_PROBE_ONLY==='micro'?[]:['runaway','idle']) {
-    p13diag.setLabel('pyodide '+mode);
-    await b.open(base+'index.html');
+  for(const phase of phases) {
+    if(phase==='micro') {
+      for(const variant of [{label:'loop-256MB',kind:'loop',pages:4096},{label:'idle-256MB',spin:false,pages:4096},{label:'jscall-dense-256MB',kind:'dense',pages:4096},{label:'jscall-sparse-256MB',kind:'sparse',pages:4096}]) {
+        p13diag.setLabel('micro '+variant.label);
+        await b.open(`http://127.0.0.1:${process.env.P13_PROBE_PORT||8765}/__p13diag/micro.html`);
+        await b.exec(v=>{runMicro(v);},variant);
+        let out;
+        for(;;){await sleep(500);out=await b.exec(()=>__micro.at(-1));if(out.done)break;}
+        const s=await p13diag.sample('micro-end');
+        results.micro.push(out);
+        console.log('[probe] micro',variant.label,'readyMs',out.rounds.map(r=>r.readyMs+(r.error?'!'+r.error:'')).join(' '),'| workerMs',out.rounds.map(r=>r.workerMs).join(' '));
+        console.log('[probe]   ps',p13diag.brief(s));
+        await sleep(5000);
+        console.log('[probe]   ps +5s',p13diag.brief(await p13diag.sample('micro-after')));
+      }
+      continue;
+    }
+    const mode=phase==='idle'?'idle':'runaway';
+    p13diag.setLabel('pyodide '+phase);
+    await b.open(`http://${lan}:${phase==='patched'?8769:8765}/index.html`);
     await b.exec(()=>{globalThis.__probeBefore=null;});
     await until(b,readyFn,'__probeBefore',180000,'first ready');
+    console.log('[probe]',phase,'start ps',p13diag.brief(await p13diag.sample(phase+'-start')));
     for(let i=1;i<=8;i++){
       await b.exec(()=>{globalThis.__probeBefore=globalThis.mainPyodide;});
       const t0=Date.now();
@@ -96,16 +107,18 @@ try {
       if(mode==='runaway')await b.click('.qpyodide-button-run');
       else await b.exec(()=>{mainPyodide.restart('P13 probe');});
       const clicked=Date.now();
-      await until(b,readyFn,'__probeBefore',300000,`recovery ${mode} ${i}`);
+      await until(b,readyFn,'__probeBefore',300000,`recovery ${phase} ${i}`);
       const entry={i,recoveryMs:Date.now()-stop,stopCommandMs:clicked-stop,runMs:stop-t0};
-      results[mode].push(entry);
-      console.log('[probe]',mode,JSON.stringify(entry),consoleLines.length?consoleLines.at(-1)[1]:'');
-      console.log('[probe]   ps',p13diag.brief(await p13diag.sample(mode+'-'+i)));
+      results[phase].push(entry);
+      console.log('[probe]',phase,JSON.stringify(entry),consoleLines.length?consoleLines.at(-1)[1]:'');
+      console.log('[probe]   ps',p13diag.brief(await p13diag.sample(phase+'-'+i)));
       await sleep(1000);
     }
+    await sleep(5000);
+    console.log('[probe]',phase,'end +5s ps',p13diag.brief(await p13diag.sample(phase+'-end')));
   }
 } catch(error){console.log('[probe] FAILED',String(error.stack||error));console.log('[probe]   ps',p13diag.brief(await p13diag.sample('failure')));process.exitCode=1;}
 finally {
   p13diag.stopSampler();await b.close();
-  console.log('[probe] summary',JSON.stringify({backend,micro:results.micro.map(m=>({label:m.label,readyMs:m.rounds.map(r=>r.readyMs)})),runaway:results.runaway.map(r=>r.recoveryMs),idle:results.idle.map(r=>r.recoveryMs)}));
+  console.log('[probe] summary',JSON.stringify({backend,micro:results.micro.map(m=>({label:m.label,readyMs:m.rounds.map(r=>r.readyMs)})),patched:results.patched.map(r=>r.recoveryMs),runaway:results.runaway.map(r=>r.recoveryMs),idle:results.idle.map(r=>r.recoveryMs)}));
 }

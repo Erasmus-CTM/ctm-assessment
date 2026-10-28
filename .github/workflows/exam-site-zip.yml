@@ -322,13 +322,10 @@ jobs:
         # DIAGNOSTIC BRANCH: WebKit profile samples plus restart probes in
         # Playwright WebKit, real Safari (safaridriver) and Chromium on macOS.
         include:
-          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 1, protocol: '', mode: profile}
-          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 2, protocol: '', mode: profile}
           - {os: macos-15, engine: webkit, version: '', profile: probe-webkit, sample: 1, protocol: '', mode: probe}
           - {os: macos-15, engine: webkit, version: '', profile: probe-webkit, sample: 2, protocol: '', mode: probe}
           - {os: macos-15, engine: safari, version: '', profile: probe-safari, sample: 1, protocol: '', mode: probe}
           - {os: macos-15, engine: safari, version: '', profile: probe-safari, sample: 2, protocol: '', mode: probe}
-          - {os: macos-15, engine: chromium, version: '', profile: probe-chromium, sample: 1, protocol: '', mode: probe}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -409,6 +406,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/deployed/__p13diag"
           cp tools/p13-diag-micro.html "$RUNNER_TEMP/deployed/__p13diag/micro.html"
+          cp -R "$RUNNER_TEMP/deployed" "$RUNNER_TEMP/patched"
+          node tools/ci/p13-diag-patch-worker.cjs "$RUNNER_TEMP/patched"
+          node tools/p13-serve.mjs "$RUNNER_TEMP/patched" 8769 > "$RUNNER_TEMP/patched.log" 2>&1 &
+          curl --noproxy '*' --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 --silent --show-error --fail -I http://127.0.0.1:8769/index.html > /dev/null
           if [ "$P13_PROBE_BROWSER" = safari ]; then
             sudo safaridriver --enable
             safaridriver -p 4444 > "$RUNNER_TEMP/safaridriver.log" 2>&1 &
