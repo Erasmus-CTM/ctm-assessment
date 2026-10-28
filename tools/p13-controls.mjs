@@ -1,6 +1,8 @@
 // Main-world DOM reads plus native input. Poll actual control state independently
 // of rendering frames, with strict selection and finite read deadlines.
+import * as p13diag from './p13-diag.mjs';
 function dom({selector,text,first,operation,enabled=false}) {
+  if(globalThis.__p13Diag){const l=globalThis.__p13Diag.evals;l.push([Date.now(),operation,selector]);if(l.length>600)l.splice(0,200);}
   const normalize=s=>s.replace(/\s+/g,' ').trim().toLowerCase();
   const matches=Array.from(document.querySelectorAll(selector)).filter(e=>text===null||normalize(e.textContent).includes(normalize(text)));
   if(operation==='count')return first?Math.min(matches.length,1):matches.length;
@@ -49,11 +51,16 @@ export function control(page,selector,text=null,first=false) {
     for(;;){
       const remaining=deadline-Date.now();
       if(remaining<=0)throw new Error('Timeout '+timeout+'ms waiting for control: '+selector);
-      let timer;
+      let timer,probeTimer;const sent=Date.now();let probe=null;
+      // DIAGNOSTIC: if a read is unanswered for 5 s, send a native mouse move
+      // (Input domain -> UI process -> WebContent IPC) and note when it lands.
+      if(p13diag.enabled)probeTimer=setTimeout(()=>{probe={sent:Date.now()};page.mouse.move(2,2).then(()=>{probe.resolved=Date.now();},e=>{probe.error=String(e);});},5000);
       try {
         const found=await Promise.race([page.evaluate(dom,{...key,operation,enabled}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Timeout '+timeout+'ms reading control: '+selector)),remaining);})]);
+        if(p13diag.enabled&&Date.now()-sent>2000)p13diag.slow({selector,operation,sent,ms:Date.now()-sent,probe});
         if(found)return;
-      }finally{clearTimeout(timer);}
+      }catch(error){if(p13diag.enabled)p13diag.slow({selector,operation,sent,ms:Date.now()-sent,probe,error:String(error).slice(0,120)});throw error;}
+      finally{clearTimeout(timer);clearTimeout(probeTimer);}
       await new Promise(resolve=>setTimeout(resolve,Math.min(50,Math.max(0,deadline-Date.now()))));
     }
   };

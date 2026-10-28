@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import {chromium,webkit} from 'playwright';
 import {control} from './p13-controls.mjs';
+import * as p13diag from './p13-diag.mjs';
 
 const engine=process.env.P13_BROWSER || 'chromium';
 const lan=Object.values(os.networkInterfaces()).flat().find(x=>x.family==='IPv4'&&!x.internal)?.address;
@@ -13,6 +14,7 @@ const browser=await ({chromium,webkit}[engine]).launch({headless:true,
   ...(engine==='chromium'?{executablePath:process.env.P13_BROWSER_EXECUTABLE||undefined,
     args:['--no-sandbox','--no-proxy-server','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE '+lan]}:
     {proxy:{server:'http://127.0.0.1:9',bypass:'127.0.0.1,'+lan}})});
+p13diag.startSampler();
 const version=browser.version(), report={engine,version,realSEB:false,results:[]};
 if(process.env.P13_EXPECT_BROWSER_VERSION)assert.equal(version,process.env.P13_EXPECT_BROWSER_VERSION);
 const prefix=process.env.P13_PATH_PREFIX || '/';
@@ -28,10 +30,13 @@ async function finished(page) {
   await page.waitForFunction(()=>globalThis.QP_L && globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.runButton.title === globalThis.QP_L.runTitle && !globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.runButton.disabled,null,{timeout});
 }
 async function run(page,text,expected) {
+  p13diag.step('run',{expected});
   await code(page,text);await control(page,'.qpyodide-button-run').first().click();
   await page.waitForFunction(expected=>document.querySelector('.qpyodide-output-code-area')?.textContent.includes(expected),expected,{timeout});
   await finished(page);
+  p13diag.step('run-done',{expected});
 }
+const diagWorkers=page=>p13diag.enabled?page.evaluate(()=>{const w=globalThis.__p13Diag?.workers;return w&&{created:w.created,terminated:w.terminated};}):null;
 try {
   for(const isolated of [false,true]) {
     const base=isolated?`http://127.0.0.1:${ports.headers}${prefix}`:`http://${lan}:${ports.plain}${prefix}`;
@@ -47,7 +52,9 @@ try {
       await context.routeWebSocket('**/*',socket=>{evidence.external.push(socket.url());socket.close();});
       const pending=new Set();context.on('request',r=>pending.add(r.url()));context.on('requestfinished',r=>pending.delete(r.url()));context.on('requestfailed',r=>pending.delete(r.url()));
       const page=await context.newPage();page.on('pageerror',e=>evidence.errors.push(e.message));
+      p13diag.setLabel(`${isolated?'isolated':'plain'} ${prefix}${name}`);p13diag.attach(page);
       try {
+        if(p13diag.enabled)await page.addInitScript(p13diag.initScript);
         await page.addInitScript(()=>{globalThis.__p13Ticks=0;globalThis.__p13MaxTickGap=0;let last=performance.now();setInterval(()=>{const now=performance.now();__p13MaxTickGap=Math.max(__p13MaxTickGap,now-last);last=now;__p13Ticks++;},20);});
         await page.goto(new URL(name,base).href,{waitUntil:"commit"});await ready(page);
         assert.equal(await page.evaluate(()=>qpyodideExamOutput),true);
@@ -63,15 +70,21 @@ try {
         assert.equal(await page.evaluate(async()=>await MathExerciseRuntime.ensurePyodide()===mainPyodide),true);
         evidence.runaways=[];
         for(const program of ['while True: pass','while True: print("flood")','while True: print("")','while True:\n    try:\n        while True: pass\n    except KeyboardInterrupt: pass']) {
+          const diagBefore=p13diag.brief(await p13diag.sample('before-run'));p13diag.step('runaway',{program,workers:await diagWorkers(page),ps:diagBefore});
           const ticks=await page.evaluate(()=>__p13Ticks);
           await page.evaluate(()=>{globalThis.__p13BeforeProxy=mainPyodide;});
           await code(page,'P13_SESSION_MARKER=42\n'+program);await control(page,'.qpyodide-button-run').first().click();
           await page.waitForTimeout(300);
+          p13diag.step('runaway-running',{ps:p13diag.brief(await p13diag.sample('running'))});
           assert.ok(await page.evaluate(()=>__p13Ticks)>ticks,'main thread stays responsive');
           await page.evaluate(()=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue('# preserved after Stop'));
           await page.evaluate(()=>{globalThis.__p13MaxTickGap=0;});
+          p13diag.step('stop-click');
           const stop=Date.now();await control(page,'.qpyodide-button-run').first().click();
-          await ready(page);await finished(page);
+          p13diag.step('stop-clicked');
+          await ready(page);p13diag.step('stop-ready');await finished(page);
+          p13diag.step('stop-recovered',{ms:Date.now()-stop,workers:await diagWorkers(page),ps:p13diag.brief(await p13diag.sample('recovered'))});
+          if(Date.now()-stop>15000)p13diag.printWindow(stop-5000,Date.now(),'slow-recovery');
           const maxMainThreadGapMs=await page.evaluate(()=>__p13MaxTickGap);
           evidence.runaways.push({program,stopRecoveryMs:Date.now()-stop,maxMainThreadGapMs});
           assert.ok(maxMainThreadGapMs<2000,'Stop/restart must not stall the page event loop');
@@ -140,6 +153,7 @@ try {
         for(const key of ['external','errors','failed','responses'])assert.deepEqual(evidence[key],[],key);
         evidence.ok=true;
       } catch(error) {evidence.error=String(error.stack||error);evidence.pending=[...pending].slice(-20);
+        if(p13diag.enabled){p13diag.step('failure',{error:String(error).slice(0,200)});const lastSlow=p13diag.diag.slow.at(-1);evidence.diagStall=await p13diag.postmortem(page,lastSlow?lastSlow.sent:p13diag.diag.steps.at(-2)?.t||Date.now()-60000);}
         evidence.startup=await page.evaluate(()=>({state:document.readyState,url:location.href,status:document.querySelector('#qpyodide-status-message-text')?.textContent,maxMainThreadGapMs:globalThis.__p13MaxTickGap,ticks:globalThis.__p13Ticks,cellsReady:globalThis.qpyodideCellsReady,hasEditor:!!globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.editor,runButtons:document.querySelectorAll('.qpyodide-button-run').length,buttonConnected:globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.runButton?.isConnected,button:globalThis.qpyodideCellContainer?.cells[0]?.primaryUnit?.runButton?.outerHTML})).catch(()=>null);
         console.error(JSON.stringify(evidence));throw error;}
       finally {report.results.push(evidence);await context.close();}
@@ -186,6 +200,7 @@ try {
     } finally {await context.close();}
   }
 } finally {
+  if(p13diag.enabled){p13diag.stopSampler();report.diag=p13diag.diag;}
   fs.writeFileSync(process.env.P13_REPORT || '/tmp/p13-seb-profile.json',JSON.stringify(report,null,2)+'\n');
   await browser.close();
 }

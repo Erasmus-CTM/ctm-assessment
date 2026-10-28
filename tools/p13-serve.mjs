@@ -7,6 +7,8 @@ const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript
 export async function serve(root,port=0,isolated=false){
   root=fs.realpathSync(root);
   const server=http.createServer((req,res)=>{
+    // DIAGNOSTIC: request timing log (P13_SERVE_LOG=1).
+    if(process.env.P13_SERVE_LOG==='1'){const start=Date.now();res.on('close',()=>console.log(JSON.stringify({t:start,ms:Date.now()-start,m:req.method,u:req.url,s:res.statusCode,done:res.writableFinished})));}
     const headers=isolated?{'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Embedder-Policy':'require-corp'}:{};
     try {
       const url=new URL(req.url,'http://local');

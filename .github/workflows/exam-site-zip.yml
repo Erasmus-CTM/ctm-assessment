@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   website:
+    if: false  # DIAGNOSTIC BRANCH: reuse the ZIP from run 40585766890
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -315,14 +316,15 @@ jobs:
             ${{ runner.temp }}/subdirectory-headers.log
 
   seb-engine-profile:
-    needs: [website]
     strategy:
       fail-fast: false
       matrix:
+        # DIAGNOSTIC BRANCH: WebKit only, repeated; protocol log on sample 1.
         include:
-          - {os: ubuntu-24.04, engine: chromium, version: '139.0.7258.138', profile: cef139}
-          - {os: ubuntu-24.04, engine: chromium, version: '147.0.7727.117', profile: cef147}
-          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 1, protocol: '1'}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 2, protocol: ''}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 3, protocol: ''}
+          - {os: macos-15, engine: safari, version: '', profile: real-safari, sample: 1, protocol: ''}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -342,6 +344,8 @@ jobs:
         with:
           name: p13-zip-candidate
           path: ${{ runner.temp }}/zip
+          run-id: '40585766890'
+          github-token: ${{ github.token }}
       - name: Extract the actual website ZIP
         run: |
           python - <<'PYTHON'
@@ -366,6 +370,8 @@ jobs:
         if: matrix.engine == 'webkit'
         run: npx playwright install webkit
       - name: Serve plain LAN HTTP and a server with isolation headers
+        env:
+          P13_SERVE_LOG: '1'
         run: |
           node tools/p13-serve.mjs "$RUNNER_TEMP/deployed" 8765 > "$RUNNER_TEMP/plain.log" 2>&1 &
           node tools/p13-serve.mjs "$RUNNER_TEMP/deployed" 8766 --isolated > "$RUNNER_TEMP/headers.log" 2>&1 &
@@ -377,27 +383,63 @@ jobs:
             curl --noproxy '*' --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 --silent --show-error --fail -I "http://127.0.0.1:$p13_port$p13_path" > /dev/null
           done
       - name: Verify the byte-preserving host and native-control negative cases
+        if: matrix.engine != 'safari'
         env:
           P13_BROWSER: ${{ matrix.engine }}
         run: |
           if [ "$P13_BROWSER" = chromium ]; then export P13_BROWSER_EXECUTABLE="$RUNNER_TEMP/chrome/chrome-linux64/chrome"; fi
           node --test tests/p13-serve.test.cjs tests/p13-controls.browser.cjs
+      - name: Runner facts
+        run: |
+          sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize || true
+          sw_vers || true
+          npx playwright --version
+      - name: Real Safari runaway/Stop sequence through safaridriver
+        if: matrix.engine == 'safari'
+        env:
+          P13_DIAG: '1'
+        run: |
+          sudo safaridriver --enable
+          safaridriver -p 4444 > "$RUNNER_TEMP/safaridriver.log" 2>&1 &
+          sleep 3
+          node tools/p13-safari-runaway.mjs
       - name: Check Run, Stop, input, NumPy, inert HTML and saved-answer restore
+        if: matrix.engine != 'safari'
         env:
           P13_BROWSER: ${{ matrix.engine }}
           P13_EXPECT_BROWSER_VERSION: ${{ matrix.version }}
           P13_REPORT: ${{ runner.temp }}/seb-profile*.json
+          P13_DIAG: '1'
+          P13_PROTOCOL: ${{ matrix.protocol }}
         run: |
           if [ "$P13_BROWSER" = chromium ]; then
             export P13_BROWSER_EXECUTABLE="$RUNNER_TEMP/chrome/chrome-linux64/chrome"
           fi
-          P13_REPORT="$RUNNER_TEMP/seb-profile-root.json" node tools/p13-seb-profile.mjs
+          if [ "$P13_PROTOCOL" = 1 ]; then export DEBUG=pw:protocol; fi
+          status=0
+          P13_REPORT="$RUNNER_TEMP/seb-profile-root.json" node tools/p13-seb-profile.mjs 2> "$RUNNER_TEMP/protocol-root.log" || status=$?
+          grep -v 'pw:protocol' "$RUNNER_TEMP/protocol-root.log" | tail -40 || true
+          [ "$status" = 0 ] || exit "$status"
           P13_PATH_PREFIX=/dept/python/ P13_PORTS='{"plain":8767,"headers":8768}' \
-            P13_REPORT="$RUNNER_TEMP/seb-profile-subdirectory.json" node tools/p13-seb-profile.mjs
+            P13_REPORT="$RUNNER_TEMP/seb-profile-subdirectory.json" node tools/p13-seb-profile.mjs 2> "$RUNNER_TEMP/protocol-subdirectory.log" || status=$?
+          grep -v 'pw:protocol' "$RUNNER_TEMP/protocol-subdirectory.log" | tail -40 || true
+          exit "$status"
+      - name: Diagnostic summaries (protocol windows, Pyodide re-fetch timing)
+        if: always()
+        run: |
+          for which in root subdirectory; do
+            if [ -s "$RUNNER_TEMP/seb-profile-$which.json" ] && [ -s "$RUNNER_TEMP/protocol-$which.log" ]; then
+              python3 tools/ci/p13-diag-protocol.py "$RUNNER_TEMP/seb-profile-$which.json" "$RUNNER_TEMP/protocol-$which.log" | head -1500
+            fi
+          done
+          for log in plain headers subdirectory subdirectory-headers; do
+            echo "== $log: Pyodide core fetches"
+            grep -E 'pyodide\.asm\.wasm|python_stdlib|pyodide-lock|numpy' "$RUNNER_TEMP/$log.log" | head -200 || true
+          done
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: p13-seb-${{ matrix.profile }}
+          name: p13-seb-${{ matrix.profile }}-${{ matrix.sample }}
           path: |
             ${{ runner.temp }}/seb-profile*.json
             ${{ runner.temp }}/chrome/receipt.json
@@ -405,8 +447,11 @@ jobs:
             ${{ runner.temp }}/headers.log
             ${{ runner.temp }}/subdirectory.log
             ${{ runner.temp }}/subdirectory-headers.log
+            ${{ runner.temp }}/protocol-*.log
+            ${{ runner.temp }}/safaridriver.log
 
   accepted-website:
+    if: false  # DIAGNOSTIC BRANCH
     needs: [website, seb-engine-profile]
     runs-on: ubuntu-latest
     steps:
