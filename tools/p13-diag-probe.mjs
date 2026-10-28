@@ -68,7 +68,9 @@ async function until(b,fn,arg,limit,what){
 // idle = the shipped worker (port 8765); micro = wasm workers on 127.0.0.1
 // (a separate site, so real Safari gives it its own WebContent process).
 const phases=(process.env.P13_PROBE_PHASES||'patched,runaway,idle,micro').split(',');
-const results={backend,micro:[],runaway:[],idle:[],patched:[]};
+// Runaway programs per phase (default `while True: pass`).
+const PROGRAMS={patchedc:'while True:\n    sum(range(10**6))',patched4:'while True:\n    try:\n        while True: pass\n    except KeyboardInterrupt: pass',patchedbig:'while True:\n    x = 7**200000'};
+const results={backend,micro:[],runaway:[],idle:[],patched:[],patchedc:[],patched4:[],patchedbig:[]};
 const b=backend==='safari'?await safariDriver():await playwrightDriver(backend);
 console.log('[probe] browser',backend,b.version);
 p13diag.startSampler(2000);
@@ -92,7 +94,7 @@ try {
     }
     const mode=phase==='idle'?'idle':'runaway';
     p13diag.setLabel('pyodide '+phase);
-    await b.open(`http://${lan}:${phase==='patched'?8769:8765}/index.html`);
+    await b.open(`http://${lan}:${phase.startsWith('patched')?8769:8765}/index.html`);
     await b.exec(()=>{globalThis.__probeBefore=null;});
     await until(b,readyFn,'__probeBefore',180000,'first ready');
     console.log('[probe]',phase,'start ps',p13diag.brief(await p13diag.sample(phase+'-start')));
@@ -100,7 +102,7 @@ try {
       await b.exec(()=>{globalThis.__probeBefore=globalThis.mainPyodide;});
       const t0=Date.now();
       if(mode==='runaway'){
-        await b.exec(text=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue(text),'while True: pass');
+        await b.exec(text=>qpyodideCellContainer.cells[0].primaryUnit.editor.setValue(text),PROGRAMS[phase]||'while True: pass');
         await b.click('.qpyodide-button-run');await sleep(300);
       }
       const stop=Date.now();
@@ -120,5 +122,5 @@ try {
 } catch(error){console.log('[probe] FAILED',String(error.stack||error));console.log('[probe]   ps',p13diag.brief(await p13diag.sample('failure')));process.exitCode=1;}
 finally {
   p13diag.stopSampler();await b.close();
-  console.log('[probe] summary',JSON.stringify({backend,micro:results.micro.map(m=>({label:m.label,readyMs:m.rounds.map(r=>r.readyMs)})),patched:results.patched.map(r=>r.recoveryMs),runaway:results.runaway.map(r=>r.recoveryMs),idle:results.idle.map(r=>r.recoveryMs)}));
+  console.log('[probe] summary',JSON.stringify({backend,micro:results.micro.map(m=>({label:m.label,readyMs:m.rounds.map(r=>r.readyMs)})),patched:results.patched.map(r=>r.recoveryMs),patchedc:results.patchedc.map(r=>r.recoveryMs),patched4:results.patched4.map(r=>r.recoveryMs),patchedbig:results.patchedbig.map(r=>r.recoveryMs),runaway:results.runaway.map(r=>r.recoveryMs),idle:results.idle.map(r=>r.recoveryMs)}));
 }

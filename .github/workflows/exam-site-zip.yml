@@ -322,10 +322,8 @@ jobs:
         # DIAGNOSTIC BRANCH: WebKit profile samples plus restart probes in
         # Playwright WebKit, real Safari (safaridriver) and Chromium on macOS.
         include:
-          - {os: macos-15, engine: webkit, version: '', profile: probe-webkit, sample: 1, protocol: '', mode: probe}
-          - {os: macos-15, engine: webkit, version: '', profile: probe-webkit, sample: 2, protocol: '', mode: probe}
-          - {os: macos-15, engine: safari, version: '', profile: probe-safari, sample: 1, protocol: '', mode: probe}
-          - {os: macos-15, engine: safari, version: '', profile: probe-safari, sample: 2, protocol: '', mode: probe}
+          - {os: macos-15, engine: webkit, version: '', profile: probe-webkit, sample: 1, protocol: '', mode: probe, phases: 'patched4,patchedc,patchedbig'}
+          - {os: macos-15, engine: safari, version: '', profile: probe-safari, sample: 1, protocol: '', mode: probe, phases: 'patched4,patchedc,patchedbig'}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -403,6 +401,7 @@ jobs:
         env:
           P13_DIAG: '1'
           P13_PROBE_BROWSER: ${{ matrix.engine }}
+          P13_PROBE_PHASES: ${{ matrix.phases }}
         run: |
           mkdir -p "$RUNNER_TEMP/deployed/__p13diag"
           cp tools/p13-diag-micro.html "$RUNNER_TEMP/deployed/__p13diag/micro.html"
