@@ -2,8 +2,8 @@
   "jobs": [
     {"name": "pw155-webkit-mac15-full", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "full,landing", "minutes": 75},
     {"name": "safari-mac15-full", "os": "macos-15", "backend": "safari", "plan": "full,landing", "minutes": 75},
-    {"name": "pw155-webkit-mac15-py", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "pyodide,pythreshold,pymitigate", "minutes": 75},
-    {"name": "safari-mac15-py", "os": "macos-15", "backend": "safari", "plan": "pyodide,pythreshold,pymitigate", "minutes": 75},
+    {"name": "pw155-webkit-mac15-py", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "pyodide,pythreshold,pymitigate,pyhard", "minutes": 75},
+    {"name": "safari-mac15-py", "os": "macos-15", "backend": "safari", "plan": "pyodide,pythreshold,pymitigate,pyhard", "minutes": 75},
     {"name": "chromium-mac15-control", "os": "macos-15", "backend": "playwright-chromium", "pw": "1.55.1", "plan": "core,lifecore,landing,pyquick"},
     {"name": "sim-ios18-mac15", "os": "macos-15", "backend": "simulator", "plan": "core,lifecore,ios,pyquick", "minutes": 60},
     {"name": "sim-ios26-mac26", "os": "macos-26", "backend": "simulator", "plan": "core,lifecore,ios,pyquick", "minutes": 60},

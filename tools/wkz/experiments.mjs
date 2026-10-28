@@ -144,3 +144,13 @@ for (const k of [0, 8, 12, 16, 20, 24]) for (const prewarm of [0, 1e6])
   landingPlan.push({id: `land-k${k}${prewarm ? '-prewarm' : ''}`, kind: 'landing', coi: true, mask: S(k), prewarm, n: 2, timeout: 60000});
 landingPlan.push({id: 'land-k32', kind: 'landing', coi: true, mask: -1 >>> 0, n: 2, timeout: 60000});
 plans.landing = landingPlan;
+
+// Hard terminate right after revoking the flag: does the zombie end by itself
+// once its current C call returns (KeyboardInterrupt at the next check)?
+plans.pyhard = [
+  py('sum1e8-u8', W('sum(range(10**8))'), {after: [1000, 4000, 10000, 20000]}),
+  py('sum1e8-getter-xhr-hard', W('sum(range(10**8))'), {stopflag: 'getter-xhr', hard: true, after: [1000, 4000, 10000, 20000]}),
+  py('sum1e6-getter-xhr-hard', W('sum(range(10**6))'), {stopflag: 'getter-xhr', hard: true}),
+  py('sort-getter-xhr-hard', 'import random\na = [random.random() for _ in range(10**6)]\n' + W('sorted(a)'), {stopflag: 'getter-xhr', hard: true}),
+  py('sum1e8-getter-now', W('sum(range(10**8))'), {stopflag: 'getter-now', after: [1000, 4000, 10000, 20000]})
+];

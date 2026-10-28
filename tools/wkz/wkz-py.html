@@ -33,7 +33,8 @@ addEventListener('load', async () => {
     await running;
     await sleep(EXP.hold || 1500);
     await mark('running');
-    if (EXP.stopflag === 'getter-xhr') {
+    if (EXP.stopflag === 'getter-xhr' && EXP.hard) URL.revokeObjectURL(flagURL); // revoke, then terminate at once
+    else if (EXP.stopflag === 'getter-xhr') {
       // Soft stop first: revoke the flag URL, give Python 2 s to raise
       // KeyboardInterrupt, then terminate as before.
       const t0 = performance.now();

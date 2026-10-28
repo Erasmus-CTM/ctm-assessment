@@ -100,6 +100,14 @@ jobs:
       - name: Server samples (per phase)
         if: always()
         run: grep -E '^\[wkz\]' "$RUNNER_TEMP/server.log" | cut -c1-700 || true
+      - name: Summary (compact, read from the end of the log)
+        if: always()
+        run: |
+          echo "SUMMARY ${{ matrix.name }} os=$(sw_vers -productVersion 2>/dev/null || lsb_release -ds) safari=$(defaults read /Applications/Safari.app/Contents/Info CFBundleShortVersionString 2>/dev/null || echo -) env=$WKZ_ENV"
+          grep -E '^\[drive\] (version|simulator)' "$RUNNER_TEMP/drive.log" | sort -u | head -5 || true
+          grep -E ' (info|DONE) ' "$RUNNER_TEMP/server.log" | grep -E ':info(-[a-z-]+)?:[a-z0-9]+ info ' | sed -E 's/.*(:info[a-z-]*):[a-z0-9]+ info .*(\{.*)/\1 \2/' | cut -c1-420 || true
+          echo "zombie-hits $(grep -c zombie-hit "$RUNNER_TEMP/server.log" || true)"
+          grep -E '^\[wkz-table\]|^\[wkz-result\].*FAILED' "$RUNNER_TEMP/drive.log" | cut -c1-900 || true
   bugzilla:
     # bugs.webkit.org is not reachable from the investigation environment;
     # print the relevant reports (REST API) into the job log instead.
