@@ -34,6 +34,7 @@ jobs:
       WKZ_ENV: ${{ matrix.env && toJSON(matrix.env) || '{}' }}
       WKZ_LABEL: ${{ matrix.name }}
       WKZ_PORT: '8790'
+      WKZ_SIM_RUNTIME: ${{ matrix.simruntime }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -45,7 +46,10 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then
             sw_vers; sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize
             echo "Safari $(defaults read /Applications/Safari.app/Contents/Info CFBundleShortVersionString) ($(defaults read /Applications/Safari.app/Contents/Info CFBundleVersion))"
+            ls -d /Applications/Xcode*.app || true
+            if [ -n "${{ matrix.xcode }}" ]; then sudo xcode-select -s "/Applications/Xcode_${{ matrix.xcode }}.app"; fi
             xcodebuild -version || true
+            if [ "$WKZ_BACKEND" = simulator ]; then xcrun simctl list runtimes; fi
           else
             nproc; free -m | head -2
           fi
@@ -58,7 +62,6 @@ jobs:
           (cd "$RUNNER_TEMP/pw" && npx playwright install $deps "$engine")
           echo "WKZ_PW=$RUNNER_TEMP/pw/node_modules/playwright/index.mjs" >> "$GITHUB_ENV"
       - name: Install Pyodide 0.28.3 core and NumPy
-        if: contains(matrix.plan, 'py')
         run: |
           npm i --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/py" pyodide@0.28.3
           mkdir -p tools/wkz/pyodide

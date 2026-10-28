@@ -32,12 +32,14 @@ async function run(c) {
   if (c.shape === 'jsloop') { send({type: 'started', ms: performance.now() - t0}); for (;;) {} }
   const memory = c.memory || new WebAssembly.Memory({initial: c.pages || 1});
   if (c.pages > 1) new Uint8Array(memory.buffer).fill(1);
-  let calls = 0, first = 0;
+  let calls = 0, first = 0, lastSide = 0;
+  let warming = false;
   const stamp = () => {
+    if (warming) return;
     calls++;
     if (calls === 1) first = performance.now();
     if (calls === 4) send({type: 'jsrate', intervalMs: (performance.now() - first) / 3});
-    if (c.sidefx && calls % 4 === 0) sideEffects(c, calls);
+    if (c.sidefx && Date.now() - lastSide > 250) { lastSide = Date.now(); sideEffects(c, calls); }
   };
   const callees = {
     arrow: stamp,
@@ -46,11 +48,12 @@ async function run(c) {
     dateNow: Date.now
   };
   const f = callees[c.callee || 'arrow'];
+  warming = true;
   for (let i = 0; i < (c.prewarm || 0); i++) f();
-  if (c.prewarm) calls = 0;
+  warming = false;
   const inst = new WebAssembly.Instance(new WebAssembly.Module(bytesOf(c.wasm)), {e: {m: memory, f}});
   send({type: 'started', ms: Math.round(performance.now() - t0), crossOriginIsolated: self.crossOriginIsolated, hasWasm: typeof WebAssembly});
-  inst.exports.spin(c.mask >>> 0);
+  inst.exports.spin(c.mask >>> 0, c.slot | 0);
 }
 
 // Zombie side effects: does a terminated-but-running worker still reach the

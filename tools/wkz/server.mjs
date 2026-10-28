@@ -22,7 +22,7 @@ import {execFile} from 'node:child_process';
 const port = +(process.argv[2] || 8790);
 const rootArg = process.argv.indexOf('--root');
 const root = fs.realpathSync(rootArg > 0 ? process.argv[rootArg + 1] : path.dirname(new URL(import.meta.url).pathname));
-const PROC = new RegExp(process.env.WKZ_PROC || 'WebContent|WebKitWebProcess|--type=renderer');
+const PROC = new RegExp(process.env.WKZ_PROC || 'WebContent|WebKitWebProcess|WPEWebProcess|--type=renderer');
 const types = {'.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm', '.zip': 'application/zip', '.whl': 'application/zip', '.tar': 'application/x-tar', '.css': 'text/css'};
 const runs = new Map();
 const sleep = ms => new Promise(r => setTimeout(r, ms));

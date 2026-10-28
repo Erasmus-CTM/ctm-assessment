@@ -21,15 +21,17 @@ const label = process.env.WKZ_LABEL || backend;
 const only = (process.env.WKZ_ONLY || '').split(',').filter(Boolean);
 const extraEnv = JSON.parse(process.env.WKZ_ENV || '{}');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const sh = (cmd, args, opts = {}) => new Promise(resolve => execFile(cmd, args, {timeout: 120000, ...opts}, (e, out, err) => resolve({code: e ? (e.code ?? 1) : 0, out: String(out), err: String(err)})));
+const sh = (cmd, args, opts = {}) => new Promise(resolve => execFile(cmd, args, {timeout: 120000, maxBuffer: 64 << 20, ...opts}, (e, out, err) => resolve({code: e ? (e.code ?? 1) : 0, out: String(out), err: String(err)})));
+import os from 'node:os';
 const host = '127.0.0.1';
-const urlFor = (exp, run) => `http://${host}:${port}${exp.coi ? '/coi' : ''}/${exp.page || 'wkz.html'}?run=${encodeURIComponent(run)}&exp=${encodeURIComponent(JSON.stringify(exp))}`;
+const lan = Object.values(os.networkInterfaces()).flat().find(x => x.family === 'IPv4' && !x.internal)?.address;
+const urlFor = (exp, run) => `http://${exp.host === 'lan' ? lan : host}:${port}${exp.coi ? '/coi' : ''}/${exp.page || 'wkz.html'}?run=${encodeURIComponent(run)}&exp=${encodeURIComponent(JSON.stringify(exp))}`;
 const blank = run => `http://${host}:${port}/wkz-blank.html?run=${encodeURIComponent(run)}&watch=2000`;
 const state = run => fetch(`http://${host}:${port}/state?run=${encodeURIComponent(run)}`).then(r => r.json());
 
 async function killContent() {
   if (process.platform === 'darwin') await sh('pkill', ['-9', '-f', 'com.apple.WebKit.WebContent']);
-  else await sh('pkill', ['-9', '-f', 'WebKitWebProcess']);
+  else await sh('pkill', ['-9', '-f', 'WebKitWebProcess|WPEWebProcess']);
   await sleep(500);
 }
 
@@ -83,9 +85,13 @@ async function safari(stp) {
   };
 }
 async function simulator() {
-  const list = JSON.parse((await sh('xcrun', ['simctl', 'list', 'devices', 'available', '-j'])).out);
+  const listed = await sh('xcrun', ['simctl', 'list', 'devices', 'available', '-j'], {timeout: 900000});
+  if (listed.code) console.log('[drive] simctl list failed', listed.code, listed.err.slice(0, 300));
+  const list = JSON.parse(listed.out);
   const devices = Object.entries(list.devices).filter(([rt]) => /iOS/.test(rt)).flatMap(([rt, ds]) => ds.map(d => ({...d, rt})));
-  const device = devices.find(d => d.state === 'Booted') || devices.filter(d => /iPhone/.test(d.name)).at(-1);
+  const want = process.env.WKZ_SIM_RUNTIME || '';
+  const pool = devices.filter(d => d.rt.includes(want));
+  const device = pool.find(d => d.state === 'Booted') || pool.filter(d => /iPhone/.test(d.name)).at(-1);
   console.log('[drive] simulator', device && device.name, device && device.rt);
   if (device.state !== 'Booted') { await sh('xcrun', ['simctl', 'boot', device.udid]); await sh('xcrun', ['simctl', 'bootstatus', device.udid, '-b'], {timeout: 600000}); }
   const udid = device.udid;
@@ -119,8 +125,9 @@ let experiments = (process.env.WKZ_PLAN || 'quick').split(',').flatMap(p => plan
 if (only.length) experiments = experiments.filter(e => only.includes(e.id));
 console.log('[drive] backend', backend, 'env', JSON.stringify(extraEnv), 'experiments', experiments.map(e => e.id).join(','));
 for (const exp of experiments) {
-  const run = `${label}:${exp.id}`;
-  const row = {id: exp.id};
+  const run = `${label}:${exp.id}:${Date.now().toString(36)}`;
+  const row = {id: exp.id, driver: []};
+  const dsample = async (tag, ms = 2000) => { const x = await sample(ms); row.driver.push(`${tag}:${x.cores}c/${x.running}R/${x.threads}t`); console.log(`[wkz] ${run} ${tag} ${brief(x)}`); return x; };
   try {
     await killContent();
     await b.start();
@@ -139,26 +146,26 @@ for (const exp of experiments) {
         handled = true;
         if (h.handoff === 'close-tab' && b.closeTab) {
           row.closeMs = await b.closeTab();
-          for (const at of [2000, 10000]) { await sleep(at === 2000 ? 0 : 6000); console.log(`[wkz] ${run} closed+${at / 1000}s ${brief(await sample(2000))}`); }
+          for (const at of [2000, 10000]) { await sleep(at === 2000 ? 0 : 6000); await dsample(`closed+${at / 1000}s`); }
           break;
         }
         if (h.handoff === 'watch-main') {
           while (!(s && s.watched) && Date.now() < deadline) { await sleep(1000); s = await state(run).catch(() => null); }
           row.nav = b.navigate ? await b.navigate(blank(run)) : 'n/a';
-          console.log(`[wkz] ${run} navigate-away ${JSON.stringify(row.nav)} ${brief(await sample(2000))}`);
+          await dsample('navigated-away');
           await sleep(3000);
-          console.log(`[wkz] ${run} navigate-away+5s ${brief(await sample(2000))}`);
+          await dsample('navigated-away+5s');
           break;
         }
         if (h.handoff === 'ios-background' && b.background) {
           await b.background();
-          for (const at of [3, 15]) { await sleep(at === 3 ? 1000 : 10000); console.log(`[wkz] ${run} background+${at}s ${brief(await sample(2000))}`); }
+          for (const at of [3, 15]) { await sleep(at === 3 ? 1000 : 10000); await dsample(`background+${at}s`); }
           row.memoryWarning = (await b.memoryWarning()).code;
           await sleep(2000);
-          console.log(`[wkz] ${run} background+memwarn ${brief(await sample(2000))}`);
+          await dsample('background+memwarn');
           await b.foreground();
           await sleep(3000);
-          console.log(`[wkz] ${run} foreground+3s ${brief(await sample(2000))}`);
+          await dsample('foreground+3s');
           break;
         }
         if (h.handoff === 'close-tab' || h.handoff === 'driver-nav' || h.handoff === 'ios-background') { row.note = h.handoff + ' unsupported by ' + backend; break; }
@@ -166,7 +173,8 @@ for (const exp of experiments) {
       if (Date.now() > deadline) { row.timeout = true; break; }
     }
     const result = s && s.done;
-    if (result) Object.assign(row, {leak: result.leakedCores, marks: result.marks, started: result.started, sidefx: result.sidefx, bench: result.bench, error: result.error, loadMs: result.loadMs, calibration: result.calibration, coi: result.coi, wasm: result.wasm, events: result.events && result.events.length ? result.events : undefined});
+    if (s) row.timeline = s.marks.filter(m => m.sample).map(m => `${m.phase}:${m.sample.cores}c/${m.sample.running}R/${m.sample.threads}t/${m.sample.rssMB}MB`).join(' ');
+    if (result) Object.assign(row, {leak: result.leakedCores, marks: result.marks, started: result.started, sidefx: result.sidefx, bench: result.bench, error: result.error, loadMs: result.loadMs, calibration: result.calibration, softStop: result.softStop, stopMs: result.stopMs, jsrate: result.jsrate, coi: result.coi, wasm: result.wasm, events: result.events && result.events.length ? result.events : undefined});
     console.log(`[wkz-result] ${label} ${exp.id} ${JSON.stringify(row)}`);
   } catch (error) {
     row.error = String(error.stack || error).slice(0, 300);
@@ -174,12 +182,10 @@ for (const exp of experiments) {
   } finally {
     await b.stop().catch(() => {});
     await sleep(1000);
-    const post = await sample(2000);
-    row.postCloseCores = post.cores;
-    console.log(`[wkz] ${run} post-close ${brief(post)}`);
+    row.postCloseCores = (await dsample('post-close')).cores;
     table.push(row);
   }
 }
 console.log(`[wkz-table] ${label} ${b.version || ''}`);
-for (const r of table) console.log(`[wkz-table] ${label} ${r.id.padEnd(28)} leak=${String(r.leak).padEnd(5)} postClose=${r.postCloseCores} ${r.timeout ? 'TIMEOUT ' : ''}${r.error ? 'ERROR ' + r.error.slice(0, 80) : ''} ${r.marks || ''}`);
+for (const r of table) console.log(`[wkz-table] ${label} ${r.id.padEnd(28)} leak=${String(r.leak).padEnd(5)} ${r.timeout ? 'TIMEOUT ' : ''}${r.error ? 'ERROR ' + r.error.slice(0, 80) : ''}${r.stopMs ? 'stopMs=' + JSON.stringify(r.stopMs) + ' jsrate=' + JSON.stringify(r.jsrate) + ' ' : ''}${r.softStop ? 'soft=' + JSON.stringify(r.softStop) + ' ' : ''}${r.calibration ? 'cal=' + r.calibration + ' ' : ''}${r.bench ? 'bench=' + JSON.stringify(r.bench) + ' ' : ''}${r.nav ? 'nav=' + JSON.stringify(r.nav) + ' ' : ''}${r.sidefx ? 'sidefx=' + JSON.stringify(r.sidefx) + ' ' : ''}| ${r.timeline || ''} | ${r.driver.join(' ')}`);
 process.exit(0);

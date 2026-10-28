@@ -65,7 +65,7 @@ export const main = [
   {id: 'main-wasm-loop', kind: 'main', shape: 'loop', timeout: 120000},
   {id: 'main-js-loop', kind: 'main', shape: 'jsloop', timeout: 120000}
 ];
-export const info = [{id: 'info', kind: 'info'}, {id: 'info-coi', kind: 'info', coi: true}];
+export const info = [{id: 'info', kind: 'info'}, {id: 'info-coi', kind: 'info', coi: true}, {id: 'info-lan', kind: 'info', host: 'lan'}, {id: 'info-lan-coi', kind: 'info', host: 'lan', coi: true}];
 
 export const plans = {
   info,
@@ -121,3 +121,26 @@ plans.ios = ios;
 const pick = (list, ids) => list.filter(e => ids.includes(e.id));
 plans.core = [...info, ...pick(shapes, ['idle', 'loop', 'call', 'grow0', 'jsloop', 'js-dense', 'js-sparse20']), ...pick(tiers, ['js-sparse20-prewarm', 'js-sparse20-hold10s'])];
 plans.lifecore = pick(lifetime, ['life-nav-same', 'life-reload', 'life-nav-cross', 'life-close-tab']);
+
+// Mitigation prototypes (wkz-pyworker.js stopflag) and their cost.
+const COST = 'import time\nt = time.perf_counter()\nfor i in range(3 * 10**6):\n    pass\nround(time.perf_counter() - t, 3)';
+export const pymitigate = [
+  py('sum1e6-getter-now', W('sum(range(10**6))'), {stopflag: 'getter-now'}),
+  py('sum1e6-getter-xhr', W('sum(range(10**6))'), {stopflag: 'getter-xhr'}),
+  py('pass-getter-xhr', W('pass'), {stopflag: 'getter-xhr'}),
+  py('sum-single-getter-xhr', 'sum(range(10**11))', {stopflag: 'getter-xhr'}),
+  py('sort-getter-xhr', 'import random\na = [random.random() for _ in range(10**6)]\n' + W('sorted(a)'), {stopflag: 'getter-xhr'}),
+  py('cost-nofix', '', {fix: false, calibrate: COST}),
+  py('cost-u8', '', {calibrate: COST}),
+  py('cost-getter-now', '', {stopflag: 'getter-now', calibrate: COST}),
+  py('cost-getter-xhr', '', {stopflag: 'getter-xhr', calibrate: COST})
+];
+plans.pymitigate = pymitigate;
+plans.options = [...plans.options, pyodide.find(e => e.id === 'py-sum1e6'), pyodide.find(e => e.id === 'py-sum-single')];
+
+// Time to stop vs JS-call interval (2^k iterations) and callee warm-up.
+export const landingPlan = [];
+for (const k of [0, 8, 12, 16, 20, 24]) for (const prewarm of [0, 1e6])
+  landingPlan.push({id: `land-k${k}${prewarm ? '-prewarm' : ''}`, kind: 'landing', coi: true, mask: S(k), prewarm, n: 2, timeout: 60000});
+landingPlan.push({id: 'land-k32', kind: 'landing', coi: true, mask: -1 >>> 0, n: 2, timeout: 60000});
+plans.landing = landingPlan;

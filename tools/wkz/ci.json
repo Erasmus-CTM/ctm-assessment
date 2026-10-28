@@ -1,15 +1,27 @@
 {
   "jobs": [
-    {"name": "smoke-pw155-webkit-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "core"},
-    {"name": "smoke-safari-mac15", "os": "macos-15", "backend": "safari", "plan": "core"},
-    {"name": "smoke-chromium-mac15", "os": "macos-15", "backend": "playwright-chromium", "pw": "1.55.1", "plan": "info,quick"},
-    {"name": "smoke-sim-mac15", "os": "macos-15", "backend": "simulator", "plan": "core", "only": "info,idle,loop,js-dense"},
-    {"name": "smoke-wkapp-mac15", "os": "macos-15", "backend": "wkapp", "plan": "core", "only": "info,idle,loop"},
-    {"name": "smoke-canary-pw155-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "info", "env": {"JSC_useWebAssembly": "0"}},
-    {"name": "smoke-canary-pw155-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "core", "only": "info,loop", "env": {"JSC_useWebAssembly": "0"}},
-    {"name": "smoke-pw155-webkit-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "core", "only": "info,idle,loop,js-dense"},
-    {"name": "smoke-stp-mac15", "os": "macos-15", "backend": "stp", "plan": "core", "only": "info,loop"},
-    {"name": "smoke-safari-mac14", "os": "macos-14", "backend": "safari", "plan": "core", "only": "info,loop"},
-    {"name": "smoke-safari-mac26", "os": "macos-26", "backend": "safari", "plan": "core", "only": "info,loop", "minutes": 20}
+    {"name": "pw155-webkit-mac15-full", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "full,landing", "minutes": 75},
+    {"name": "safari-mac15-full", "os": "macos-15", "backend": "safari", "plan": "full,landing", "minutes": 75},
+    {"name": "pw155-webkit-mac15-py", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "pyodide,pythreshold,pymitigate", "minutes": 75},
+    {"name": "safari-mac15-py", "os": "macos-15", "backend": "safari", "plan": "pyodide,pythreshold,pymitigate", "minutes": 75},
+    {"name": "chromium-mac15-control", "os": "macos-15", "backend": "playwright-chromium", "pw": "1.55.1", "plan": "core,lifecore,landing,pyquick"},
+    {"name": "sim-ios18-mac15", "os": "macos-15", "backend": "simulator", "plan": "core,lifecore,ios,pyquick", "minutes": 60},
+    {"name": "sim-ios26-mac26", "os": "macos-26", "backend": "simulator", "plan": "core,lifecore,ios,pyquick", "minutes": 60},
+    {"name": "wkapp-mac15", "os": "macos-15", "backend": "wkapp", "plan": "core,lifecore,pyquick"},
+    {"name": "pw163-webkit-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.63.0", "plan": "core,landing"},
+    {"name": "pw149-webkit-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.49.1", "plan": "core"},
+    {"name": "stp-mac26", "os": "macos-26", "backend": "stp", "plan": "core,landing,pyquick"},
+    {"name": "safari-mac26", "os": "macos-26", "backend": "safari", "plan": "core,pyquick"},
+    {"name": "opt-polling-pw155-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "options,landing", "env": {"JSC_usePollingTraps": "1"}},
+    {"name": "opt-ipint-pw155-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "options", "env": {"JSC_useBBQJIT": "0", "JSC_useOMGJIT": "0"}},
+    {"name": "opt-nojit-pw155-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "options", "env": {"JSC_useJIT": "0"}},
+    {"name": "opt-canary-pw155-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "info", "env": {"JSC_useWasm": "0"}},
+    {"name": "opt-default-pw155-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "options,landing"},
+    {"name": "opt-canary-pw155-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "info", "env": {"JSC_useWasm": "0"}},
+    {"name": "opt-polling-pw155-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "options,landing", "env": {"JSC_usePollingTraps": "1"}},
+    {"name": "opt-ipint-pw155-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "options", "env": {"JSC_useBBQJIT": "0", "JSC_useOMGJIT": "0"}},
+    {"name": "opt-nojit-pw155-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "options", "env": {"JSC_useJIT": "0"}},
+    {"name": "opt-default-pw163-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.63.0", "plan": "options,landing"},
+    {"name": "opt-ipint-pw163-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.63.0", "plan": "options", "env": {"JSC_useBBQJIT": "0", "JSC_useOMGJIT": "0"}}
   ]
 }

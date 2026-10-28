@@ -22,7 +22,8 @@ addEventListener('load', async () => {
     const w = new Worker('/wkz-pyworker.js');
     const next = type => new Promise((resolve, reject) => { w.onmessage = e => { if (e.data.type === 'error') reject(new Error(e.data.error)); else if (e.data.type === type) resolve(e.data); }; });
     const ready = next('ready');
-    w.postMessage({indexURL: location.origin + '/pyodide/', fix: EXP.fix !== false, packages: EXP.packages, setup: EXP.setup, calibrate: EXP.calibrate});
+    const flagURL = URL.createObjectURL(new Blob(['run']));
+    w.postMessage({indexURL: location.origin + '/pyodide/', fix: EXP.fix !== false, stopflag: EXP.stopflag, flagURL, packages: EXP.packages, setup: EXP.setup, calibrate: EXP.calibrate});
     const r = await ready;
     out.loadMs = r.ms; out.pyodide = r.version; out.calibration = r.calibration;
     if (EXP.calibrate) { w.terminate(); await sleep(1000); await mark('after-calibration'); throw null; }
@@ -32,6 +33,15 @@ addEventListener('load', async () => {
     await running;
     await sleep(EXP.hold || 1500);
     await mark('running');
+    if (EXP.stopflag === 'getter-xhr') {
+      // Soft stop first: revoke the flag URL, give Python 2 s to raise
+      // KeyboardInterrupt, then terminate as before.
+      const t0 = performance.now();
+      const soft = new Promise(r => { w.onmessage = e => { if (e.data.type === 'stopped' || e.data.type === 'finished') r(e.data); }; setTimeout(() => r(null), 2000); });
+      URL.revokeObjectURL(flagURL);
+      const s = await soft;
+      out.softStop = s ? {ms: Math.round(performance.now() - t0), error: s.error, xhrCount: s.xhrCount} : 'no response in 2 s';
+    }
     w.terminate();
     let t = Date.now();
     for (const at of EXP.after || [1000, 4000, 10000]) { await sleep(Math.max(0, at - (Date.now() - t))); await mark('after' + at / 1000 + 's'); }
