@@ -69,8 +69,10 @@ async function until(b,fn,arg,limit,what){
 // (a separate site, so real Safari gives it its own WebContent process).
 const phases=(process.env.P13_PROBE_PHASES||'patched,runaway,idle,micro').split(',');
 // Runaway programs per phase (default `while True: pass`).
-const PROGRAMS={patchedc:'while True:\n    sum(range(10**6))',patched4:'while True:\n    try:\n        while True: pass\n    except KeyboardInterrupt: pass',patchedbig:'while True:\n    x = 7**200000'};
-const results={backend,micro:[],runaway:[],idle:[],patched:[],patchedc:[],patched4:[],patchedbig:[]};
+// probe* phases: the candidate stop-probe worker (port 8770).
+const C_HEAVY='while True:\n    sum(range(10**6))',C_CATCHER='while True:\n    try:\n        while True: sum(range(10**6))\n    except KeyboardInterrupt: pass';
+const PROGRAMS={probec:C_HEAVY,probe4c:C_CATCHER,probe4:'while True:\n    try:\n        while True: pass\n    except KeyboardInterrupt: pass',probebig:'while True:\n    x = 7**200000',patched4c:C_CATCHER,patchedc:'while True:\n    sum(range(10**6))',patched4:'while True:\n    try:\n        while True: pass\n    except KeyboardInterrupt: pass',patchedbig:'while True:\n    x = 7**200000'};
+const results={backend,micro:[],runaway:[],idle:[],patched:[],patchedc:[],patched4:[],patchedbig:[],patched4c:[],probe:[],probec:[],probe4c:[],probe4:[],probebig:[]};
 const b=backend==='safari'?await safariDriver():await playwrightDriver(backend);
 console.log('[probe] browser',backend,b.version);
 p13diag.startSampler(2000);
@@ -94,7 +96,7 @@ try {
     }
     const mode=phase==='idle'?'idle':'runaway';
     p13diag.setLabel('pyodide '+phase);
-    await b.open(`http://${lan}:${phase.startsWith('patched')?8769:8765}/index.html`);
+    await b.open(`http://${lan}:${phase.startsWith('probe')?8770:phase.startsWith('patched')?8769:8765}/index.html`);
     await b.exec(()=>{globalThis.__probeBefore=null;});
     await until(b,readyFn,'__probeBefore',180000,'first ready');
     console.log('[probe]',phase,'start ps',p13diag.brief(await p13diag.sample(phase+'-start')));
@@ -122,5 +124,5 @@ try {
 } catch(error){console.log('[probe] FAILED',String(error.stack||error));console.log('[probe]   ps',p13diag.brief(await p13diag.sample('failure')));process.exitCode=1;}
 finally {
   p13diag.stopSampler();await b.close();
-  console.log('[probe] summary',JSON.stringify({backend,micro:results.micro.map(m=>({label:m.label,readyMs:m.rounds.map(r=>r.readyMs)})),patched:results.patched.map(r=>r.recoveryMs),patchedc:results.patchedc.map(r=>r.recoveryMs),patched4:results.patched4.map(r=>r.recoveryMs),patchedbig:results.patchedbig.map(r=>r.recoveryMs),runaway:results.runaway.map(r=>r.recoveryMs),idle:results.idle.map(r=>r.recoveryMs)}));
+  console.log('[probe] summary',JSON.stringify({backend,micro:results.micro.map(m=>({label:m.label,readyMs:m.rounds.map(r=>r.readyMs)})),patched:results.patched.map(r=>r.recoveryMs),patchedc:results.patchedc.map(r=>r.recoveryMs),patched4:results.patched4.map(r=>r.recoveryMs),patchedbig:results.patchedbig.map(r=>r.recoveryMs),patched4c:results.patched4c.map(r=>r.recoveryMs),probe:results.probe.map(r=>r.recoveryMs),probec:results.probec.map(r=>r.recoveryMs),probe4c:results.probe4c.map(r=>r.recoveryMs),probe4:results.probe4.map(r=>r.recoveryMs),probebig:results.probebig.map(r=>r.recoveryMs),runaway:results.runaway.map(r=>r.recoveryMs),idle:results.idle.map(r=>r.recoveryMs)}));
 }

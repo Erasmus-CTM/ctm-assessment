@@ -322,10 +322,10 @@ jobs:
         # DIAGNOSTIC BRANCH: WebKit profile samples plus restart probes in
         # Playwright WebKit, real Safari (safaridriver) and Chromium on macOS.
         include:
-          - {os: macos-15, engine: webkit, version: '', profile: probe-webkit, sample: 1, protocol: '', mode: probe, phases: 'patched4,patchedc,patchedbig'}
-          - {os: macos-15, engine: safari, version: '', profile: probe-safari, sample: 1, protocol: '', mode: probe, phases: 'patched4,patchedc,patchedbig'}
+          - {os: macos-15, engine: webkit, version: '', profile: probe-webkit, sample: 1, protocol: '', mode: probe, phases: 'probe,probe4,probec,probe4c,probebig,patched4c,patchedc'}
+          - {os: macos-15, engine: safari, version: '', profile: probe-safari, sample: 1, protocol: '', mode: probe, phases: 'probe,probe4,probec,probe4c,probebig,patched4c,patchedc'}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
         with:
@@ -408,7 +408,11 @@ jobs:
           cp -R "$RUNNER_TEMP/deployed" "$RUNNER_TEMP/patched"
           node tools/ci/p13-diag-patch-worker.cjs "$RUNNER_TEMP/patched"
           node tools/p13-serve.mjs "$RUNNER_TEMP/patched" 8769 > "$RUNNER_TEMP/patched.log" 2>&1 &
+          cp -R "$RUNNER_TEMP/deployed" "$RUNNER_TEMP/probe"
+          node tools/ci/p13-diag-swap-worker.cjs "$RUNNER_TEMP/probe"
+          node tools/p13-serve.mjs "$RUNNER_TEMP/probe" 8770 > "$RUNNER_TEMP/probe.log" 2>&1 &
           curl --noproxy '*' --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 --silent --show-error --fail -I http://127.0.0.1:8769/index.html > /dev/null
+          curl --noproxy '*' --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 --silent --show-error --fail -I http://127.0.0.1:8770/index.html > /dev/null
           if [ "$P13_PROBE_BROWSER" = safari ]; then
             sudo safaridriver --enable
             safaridriver -p 4444 > "$RUNNER_TEMP/safaridriver.log" 2>&1 &
