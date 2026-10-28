@@ -79,6 +79,9 @@ export const plans = {
 // Pyodide (wkz-py.html): runaway programs stopped by terminate() after 1.5 s,
 // with the ctm-libs interrupt-buffer fix unless fix:false.
 const py = (id, code, extra = {}) => ({id: 'py-' + id, page: 'wkz-py.html', code, timeout: 150000, ...extra});
+// A worker that already ran Python: the interrupt callback has been called
+// tens of thousands of times (JIT-compiled), as in the IDE after a few runs.
+const WARM = 'for _ in range(2 * 10**6):\n    pass';
 const W = body => 'while True:\n    ' + body;
 export const pyodide = [
   py('pass-nofix', W('pass'), {fix: false}),
@@ -154,3 +157,27 @@ plans.pyhard = [
   py('sort-getter-xhr-hard', 'import random\na = [random.random() for _ in range(10**6)]\n' + W('sorted(a)'), {stopflag: 'getter-xhr', hard: true}),
   py('sum1e8-getter-now', W('sum(range(10**8))'), {stopflag: 'getter-now', after: [1000, 4000, 10000, 20000]})
 ];
+
+// Which callee makes a JIT-compiled callback reliably terminable? (k20 with a
+// pre-warmed callee never stopped within 20 s with the plain arrow callee.)
+plans.landhost = [];
+for (const callee of ['arrow', 'json', 'jsonparse', 'now', 'apply', 'eval', 'proxy'])
+  for (const k of [16, 20])
+    plans.landhost.push({id: `land-${callee}-k${k}-prewarm`, kind: 'landing', coi: true, mask: S(k), prewarm: 1e6, callee, n: 2, timeout: 60000});
+
+// Pyodide with an interrupt buffer whose read makes a host call (candidate
+// worker-only fix that does not depend on the callback's JIT tier).
+plans.pyhost = [];
+for (const stopflag of [undefined, 'getter-host:jsonparse', 'getter-host:apply', 'proxy-buffer']) {
+  const tag = stopflag ? stopflag.replace('getter-host:', 'h-') : 'u8';
+  plans.pyhost.push(py(`cost-${tag}`, '', {stopflag, calibrate: COST}));
+  for (const [id, code] of [['sum1e6-hold10s', W('sum(range(10**6))')], ['sort', 'import random\na = [random.random() for _ in range(10**6)]\n' + W('sorted(a)')], ['json', 'import json\ns = json.dumps(list(range(10**6)))\n' + W('json.loads(s)')], ['sum-n10000', W('sum(range(10000))')], ['sum-n1e7', W('sum(range(10**7))')]])
+    plans.pyhost.push(py(`${id}-${tag}`, code, {stopflag, hold: id.endsWith('hold10s') ? 10000 : 1500}));
+}
+// Repetitions of the C-call-length sweep (landing is probabilistic).
+plans.pyrepeat = [];
+for (const r of [1, 2, 3]) for (const n of SUM_N) plans.pyrepeat.push(py(`sum-n${n}-r${r}`, W(`sum(range(${n}))`)));
+
+// The pattern map again, with a warm interrupt callback (realistic IDE state).
+plans.pywarm = pyodide.filter(e => !/nofix|hold10s/.test(e.id)).map(e => ({...e, id: e.id + '-warm', setup: WARM}));
+plans.pyhost = plans.pyhost.map(e => e.calibrate ? e : {...e, setup: WARM});

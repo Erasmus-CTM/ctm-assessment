@@ -170,6 +170,7 @@ async function landing() {
   const n = EXP.n || 2;
   const workers = [];
   for (let i = 0; i < n; i++) workers.push(await startWorker({shape: 'jscallctr', mask: EXP.mask || 0, callee: EXP.callee, prewarm: EXP.prewarm}, i));
+  if (workers.some(w => w.error || (w.started && w.started.type === 'error'))) result.events.push({type: 'start-error', detail: JSON.stringify(workers.map(w => w.error || w.started)).slice(0, 300)});
   await sleep(EXP.hold || 500);
   const t0 = performance.now();
   workers.forEach(w => w.w.terminate());

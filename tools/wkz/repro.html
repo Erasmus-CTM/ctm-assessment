@@ -1,0 +1,64 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Worker.terminate() leaves a WebAssembly loop running</title>
+<!-- Minimal standalone repro for the WebKit report drafted in
+     docs/notes/webkit-terminated-wasm-worker.md. Serve over HTTP, e.g.
+     `python3 -m http.server` and open http://localhost:8000/<this file>.
+     No special headers needed. -->
+<style>body{font:15px/1.4 system-ui;margin:1.5em;max-width:46em}button{font:inherit;margin:.2em}pre{background:#f4f4f4;padding:.6em;white-space:pre-wrap}</style>
+<h1>Worker.terminate() vs. a WebAssembly loop</h1>
+<p>Each button starts workers that enter a loop, then calls
+<code>worker.terminate()</code> after 300 ms. Watch the CPU use of the tab's
+web content process (Activity Monitor: "localhost" / "Safari Web Content", or
+<code>top -o cpu</code>). Expected: back to ~0% at once. WebKit: each
+terminated worker of the first two kinds keeps one core at 100% until the
+tab's process exits; reloading the page does not help.</p>
+<p>
+<button data-kind="loop">Pure wasm loop <code>(loop br 0)</code></button>
+<button data-kind="warm">Wasm loop calling a warmed-up JS function every 2<sup>20</sup> iterations</button>
+<button data-kind="dense">Wasm loop calling JS every iteration (control)</button>
+<button data-kind="js">JS <code>for(;;)</code> (control)</button>
+<label>workers <input id="n" type="number" value="2" min="1" max="16" style="width:3em"></label>
+</p>
+<pre id="out"></pre>
+<script>
+// Both modules are compiled from the WAT in the comment below each.
+const LOOP = 'AGFzbQEAAAABBAFgAAADAgEABwgBBHNwaW4AAAoJAQcAA0AMAAsL';
+// (module (func (export "spin") (loop $l (br $l))))
+const JSCALL = 'AGFzbQEAAAABCAJgAABgAX8AAgcBAWUBZgAAAwIBAQcIAQRzcGluAAEKHQEbAQF/A0AgAUEBaiEBIAEgAHFFBEAQAAsMAAsL';
+// (module (import "e" "f" (func $f))
+//   (func (export "spin") (param $mask i32) (local $i i32)
+//     (loop $l (local.set $i (i32.add (local.get $i) (i32.const 1)))
+//       (if (i32.eqz (i32.and (local.get $i) (local.get $mask))) (then (call $f)))
+//       (br $l))))
+const workerSource = `
+onmessage = e => {
+  const {kind, LOOP, JSCALL} = e.data;
+  if (kind === 'js') { postMessage('spinning'); for (;;) {} }
+  const bytes = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  let calls = 0;
+  const f = () => { calls++; };
+  if (kind === 'warm') for (let i = 0; i < 1e6; i++) f();   // let JSC optimize f
+  const inst = new WebAssembly.Instance(new WebAssembly.Module(bytes(kind === 'loop' ? LOOP : JSCALL)), {e: {f}});
+  postMessage('spinning');
+  inst.exports.spin(kind === 'dense' ? 0 : (1 << 20) - 1);
+};`;
+const out = document.getElementById('out');
+const log = s => { out.textContent += s + '\n'; };
+const url = URL.createObjectURL(new Blob([workerSource], {type: 'text/javascript'}));
+// Main-thread probe: a fixed JS workload. With as many leaked threads as
+// cores it slows down, which shows the leak without any tool.
+const probe = () => { const t = performance.now(); let x = 0; for (let i = 0; i < 2e8; i++) x = (x + i) | 0; return Math.round(performance.now() - t); };
+log(`${navigator.userAgent}\ncores: ${navigator.hardwareConcurrency}, main-thread probe: ${probe()} ms`);
+for (const b of document.querySelectorAll('button')) b.onclick = async () => {
+  const n = +document.getElementById('n').value;
+  const ws = await Promise.all(Array.from({length: n}, () => new Promise(r => {
+    const w = new Worker(url); w.onmessage = () => r(w); w.postMessage({kind: b.dataset.kind, LOOP, JSCALL});
+  })));
+  await new Promise(r => setTimeout(r, 300));
+  ws.forEach(w => w.terminate());
+  await new Promise(r => setTimeout(r, 2000));
+  log(`terminated ${n} × ${b.dataset.kind}; 2 s later the main-thread probe takes ${probe()} ms (check the process CPU)`);
+};
+</script>

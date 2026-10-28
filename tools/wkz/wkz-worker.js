@@ -18,6 +18,7 @@ let port = null;
 const send = (m, transfer) => (port ? port.postMessage(m, transfer || []) : postMessage(m, transfer || []));
 const bytesOf = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 let child = null;
+const noop = () => {};
 
 async function run(c) {
   const t0 = performance.now();
@@ -45,7 +46,15 @@ async function run(c) {
     arrow: stamp,
     long: () => { stamp(); const end = performance.now() + 200; while (performance.now() < end) {} },
     native: Math.random,
-    dateNow: Date.now
+    dateNow: Date.now,
+    // Host calls inside the callee: does a C++ path with an exception scope
+    // service the pending termination even when the callee is DFG/FTL code?
+    json: () => { stamp(); JSON.stringify(0); },
+    jsonparse: () => { stamp(); JSON.parse('0'); },
+    now: () => { stamp(); performance.now(); },
+    apply: () => { stamp(); Reflect.apply(noop, null, []); },
+    eval: () => { stamp(); eval('0'); },
+    proxy: new Proxy(() => { stamp(); }, {})
   };
   const f = callees[c.callee || 'arrow'];
   warming = true;

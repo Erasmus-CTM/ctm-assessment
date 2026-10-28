@@ -95,7 +95,8 @@ jobs:
           node tools/wkz/server.mjs 8790 > "$RUNNER_TEMP/server.log" 2>&1 &
           for i in $(seq 1 20); do curl -fs http://127.0.0.1:8790/wkz-blank.html > /dev/null && break; sleep 0.5; done
           status=0
-          node tools/wkz/drive.mjs 2>&1 | tee "$RUNNER_TEMP/drive.log" || status=$?
+          if [ -n "$WKZ_PLAN" ]; then node tools/wkz/drive.mjs 2>&1 | tee "$RUNNER_TEMP/drive.log" || status=$?; fi
+          if [ "${{ matrix.repro }}" = true ]; then node tools/wkz/repro-check.mjs 2>&1 | tee -a "$RUNNER_TEMP/drive.log" || status=$?; fi
           exit "$status"
       - name: Server samples (per phase)
         if: always()
@@ -107,7 +108,7 @@ jobs:
           grep -E '^\[drive\] (version|simulator)' "$RUNNER_TEMP/drive.log" | sort -u | head -5 || true
           grep -E ' (info|DONE) ' "$RUNNER_TEMP/server.log" | grep -E ':info(-[a-z-]+)?:[a-z0-9]+ info ' | sed -E 's/.*(:info[a-z-]*):[a-z0-9]+ info .*(\{.*)/\1 \2/' | cut -c1-420 || true
           echo "zombie-hits $(grep -c zombie-hit "$RUNNER_TEMP/server.log" || true)"
-          grep -E '^\[wkz-table\]|^\[wkz-result\].*FAILED' "$RUNNER_TEMP/drive.log" | cut -c1-900 || true
+          grep -E '^\[wkz-table\]|^\[wkz-result\].*FAILED|^\[repro\]|^(terminated|cores:)' "$RUNNER_TEMP/drive.log" | cut -c1-900 || true
   bugzilla:
     # bugs.webkit.org is not reachable from the investigation environment;
     # print the relevant reports (REST API) into the job log instead.
