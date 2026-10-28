@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Pins ctm-libs ec3008f (ctm-libs#61, on top of #60): a worker that WebKit
+- Pins ctm-libs 141cf51 (ctm-libs#61, on top of #60): a worker that WebKit
   does not end on Stop now stops itself, also inside long C calls. The page
   revokes a blob URL before it terminates the worker; once a command has run
   for a second, the worker checks that URL at most every 250 ms, raises one
@@ -10,7 +10,7 @@
   and, if the program goes on, waits in a JavaScript loop where WebKit ends
   it. With #60 alone, `while True: sum(range(10**6))` still left a thread
   per Stop (Safari: restarts 10-27 s, 299% CPU after 8 Stops). The P13
-  complete lock for ec3008f awaits AC's approval; the receipt stays at
+  complete lock for 141cf51 awaits AC's approval; the receipt stays at
   09a18eb9 until then.
 - Pins ctm-libs 244d249 (ctm-libs#60): Stop on a runaway program no longer
   leaves a busy thread behind in Safari and SEB. WebKit does not end a worker
