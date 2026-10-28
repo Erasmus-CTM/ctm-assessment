@@ -11,9 +11,11 @@
 <p>Each button starts workers that enter a loop, then calls
 <code>worker.terminate()</code> after 300 ms. Watch the CPU use of the tab's
 web content process (Activity Monitor: "localhost" / "Safari Web Content", or
-<code>top -o cpu</code>). Expected: back to ~0% at once. WebKit: each
-terminated worker of the first two kinds keeps one core at 100% until the
-tab's process exits; reloading the page does not help.</p>
+<code>top -o cpu</code>). Expected: back to ~0% at once (Chrome: after ~2 s).
+WebKit: each terminated worker of the first two kinds keeps one core at 100%
+until the web content process exits. Reloading the page or navigating away
+does not help, and in Safari neither does closing the tab (the process is
+cached); quit Safari to recover.</p>
 <p>
 <button data-kind="loop">Pure wasm loop <code>(loop br 0)</code></button>
 <button data-kind="warm">Wasm loop calling a warmed-up JS function every 2<sup>20</sup> iterations</button>
@@ -47,10 +49,7 @@ onmessage = e => {
 const out = document.getElementById('out');
 const log = s => { out.textContent += s + '\n'; };
 const url = URL.createObjectURL(new Blob([workerSource], {type: 'text/javascript'}));
-// Main-thread probe: a fixed JS workload. With as many leaked threads as
-// cores it slows down, which shows the leak without any tool.
-const probe = () => { const t = performance.now(); let x = 0; for (let i = 0; i < 2e8; i++) x = (x + i) | 0; return Math.round(performance.now() - t); };
-log(`${navigator.userAgent}\ncores: ${navigator.hardwareConcurrency}, main-thread probe: ${probe()} ms`);
+log(`${navigator.userAgent}, ${navigator.hardwareConcurrency} cores`);
 for (const b of document.querySelectorAll('button')) b.onclick = async () => {
   const n = +document.getElementById('n').value;
   const ws = await Promise.all(Array.from({length: n}, () => new Promise(r => {
@@ -58,7 +57,6 @@ for (const b of document.querySelectorAll('button')) b.onclick = async () => {
   })));
   await new Promise(r => setTimeout(r, 300));
   ws.forEach(w => w.terminate());
-  await new Promise(r => setTimeout(r, 2000));
-  log(`terminated ${n} × ${b.dataset.kind}; 2 s later the main-thread probe takes ${probe()} ms (check the process CPU)`);
+  log(`${new Date().toLocaleTimeString()} terminated ${n} × ${b.dataset.kind}; the web content process should now be back to ~0% CPU`);
 };
 </script>
