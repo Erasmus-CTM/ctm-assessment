@@ -1,9 +1,9 @@
 {
   "v": 1,
-  "sha256": "252f271a5639163534eb2146b3e5bcb6c00cf38facf0db65cb9b9c4587fe5387",
+  "sha256": "09a18eb922c28355cffbf4b3a02af2f1f60fb000990386ddcf89cd346eb0be92",
   "files": 3230,
   "application_refs": {
-    "ctm-libs": "33fd5a505c4b519d1c7261920d8424d36d66f187",
+    "ctm-libs": "244d249e5274e325c6591aa5b52844f15c5e5d14",
     "pyodide-interaktiv": "793a87262e60ada72c08560ed8c5db011483baae"
   }
 }
