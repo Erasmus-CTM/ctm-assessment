@@ -323,6 +323,8 @@ jobs:
           - {os: ubuntu-24.04, engine: chromium, version: '139.0.7258.138', profile: cef139}
           - {os: ubuntu-24.04, engine: chromium, version: '147.0.7727.117', profile: cef147}
           - {os: macos-15, engine: webkit, version: '', profile: apple-webkit}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit-2}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit-3}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
