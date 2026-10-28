@@ -1,0 +1,189 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>wkz: terminated wasm worker probe</title>
+<!-- DIAGNOSTIC ONLY (WebKit terminated-wasm-worker investigation).
+     Self-driving: wkz.html?run=ID&exp=JSON runs one experiment and reports
+     every phase to server.mjs, which samples the browser's content processes
+     at each /mark. See tools/wkz/README.md for the experiment fields. -->
+<script src="/wasm.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const RUN = params.get('run') || 'adhoc';
+const EXP = JSON.parse(params.get('exp') || '{}');
+const ROLE = params.get('role') || 'top';
+const BASE = location.pathname.startsWith('/coi/') ? '/coi' : '';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const result = {run: RUN, exp: EXP, role: ROLE, ua: navigator.userAgent, coi: self.crossOriginIsolated, wasm: typeof WebAssembly, marks: [], events: []};
+const post = (p, body, keepalive) => fetch(p, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body), keepalive}).then(r => r.json());
+async function mark(phase, extra = {}, opts = {}) {
+  const t = performance.now();
+  const m = await post('/mark', {run: RUN, phase, extra, window: opts.window, handoff: opts.handoff}, opts.keepalive);
+  result.marks.push({phase, at: Math.round(t), cores: m.sample && m.sample.cores, running: m.sample && m.sample.running, threads: m.sample && m.sample.threads, rssMB: m.sample && m.sample.rssMB, ...extra});
+  return m;
+}
+const done = extra => post('/done', {run: RUN, result: {...summary(), ...extra}});
+const log = text => post('/log', {run: RUN, text});
+// Leak verdict: cores used by content processes after terminate, minus the
+// baseline before the workers started.
+function summary() {
+  const base = result.marks.find(m => m.phase === 'baseline');
+  const last = result.marks.filter(m => /^after/.test(m.phase)).at(-1);
+  return {id: EXP.id, coi: result.coi, wasm: result.wasm, ua: result.ua.replace(/^Mozilla\/5\.0 /, ''), marks: result.marks.map(m => `${m.phase}:${m.cores}c/${m.running}R/${m.threads}t/${m.rssMB}MB${m.counter !== undefined ? '/ctr=' + m.counter : ''}`).join(' '), leakedCores: base && last ? +(last.cores - base.cores).toFixed(2) : null, events: result.events.slice(0, 30)};
+}
+
+const wasmFor = shape => WKZ_WASM[shape];
+// Start one worker of the requested type running config c; resolves when it
+// reports 'started' (or parent-ready for nested parents, which forward their
+// child's 'started').
+function startWorker(c, i) {
+  const wtype = EXP.wtype || 'dedicated';
+  const url = BASE + '/wkz-worker.js';
+  let w, target;
+  if (wtype === 'shared') { w = new SharedWorker(url + '?i=' + i, {name: RUN + '-' + i}); target = w.port; w.port.start(); }
+  else { w = new Worker(url, wtype === 'module' ? {type: 'module'} : undefined); target = w; }
+  const cfg = {...c, wasm: wasmFor(c.shape), workerURL: url, run: RUN};
+  if (wtype === 'nested' || wtype === 'nested-kill') cfg.nested = 'parent';
+  if (EXP.counter) cfg.memory = counterMemory;
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve({w, target, error: 'no start within 30 s'}), 30000);
+    target.onmessage = e => {
+      const d = e.data;
+      if (d.type !== 'started' && d.type !== 'parent-ready') result.events.push({i, ...d, at: Math.round(performance.now())});
+      if (d.type === 'started' || d.type === 'error') { clearTimeout(timer); resolve({w, target, started: d}); }
+    };
+    target.postMessage(cfg);
+  });
+}
+let counterMemory = null;
+const counter = () => counterMemory ? Atomics.load(new Int32Array(counterMemory.buffer), 0) : undefined;
+
+async function workersExperiment() {
+  if (EXP.counter) counterMemory = new WebAssembly.Memory({initial: 1, maximum: 16384, shared: true});
+  await mark('baseline', {wasm: result.wasm, coi: result.coi});
+  const config = {shape: EXP.shape || 'loop', mask: EXP.mask || 0, callee: EXP.callee, prewarm: EXP.prewarm, pages: EXP.pages || 1, sidefx: EXP.sidefx};
+  const n = EXP.n || 2;
+  const workers = [];
+  for (let i = 0; i < n; i++) workers.push(await startWorker(config, i));
+  result.started = workers.map(w => w.started ? w.started.ms : w.error);
+  await sleep(EXP.hold || 500);
+  await mark('running', {counter: counter(), started: result.started});
+  return workers;
+}
+
+async function terminateAndWatch(workers) {
+  const t = Date.now();
+  if ((EXP.wtype || '') === 'nested-kill') {
+    for (const w of workers) w.target.postMessage({type: 'kill-child'});
+    await sleep(1000);
+    await mark('after-child-killed', {counter: counter()});
+  }
+  for (const w of workers) if (w.w.terminate) w.w.terminate();
+  result.terminatedAt = t;
+  let elapsed = 0;
+  for (const at of EXP.after || [1000, 8000]) {
+    await sleep(Math.max(0, at - elapsed));
+    await mark('after' + Math.round(at / 1000) + 's', {counter: counter()});
+    elapsed = Date.now() - t;
+  }
+  if (EXP.sidefx) {
+    const idb = await new Promise(resolve => {
+      const r = indexedDB.open('wkz-zombie');
+      r.onupgradeneeded = () => r.result.createObjectStore('s');
+      r.onerror = () => resolve('open-error');
+      r.onsuccess = () => {
+        const store = r.result.transaction('s').objectStore('s'), out = [];
+        store.openCursor().onsuccess = e => { const cur = e.target.result; if (cur) { out.push(cur.value); cur.continue(); } else resolve({total: out.length, afterTerminate: out.filter(v => v > t).length}); };
+      };
+    });
+    const s = await fetch('/state?run=' + encodeURIComponent(RUN)).then(r => r.json()).catch(() => null);
+    result.sidefx = {idb, fetchHitsAfterTerminate: s ? s.zombie.filter(z => +z.t > t).length : null};
+  }
+}
+
+// Lifetime actions after the workers were terminated (or left running with
+// action names ending in -live).
+const KEY = 'wkz-phase-' + RUN;
+async function watchAndDone(prefix) {
+  const t = Date.now();
+  for (const at of EXP.watch || [2000, 10000]) {
+    await sleep(Math.max(0, at - (Date.now() - t)));
+    await mark(prefix + Math.round(at / 1000) + 's');
+  }
+  await done({lifetime: EXP.action});
+}
+function blankURL(origin) {
+  return (origin || '') + BASE + '/wkz-blank.html?run=' + encodeURIComponent(RUN) + '&watch=' + (EXP.watch || [2000, 10000]).join(',') + (EXP.action === 'bfcache' ? '&then=back' : '');
+}
+
+async function lifetime() {
+  const phase = sessionStorage.getItem(KEY);
+  if (phase === 'left') {
+    sessionStorage.removeItem(KEY);
+    await mark('returned-fresh-load', {navType: performance.getEntriesByType('navigation')[0]?.type});
+    return watchAndDone('back+');
+  }
+  if (EXP.inFrame && ROLE === 'top') return frameHost();
+  const workers = await workersExperiment();
+  const live = /-live$/.test(EXP.action);
+  if (!live) { for (const w of workers) if (w.w.terminate) w.w.terminate(); await sleep(1000); await mark('after1s'); }
+  if (ROLE === 'frame') { parent.postMessage({wkz: 'frame-ready'}, '*'); return; }
+  const action = EXP.action.replace(/-live$/, '');
+  if (action === 'reload') { sessionStorage.setItem(KEY, 'left'); location.reload(); }
+  else if (action === 'nav-same') location.href = blankURL();
+  else if (action === 'nav-cross') location.href = blankURL(`http://${location.hostname === 'localhost' ? '127.0.0.1' : 'localhost'}:${location.port}`);
+  else if (action === 'bfcache') {
+    sessionStorage.setItem(KEY, 'left');
+    addEventListener('pageshow', async e => { if (e.persisted) { sessionStorage.removeItem(KEY); await mark('restored-from-bfcache'); await watchAndDone('back+'); } });
+    location.href = blankURL();
+  } else if (action === 'close-tab' || action === 'driver-nav' || action === 'ios-background') {
+    await mark('handoff', {}, {window: 0, handoff: action});
+  }
+}
+async function frameHost() {
+  await mark('baseline-host');
+  const frame = document.createElement('iframe');
+  const ready = new Promise(r => addEventListener('message', e => { if (e.data && e.data.wkz === 'frame-ready') r(); }));
+  frame.src = location.pathname + '?run=' + encodeURIComponent(RUN) + '&role=frame&exp=' + encodeURIComponent(JSON.stringify(EXP));
+  document.body.append(frame);
+  await ready;
+  if (EXP.action === 'iframe-remove' || EXP.action === 'iframe-remove-live') frame.remove();
+  else { frame.src = 'about:blank'; }
+  await watchAndDone('frame+');
+}
+
+async function mainThread() {
+  await mark('baseline');
+  await mark('main-spin', {}, {window: 0, handoff: 'watch-main', keepalive: true});
+  await sleep(300);
+  if (EXP.shape === 'jsloop') for (;;) {}
+  const inst = new WebAssembly.Instance(new WebAssembly.Module(Uint8Array.from(atob(WKZ_WASM.loop), c => c.charCodeAt(0))), {e: {m: new WebAssembly.Memory({initial: 1})}});
+  inst.exports.spin(0);
+}
+
+// Effect of zombies on the rest of the process: a fixed main-thread JS
+// workload and a fresh worker start, timed with 0..k zombies.
+async function bench() {
+  const work = () => { const t = performance.now(); let x = 0; for (let i = 0; i < 3e8; i++) x = (x + i * 7) | 0; return Math.round(performance.now() - t); };
+  const fresh = async () => { const t = performance.now(); const r = await startWorker({shape: 'idle'}, 99); r.w.terminate(); return Math.round(performance.now() - t); };
+  const rows = [];
+  for (let k = 0; k <= (EXP.k || 4); k++) {
+    if (k) { const w = await startWorker({shape: 'loop'}, k); await sleep(300); w.w.terminate(); await sleep(1000); }
+    const m = await mark('zombies' + k, {}, {window: 1000});
+    rows.push({k, mainMs: work(), workerStartMs: await fresh(), cores: m.sample && m.sample.cores});
+  }
+  result.bench = rows;
+  await done({bench: rows});
+}
+
+addEventListener('load', async () => {
+  try {
+    const kind = EXP.kind || 'workers';
+    if (kind === 'workers') { const ws = await workersExperiment(); await terminateAndWatch(ws); await done({started: result.started, sidefx: result.sidefx}); }
+    else if (kind === 'lifetime') await lifetime();
+    else if (kind === 'main') await mainThread();
+    else if (kind === 'bench') await bench();
+    else if (kind === 'info') { await mark('info', {wasm: result.wasm, coi: result.coi, ua: navigator.userAgent, sab: typeof SharedArrayBuffer, sw: typeof SharedWorker}, {window: 500}); await done({}); }
+  } catch (error) { await log('page error ' + (error && error.stack || error)); await done({error: String(error)}); }
+});
+</script>
+<p>wkz probe</p>

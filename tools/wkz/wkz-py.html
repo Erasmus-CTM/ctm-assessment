@@ -1,0 +1,46 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>wkz: Pyodide runaway Stop probe</title>
+<!-- DIAGNOSTIC ONLY: wkz-py.html?run=ID&exp=JSON. Loads Pyodide in a worker
+     (with or without the interrupt-buffer fix), starts a runaway program,
+     terminates the worker after `hold` ms and reports content-process CPU
+     at each phase via server.mjs (see wkz.html). -->
+<script>
+const params = new URLSearchParams(location.search), RUN = params.get('run') || 'adhoc', EXP = JSON.parse(params.get('exp') || '{}');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const post = (p, body) => fetch(p, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body)}).then(r => r.json());
+const marks = [];
+async function mark(phase, extra = {}, window) {
+  const m = await post('/mark', {run: RUN, phase, extra, window});
+  marks.push({phase, cores: m.sample && m.sample.cores, running: m.sample && m.sample.running, threads: m.sample && m.sample.threads, rssMB: m.sample && m.sample.rssMB});
+  return m;
+}
+addEventListener('load', async () => {
+  const out = {id: EXP.id};
+  try {
+    await mark('baseline');
+    const w = new Worker('/wkz-pyworker.js');
+    const next = type => new Promise((resolve, reject) => { w.onmessage = e => { if (e.data.type === 'error') reject(new Error(e.data.error)); else if (e.data.type === type) resolve(e.data); }; });
+    const ready = next('ready');
+    w.postMessage({indexURL: location.origin + '/pyodide/', fix: EXP.fix !== false, packages: EXP.packages, setup: EXP.setup, calibrate: EXP.calibrate});
+    const r = await ready;
+    out.loadMs = r.ms; out.pyodide = r.version; out.calibration = r.calibration;
+    if (EXP.calibrate) { w.terminate(); await sleep(1000); await mark('after-calibration'); throw null; }
+    await mark('ready', {}, 1000);
+    const running = next('running');
+    w.postMessage({type: 'run', code: EXP.code});
+    await running;
+    await sleep(EXP.hold || 1500);
+    await mark('running');
+    w.terminate();
+    let t = Date.now();
+    for (const at of EXP.after || [1000, 4000, 10000]) { await sleep(Math.max(0, at - (Date.now() - t))); await mark('after' + at / 1000 + 's'); }
+  } catch (error) { if (error) out.error = String(error.message || error); }
+  const base = marks.find(m => m.phase === 'baseline'), last = marks.filter(m => /^after\d/.test(m.phase)).at(-1);
+  out.leakedCores = base && last ? +(last.cores - base.cores).toFixed(2) : null;
+  out.marks = marks.map(m => `${m.phase}:${m.cores}c/${m.running}R/${m.threads}t/${m.rssMB}MB`).join(' ');
+  out.ua = navigator.userAgent.replace(/^Mozilla\/5\.0 /, '');
+  await post('/done', {run: RUN, result: out});
+});
+</script>
+<p>wkz Pyodide probe</p>

@@ -1,0 +1,98 @@
+# DIAGNOSTIC BRANCH ONLY (not for merge): WebKit terminated-wasm-worker
+# investigation. Runs the jobs listed in tools/wkz/ci.json on every push to
+# this branch; results are printed to the job logs ([wkz-result], [wkz-table]
+# and the server's per-phase [wkz] samples).
+name: wkz-diag
+on:
+  push:
+    branches: ['claude/epic-bell-ne4tnu-diag']
+    paths: ['tools/wkz/**', '.github/workflows/wkz-diag.yml']
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: m
+        run: echo "matrix=$(jq -c '{include: [.jobs[] | select(.skip != true)]}' tools/wkz/ci.json)" >> "$GITHUB_OUTPUT"
+  probe:
+    needs: plan
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.minutes || 45 }}
+    env:
+      WKZ_BACKEND: ${{ matrix.backend }}
+      WKZ_PLAN: ${{ matrix.plan }}
+      WKZ_ONLY: ${{ matrix.only }}
+      WKZ_ENV: ${{ matrix.env && toJSON(matrix.env) || '{}' }}
+      WKZ_LABEL: ${{ matrix.name }}
+      WKZ_PORT: '8790'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Runner facts
+        run: |
+          uname -a
+          if [ "$RUNNER_OS" = macOS ]; then
+            sw_vers; sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize
+            echo "Safari $(defaults read /Applications/Safari.app/Contents/Info CFBundleShortVersionString) ($(defaults read /Applications/Safari.app/Contents/Info CFBundleVersion))"
+            xcodebuild -version || true
+          else
+            nproc; free -m | head -2
+          fi
+      - name: Install Playwright ${{ matrix.pw }}
+        if: startsWith(matrix.backend, 'playwright-')
+        run: |
+          engine="${WKZ_BACKEND#playwright-}"
+          npm i --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" "playwright@${{ matrix.pw || '1.55.1' }}"
+          deps=""; [ "$RUNNER_OS" = Linux ] && deps="--with-deps"
+          (cd "$RUNNER_TEMP/pw" && npx playwright install $deps "$engine")
+          echo "WKZ_PW=$RUNNER_TEMP/pw/node_modules/playwright/index.mjs" >> "$GITHUB_ENV"
+      - name: Install Pyodide 0.28.3 core and NumPy
+        if: contains(matrix.plan, 'py')
+        run: |
+          npm i --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/py" pyodide@0.28.3
+          mkdir -p tools/wkz/pyodide
+          cp "$RUNNER_TEMP"/py/node_modules/pyodide/{pyodide.js,pyodide.mjs,pyodide.asm.js,pyodide.asm.wasm,python_stdlib.zip,pyodide-lock.json} tools/wkz/pyodide/
+          for name in numpy; do
+            file=$(jq -r ".packages.$name.file_name" tools/wkz/pyodide/pyodide-lock.json)
+            curl -fsSL --retry 3 -o "tools/wkz/pyodide/$file" "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/$file"
+          done
+          ls -la tools/wkz/pyodide
+      - name: Enable safaridriver
+        if: matrix.backend == 'safari'
+        run: sudo safaridriver --enable
+      - name: Install Safari Technology Preview
+        if: matrix.backend == 'stp'
+        run: |
+          brew install --cask safari-technology-preview
+          defaults read "/Applications/Safari Technology Preview.app/Contents/Info" CFBundleShortVersionString
+          sudo "/Applications/Safari Technology Preview.app/Contents/MacOS/safaridriver" --enable
+      - name: Build the WKWebView host app
+        if: matrix.backend == 'wkapp'
+        run: |
+          swiftc -O tools/wkz/wkapp.swift -o "$RUNNER_TEMP/wkapp" -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker tools/wkz/wkapp-Info.plist
+          echo "WKZ_APP=$RUNNER_TEMP/wkapp" >> "$GITHUB_ENV"
+      - name: Launch environment (launchctl) for Safari JSC options
+        if: matrix.launchctl
+        run: |
+          for kv in ${{ matrix.launchctl }}; do launchctl setenv "${kv%%=*}" "${kv#*=}"; launchctl setenv "__XPC_${kv%%=*}" "${kv#*=}"; done
+          launchctl getenv JSC_useWebAssembly || true
+      - name: Probe
+        run: |
+          node tools/wkz/server.mjs 8790 > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8790/wkz-blank.html > /dev/null && break; sleep 0.5; done
+          status=0
+          node tools/wkz/drive.mjs 2>&1 | tee "$RUNNER_TEMP/drive.log" || status=$?
+          exit "$status"
+      - name: Server samples (per phase)
+        if: always()
+        run: grep -E '^\[wkz\]' "$RUNNER_TEMP/server.log" | cut -c1-700 || true

@@ -1,0 +1,15 @@
+{
+  "jobs": [
+    {"name": "smoke-pw155-webkit-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "core"},
+    {"name": "smoke-safari-mac15", "os": "macos-15", "backend": "safari", "plan": "core"},
+    {"name": "smoke-chromium-mac15", "os": "macos-15", "backend": "playwright-chromium", "pw": "1.55.1", "plan": "info,quick"},
+    {"name": "smoke-sim-mac15", "os": "macos-15", "backend": "simulator", "plan": "core", "only": "info,idle,loop,js-dense"},
+    {"name": "smoke-wkapp-mac15", "os": "macos-15", "backend": "wkapp", "plan": "core", "only": "info,idle,loop"},
+    {"name": "smoke-canary-pw155-mac15", "os": "macos-15", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "info", "env": {"JSC_useWebAssembly": "0"}},
+    {"name": "smoke-canary-pw155-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "core", "only": "info,loop", "env": {"JSC_useWebAssembly": "0"}},
+    {"name": "smoke-pw155-webkit-linux", "os": "ubuntu-24.04", "backend": "playwright-webkit", "pw": "1.55.1", "plan": "core", "only": "info,idle,loop,js-dense"},
+    {"name": "smoke-stp-mac15", "os": "macos-15", "backend": "stp", "plan": "core", "only": "info,loop"},
+    {"name": "smoke-safari-mac14", "os": "macos-14", "backend": "safari", "plan": "core", "only": "info,loop"},
+    {"name": "smoke-safari-mac26", "os": "macos-26", "backend": "safari", "plan": "core", "only": "info,loop", "minutes": 20}
+  ]
+}

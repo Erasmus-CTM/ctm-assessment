@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>wkz: after navigation</title>
+<!-- DIAGNOSTIC ONLY: destination of lifetime navigations. Marks at each
+     ?watch= offset (ms), then reports done, or goes back (?then=back). -->
+<script>
+const p = new URLSearchParams(location.search), RUN = p.get('run');
+const post = (path, body) => fetch(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body)}).then(r => r.json());
+addEventListener('load', async () => {
+  const t = Date.now();
+  for (const at of (p.get('watch') || '2000,10000').split(',').map(Number)) {
+    await new Promise(r => setTimeout(r, Math.max(0, at - (Date.now() - t))));
+    await post('/mark', {run: RUN, phase: 'nav+' + Math.round(at / 1000) + 's', extra: {origin: location.origin}});
+  }
+  if (p.get('then') === 'back') history.back();
+  else await post('/done', {run: RUN, result: {navigated: location.origin}});
+});
+</script>
+<p>wkz blank</p>
