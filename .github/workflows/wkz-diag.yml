@@ -97,3 +97,21 @@ jobs:
       - name: Server samples (per phase)
         if: always()
         run: grep -E '^\[wkz\]' "$RUNNER_TEMP/server.log" | cut -c1-700 || true
+  bugzilla:
+    # bugs.webkit.org is not reachable from the investigation environment;
+    # print the relevant reports (REST API) into the job log instead.
+    runs-on: ubuntu-24.04
+    steps:
+      - name: WebKit bugs
+        run: |
+          api=https://bugs.webkit.org/rest
+          show() {
+            echo "=== bug $1"
+            curl -fsS "$api/bug/$1?include_fields=id,summary,status,resolution,product,component,version,op_sys,creation_time,last_change_time,see_also,keywords,depends_on,blocks,dupe_of" | jq -c '.bugs[0]' || true
+            curl -fsS "$api/bug/$1/comment" | jq -r '.bugs[].comments[] | "--- #\(.count) \(.creation_time) \(.creator | split("@")[0])\n\(.text)"' | cut -c1-400 | head -150 || true
+          }
+          for q in "worker terminate wasm" "terminate WebAssembly" "wasm loop terminate" "wasm watchdog" "VMTraps wasm" "wasm infinite loop worker" "worker.terminate" "wasm trap aware stack"; do
+            echo "=== search: $q"
+            curl -fsS -G "$api/bug" --data-urlencode "quicksearch=$q" --data-urlencode "include_fields=id,summary,status,resolution,last_change_time" --data-urlencode "limit=40" | jq -r '.bugs[] | "\(.id) [\(.status) \(.resolution)] \(.last_change_time[0:10]) \(.summary)"' || true
+          done
+          for id in 328618 202786 297402 289686 313389 324453; do show "$id"; done
