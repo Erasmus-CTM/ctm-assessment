@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Pins ctm-libs 1abf134 (ctm-libs#61, on top of #60): a worker that WebKit
+  does not end on Stop now stops itself, also inside long C calls. The page
+  revokes a blob URL before it terminates the worker; the worker checks that
+  URL at most every 250 ms while Python runs, raises one KeyboardInterrupt
+  and, if the program goes on, waits in a JavaScript loop where WebKit ends
+  it. With #60 alone, `while True: sum(range(10**6))` still left a thread
+  per Stop (Safari: restarts 10-27 s, 299% CPU after 8 Stops). The P13
+  complete lock for 1abf134 awaits AC's approval; the receipt stays at
+  09a18eb9 until then.
 - Pins ctm-libs 244d249 (ctm-libs#60): Stop on a runaway program no longer
   leaves a busy thread behind in Safari and SEB. WebKit does not end a worker
   that runs a WebAssembly loop when the page terminates it, so on plain LAN
