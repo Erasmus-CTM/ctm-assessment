@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>P13 diagnostic: terminate wasm workers</title>
+<!-- DIAGNOSTIC ONLY. runMicro({spin,pages,iterations}) creates a worker that
+     allocates and touches a WebAssembly.Memory, optionally spins in a wasm
+     loop, terminates it and repeats; records create->ready time each round. -->
+<script>
+const WASM='AGFzbQEAAAABBAFgAAACCAEBZQFtAgABAwIBAAcIAQRzcGluAAAKCQEHAANADAALCw==';
+const source=(spin,pages)=>`
+const t=performance.now();
+const bytes=Uint8Array.from(atob(${JSON.stringify(WASM)}),c=>c.charCodeAt(0));
+const mem=new WebAssembly.Memory({initial:${pages}});
+new Uint8Array(mem.buffer).fill(1);
+const inst=new WebAssembly.Instance(new WebAssembly.Module(bytes),{e:{m:mem}});
+postMessage({ms:performance.now()-t});
+${spin?'inst.exports.spin();':''}`;
+globalThis.__micro=[];
+globalThis.runMicro=async function({spin=true,pages=4096,iterations=8,hold=500,gap=1000,label}){
+  const out={label,spin,pages,rounds:[]};globalThis.__micro.push(out);
+  for(let i=1;i<=iterations;i++){
+    const url=URL.createObjectURL(new Blob([source(spin,pages)],{type:'text/javascript'}));
+    const t0=performance.now();const w=new Worker(url);
+    const result=await Promise.race([new Promise(r=>{w.onmessage=e=>r(e.data);w.onerror=e=>r({error:String(e.message)});}),new Promise(r=>setTimeout(()=>r({error:'no ready within 120 s'}),120000))]);
+    const readyMs=Math.round(performance.now()-t0);
+    await new Promise(r=>setTimeout(r,hold));
+    w.terminate();URL.revokeObjectURL(url);
+    out.rounds.push({i,readyMs,workerMs:result.ms&&Math.round(result.ms),error:result.error});
+    await new Promise(r=>setTimeout(r,gap));
+  }
+  out.done=true;return out;
+};
+</script>
+<p>P13 diagnostic micro page.</p>

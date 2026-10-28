@@ -40,24 +40,45 @@ export function attach(page){
   page.on('worker',w=>{const t=Date.now();diag.workers.push([t,'attach',w.url().slice(-40)]);w.on('close',()=>diag.workers.push([Date.now(),'close',w.url().slice(-40)]));});
 }
 
-// macOS: WebKit process CPU/RSS and per-thread CPU of WebContent processes.
+// macOS: WebKit process CPU/RSS, per-thread CPU of WebContent processes from
+// cumulative thread times (ps -M thread lines lack USER/TT, so columns are
+// located from the STAT field), system load, memory and the top processes.
 const run=(cmd,args)=>new Promise(resolve=>execFile(cmd,args,{timeout:8000,maxBuffer:8<<20},(error,stdout)=>resolve(error?'':stdout)));
+const secs=t=>{const m=String(t).match(/^(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)$/);return m?(+(m[1]||0))*3600+(+m[2])*60+(+m[3]):NaN;};
+const lastThreads=new Map();
+async function threads(pid){
+  const t=Date.now(),rows=(await run('ps',['-M','-p',String(pid)])).split('\n').slice(1).map(l=>l.trim().split(/\s+/)).filter(f=>f.length>=5);
+  const list=rows.map((f,i)=>{const k=f.findIndex(x=>/^[RSITUZ][A-Za-z+<>]*$/.test(x));return k<1?null:{i,cpu:parseFloat(f[k-1]),stat:f[k],cum:secs(f[k+2])+secs(f[k+3])};}).filter(Boolean);
+  const prev=lastThreads.get(pid);lastThreads.set(pid,{t,list});
+  const dt=prev?(t-prev.t)/1000:0;
+  // Busy: a thread that used >= 80% of one core since the previous sample.
+  const deltas=prev&&dt>0.5?list.map((x,j)=>prev.list[j]?Math.round(100*(x.cum-prev.list[j].cum)/dt):null).filter(x=>x!==null&&x>=0):[];
+  return {pid,threads:list.length,running:list.filter(x=>x.stat.startsWith('R')).length,busy:deltas.filter(x=>x>=80).length,top:deltas.sort((a,b)=>b-a).slice(0,5),window:Math.round(dt)};
+}
+let lastVm=null;
+async function vm(){
+  const text=await run('vm_stat',[]),get=k=>+(text.match(new RegExp(k+':\\s+(\\d+)'))||[])[1]||0;
+  const now={t:Date.now(),pageins:get('Pageins'),pageouts:get('Pageouts'),swapins:get('Swapins'),swapouts:get('Swapouts'),compressor:get('Pages occupied by compressor')};
+  const d=lastVm?{pageins:now.pageins-lastVm.pageins,pageouts:now.pageouts-lastVm.pageouts,swapins:now.swapins-lastVm.swapins,swapouts:now.swapouts-lastVm.swapouts}:{};
+  lastVm=now;return {...d,compressorMB:Math.round(now.compressor*16/1024)};
+}
 export async function sample(tag=''){
   if(!enabled||os.platform()!=='darwin')return null;
   const t=Date.now();
-  const lines=(await run('ps',['-axo','pid=,ppid=,pcpu=,rss=,command='])).split('\n').filter(l=>/WebKit|Playwright|Safari/i.test(l)&&!/ps -axo/.test(l));
-  const procs=lines.map(l=>{const m=l.trim().match(/^(\d+)\s+(\d+)\s+([\d.]+)\s+(\d+)\s+(.*)$/);return m&&{pid:+m[1],cpu:+m[3],rssMB:Math.round(+m[4]/1024),name:m[5].split('/').pop().slice(0,40)};}).filter(Boolean);
+  const all=(await run('ps',['-axo','pid=,ppid=,pcpu=,rss=,command='])).split('\n').map(l=>{const m=l.trim().match(/^(\d+)\s+(\d+)\s+([\d.]+)\s+(\d+)\s+(.*)$/);return m&&{pid:+m[1],cpu:+m[3],rssMB:Math.round(+m[4]/1024),name:m[5].split(' ')[0].split('/').pop().slice(0,40),full:m[5]};}).filter(Boolean);
+  const procs=all.filter(p=>/WebKit|Playwright|Safari/i.test(p.full)&&!/ps -axo/.test(p.full)).map(({full,...p})=>p);
+  const topProcs=all.slice().sort((a,b)=>b.cpu-a.cpu).slice(0,6).map(p=>`${p.name}#${p.pid}:${p.cpu}%`);
   const hot=[];
-  for(const p of procs.filter(p=>/WebContent/.test(p.name))){
-    // ps -M: one line per thread; %CPU is the 4th column.
-    const threads=(await run('ps',['-M','-p',String(p.pid)])).split('\n').slice(1).map(l=>l.trim().split(/\s+/)).filter(f=>f.length>4).map(f=>parseFloat(f[3])).filter(Number.isFinite);
-    hot.push({pid:p.pid,threads:threads.length,busy:threads.filter(c=>c>=50).length,top:threads.sort((a,b)=>b-a).slice(0,5)});
-  }
+  for(const p of procs.filter(p=>/WebContent/.test(p.name)))hot.push(await threads(p.pid));
   const load=os.loadavg().map(x=>+x.toFixed(2)),freeMB=Math.round(os.freemem()/1048576);
-  const entry={t,tag,load,freeMB,procs:procs.filter(p=>p.cpu>=1||/WebContent/.test(p.name)),hot};
+  const entry={t,tag,load,freeMB,vm:await vm(),lagMs:takeLag(),procs:procs.filter(p=>p.cpu>=1||/WebContent/.test(p.name)),hot,topProcs};
   diag.ps.push(entry);cap(diag.ps,1500);
   return entry;
 }
+// Node event-loop lag: the largest timer delay since the last sample.
+let lagMax=0,lagLast=Date.now();
+if(enabled){setInterval(()=>{const now=Date.now();lagMax=Math.max(lagMax,now-lagLast-100);lagLast=now;},100).unref();}
+function takeLag(){const v=lagMax;lagMax=0;return v;}
 let samplerTimer=null;
 export function startSampler(ms=2000){
   if(!enabled||os.platform()!=='darwin'||samplerTimer)return;
@@ -68,7 +89,7 @@ export function startSampler(ms=2000){
 export function stopSampler(){if(samplerTimer)clearInterval(samplerTimer);samplerTimer=null;}
 export function brief(entry){
   if(!entry)return 'n/a';
-  return `load=${entry.load.join('/')} free=${entry.freeMB}MB `+entry.hot.map(h=>`wc${h.pid}:busy=${h.busy}/${h.threads} top=${h.top.join(',')}`).join(' ')+' '+entry.procs.map(p=>`${p.name.replace('com.apple.WebKit.','')}#${p.pid}:${p.cpu}%/${p.rssMB}MB`).join(' ');
+  return `load=${entry.load.join('/')} free=${entry.freeMB}MB lag=${entry.lagMs}ms vm=${JSON.stringify(entry.vm)} `+entry.hot.map(h=>`wc${h.pid}:busy=${h.busy}/${h.threads}(R${h.running}) top=${h.top.join(',')}/${h.window}s`).join(' ')+' '+entry.procs.map(p=>`${p.name.replace('com.apple.WebKit.','')}#${p.pid}:${p.cpu}%/${p.rssMB}MB`).join(' ')+' top: '+entry.topProcs.join(' ');
 }
 // Print the samples inside [from,to] compactly.
 export function printWindow(from,to,why){

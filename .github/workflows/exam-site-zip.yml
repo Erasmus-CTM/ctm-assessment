@@ -319,12 +319,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # DIAGNOSTIC BRANCH: WebKit only, repeated; protocol log on sample 1.
+        # DIAGNOSTIC BRANCH: WebKit profile samples plus restart probes in
+        # Playwright WebKit, real Safari (safaridriver) and Chromium on macOS.
         include:
-          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 1, protocol: '1'}
-          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 2, protocol: ''}
-          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 3, protocol: ''}
-          - {os: macos-15, engine: safari, version: '', profile: real-safari, sample: 1, protocol: ''}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 1, protocol: '', mode: profile}
+          - {os: macos-15, engine: webkit, version: '', profile: apple-webkit, sample: 2, protocol: '', mode: profile}
+          - {os: macos-15, engine: webkit, version: '', profile: probe-webkit, sample: 1, protocol: '', mode: probe}
+          - {os: macos-15, engine: webkit, version: '', profile: probe-webkit, sample: 2, protocol: '', mode: probe}
+          - {os: macos-15, engine: safari, version: '', profile: probe-safari, sample: 1, protocol: '', mode: probe}
+          - {os: macos-15, engine: safari, version: '', profile: probe-safari, sample: 2, protocol: '', mode: probe}
+          - {os: macos-15, engine: chromium, version: '', profile: probe-chromium, sample: 1, protocol: '', mode: probe}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -359,7 +363,7 @@ jobs:
           PYTHON
       - name: Install the exact CEF release-branch Chromium profile
         timeout-minutes: 5
-        if: matrix.engine == 'chromium'
+        if: matrix.engine == 'chromium' && matrix.mode == 'profile'
         env:
           P13_CHROME_VERSION: ${{ matrix.version }}
         run: |
@@ -369,6 +373,9 @@ jobs:
       - name: Install pinned Playwright WebKit on macOS
         if: matrix.engine == 'webkit'
         run: npx playwright install webkit
+      - name: Install Playwright Chromium on macOS (diagnostic contrast)
+        if: matrix.engine == 'chromium' && matrix.mode == 'probe'
+        run: npx playwright install chromium
       - name: Serve plain LAN HTTP and a server with isolation headers
         env:
           P13_SERVE_LOG: '1'
@@ -383,7 +390,7 @@ jobs:
             curl --noproxy '*' --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 --silent --show-error --fail -I "http://127.0.0.1:$p13_port$p13_path" > /dev/null
           done
       - name: Verify the byte-preserving host and native-control negative cases
-        if: matrix.engine != 'safari'
+        if: matrix.mode == 'profile'
         env:
           P13_BROWSER: ${{ matrix.engine }}
         run: |
@@ -394,17 +401,22 @@ jobs:
           sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize || true
           sw_vers || true
           npx playwright --version
-      - name: Real Safari runaway/Stop sequence through safaridriver
-        if: matrix.engine == 'safari'
+      - name: Restart probes (micro wasm worker, 8x runaway Stop, 8x idle restart)
+        if: matrix.mode == 'probe'
         env:
           P13_DIAG: '1'
+          P13_PROBE_BROWSER: ${{ matrix.engine }}
         run: |
-          sudo safaridriver --enable
-          safaridriver -p 4444 > "$RUNNER_TEMP/safaridriver.log" 2>&1 &
-          sleep 3
-          node tools/p13-safari-runaway.mjs
+          mkdir -p "$RUNNER_TEMP/deployed/__p13diag"
+          cp tools/p13-diag-micro.html "$RUNNER_TEMP/deployed/__p13diag/micro.html"
+          if [ "$P13_PROBE_BROWSER" = safari ]; then
+            sudo safaridriver --enable
+            safaridriver -p 4444 > "$RUNNER_TEMP/safaridriver.log" 2>&1 &
+            sleep 3
+          fi
+          node tools/p13-diag-probe.mjs
       - name: Check Run, Stop, input, NumPy, inert HTML and saved-answer restore
-        if: matrix.engine != 'safari'
+        if: matrix.mode == 'profile'
         env:
           P13_BROWSER: ${{ matrix.engine }}
           P13_EXPECT_BROWSER_VERSION: ${{ matrix.version }}
