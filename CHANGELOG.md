@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Pins ctm-libs 244d249 (ctm-libs#60): Stop on a runaway program no longer
+  leaves a busy thread behind in Safari and SEB. WebKit does not end a worker
+  that runs a WebAssembly loop when the page terminates it, so on plain LAN
+  HTTP every Stop of a pure-Python loop kept one core busy until the tab's
+  process ended; later restarts slowed from about 4 s to 20-150 s on the
+  3-core macOS runner, which starved the P13 WebKit acceptance into its
+  intermittent 30 s control timeouts. The P13 complete lock for 244d249
+  (proposed 09a18eb9..., lock-review run 40645316149) awaits AC's approval;
+  the receipt stays at 252f271a until then.
 - Pins py-exercise 5682787, ctm-checkers 57823df (shared STACK expression
   admission, ctm-checkers#41), ctm-stack e8437f1 (README and authoring guide;
   CI pins and browser tests for the current ctm-libs) and pyodide-interaktiv
