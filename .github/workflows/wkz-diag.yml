@@ -17,7 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - id: m
-        run: echo "matrix=$(jq -c '{include: [.jobs[] | select(.skip != true)]}' tools/wkz/ci.json)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "matrix=$(jq -c '{include: [.jobs[] | select(.skip != true)]}' tools/wkz/ci.json)" >> "$GITHUB_OUTPUT"
   probe:
     needs: plan
     name: ${{ matrix.name }}
