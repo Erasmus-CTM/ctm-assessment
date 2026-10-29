@@ -10,8 +10,10 @@
   without it. That message now names the seconds elapsed and the browser's
   reason. A corrective retry keeps one system message at the beginning
   (Qwen3 rejected a second one with "System message must be at the
-  beginning"). The P13 complete lock for b1e7ec8 awaits AC's approval; the
-  receipt stays at 2c52f5f0 until then.
+  beginning"). The P13 receipt records AC's approved complete lock
+  8af1796043a4bc22d57121b089f593bbd9e95dddfde10ae08fc98451407e32d9 for
+  ctm-libs b1e7ec8 and pyodide-interaktiv 793a872 (lock-review run
+  40889517603); the P13 application bytes are unchanged.
 - Pins ctm-checkers fde317a (ctm-checkers#45) and math-exercise 17f1ace
   (math-exercise#44): similar problems can change the givens of a
   custom-checked exercise. `#| givens:` gives a custom checker exact data
