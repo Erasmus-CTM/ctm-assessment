@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Pins ctm-libs b1e7ec8 (ctm-libs#62, #63): calls that may run longer than
+  60 s (similar-problem generation, the independent solve) stream the reply,
+  so a proxy in front of the provider no longer closes the silent connection
+  of a reasoning model and the browser no longer reports it as "Could not
+  contact the provider"; a provider that rejects streaming is asked again
+  without it. That message now names the seconds elapsed and the browser's
+  reason. A corrective retry keeps one system message at the beginning
+  (Qwen3 rejected a second one with "System message must be at the
+  beginning"). The P13 complete lock for b1e7ec8 awaits AC's approval; the
+  receipt stays at 2c52f5f0 until then.
 - Pins ctm-checkers fde317a (ctm-checkers#45) and math-exercise 17f1ace
   (math-exercise#44): similar problems can change the givens of a
   custom-checked exercise. `#| givens:` gives a custom checker exact data
