@@ -20,12 +20,12 @@
     "math-exercise": {
       "repository": "Erasmus-CTM/math-exercise",
       "branch": "main",
-      "commit": "bf2926905e995070ded6c5cfa08624a0be7ddeb0"
+      "commit": "17f1acefeca8a8da7128ffe73301347256e226d8"
     },
     "ctm-checkers": {
       "repository": "Erasmus-CTM/ctm-checkers",
       "branch": "main",
-      "commit": "57823df14c42a83f808f85bf0086a7feacc920cf"
+      "commit": "fde317ac2072e858da155cadf66c2a27b14245a0"
     },
     "pyodide-interaktiv": {
       "repository": "Erasmus-CTM/pyodide-interaktiv",

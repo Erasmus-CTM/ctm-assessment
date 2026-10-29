@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Pins ctm-checkers fde317a (ctm-checkers#45) and math-exercise 17f1ace
+  (math-exercise#44): similar problems can change the givens of a
+  custom-checked exercise. `#| givens:` gives a custom checker exact data
+  without variants, `#| similar-data:` names the givens a generated problem
+  may replace; ctm-checkers' `bind_data` admits the model's text through the
+  restricted grammar and returns LaTeX (`\ln`). Numeric recipe keys are
+  compared under the field's tolerance; nested powers and `gamma` in generated
+  mathematics are bounded. The P13 lock (ctm-libs, pyodide-interaktiv) is
+  unchanged.
 - Pins ctm-libs 141cf51 (ctm-libs#61, on top of #60): a worker that WebKit
   does not end on Stop now stops itself, also inside long C calls. The page
   revokes a blob URL before it terminates the worker; once a command has run
