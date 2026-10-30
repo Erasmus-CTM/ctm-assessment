@@ -1,0 +1,22 @@
+[
+  {
+    "a": "ctm-libs:_extensions/ctm-libs/runtime/pyodide-worker.js",
+    "b": "pyodide-interaktiv:_extensions/ctm-libs/runtime/pyodide-worker.js",
+    "normalized_similarity": 0.9735
+  },
+  {
+    "a": "math-exercise:_extensions/math-exercise/variants-review.py",
+    "b": "ctm-stack:_extensions/ctm-stack/variants-review.py",
+    "normalized_similarity": 0.9699
+  },
+  {
+    "a": "ctm-libs:_extensions/ctm-libs/feedback/feedback-core.js",
+    "b": "pyodide-interaktiv:_extensions/ctm-libs/feedback/feedback-core.js",
+    "normalized_similarity": 0.9694
+  },
+  {
+    "a": "ctm-libs:_extensions/ctm-libs/runtime/pyodide-worker-core.js",
+    "b": "pyodide-interaktiv:_extensions/ctm-libs/runtime/pyodide-worker-core.js",
+    "normalized_similarity": 0.9654
+  }
+]

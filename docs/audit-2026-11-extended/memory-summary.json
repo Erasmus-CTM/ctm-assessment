@@ -1,0 +1,131 @@
+{
+  "node": "v24.19.0",
+  "forced_gc": true,
+  "repetitions": 3,
+  "problems_per_repetition": 100,
+  "record_cap": 10,
+  "cards_after_clear": 0,
+  "scope": "Node jsdom JS heap; actual MathSimilar and renderer, deterministic provider and compute_key/check substitutes; no Pyodide/browser/native process memory",
+  "observations": [
+    {
+      "repetition": 1,
+      "generated": 100,
+      "elapsedGenerationMs": 2117.874781,
+      "clearMs": 0.7785329999996975,
+      "baseline": {
+        "heapUsedBytes": 22722552,
+        "records": 0,
+        "problemCards": 0,
+        "domNodes": 14,
+        "providerCalls": 0,
+        "graderCalls": 0
+      },
+      "after10": {
+        "heapUsedBytes": 25018784,
+        "records": 10,
+        "problemCards": 10,
+        "domNodes": 215,
+        "providerCalls": 10,
+        "graderCalls": 20
+      },
+      "after100": {
+        "heapUsedBytes": 25688896,
+        "records": 10,
+        "problemCards": 10,
+        "domNodes": 215,
+        "providerCalls": 100,
+        "graderCalls": 200
+      },
+      "afterClear": {
+        "heapUsedBytes": 24601696,
+        "records": 0,
+        "problemCards": 0,
+        "domNodes": 14,
+        "providerCalls": 100,
+        "graderCalls": 200
+      },
+      "warmTo100HeapDelta": 670112,
+      "retainedAfterClearHeapDelta": 1879144
+    },
+    {
+      "repetition": 2,
+      "generated": 100,
+      "elapsedGenerationMs": 2111.7935629999997,
+      "clearMs": 0.7943150000000969,
+      "baseline": {
+        "heapUsedBytes": 25774528,
+        "records": 0,
+        "problemCards": 0,
+        "domNodes": 14,
+        "providerCalls": 0,
+        "graderCalls": 0
+      },
+      "after10": {
+        "heapUsedBytes": 27243264,
+        "records": 10,
+        "problemCards": 10,
+        "domNodes": 215,
+        "providerCalls": 10,
+        "graderCalls": 20
+      },
+      "after100": {
+        "heapUsedBytes": 25717704,
+        "records": 10,
+        "problemCards": 10,
+        "domNodes": 215,
+        "providerCalls": 100,
+        "graderCalls": 200
+      },
+      "afterClear": {
+        "heapUsedBytes": 24646352,
+        "records": 0,
+        "problemCards": 0,
+        "domNodes": 14,
+        "providerCalls": 100,
+        "graderCalls": 200
+      },
+      "warmTo100HeapDelta": -1525560,
+      "retainedAfterClearHeapDelta": -1128176
+    },
+    {
+      "repetition": 3,
+      "generated": 100,
+      "elapsedGenerationMs": 2105.7492900000007,
+      "clearMs": 0.7449219999998604,
+      "baseline": {
+        "heapUsedBytes": 25963784,
+        "records": 0,
+        "problemCards": 0,
+        "domNodes": 14,
+        "providerCalls": 0,
+        "graderCalls": 0
+      },
+      "after10": {
+        "heapUsedBytes": 25833320,
+        "records": 10,
+        "problemCards": 10,
+        "domNodes": 215,
+        "providerCalls": 10,
+        "graderCalls": 20
+      },
+      "after100": {
+        "heapUsedBytes": 26043816,
+        "records": 10,
+        "problemCards": 10,
+        "domNodes": 215,
+        "providerCalls": 100,
+        "graderCalls": 200
+      },
+      "afterClear": {
+        "heapUsedBytes": 24984352,
+        "records": 0,
+        "problemCards": 0,
+        "domNodes": 14,
+        "providerCalls": 100,
+        "graderCalls": 200
+      },
+      "warmTo100HeapDelta": 210496,
+      "retainedAfterClearHeapDelta": -979432
+    }
+  ]
+}

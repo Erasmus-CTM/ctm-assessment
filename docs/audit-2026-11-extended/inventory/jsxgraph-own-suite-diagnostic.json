@@ -1,0 +1,38 @@
+{
+  "repository": "jsxgraph-quarto",
+  "commit": "49a1c7d575e08b2133e39098e8f9deda61567287",
+  "initialOwnSuite": {
+    "tests": 33,
+    "passed": 27,
+    "failed": 5,
+    "skipped": 1,
+    "rawLog": "/tmp/ctm-jsxgraph-final.log",
+    "countsPreserved": true
+  },
+  "diagnostic": {
+    "script": "code/workers/jsxgraph-diagnostic.mjs",
+    "purpose": "Normal generated bundled point-board, no source changes",
+    "renderExitCode": 0,
+    "renderedFrameContainsMathJaxScript": true,
+    "renderedFrameHTMLCharacters": 1357115,
+    "iframeElementCharacters": 1809821,
+    "observedChildURL": "chrome-error://chromewebdata/",
+    "observedChildMessage": "This page is blocked. Your organization doesn’t allow you to view this site.",
+    "observedChildHasBoard": false,
+    "observedChildHasJXG": false,
+    "failedMathJaxTestsWaitBeforeStartup": "tests/mathjax-preload.browser.test.mjs:138",
+    "failedResizeTestWait": "tests/iframe-resize.browser.test.mjs:44",
+    "policyFile": "/etc/chromium/policies/managed/urls.json",
+    "policy": {
+      "URLBlocklist": ["*"],
+      "relevantURLAllowlist": ["http://*", "https://*", "wss://*"],
+      "dataNavigationAllowed": false
+    },
+    "classification": "Managed Chromium blocks the generated data: iframe navigation before runtime scripts execute. Source/runtime behavior behind this boundary remains unverified; initial failures are not converted into passes.",
+    "policyChangedOrBypassed": false,
+    "alternateEngineUsedToBypass": false,
+    "rawDiagnosticReport": "/tmp/ctm-jsxgraph-diagnostic.json",
+    "rawScreenshot": "/tmp/ctm-jsxgraph-diagnostic.png",
+    "rawDecodedFrame": "/tmp/ctm-jsxgraph-diagnostic-rendered-frame.html"
+  }
+}

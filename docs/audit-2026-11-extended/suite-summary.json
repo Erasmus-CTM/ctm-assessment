@@ -1,0 +1,173 @@
+{
+  "toolchain": {
+    "quarto": "1.8.27",
+    "node": "24.19.0",
+    "python": "3.12.14",
+    "sympy": "1.13.3",
+    "pyodide": "0.28.3"
+  },
+  "runs": [
+    {
+      "repository": "ctm-assessment",
+      "command": "npm test (full fixture environment)",
+      "passed": 135,
+      "failed": 0,
+      "skipped": 7,
+      "notes": "142 cases; same pinned source, ordinary skip paths retained"
+    },
+    {
+      "repository": "ctm-assessment",
+      "command": "Python unittest discovery",
+      "passed": 253,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "full setup campaign environment"
+    },
+    {
+      "repository": "ctm-assessment",
+      "command": "npm run test:integration",
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "exact rendered common package"
+    },
+    {
+      "repository": "ctm-libs",
+      "command": "npm test",
+      "passed": 458,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "canonical local original-lock Pyodide cache; first remote attempt450pass/7fail/1skip"
+    },
+    {
+      "repository": "math-exercise",
+      "command": "npm test: embedded Python",
+      "passed": 47,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "native authoring/wheel installed"
+    },
+    {
+      "repository": "math-exercise",
+      "command": "npm test: Node",
+      "passed": 207,
+      "failed": 0,
+      "skipped": 1,
+      "notes": "legacy missing-feature branch inapplicable to current library"
+    },
+    {
+      "repository": "py-exercise",
+      "command": "npm test / Python unittest",
+      "passed": "50 / 17",
+      "failed": 0,
+      "skipped": 0,
+      "notes": "component and current canonical libraries"
+    },
+    {
+      "repository": "pyodide-interaktiv",
+      "command": "npm test",
+      "passed": 135,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "exact793a872 source; standalone shipped copy distinguished"
+    },
+    {
+      "repository": "ctm-checkers",
+      "command": "pytest -q -ra",
+      "passed": 1763,
+      "failed": 0,
+      "skipped": 147,
+      "notes": "SymPy1.13.3; installed Chromium; skip grouping below"
+    },
+    {
+      "repository": "ctm-stack",
+      "command": "pytest",
+      "passed": 57,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "pinned e8437f1 with audited package/native-authoring; render cases included"
+    },
+    {
+      "repository": "JSXGraph",
+      "command": "node --test tests/*.test.mjs",
+      "passed": 27,
+      "failed": 5,
+      "skipped": 1,
+      "notes": "33 cases; five managed data: navigation timeouts; one dependent control skipped"
+    },
+    {
+      "repository": "stack-wasm-maxima",
+      "command": "existing lightweight CI group",
+      "passed": "10 script invocations",
+      "failed": 0,
+      "skipped": 0,
+      "notes": "includes34Python cases; own c366f175 checker pin; no npm test script"
+    },
+    {
+      "repository": "math-exercise",
+      "command": "own Playwright asset/similar/example specs",
+      "passed": 69,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "2+53+14; original assertions; local transport configurations documented"
+    },
+    {
+      "repository": "math-exercise",
+      "command": "own graphical Playwright specs",
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "notes": "first environment timeout;3not run (reporter labels those skipped); managed policy"
+    },
+    {
+      "repository": "math-exercise",
+      "command": "official PR45 grading-parity corpus",
+      "passed": "1668 per build",
+      "failed": 0,
+      "skipped": 0,
+      "notes": "zero differences/missing/harness errors;40authored groups"
+    },
+    {
+      "repository": "consumer renders",
+      "command": "quarto render",
+      "passed": "21 demo +4freehand +2combined +1course index",
+      "failed": 0,
+      "skipped": 0,
+      "notes": "consumer source SHAs fixed; compatibility with audited package tuple"
+    },
+    {
+      "repository": "ctm-assessment supplemental",
+      "command": "node --test tests/*.browser.cjs",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "browser contract assertions recovered independently after chained failure;357.23s"
+    },
+    {
+      "repository": "required umbrella campaign",
+      "command": "setup-feedback-integration.py --test --browser",
+      "passed": "all unit/integration phases;23 browser checkpoints",
+      "failed": "exit1",
+      "skipped": 0,
+      "notes": "stops at first JSXGraph data: policy block; downstream chain not reached; see separate supplemental runs"
+    }
+  ],
+  "scope": "Counts use final appropriately configured runs; original setup failures remain summarized separately. Script invocations, cases, pages and checkpoints are not interchangeable.",
+  "supplemental": [
+    {
+      "command": "node integration/feedback/stack-browser.cjs",
+      "result": "pass: real mixed math/IDE/STACK grading, validation, qtests and runtime reuse"
+    },
+    {
+      "command": "node integration/feedback/pyodide-browser.cjs",
+      "result": "static SW placement passed; first isolation runtime scenario asset-transport blocked; zero lifecycle scenarios credited"
+    },
+    {
+      "command": "node --test tests/*.browser.cjs",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 357.23
+    }
+  ]
+}
