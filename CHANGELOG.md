@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Pins ctm-checkers 4cff6aa (ctm-checkers#46) and math-exercise 39df17e
+  (math-exercise#45): similar problems accept model output that means the
+  same. Givens may use `ln` and `e` (Euler's number); a custom-checked field
+  keeps its authored checker and variables when the model leaves them out or
+  writes them differently; an answer such as `y = x - 1` is its right-hand
+  side, and the independent solve may answer with JSON numbers. A Python error
+  is reported by its last line. The P13 lock (ctm-libs, pyodide-interaktiv) is
+  unchanged.
 - Pins ctm-libs b1e7ec8 (ctm-libs#62, #63): calls that may run longer than
   60 s (similar-problem generation, the independent solve) stream the reply,
   so a proxy in front of the provider no longer closes the silent connection
