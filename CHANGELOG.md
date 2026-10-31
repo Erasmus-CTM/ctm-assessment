@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Pins ctm-libs 972cae3 (ctm-libs#64): image feedback activities can opt into
+  one correction exchange with `corrections="true"` (with `image-upload="true"`).
+  After direct API feedback on an uploaded response image, a student can point
+  out a misreading; the clarification is checked against the original image and
+  preceding feedback, the corrected feedback restarts at hint 1, and later hints
+  keep the clarification without reopening the exchange. Changed work needs a
+  new upload. Typed answers survive uploads; changed policy, language or
+  provider settings ask for fresh feedback instead of sending. Off by default.
 - Pins ctm-checkers 4cff6aa (ctm-checkers#46) and math-exercise 39df17e
   (math-exercise#45): similar problems accept model output that means the
   same. Givens may use `ln` and `e` (Euler's number); a custom-checked field
