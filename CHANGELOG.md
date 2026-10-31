@@ -10,6 +10,10 @@
   keep the clarification without reopening the exchange. Changed work needs a
   new upload. Typed answers survive uploads; changed policy, language or
   provider settings ask for fresh feedback instead of sending. Off by default.
+  The P13 receipt records AC's approved complete lock
+  c169a36d35c17c5fc59c0e46c0262dbc1e2733cd97629148f7fd0c7f51ff17fc for
+  ctm-libs 972cae3 and pyodide-interaktiv 793a872 (lock-review run
+  41188933116); the P13 application bytes are unchanged.
 - Pins ctm-checkers 4cff6aa (ctm-checkers#46) and math-exercise 39df17e
   (math-exercise#45): similar problems accept model output that means the
   same. Givens may use `ln` and `e` (Euler's number); a custom-checked field
