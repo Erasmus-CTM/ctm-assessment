@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Pins ctm-libs 972cae3 (ctm-libs#64): image feedback activities can opt into
+  one correction exchange with `corrections="true"` (with `image-upload="true"`).
+  After direct API feedback on an uploaded response image, a student can point
+  out a misreading; the clarification is checked against the original image and
+  preceding feedback, the corrected feedback restarts at hint 1, and later hints
+  keep the clarification without reopening the exchange. Changed work needs a
+  new upload. Typed answers survive uploads; changed policy, language or
+  provider settings ask for fresh feedback instead of sending. Off by default.
+  The P13 receipt records AC's approved complete lock
+  c169a36d35c17c5fc59c0e46c0262dbc1e2733cd97629148f7fd0c7f51ff17fc for
+  ctm-libs 972cae3 and pyodide-interaktiv 793a872 (lock-review run
+  41188933116); the P13 application bytes are unchanged.
 - Pins ctm-checkers 4cff6aa (ctm-checkers#46) and math-exercise 39df17e
   (math-exercise#45): similar problems accept model output that means the
   same. Givens may use `ln` and `e` (Euler's number); a custom-checked field

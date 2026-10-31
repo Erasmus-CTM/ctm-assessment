@@ -14,11 +14,11 @@ measurements establish the observed effect; no speed threshold is assumed.
 The workflow reproduces the reviewed vendor selections with the canonical
 composer, then binds the worker, plugin and service worker to exact component
 pins. The complete 3,230-file lock has SHA256
-`8af1796043a4bc22d57121b089f593bbd9e95dddfde10ae08fc98451407e32d9`.
-AC approved this exact combined hash on 29 October for ctm-libs `b1e7ec8`
+`c169a36d35c17c5fc59c0e46c0262dbc1e2733cd97629148f7fd0c7f51ff17fc`.
+AC approved this exact combined hash on 31 October for ctm-libs `972cae3`
 and pyodide-interaktiv `793a872` after its review against #80’s approved
-`73d8b6fb…` baseline (the previous approvals, `2c52f5f0…`, `09a18eb9…`,
-`252f271a…`, `1fb2077…` and `d93fc099…`, are superseded). All vendor subset hashes and
+`73d8b6fb…` baseline (the previous approvals, `8af17960…`, `2c52f5f0…`,
+`09a18eb9…`, `252f271a…`, `1fb2077…` and `d93fc099…`, are superseded). All vendor subset hashes and
 payloads remain unchanged. The small receipt is `integration/p13-complete-assets.json`; raw locks and logs
 remain CI artifacts. The frozen older inspector and its receipts are retained.
 Deployment verification checks the actual scripts Quarto emits, including any

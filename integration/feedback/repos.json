@@ -4,7 +4,7 @@
     "ctm-libs": {
       "repository": "Erasmus-CTM/ctm-libs",
       "branch": "main",
-      "commit": "b1e7ec80b198eacd04793fd1cec2adb776555b73",
+      "commit": "972cae390b3aa7afd4e66c73bd4db3a33d208746",
       "extensions": [
         "ctm-libs"
       ],
