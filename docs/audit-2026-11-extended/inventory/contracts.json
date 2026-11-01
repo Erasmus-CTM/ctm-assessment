@@ -1,0 +1,2622 @@
+{
+  "ctm-libs": {
+    "commit": "b1e7ec80b198eacd04793fd1cec2adb776555b73",
+    "globals": {
+      "AIFeedback": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:4",
+        "_extensions/ctm-libs/feedback/feedback-core.js:6",
+        "_extensions/ctm-libs/feedback/feedback-core.js:6",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:4",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:447"
+      ],
+      "BroadcastChannel": [
+        "_extensions/ctm-libs/ui/ctm-store.js:93",
+        "_extensions/ctm-libs/ui/ctm-store.js:95"
+      ],
+      "CSS": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:127"
+      ],
+      "CTMAssets": [
+        "_extensions/ctm-libs/assets.js:5",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:194",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:194",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:107",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:107",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:107",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:114",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:114",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:874"
+      ],
+      "CTMCheckers": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:381",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:404"
+      ],
+      "CTMCheckersStack": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:382"
+      ],
+      "CTMCoiFrameStartup": [
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:5",
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:6"
+      ],
+      "CTMCoiSettled": [
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:34"
+      ],
+      "CTMCopy": [
+        "_extensions/ctm-libs/ui/ctm-copy.js:4",
+        "_extensions/ctm-libs/ui/ctm-copy.js:56",
+        "_extensions/ctm-libs/ui/ctm-export.js:86"
+      ],
+      "CTMExport": [
+        "_extensions/ctm-libs/ui/ctm-export.js:4",
+        "_extensions/ctm-libs/ui/ctm-export.js:101"
+      ],
+      "CTMLayout": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:4",
+        "_extensions/ctm-libs/ui/ctm-layout.js:98",
+        "_extensions/ctm-libs/ui/ctm-progress.js:164",
+        "_extensions/ctm-libs/ui/ctm-progress.js:175",
+        "_extensions/ctm-libs/ui/ctm-progress.js:225",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:119",
+        "_extensions/ctm-libs/ui/ctm-store.js:492"
+      ],
+      "CTMLocales": [
+        "_extensions/ctm-libs/locales/ctm-locale.js:14",
+        "_extensions/ctm-libs/locales/ctm-locale.js:14",
+        "_extensions/ctm-libs/locales/ctm-locale.js:140",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:871",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:871",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1201",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1201",
+        "_extensions/ctm-libs/ui/ctm-copy.js:7",
+        "_extensions/ctm-libs/ui/ctm-settings.js:10",
+        "_extensions/ctm-libs/ui/ctm-store.js:481",
+        "_extensions/ctm-libs/ui/ctm-store.js:482"
+      ],
+      "CTMNav": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:40",
+        "_extensions/ctm-libs/ui/ctm-nav.js:485",
+        "_extensions/ctm-libs/ui/ctm-progress.js:100",
+        "_extensions/ctm-libs/ui/ctm-progress.js:100",
+        "_extensions/ctm-libs/ui/ctm-progress.js:103",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:83"
+      ],
+      "CTMReveal": [
+        "_extensions/ctm-libs/ui/ctm-reveal.js:18",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:112"
+      ],
+      "CTMSettings": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:30",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:30",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:33",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:33",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:34",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:38",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:40",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:43",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:103",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:103",
+        "_extensions/ctm-libs/ui/ctm-export.js:98",
+        "_extensions/ctm-libs/ui/ctm-export.js:98",
+        "_extensions/ctm-libs/ui/ctm-progress.js:132",
+        "_extensions/ctm-libs/ui/ctm-progress.js:132",
+        "_extensions/ctm-libs/ui/ctm-settings.js:4",
+        "_extensions/ctm-libs/ui/ctm-settings.js:56",
+        "_extensions/ctm-libs/ui/ctm-store.js:419",
+        "_extensions/ctm-libs/ui/ctm-store.js:420",
+        "_extensions/ctm-libs/ui/ctm-store.js:424",
+        "_extensions/ctm-libs/ui/ctm-store.js:425"
+      ],
+      "CTMStore": [
+        "_extensions/ctm-libs/ui/ctm-export.js:62",
+        "_extensions/ctm-libs/ui/ctm-export.js:76",
+        "_extensions/ctm-libs/ui/ctm-progress.js:206",
+        "_extensions/ctm-libs/ui/ctm-store.js:4",
+        "_extensions/ctm-libs/ui/ctm-store.js:465",
+        "_extensions/ctm-libs/ui/ctm-store.js:491",
+        "_extensions/ctm-libs/ui/variants.js:30"
+      ],
+      "CTMVariants": [
+        "_extensions/ctm-libs/ui/variants.js:4",
+        "_extensions/ctm-libs/ui/variants.js:96"
+      ],
+      "CTMWorker": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:207",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:207",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:210",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:24",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:24",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1273"
+      ],
+      "CTM_ASSETS": [
+        "_extensions/ctm-libs/assets.js:7",
+        "_extensions/ctm-libs/lua/assets.lua:128",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:873",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:873"
+      ],
+      "CTM_COI_FRAME_STARTUP": [
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:15"
+      ],
+      "ClipboardItem": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:79"
+      ],
+      "CustomEvent": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:581",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:581"
+      ],
+      "MathExerciseRuntime": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:58",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:87",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:87",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:88",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:88",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:89",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:90",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:91",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:92",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:620",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:902",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1214"
+      ],
+      "MathJax": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:223",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:223",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:223",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:7",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:96",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:40",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:40",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:40",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:41"
+      ],
+      "MatrixInput": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:232"
+      ],
+      "MonacoEnvironment": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:648",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:648"
+      ],
+      "MutationObserver": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:26",
+        "_extensions/ctm-libs/ui/ctm-layout.js:27"
+      ],
+      "ResizeObserver": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:71",
+        "_extensions/ctm-libs/ui/ctm-layout.js:71",
+        "_extensions/ctm-libs/ui/ctm-progress.js:170"
+      ],
+      "Worker": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:647",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:670"
+      ],
+      "__aiFeedbackConfig": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:17",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/lua/feedback.lua:388"
+      ],
+      "__aiFeedbackPolicies": [
+        "_extensions/ctm-libs/feedback/feedback-core.js:41",
+        "_extensions/ctm-libs/lua/policy.lua:3",
+        "_extensions/ctm-libs/lua/policy.lua:8",
+        "_extensions/ctm-libs/lua/policy.lua:11"
+      ],
+      "__ctmStandaloneCoiRegistered": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:51",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:52"
+      ],
+      "__ctmWorkerNoBackground": [
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:867",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1152"
+      ],
+      "__qExercisePyodide": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:216",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:217",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:225",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:230",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:230"
+      ],
+      "__qExercisePyodideTimeout": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:125"
+      ],
+      "_qpyodideGetInstance": [
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:890"
+      ],
+      "addEventListener": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:429",
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:19",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:34",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:14",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:32",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:51",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:55",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:57",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:368",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:369",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1251",
+        "_extensions/ctm-libs/ui/ctm-layout.js:81",
+        "_extensions/ctm-libs/ui/ctm-nav.js:61",
+        "_extensions/ctm-libs/ui/ctm-nav.js:367",
+        "_extensions/ctm-libs/ui/ctm-nav.js:446",
+        "_extensions/ctm-libs/ui/ctm-nav.js:452",
+        "_extensions/ctm-libs/ui/ctm-nav.js:453",
+        "_extensions/ctm-libs/ui/ctm-nav.js:462",
+        "_extensions/ctm-libs/ui/ctm-nav.js:480",
+        "_extensions/ctm-libs/ui/ctm-progress.js:165",
+        "_extensions/ctm-libs/ui/ctm-progress.js:181",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:92",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:100",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:109",
+        "_extensions/ctm-libs/ui/ctm-store.js:438",
+        "_extensions/ctm-libs/ui/ctm-store.js:464"
+      ],
+      "bootstrap": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:149",
+        "_extensions/ctm-libs/ui/ctm-nav.js:149",
+        "_extensions/ctm-libs/ui/ctm-nav.js:176",
+        "_extensions/ctm-libs/ui/ctm-nav.js:176"
+      ],
+      "caches": [
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:468",
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:486",
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:495",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:500",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:518",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:527"
+      ],
+      "cancelAnimationFrame": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:49"
+      ],
+      "confirm": [
+        "_extensions/ctm-libs/ui/ctm-store.js:431",
+        "_extensions/ctm-libs/ui/ctm-store.js:432",
+        "_extensions/ctm-libs/ui/ctm-store.js:434"
+      ],
+      "crossOriginIsolated": [
+        "_extensions/ctm-libs/runtime/coi-serviceworker.js:98",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:59",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:585",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1166"
+      ],
+      "crypto": [
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:468",
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:477",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:500",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:509",
+        "_extensions/ctm-libs/ui/ctm-store.js:193"
+      ],
+      "dispatchEvent": [
+        "_extensions/ctm-libs/runtime/coi-serviceworker.js:93",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:581",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:581",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1104",
+        "_extensions/ctm-libs/ui/ctm-nav.js:387",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:43"
+      ],
+      "document": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:25",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:25",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:647",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:871",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1201",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1204"
+      ],
+      "endsWith": [
+        "_extensions/ctm-libs/ui/ctm-store.js:80"
+      ],
+      "fetch": [
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:459",
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:460",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:491",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:492"
+      ],
+      "getComputedStyle": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:269"
+      ],
+      "importScripts": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:133",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:137"
+      ],
+      "innerHeight": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:289",
+        "_extensions/ctm-libs/ui/ctm-progress.js:167",
+        "_extensions/ctm-libs/ui/ctm-progress.js:178"
+      ],
+      "innerWidth": [
+        "_extensions/ctm-libs/ui/ctm-progress.js:148",
+        "_extensions/ctm-libs/ui/ctm-progress.js:149",
+        "_extensions/ctm-libs/ui/ctm-progress.js:149"
+      ],
+      "isSecureContext": [
+        "_extensions/ctm-libs/ui/ctm-copy.js:42"
+      ],
+      "length": [
+        "_extensions/ctm-libs/ui/ctm-store.js:82"
+      ],
+      "load": [
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:9",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:8",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:17"
+      ],
+      "loadPyodide": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:128",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:222"
+      ],
+      "localStorage": [
+        "_extensions/ctm-libs/ui/ctm-store.js:116"
+      ],
+      "location": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:59",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:62",
+        "_extensions/ctm-libs/ui/variants.js:65",
+        "_extensions/ctm-libs/ui/variants.js:65"
+      ],
+      "mainPyodide": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:194",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:195",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:198",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:200",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:201",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:227",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:228",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:370",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:564",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:882",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1186"
+      ],
+      "navigator": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:78",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:78",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:79"
+      ],
+      "parent": [
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:20",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:20",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:21"
+      ],
+      "qpyodideCellContainer": [
+        "_extensions/ctm-libs/ui/ctm-export.js:42"
+      ],
+      "qpyodideCoiOutcome": [
+        "_extensions/ctm-libs/runtime/coi-serviceworker.js:85",
+        "_extensions/ctm-libs/runtime/coi-serviceworker.js:92"
+      ],
+      "qpyodideCoiSettled": [
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:34",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:59",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:686"
+      ],
+      "qpyodideExamOutput": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:78"
+      ],
+      "qpyodideFeedbackOptions": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:277"
+      ],
+      "qpyodideInstance": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:191",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:887",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:891"
+      ],
+      "qpyodideReady": [
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:883",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1186"
+      ],
+      "queueMicrotask": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:18",
+        "_extensions/ctm-libs/ui/ctm-layout.js:24"
+      ],
+      "removeEventListener": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:411",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:30",
+        "_extensions/ctm-libs/ui/ctm-layout.js:88",
+        "_extensions/ctm-libs/ui/ctm-nav.js:352"
+      ],
+      "requestAnimationFrame": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:42"
+      ],
+      "require": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:70",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:677"
+      ],
+      "scrollTo": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:251"
+      ],
+      "scrollX": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:113",
+        "_extensions/ctm-libs/ui/ctm-nav.js:251"
+      ],
+      "scrollY": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:113",
+        "_extensions/ctm-libs/ui/ctm-nav.js:255",
+        "_extensions/ctm-libs/ui/ctm-nav.js:363"
+      ],
+      "sessionStorage": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:60"
+      ],
+      "style": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:249",
+        "_extensions/ctm-libs/ui/ctm-nav.js:250",
+        "_extensions/ctm-libs/ui/ctm-nav.js:252"
+      ],
+      "trustedTypes": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:660",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:660",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:660"
+      ],
+      "visualViewport": [
+        "_extensions/ctm-libs/ui/ctm-progress.js:167",
+        "_extensions/ctm-libs/ui/ctm-progress.js:167",
+        "_extensions/ctm-libs/ui/ctm-progress.js:168"
+      ]
+    },
+    "data_attributes": {
+      "data-ai-feedback-context": [
+        "_extensions/ctm-libs/lua/feedback.lua:313",
+        "_extensions/ctm-libs/lua/feedback.lua:328",
+        "_extensions/ctm-libs/lua/feedback.lua:409"
+      ],
+      "data-ai-feedback-display": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:285",
+        "_extensions/ctm-libs/lua/feedback.lua:167"
+      ],
+      "data-ai-feedback-marked": [
+        "_extensions/ctm-libs/lua/feedback.lua:339",
+        "_extensions/ctm-libs/lua/feedback.lua:343"
+      ],
+      "data-ai-feedback-ready": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:219",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:220"
+      ],
+      "data-ai-feedback-tex": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:284",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:285",
+        "_extensions/ctm-libs/lua/feedback.lua:166"
+      ],
+      "data-answer": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:32"
+      ],
+      "data-auto-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:58",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:90"
+      ],
+      "data-auto-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:58",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:84"
+      ],
+      "data-bs-target": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:128"
+      ],
+      "data-bs-toggle": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:434"
+      ],
+      "data-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:57",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:117",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:129",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:157",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:172",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:175",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:187",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:223"
+      ],
+      "data-ctm-clear-course": [
+        "_extensions/ctm-libs/lua/store.lua:72",
+        "_extensions/ctm-libs/ui/ctm-store.js:432"
+      ],
+      "data-ctm-clear-page": [
+        "_extensions/ctm-libs/lua/store.lua:71",
+        "_extensions/ctm-libs/ui/ctm-store.js:431"
+      ],
+      "data-ctm-component": [
+        "_extensions/ctm-libs/lua/store.lua:48",
+        "_extensions/ctm-libs/ui/ctm-progress.js:31",
+        "_extensions/ctm-libs/ui/ctm-progress.js:34"
+      ],
+      "data-ctm-export": [
+        "_extensions/ctm-libs/lua/store.lua:69",
+        "_extensions/ctm-libs/ui/ctm-export.js:103"
+      ],
+      "data-ctm-id": [
+        "_extensions/ctm-libs/lua/store.lua:48",
+        "_extensions/ctm-libs/ui/ctm-progress.js:32",
+        "_extensions/ctm-libs/ui/ctm-progress.js:33",
+        "_extensions/ctm-libs/ui/ctm-progress.js:38"
+      ],
+      "data-ctm-mathjax-transport": [
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:42"
+      ],
+      "data-ctm-nav": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:36",
+        "_extensions/ctm-libs/ui/ctm-nav.js:401"
+      ],
+      "data-ctm-nav-focus": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:315",
+        "_extensions/ctm-libs/ui/ctm-nav.js:318"
+      ],
+      "data-ctm-quiz": [
+        "_extensions/ctm-libs/lua/progress.lua:21",
+        "_extensions/ctm-libs/ui/ctm-progress.js:82",
+        "_extensions/ctm-libs/ui/ctm-progress.js:82",
+        "_extensions/ctm-libs/ui/ctm-progress.js:82",
+        "_extensions/ctm-libs/ui/ctm-progress.js:112",
+        "_extensions/ctm-libs/ui/ctm-progress.js:115"
+      ],
+      "data-ctm-quiz-heading": [
+        "_extensions/ctm-libs/lua/progress.lua:68",
+        "_extensions/ctm-libs/lua/progress.lua:114",
+        "_extensions/ctm-libs/lua/progress.lua:116"
+      ],
+      "data-ctm-runtime-id": [
+        "_extensions/ctm-libs/lua/store.lua:49",
+        "_extensions/ctm-libs/ui/ctm-progress.js:29",
+        "_extensions/ctm-libs/ui/ctm-progress.js:30",
+        "_extensions/ctm-libs/ui/ctm-progress.js:38",
+        "_extensions/ctm-libs/ui/ctm-store.js:252"
+      ],
+      "data-ctm-save": [
+        "_extensions/ctm-libs/lua/store.lua:50"
+      ],
+      "data-ctm-save-toggle": [
+        "_extensions/ctm-libs/lua/store.lua:67",
+        "_extensions/ctm-libs/ui/ctm-store.js:404",
+        "_extensions/ctm-libs/ui/ctm-store.js:433"
+      ],
+      "data-ctm-source": [
+        "_extensions/ctm-libs/lua/store.lua:50"
+      ],
+      "data-display": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:89",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:215"
+      ],
+      "data-dynamic-action": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:65",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:66",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:68",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:69",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:195",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:219",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:220"
+      ],
+      "data-dynamic-axis": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:64",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:67",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:189"
+      ],
+      "data-dynamic-matrix-name": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:34"
+      ],
+      "data-exercise": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:279",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:283",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:283"
+      ],
+      "data-integration": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:277",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:278",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:290"
+      ],
+      "data-language": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:278"
+      ],
+      "data-last-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:61",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:91",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:107",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:133"
+      ],
+      "data-last-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:61",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:85",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:106",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:136"
+      ],
+      "data-latex": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:298",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:298",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:303"
+      ],
+      "data-learning-mode": [
+        "_extensions/ctm-libs/lua/ui.lua:277"
+      ],
+      "data-lecture": [
+        "_extensions/ctm-libs/lua/ui.lua:251"
+      ],
+      "data-math-exercise-display": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:285"
+      ],
+      "data-math-exercise-source": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:341",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:344"
+      ],
+      "data-math-exercise-tex": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:284",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:285"
+      ],
+      "data-matrix-column": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:35",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:100",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:101",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:122",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:123",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:180"
+      ],
+      "data-matrix-label": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:57",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:82"
+      ],
+      "data-matrix-name": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:279",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:56",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:72",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:81"
+      ],
+      "data-matrix-row": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:35",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:100",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:101",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:122",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:123",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:157",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:180",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:215"
+      ],
+      "data-max-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:60",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:93"
+      ],
+      "data-max-issues": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:290",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:290"
+      ],
+      "data-max-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:59",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:87"
+      ],
+      "data-min-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:60",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:92"
+      ],
+      "data-min-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:59",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:86"
+      ],
+      "data-mml-node": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:298"
+      ],
+      "data-mode": [
+        "_extensions/ctm-libs/lua/ui.lua:249",
+        "_extensions/ctm-libs/lua/ui.lua:250",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:52",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:53",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:70",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:71"
+      ],
+      "data-policy": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:279"
+      ],
+      "data-q-loaded": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:146",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:149"
+      ],
+      "data-reading": [
+        "_extensions/ctm-libs/lua/ui.lua:251"
+      ],
+      "data-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:57",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:116",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:129",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:157",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:171",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:174",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:187",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:223"
+      ],
+      "data-status": [
+        "_extensions/ctm-libs/ui/ctm-progress.js:70"
+      ],
+      "data-structural-label": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:36"
+      ],
+      "data-tex": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:89",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:215"
+      ],
+      "data-vars": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:33"
+      ]
+    }
+  },
+  "py-exercise": {
+    "commit": "5682787dbdff309890b8cb85503cc060d981b4e4",
+    "globals": {
+      "AIFeedback": [
+        "_extensions/py-exercise/py-exercise-feedback.js:5"
+      ],
+      "CTMLayout": [
+        "_extensions/py-exercise/py-exercise.js:517"
+      ],
+      "CTMStore": [
+        "_extensions/py-exercise/py-exercise.js:538"
+      ],
+      "CTM_ASSETS": [
+        "_extensions/py-exercise/py-exercise.js:67",
+        "_extensions/py-exercise/py-exercise.js:67"
+      ],
+      "MathExerciseRuntime": [
+        "_extensions/py-exercise/py-exercise.js:12",
+        "_extensions/py-exercise/py-exercise.js:13",
+        "_extensions/py-exercise/py-exercise.js:22",
+        "_extensions/py-exercise/py-exercise.js:273",
+        "_extensions/py-exercise/py-exercise.js:488",
+        "_extensions/py-exercise/py-exercise.js:621",
+        "_extensions/py-exercise/py-exercise.js:1040"
+      ],
+      "PyExerciseFeedback": [
+        "_extensions/py-exercise/py-exercise-feedback.js:48",
+        "_extensions/py-exercise/py-exercise.js:506"
+      ],
+      "__pyExerciseConfig": [
+        "_extensions/py-exercise/py-exercise.js:60",
+        "_extensions/py-exercise/py-exercise.lua:190"
+      ],
+      "__pyExerciseSlowCheckMs": [
+        "_extensions/py-exercise/py-exercise.js:635"
+      ],
+      "__pyExercises": [
+        "_extensions/py-exercise/py-exercise.js:873",
+        "_extensions/py-exercise/py-exercise.js:914",
+        "_extensions/py-exercise/py-exercise.js:1015",
+        "_extensions/py-exercise/py-exercise.js:1024",
+        "_extensions/py-exercise/py-exercise.lua:322",
+        "_extensions/py-exercise/py-exercise.lua:322"
+      ],
+      "localStorage": [
+        "_extensions/py-exercise/py-exercise.js:396",
+        "_extensions/py-exercise/py-exercise.js:402"
+      ],
+      "location": [
+        "_extensions/py-exercise/py-exercise.js:380"
+      ]
+    },
+    "data_attributes": {
+      "data-ctm-component": [
+        "_extensions/py-exercise/py-exercise.lua:310"
+      ],
+      "data-ctm-id": [
+        "_extensions/py-exercise/py-exercise.lua:310"
+      ],
+      "data-ctm-runtime-id": [
+        "_extensions/py-exercise/py-exercise.lua:310"
+      ],
+      "data-ctm-save": [
+        "_extensions/py-exercise/py-exercise.lua:310"
+      ],
+      "data-ctm-source": [
+        "_extensions/py-exercise/py-exercise.lua:310"
+      ]
+    }
+  },
+  "math-exercise": {
+    "commit": "39df17ee28789e7d8d5d8e0abc01dcb967fc8858",
+    "globals": {
+      "AIFeedback": [
+        "_extensions/math-exercise/math-exercise.js:41",
+        "_extensions/math-exercise/math-exercise.js:985",
+        "_extensions/math-exercise/math-exercise.js:985",
+        "_extensions/math-exercise/math-exercise.js:989",
+        "_extensions/math-exercise/math-exercise.js:989",
+        "_extensions/math-exercise/math-exercise.js:996",
+        "_extensions/math-exercise/math-exercise.js:1676",
+        "_extensions/math-exercise/math-exercise.js:1720",
+        "_extensions/math-exercise/math-similar.js:127"
+      ],
+      "CTMAssets": [
+        "_extensions/math-exercise/math-exercise.js:60"
+      ],
+      "CTMCopy": [
+        "_extensions/math-exercise/math-similar.js:1004",
+        "_extensions/math-exercise/math-similar.js:1383",
+        "_extensions/math-exercise/math-store.js:137",
+        "_extensions/math-exercise/math-store.js:145"
+      ],
+      "CTMLocales": [
+        "_extensions/math-exercise/math-similar.js:197",
+        "_extensions/math-exercise/math-similar.js:1209",
+        "_extensions/math-exercise/math-similar.js:1215",
+        "_extensions/math-exercise/math-similar.js:1221",
+        "_extensions/math-exercise/math-store.js:8"
+      ],
+      "CTMStore": [
+        "_extensions/math-exercise/math-exercise.js:1122",
+        "_extensions/math-exercise/math-exercise.js:1182",
+        "_extensions/math-exercise/math-store.js:6"
+      ],
+      "CTMVariants": [
+        "_extensions/math-exercise/math-exercise.js:1122",
+        "_extensions/math-exercise/math-exercise.js:1126",
+        "_extensions/math-exercise/math-exercise.js:1182"
+      ],
+      "MathExercise": [
+        "_extensions/math-exercise/math-exercise.js:1730",
+        "_extensions/math-exercise/math-exercise.js:1730"
+      ],
+      "MathExerciseBoards": [
+        "_extensions/math-exercise/math-exercise.js:1662",
+        "_extensions/math-exercise/math-exercise.js:1664",
+        "_extensions/math-exercise/variants-board.js:4",
+        "_extensions/math-exercise/variants-board.js:108"
+      ],
+      "MathExerciseRuntime": [
+        "_extensions/math-exercise/math-exercise.js:48",
+        "_extensions/math-exercise/math-exercise.js:141",
+        "_extensions/math-exercise/math-exercise.js:172",
+        "_extensions/math-exercise/math-exercise.js:174",
+        "_extensions/math-exercise/math-exercise.js:176",
+        "_extensions/math-exercise/math-exercise.js:876",
+        "_extensions/math-exercise/math-exercise.js:920",
+        "_extensions/math-exercise/math-exercise.js:922",
+        "_extensions/math-exercise/math-exercise.js:934",
+        "_extensions/math-exercise/math-exercise.js:1379",
+        "_extensions/math-exercise/math-exercise.js:1394",
+        "_extensions/math-exercise/math-exercise.js:1409",
+        "_extensions/math-exercise/math-exercise.js:1410",
+        "_extensions/math-exercise/math-exercise.js:1808"
+      ],
+      "MathExerciseStore": [
+        "_extensions/math-exercise/math-exercise.js:1631",
+        "_extensions/math-exercise/math-exercise.js:1632",
+        "_extensions/math-exercise/math-store.js:201"
+      ],
+      "MathJax": [
+        "_extensions/math-exercise/math-exercise.js:1164",
+        "_extensions/math-exercise/math-exercise.js:1164"
+      ],
+      "MathSimilar": [
+        "_extensions/math-exercise/math-exercise.js:1622",
+        "_extensions/math-exercise/math-exercise.js:1622",
+        "_extensions/math-exercise/math-similar.js:1442"
+      ],
+      "MatrixInput": [
+        "_extensions/math-exercise/math-exercise.js:362",
+        "_extensions/math-exercise/math-exercise.js:633",
+        "_extensions/math-exercise/math-exercise.js:648"
+      ],
+      "MutationObserver": [
+        "_extensions/math-exercise/variants-board.js:87",
+        "_extensions/math-exercise/variants-board.js:88"
+      ],
+      "__mathExerciseConfig": [
+        "_extensions/math-exercise/math-exercise.js:6",
+        "_extensions/math-exercise/math-exercise.lua:188",
+        "_extensions/math-exercise/math-exercise.lua:1151"
+      ],
+      "__mathExerciseSlowCheckMs": [
+        "_extensions/math-exercise/math-exercise.js:914"
+      ],
+      "__mathExerciseTestApi": [
+        "_extensions/math-exercise/math-exercise.js:1736"
+      ],
+      "__mathExerciseTestMode": [
+        "_extensions/math-exercise/math-exercise.js:1735"
+      ],
+      "addEventListener": [
+        "_extensions/math-exercise/math-exercise.js:110",
+        "_extensions/math-exercise/math-exercise.js:111",
+        "_extensions/math-exercise/math-exercise.js:738",
+        "_extensions/math-exercise/variants-board.js:82",
+        "_extensions/math-exercise/variants-board.js:83"
+      ],
+      "bootstrap": [
+        "_extensions/math-exercise/math-exercise.js:1568",
+        "_extensions/math-exercise/math-exercise.js:1568",
+        "_extensions/math-exercise/math-exercise.js:1569"
+      ],
+      "cancelAnimationFrame": [
+        "_extensions/math-exercise/variants-board.js:98",
+        "_extensions/math-exercise/variants-board.js:98"
+      ],
+      "clearTimeout": [
+        "_extensions/math-exercise/math-exercise.js:708",
+        "_extensions/math-exercise/variants-board.js:99"
+      ],
+      "confirm": [
+        "_extensions/math-exercise/math-store.js:196"
+      ],
+      "console": [
+        "_extensions/math-exercise/variants-board.js:11"
+      ],
+      "katex": [
+        "_extensions/math-exercise/math-exercise.js:71"
+      ],
+      "querySelectorAll": [
+        "_extensions/math-exercise/math-exercise.js:611",
+        "_extensions/math-exercise/math-exercise.js:637"
+      ],
+      "removeEventListener": [
+        "_extensions/math-exercise/math-exercise.js:709",
+        "_extensions/math-exercise/variants-board.js:102",
+        "_extensions/math-exercise/variants-board.js:102"
+      ],
+      "renderMathInElement": [
+        "_extensions/math-exercise/math-exercise.js:71"
+      ],
+      "requestAnimationFrame": [
+        "_extensions/math-exercise/math-exercise.js:679",
+        "_extensions/math-exercise/math-exercise.js:680",
+        "_extensions/math-exercise/math-exercise.js:682",
+        "_extensions/math-exercise/variants-board.js:69",
+        "_extensions/math-exercise/variants-board.js:69"
+      ],
+      "setTimeout": [
+        "_extensions/math-exercise/math-exercise.js:685",
+        "_extensions/math-exercise/math-exercise.js:701",
+        "_extensions/math-exercise/variants-board.js:70"
+      ],
+      "textContent": [
+        "_extensions/math-exercise/math-exercise.js:986"
+      ]
+    },
+    "data_attributes": {
+      "data-ai-feedback-display": [
+        "_extensions/math-exercise/native-variants.lua:57"
+      ],
+      "data-ai-feedback-tex": [
+        "_extensions/math-exercise/native-variants.lua:56"
+      ],
+      "data-answer": [
+        "_extensions/math-exercise/math-exercise.js:253",
+        "_extensions/math-exercise/math-exercise.js:263",
+        "_extensions/math-exercise/math-exercise.js:578",
+        "_extensions/math-exercise/math-exercise.js:894",
+        "_extensions/math-exercise/math-exercise.js:1611",
+        "_extensions/math-exercise/math-exercise.js:1611",
+        "_extensions/math-exercise/math-exercise.lua:341",
+        "_extensions/math-exercise/math-exercise.lua:354",
+        "_extensions/math-exercise/math-exercise.lua:425",
+        "_extensions/math-exercise/math-similar.js:439",
+        "_extensions/math-exercise/math-similar.js:1203"
+      ],
+      "data-auto-cols": [
+        "_extensions/math-exercise/math-exercise.js:601",
+        "_extensions/math-exercise/math-exercise.lua:456"
+      ],
+      "data-auto-rows": [
+        "_extensions/math-exercise/math-exercise.js:595",
+        "_extensions/math-exercise/math-exercise.lua:455"
+      ],
+      "data-checker": [
+        "_extensions/math-exercise/math-exercise.js:1063",
+        "_extensions/math-exercise/math-exercise.lua:1011"
+      ],
+      "data-cols": [
+        "_extensions/math-exercise/math-exercise.js:618",
+        "_extensions/math-exercise/math-exercise.lua:454",
+        "_extensions/math-exercise/math-store.js:127"
+      ],
+      "data-context": [
+        "_extensions/math-exercise/math-exercise.js:995",
+        "_extensions/math-exercise/math-exercise.lua:297",
+        "_extensions/math-exercise/math-exercise.lua:1025"
+      ],
+      "data-context-mode": [
+        "_extensions/math-exercise/math-exercise.js:996",
+        "_extensions/math-exercise/math-exercise.js:999",
+        "_extensions/math-exercise/math-exercise.js:1005",
+        "_extensions/math-exercise/math-exercise.js:1682",
+        "_extensions/math-exercise/math-exercise.lua:1023"
+      ],
+      "data-context-refs": [
+        "_extensions/math-exercise/math-exercise.js:996",
+        "_extensions/math-exercise/math-exercise.js:1682",
+        "_extensions/math-exercise/math-exercise.lua:1024"
+      ],
+      "data-context-text": [
+        "_extensions/math-exercise/math-exercise.js:998",
+        "_extensions/math-exercise/math-exercise.lua:1026"
+      ],
+      "data-copy-mode": [
+        "_extensions/math-exercise/math-similar.js:254"
+      ],
+      "data-ctm-id": [
+        "_extensions/math-exercise/math-exercise.js:1633"
+      ],
+      "data-ctm-runtime-id": [
+        "_extensions/math-exercise/math-store.js:190"
+      ],
+      "data-ctm-save": [
+        "_extensions/math-exercise/math-store.js:158"
+      ],
+      "data-ctm-source": [
+        "_extensions/math-exercise/math-similar.js:715",
+        "_extensions/math-exercise/math-similar.js:1136",
+        "_extensions/math-exercise/math-similar.js:1326",
+        "_extensions/math-exercise/math-store.js:7",
+        "_extensions/math-exercise/math-store.js:47",
+        "_extensions/math-exercise/math-store.js:158"
+      ],
+      "data-decplaces": [
+        "_extensions/math-exercise/math-exercise.js:1072",
+        "_extensions/math-exercise/math-exercise.lua:1008"
+      ],
+      "data-dynamic-action": [
+        "_extensions/math-exercise/math-exercise.lua:463",
+        "_extensions/math-exercise/math-exercise.lua:464",
+        "_extensions/math-exercise/math-exercise.lua:466",
+        "_extensions/math-exercise/math-exercise.lua:467"
+      ],
+      "data-dynamic-axis": [
+        "_extensions/math-exercise/math-exercise.lua:462",
+        "_extensions/math-exercise/math-exercise.lua:465"
+      ],
+      "data-dynamic-matrix-name": [
+        "_extensions/math-exercise/math-exercise.js:801",
+        "_extensions/math-exercise/math-exercise.js:804",
+        "_extensions/math-exercise/math-exercise.js:806",
+        "_extensions/math-exercise/math-exercise.js:808",
+        "_extensions/math-exercise/math-exercise.js:839",
+        "_extensions/math-exercise/math-exercise.lua:426"
+      ],
+      "data-embed-response": [
+        "_extensions/math-exercise/math-exercise.js:1084",
+        "_extensions/math-exercise/math-exercise.lua:1015"
+      ],
+      "data-feedback-policy": [
+        "_extensions/math-exercise/math-exercise.js:1683",
+        "_extensions/math-exercise/math-exercise.lua:1020"
+      ],
+      "data-field-labels": [
+        "_extensions/math-exercise/math-exercise.js:1059",
+        "_extensions/math-exercise/math-exercise.lua:1018"
+      ],
+      "data-fields": [
+        "_extensions/math-exercise/math-exercise.js:1195",
+        "_extensions/math-exercise/math-exercise.js:1219",
+        "_extensions/math-exercise/math-exercise.js:1305",
+        "_extensions/math-exercise/math-exercise.js:1549",
+        "_extensions/math-exercise/math-exercise.lua:1083",
+        "_extensions/math-exercise/math-exercise.lua:1094",
+        "_extensions/math-exercise/math-similar.js:454",
+        "_extensions/math-exercise/math-similar.js:844"
+      ],
+      "data-form": [
+        "_extensions/math-exercise/math-exercise.js:1074",
+        "_extensions/math-exercise/math-exercise.lua:1010"
+      ],
+      "data-form-credit": [
+        "_extensions/math-exercise/math-exercise.js:870",
+        "_extensions/math-exercise/math-exercise.js:1067",
+        "_extensions/math-exercise/math-exercise.lua:1017"
+      ],
+      "data-generation-policy": [
+        "_extensions/math-exercise/math-exercise.lua:1000",
+        "_extensions/math-exercise/math-similar.js:776"
+      ],
+      "data-givens": [
+        "_extensions/math-exercise/math-exercise.js:1064",
+        "_extensions/math-exercise/math-exercise.lua:1012",
+        "_extensions/math-exercise/math-similar.js:1283"
+      ],
+      "data-initial-values": [
+        "_extensions/math-exercise/math-exercise.js:1331",
+        "_extensions/math-exercise/math-exercise.lua:1039"
+      ],
+      "data-key-disputed": [
+        "_extensions/math-exercise/math-similar.js:1070"
+      ],
+      "data-label": [
+        "_extensions/math-exercise/math-exercise.js:1000",
+        "_extensions/math-exercise/math-exercise.js:1006",
+        "_extensions/math-exercise/math-exercise.js:1056",
+        "_extensions/math-exercise/math-exercise.lua:1003",
+        "_extensions/math-exercise/math-similar.js:177",
+        "_extensions/math-exercise/math-similar.js:777",
+        "_extensions/math-exercise/math-similar.js:1187"
+      ],
+      "data-last-cols": [
+        "_extensions/math-exercise/math-exercise.js:602",
+        "_extensions/math-exercise/math-exercise.lua:459"
+      ],
+      "data-last-rows": [
+        "_extensions/math-exercise/math-exercise.js:596",
+        "_extensions/math-exercise/math-exercise.lua:459"
+      ],
+      "data-math-enter-listener": [
+        "_extensions/math-exercise/math-exercise.js:1516",
+        "_extensions/math-exercise/math-exercise.js:1517"
+      ],
+      "data-math-exercise-source": [
+        "_extensions/math-exercise/math-exercise.js:578",
+        "_extensions/math-exercise/math-exercise.lua:946",
+        "_extensions/math-exercise/math-exercise.lua:1099"
+      ],
+      "data-matrix-column": [
+        "_extensions/math-exercise/math-exercise.js:622",
+        "_extensions/math-exercise/math-exercise.js:806",
+        "_extensions/math-exercise/math-exercise.lua:427"
+      ],
+      "data-matrix-name": [
+        "_extensions/math-exercise/math-exercise.js:593",
+        "_extensions/math-exercise/math-exercise.js:612",
+        "_extensions/math-exercise/math-exercise.js:643",
+        "_extensions/math-exercise/math-exercise.js:789",
+        "_extensions/math-exercise/math-exercise.lua:453",
+        "_extensions/math-exercise/math-exercise.lua:469",
+        "_extensions/math-exercise/math-store.js:40",
+        "_extensions/math-exercise/math-store.js:76",
+        "_extensions/math-exercise/math-store.js:131"
+      ],
+      "data-matrix-row": [
+        "_extensions/math-exercise/math-exercise.js:622",
+        "_extensions/math-exercise/math-exercise.js:808",
+        "_extensions/math-exercise/math-exercise.lua:427"
+      ],
+      "data-max-cols": [
+        "_extensions/math-exercise/math-exercise.js:604",
+        "_extensions/math-exercise/math-exercise.lua:458"
+      ],
+      "data-max-rows": [
+        "_extensions/math-exercise/math-exercise.js:598",
+        "_extensions/math-exercise/math-exercise.lua:457"
+      ],
+      "data-min-cols": [
+        "_extensions/math-exercise/math-exercise.js:603",
+        "_extensions/math-exercise/math-exercise.lua:458"
+      ],
+      "data-min-rows": [
+        "_extensions/math-exercise/math-exercise.js:597",
+        "_extensions/math-exercise/math-exercise.lua:457"
+      ],
+      "data-mode": [
+        "_extensions/math-exercise/math-exercise.js:1054",
+        "_extensions/math-exercise/math-exercise.lua:1004"
+      ],
+      "data-outdated": [
+        "_extensions/math-exercise/math-store.js:99",
+        "_extensions/math-exercise/math-store.js:178",
+        "_extensions/math-exercise/math-store.js:180"
+      ],
+      "data-packages": [
+        "_extensions/math-exercise/math-exercise.js:1066",
+        "_extensions/math-exercise/math-exercise.lua:1013"
+      ],
+      "data-partial-credit": [
+        "_extensions/math-exercise/math-exercise.js:1080",
+        "_extensions/math-exercise/math-exercise.lua:1016"
+      ],
+      "data-pool": [
+        "_extensions/math-exercise/math-exercise.js:1122",
+        "_extensions/math-exercise/math-exercise.js:1173",
+        "_extensions/math-exercise/math-exercise.lua:1081"
+      ],
+      "data-reject": [
+        "_extensions/math-exercise/math-exercise.js:1055",
+        "_extensions/math-exercise/math-exercise.lua:1005"
+      ],
+      "data-response": [
+        "_extensions/math-exercise/math-exercise.js:1079",
+        "_extensions/math-exercise/math-exercise.lua:1014",
+        "_extensions/math-exercise/math-similar.js:132"
+      ],
+      "data-rows": [
+        "_extensions/math-exercise/math-exercise.js:618",
+        "_extensions/math-exercise/math-exercise.lua:454"
+      ],
+      "data-sigfigs": [
+        "_extensions/math-exercise/math-exercise.js:1073",
+        "_extensions/math-exercise/math-exercise.lua:1009"
+      ],
+      "data-similar": [
+        "_extensions/math-exercise/math-exercise.lua:998",
+        "_extensions/math-exercise/math-similar.js:129"
+      ],
+      "data-similar-data": [
+        "_extensions/math-exercise/math-exercise.lua:1001",
+        "_extensions/math-exercise/math-similar.js:152"
+      ],
+      "data-similar-generated": [
+        "_extensions/math-exercise/math-exercise.js:1069"
+      ],
+      "data-similar-guidance": [
+        "_extensions/math-exercise/math-exercise.lua:999",
+        "_extensions/math-exercise/math-similar.js:785"
+      ],
+      "data-storage-variants": [
+        "_extensions/math-exercise/math-exercise.js:1104",
+        "_extensions/math-exercise/math-exercise.lua:1079"
+      ],
+      "data-structural-field-labels": [
+        "_extensions/math-exercise/math-exercise.js:1061",
+        "_extensions/math-exercise/math-exercise.js:1196",
+        "_extensions/math-exercise/math-exercise.js:1306",
+        "_extensions/math-exercise/math-exercise.js:1550",
+        "_extensions/math-exercise/math-exercise.lua:1084",
+        "_extensions/math-exercise/math-exercise.lua:1095"
+      ],
+      "data-structural-label": [
+        "_extensions/math-exercise/math-exercise.js:1300",
+        "_extensions/math-exercise/math-exercise.lua:428"
+      ],
+      "data-tolerance": [
+        "_extensions/math-exercise/math-exercise.js:1071",
+        "_extensions/math-exercise/math-exercise.lua:1007"
+      ],
+      "data-variant-board-title": [
+        "_extensions/math-exercise/math-exercise.js:1664",
+        "_extensions/math-exercise/math-exercise.lua:1022"
+      ],
+      "data-variant-boards": [
+        "_extensions/math-exercise/math-exercise.js:1662",
+        "_extensions/math-exercise/math-exercise.js:1665",
+        "_extensions/math-exercise/math-exercise.lua:1021"
+      ],
+      "data-variant-id": [
+        "_extensions/math-exercise/math-exercise.js:1150"
+      ],
+      "data-variants": [
+        "_extensions/math-exercise/math-exercise.js:1106",
+        "_extensions/math-exercise/math-exercise.js:1106",
+        "_extensions/math-exercise/math-exercise.lua:1049"
+      ],
+      "data-vars": [
+        "_extensions/math-exercise/math-exercise.js:254",
+        "_extensions/math-exercise/math-exercise.js:264",
+        "_extensions/math-exercise/math-exercise.js:895",
+        "_extensions/math-exercise/math-exercise.js:1053",
+        "_extensions/math-exercise/math-exercise.lua:342",
+        "_extensions/math-exercise/math-exercise.lua:355",
+        "_extensions/math-exercise/math-exercise.lua:425",
+        "_extensions/math-exercise/math-exercise.lua:1006",
+        "_extensions/math-exercise/math-similar.js:150",
+        "_extensions/math-exercise/math-similar.js:412",
+        "_extensions/math-exercise/math-similar.js:683",
+        "_extensions/math-exercise/math-similar.js:693",
+        "_extensions/math-exercise/math-similar.js:843",
+        "_extensions/math-exercise/math-similar.js:866"
+      ],
+      "data-vecdir": [
+        "_extensions/math-exercise/math-exercise.js:1057",
+        "_extensions/math-exercise/math-exercise.lua:1019",
+        "_extensions/math-exercise/math-similar.js:428",
+        "_extensions/math-exercise/math-similar.js:711"
+      ]
+    }
+  },
+  "ctm-checkers": {
+    "commit": "4cff6aa604fb04de838e7c479d38f14ad9e21c57",
+    "globals": {
+      "CTMCheckers": [
+        "_extensions/ctm-checkers/ctm-checkers-stack.js:63",
+        "_extensions/ctm-checkers/ctm-checkers.js:59",
+        "_extensions/ctm-checkers/ctm-checkers.js:59"
+      ],
+      "CTMCheckersStack": [
+        "_extensions/ctm-checkers/ctm-checkers-stack.js:9095",
+        "_extensions/ctm-checkers/ctm-checkers-stack.js:9095"
+      ],
+      "CTMCreateStackAdmission": [
+        "_extensions/ctm-checkers/ctm-checkers-stack.js:345"
+      ]
+    },
+    "data_attributes": {}
+  },
+  "ctm-assessment": {
+    "commit": "cf1ca2a9abdb3647b04b8fd298d2b123002ebcaf",
+    "globals": {
+      "CTM_COI_FRAME_STARTUP": [
+        "_extensions/ctm-assessment/ctm-assessment.lua:36"
+      ]
+    },
+    "data_attributes": {}
+  },
+  "ctm-stack": {
+    "commit": "e8437f1f7420ec33dd9f7b7f5a8469e2b6473b55",
+    "globals": {
+      "AIFeedback": [
+        "_extensions/ctm-stack/ctm-stack.js:250",
+        "_extensions/ctm-stack/ctm-stack.js:371"
+      ],
+      "CTMCheckersStack": [
+        "_extensions/ctm-stack/backends/sympy.js:23",
+        "_extensions/ctm-stack/backends/sympy.js:41",
+        "_extensions/ctm-stack/backends/sympy.js:54"
+      ],
+      "CTMLocales": [
+        "_extensions/ctm-stack/ctm-stack.js:6",
+        "_extensions/ctm-stack/ctm-stack.js:117"
+      ],
+      "CTMMaximaDirect": [
+        "_extensions/ctm-stack/native/direct-runtime.js:140",
+        "_extensions/ctm-stack/native/node-runtime.mjs:93"
+      ],
+      "CTMStackAdapters": [
+        "_extensions/ctm-stack/backends/sympy.js:4",
+        "_extensions/ctm-stack/backends/sympy.js:4",
+        "_extensions/ctm-stack/ctm-stack.js:23"
+      ],
+      "CTMStore": [
+        "_extensions/ctm-stack/ctm-stack.js:569",
+        "_extensions/ctm-stack/ctm-stack.js:570",
+        "_extensions/ctm-stack/ctm-stack.js:592",
+        "_extensions/ctm-stack/ctm-stack.js:592"
+      ],
+      "CTMVariants": [
+        "_extensions/ctm-stack/ctm-stack.js:592",
+        "_extensions/ctm-stack/ctm-stack.js:593"
+      ],
+      "CTMWorker": [
+        "_extensions/ctm-stack/backends/sympy.js:40"
+      ],
+      "MathExerciseRuntime": [
+        "_extensions/ctm-stack/backends/sympy.js:14",
+        "_extensions/ctm-stack/backends/sympy.js:40",
+        "_extensions/ctm-stack/backends/sympy.js:53",
+        "_extensions/ctm-stack/backends/sympy.js:61",
+        "_extensions/ctm-stack/ctm-stack.js:22",
+        "_extensions/ctm-stack/ctm-stack.js:103"
+      ],
+      "MathJax": [
+        "_extensions/ctm-stack/ctm-stack.js:98",
+        "_extensions/ctm-stack/ctm-stack.js:98",
+        "_extensions/ctm-stack/ctm-stack.js:98",
+        "_extensions/ctm-stack/ctm-stack.js:98",
+        "_extensions/ctm-stack/ctm-stack.js:99",
+        "_extensions/ctm-stack/ctm-stack.js:99",
+        "_extensions/ctm-stack/ctm-stack.js:101",
+        "_extensions/ctm-stack/ctm-stack.js:101",
+        "_extensions/ctm-stack/ctm-stack.js:105",
+        "_extensions/ctm-stack/ctm-stack.js:105",
+        "_extensions/ctm-stack/ctm-stack.js:106",
+        "_extensions/ctm-stack/ctm-stack.js:107",
+        "_extensions/ctm-stack/ctm-stack.js:139",
+        "_extensions/ctm-stack/ctm-stack.js:139",
+        "_extensions/ctm-stack/ctm-stack.js:140"
+      ],
+      "MatrixInput": [
+        "_extensions/ctm-stack/ctm-stack.js:260"
+      ],
+      "confirm": [
+        "_extensions/ctm-stack/ctm-stack.js:609"
+      ],
+      "crossOriginIsolated": [
+        "_extensions/ctm-stack/ctm-stack.js:21"
+      ]
+    },
+    "data_attributes": {
+      "data-backend": [
+        "_extensions/ctm-stack/ctm-stack.js:9",
+        "_extensions/ctm-stack/ctm-stack.js:11",
+        "_extensions/ctm-stack/ctm-stack.js:486",
+        "_extensions/ctm-stack/ctm-stack.lua:125",
+        "_extensions/ctm-stack/ctm-stack.lua:151"
+      ],
+      "data-ctm-id": [
+        "_extensions/ctm-stack/ctm-stack.js:461",
+        "_extensions/ctm-stack/ctm-stack.js:570",
+        "_extensions/ctm-stack/ctm-stack.js:593"
+      ],
+      "data-ctm-save": [
+        "_extensions/ctm-stack/ctm-stack.js:571"
+      ],
+      "data-ctm-source": [
+        "_extensions/ctm-stack/ctm-stack.js:569",
+        "_extensions/ctm-stack/ctm-stack.js:571"
+      ],
+      "data-lang": [
+        "_extensions/ctm-stack/ctm-stack.js:6",
+        "_extensions/ctm-stack/ctm-stack.js:117",
+        "_extensions/ctm-stack/ctm-stack.lua:126"
+      ],
+      "data-latex": [
+        "_extensions/ctm-stack/ctm-stack.js:220",
+        "_extensions/ctm-stack/ctm-stack.js:350",
+        "_extensions/ctm-stack/ctm-stack.js:440"
+      ],
+      "data-mathjax": [
+        "_extensions/ctm-stack/ctm-stack.js:103",
+        "_extensions/ctm-stack/ctm-stack.lua:159"
+      ],
+      "data-matrix-spec": [
+        "_extensions/ctm-stack/ctm-stack.js:332",
+        "_extensions/ctm-stack/ctm-stack.js:557",
+        "_extensions/ctm-stack/ctm-stack.js:557",
+        "_extensions/ctm-stack/ctm-stack.js:557"
+      ],
+      "data-name": [
+        "_extensions/ctm-stack/ctm-stack.js:176",
+        "_extensions/ctm-stack/ctm-stack.js:178",
+        "_extensions/ctm-stack/ctm-stack.js:191",
+        "_extensions/ctm-stack/ctm-stack.js:211",
+        "_extensions/ctm-stack/ctm-stack.js:212",
+        "_extensions/ctm-stack/ctm-stack.js:246",
+        "_extensions/ctm-stack/ctm-stack.js:247",
+        "_extensions/ctm-stack/ctm-stack.js:301",
+        "_extensions/ctm-stack/ctm-stack.js:303",
+        "_extensions/ctm-stack/ctm-stack.js:312",
+        "_extensions/ctm-stack/ctm-stack.js:317",
+        "_extensions/ctm-stack/ctm-stack.js:323",
+        "_extensions/ctm-stack/ctm-stack.js:346",
+        "_extensions/ctm-stack/ctm-stack.js:401",
+        "_extensions/ctm-stack/ctm-stack.js:428",
+        "_extensions/ctm-stack/ctm-stack.js:464",
+        "_extensions/ctm-stack/ctm-stack.js:509",
+        "_extensions/ctm-stack/ctm-stack.js:551",
+        "_extensions/ctm-stack/ctm-stack.js:552",
+        "_extensions/ctm-stack/ctm-stack.js:553",
+        "_extensions/ctm-stack/ctm-stack.js:555",
+        "_extensions/ctm-stack/ctm-stack.js:555",
+        "_extensions/ctm-stack/ctm-stack.js:562",
+        "_extensions/ctm-stack/ctm-stack.js:564",
+        "_extensions/ctm-stack/ctm-stack.js:564",
+        "_extensions/ctm-stack/ctm-stack.js:584",
+        "_extensions/ctm-stack/ctm-stack.js:586",
+        "_extensions/ctm-stack/ctm-stack.js:586",
+        "_extensions/ctm-stack/ctm-stack.js:587"
+      ],
+      "data-stack-feedback": [
+        "_extensions/ctm-stack/ctm-stack.js:372",
+        "_extensions/ctm-stack/ctm-stack.js:374",
+        "_extensions/ctm-stack/ctm-stack.lua:135"
+      ],
+      "data-stack-id": [
+        "_extensions/ctm-stack/ctm-stack.js:42",
+        "_extensions/ctm-stack/ctm-stack.js:327",
+        "_extensions/ctm-stack/ctm-stack.js:389",
+        "_extensions/ctm-stack/ctm-stack.js:550",
+        "_extensions/ctm-stack/ctm-stack.lua:125"
+      ],
+      "data-stack-variant-hash": [
+        "_extensions/ctm-stack/ctm-stack.js:447"
+      ],
+      "data-stack-variant-id": [
+        "_extensions/ctm-stack/ctm-stack.js:446"
+      ],
+      "data-state": [
+        "_extensions/ctm-stack/ctm-stack.js:148",
+        "_extensions/ctm-stack/ctm-stack.js:166",
+        "_extensions/ctm-stack/ctm-stack.js:206",
+        "_extensions/ctm-stack/ctm-stack.js:219",
+        "_extensions/ctm-stack/ctm-stack.js:231",
+        "_extensions/ctm-stack/ctm-stack.js:344",
+        "_extensions/ctm-stack/ctm-stack.js:351",
+        "_extensions/ctm-stack/ctm-stack.js:436",
+        "_extensions/ctm-stack/ctm-stack.js:441"
+      ],
+      "data-stop-after": [
+        "_extensions/ctm-stack/ctm-stack.js:59",
+        "_extensions/ctm-stack/ctm-stack.lua:126"
+      ],
+      "data-validation": [
+        "_extensions/ctm-stack/ctm-stack.lua:130"
+      ]
+    }
+  },
+  "ctm-demo": {
+    "commit": "891e5ffd1c7cd7f400a6f07aa0fc2a13bfd290f8",
+    "globals": {},
+    "data_attributes": {}
+  },
+  "ingmat3a_ntnu": {
+    "commit": "5915fa446ba6644ac4c9c9c62cbc315bdd2fb82c",
+    "globals": {},
+    "data_attributes": {}
+  },
+  "stack-wasm-maxima": {
+    "commit": "63ee8e434339f6553a7bd2a263e794769f40ad9a",
+    "globals": {},
+    "data_attributes": {}
+  },
+  "pyodide-interaktiv": {
+    "commit": "793a87262e60ada72c08560ed8c5db011483baae",
+    "globals": {
+      "AIFeedback": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:4",
+        "_extensions/ctm-libs/feedback/feedback-core.js:6",
+        "_extensions/ctm-libs/feedback/feedback-core.js:6",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:4",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:447",
+        "_extensions/pyodide-interaktiv/qpyodide-feedback.js:7",
+        "_extensions/pyodide-interaktiv/qpyodide-storage-settings.js:35"
+      ],
+      "BroadcastChannel": [
+        "_extensions/ctm-libs/ui/ctm-store.js:93",
+        "_extensions/ctm-libs/ui/ctm-store.js:95"
+      ],
+      "CSS": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:127"
+      ],
+      "CTMAssets": [
+        "_extensions/ctm-libs/assets.js:5",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:194",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:194",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:107",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:107",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:107",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:114",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:114",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:799"
+      ],
+      "CTMCheckers": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:381",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:404"
+      ],
+      "CTMCheckersStack": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:382"
+      ],
+      "CTMCoiFrameStartup": [
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:5",
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:6"
+      ],
+      "CTMCoiSettled": [
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:34"
+      ],
+      "CTMCopy": [
+        "_extensions/ctm-libs/ui/ctm-copy.js:4",
+        "_extensions/ctm-libs/ui/ctm-copy.js:56",
+        "_extensions/ctm-libs/ui/ctm-export.js:86"
+      ],
+      "CTMExport": [
+        "_extensions/ctm-libs/ui/ctm-export.js:4",
+        "_extensions/ctm-libs/ui/ctm-export.js:101"
+      ],
+      "CTMLayout": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:4",
+        "_extensions/ctm-libs/ui/ctm-layout.js:98",
+        "_extensions/ctm-libs/ui/ctm-progress.js:164",
+        "_extensions/ctm-libs/ui/ctm-progress.js:175",
+        "_extensions/ctm-libs/ui/ctm-progress.js:225",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:119",
+        "_extensions/ctm-libs/ui/ctm-store.js:492",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:729"
+      ],
+      "CTMLocales": [
+        "_extensions/ctm-libs/locales/ctm-locale.js:14",
+        "_extensions/ctm-libs/locales/ctm-locale.js:14",
+        "_extensions/ctm-libs/locales/ctm-locale.js:140",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:796",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:796",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1121",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1121",
+        "_extensions/ctm-libs/ui/ctm-copy.js:7",
+        "_extensions/ctm-libs/ui/ctm-settings.js:10",
+        "_extensions/ctm-libs/ui/ctm-store.js:481",
+        "_extensions/ctm-libs/ui/ctm-store.js:482"
+      ],
+      "CTMNav": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:40",
+        "_extensions/ctm-libs/ui/ctm-nav.js:485",
+        "_extensions/ctm-libs/ui/ctm-progress.js:100",
+        "_extensions/ctm-libs/ui/ctm-progress.js:100",
+        "_extensions/ctm-libs/ui/ctm-progress.js:103",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:83"
+      ],
+      "CTMReveal": [
+        "_extensions/ctm-libs/ui/ctm-reveal.js:18",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:112"
+      ],
+      "CTMSettings": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:30",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:30",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:33",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:33",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:34",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:38",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:40",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:43",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:103",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:103",
+        "_extensions/ctm-libs/ui/ctm-export.js:98",
+        "_extensions/ctm-libs/ui/ctm-export.js:98",
+        "_extensions/ctm-libs/ui/ctm-progress.js:132",
+        "_extensions/ctm-libs/ui/ctm-progress.js:132",
+        "_extensions/ctm-libs/ui/ctm-settings.js:4",
+        "_extensions/ctm-libs/ui/ctm-settings.js:56",
+        "_extensions/ctm-libs/ui/ctm-store.js:419",
+        "_extensions/ctm-libs/ui/ctm-store.js:420",
+        "_extensions/ctm-libs/ui/ctm-store.js:424",
+        "_extensions/ctm-libs/ui/ctm-store.js:425"
+      ],
+      "CTMStore": [
+        "_extensions/ctm-libs/ui/ctm-export.js:62",
+        "_extensions/ctm-libs/ui/ctm-export.js:76",
+        "_extensions/ctm-libs/ui/ctm-progress.js:206",
+        "_extensions/ctm-libs/ui/ctm-store.js:4",
+        "_extensions/ctm-libs/ui/ctm-store.js:465",
+        "_extensions/ctm-libs/ui/ctm-store.js:491",
+        "_extensions/ctm-libs/ui/variants.js:30",
+        "_extensions/pyodide-interaktiv/qpyodide-storage-settings.js:31",
+        "_extensions/pyodide-interaktiv/qpyodide-storage.js:9"
+      ],
+      "CTMVariants": [
+        "_extensions/ctm-libs/ui/variants.js:4",
+        "_extensions/ctm-libs/ui/variants.js:96"
+      ],
+      "CTMWorker": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:207",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:207",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:210",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:24",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:24",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1193"
+      ],
+      "CTM_ASSETS": [
+        "_extensions/ctm-libs/assets.js:7",
+        "_extensions/ctm-libs/lua/assets.lua:128",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:798",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:798"
+      ],
+      "CTM_COI_FRAME_STARTUP": [
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:15"
+      ],
+      "ClipboardItem": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:79"
+      ],
+      "CustomEvent": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:581",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:581"
+      ],
+      "MathExerciseRuntime": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:58",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:87",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:87",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:88",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:88",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:89",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:90",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:91",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:92",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:620",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:827",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1134",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:649",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:736"
+      ],
+      "MathJax": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:223",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:223",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:223",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:7",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:96",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:40",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:40",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:40",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:41"
+      ],
+      "MatrixInput": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:232"
+      ],
+      "MonacoEnvironment": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:648",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:648"
+      ],
+      "MutationObserver": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:26",
+        "_extensions/ctm-libs/ui/ctm-layout.js:27"
+      ],
+      "QPYODIDE_WORKER_PLUGIN": [
+        "_extensions/pyodide-interaktiv/qpyodide-worker-plugin.js:14"
+      ],
+      "QP_L": [
+        "_extensions/pyodide-interaktiv/qpyodide-locale.js:7",
+        "_extensions/pyodide-interaktiv/qpyodide-storage-settings.js:6",
+        "_extensions/pyodide-interaktiv/qpyodide.lua:763"
+      ],
+      "ResizeObserver": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:71",
+        "_extensions/ctm-libs/ui/ctm-layout.js:71",
+        "_extensions/ctm-libs/ui/ctm-progress.js:170"
+      ],
+      "Worker": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:647",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:670"
+      ],
+      "__aiFeedbackConfig": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:17",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:20",
+        "_extensions/ctm-libs/lua/feedback.lua:388",
+        "_extensions/pyodide-interaktiv/qpyodide-feedback.js:6",
+        "_extensions/pyodide-interaktiv/qpyodide-feedback.js:6"
+      ],
+      "__aiFeedbackPolicies": [
+        "_extensions/ctm-libs/feedback/feedback-core.js:41",
+        "_extensions/ctm-libs/lua/policy.lua:3",
+        "_extensions/ctm-libs/lua/policy.lua:8",
+        "_extensions/ctm-libs/lua/policy.lua:11"
+      ],
+      "__ctmStandaloneCoiRegistered": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:51",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:52"
+      ],
+      "__ctmWorkerNoBackground": [
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:792",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1073"
+      ],
+      "__qExercisePyodide": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:216",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:217",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:225",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:230",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:230"
+      ],
+      "__qExercisePyodideTimeout": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:125"
+      ],
+      "_qpyodideGetInstance": [
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:815",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:153"
+      ],
+      "addEventListener": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:429",
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:19",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:34",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:14",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:32",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:51",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:55",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:57",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:368",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:369",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1171",
+        "_extensions/ctm-libs/ui/ctm-layout.js:81",
+        "_extensions/ctm-libs/ui/ctm-nav.js:61",
+        "_extensions/ctm-libs/ui/ctm-nav.js:367",
+        "_extensions/ctm-libs/ui/ctm-nav.js:446",
+        "_extensions/ctm-libs/ui/ctm-nav.js:452",
+        "_extensions/ctm-libs/ui/ctm-nav.js:453",
+        "_extensions/ctm-libs/ui/ctm-nav.js:462",
+        "_extensions/ctm-libs/ui/ctm-nav.js:480",
+        "_extensions/ctm-libs/ui/ctm-progress.js:165",
+        "_extensions/ctm-libs/ui/ctm-progress.js:181",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:92",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:100",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:109",
+        "_extensions/ctm-libs/ui/ctm-store.js:438",
+        "_extensions/ctm-libs/ui/ctm-store.js:464",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:115",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:801",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:802",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:803",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-initialization.js:35",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:45",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:185",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:186",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:198",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:199"
+      ],
+      "bootstrap": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:149",
+        "_extensions/ctm-libs/ui/ctm-nav.js:149",
+        "_extensions/ctm-libs/ui/ctm-nav.js:176",
+        "_extensions/ctm-libs/ui/ctm-nav.js:176"
+      ],
+      "caches": [
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:396",
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:414",
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:423",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:428",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:446",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:455"
+      ],
+      "cancelAnimationFrame": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:49"
+      ],
+      "confirm": [
+        "_extensions/ctm-libs/ui/ctm-store.js:431",
+        "_extensions/ctm-libs/ui/ctm-store.js:432",
+        "_extensions/ctm-libs/ui/ctm-store.js:434",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:753"
+      ],
+      "crossOriginIsolated": [
+        "_extensions/ctm-libs/runtime/coi-serviceworker.js:98",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:59",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:585",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1086",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:38",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:60",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:89"
+      ],
+      "crypto": [
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:396",
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:405",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:428",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:437",
+        "_extensions/ctm-libs/ui/ctm-store.js:193"
+      ],
+      "dispatchEvent": [
+        "_extensions/ctm-libs/runtime/coi-serviceworker.js:93",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:581",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:581",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1025",
+        "_extensions/ctm-libs/ui/ctm-nav.js:387",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:43",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1441",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:99",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:35"
+      ],
+      "document": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:25",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:25",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:647",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:796",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1121",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1124"
+      ],
+      "endsWith": [
+        "_extensions/ctm-libs/ui/ctm-store.js:80"
+      ],
+      "fetch": [
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:387",
+        "_extensions/ctm-libs/runtime/pyodide-worker-core.js:388",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:419",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:420"
+      ],
+      "getComputedStyle": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:269"
+      ],
+      "importScripts": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:133",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:137"
+      ],
+      "innerHeight": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:289",
+        "_extensions/ctm-libs/ui/ctm-progress.js:167",
+        "_extensions/ctm-libs/ui/ctm-progress.js:178"
+      ],
+      "innerWidth": [
+        "_extensions/ctm-libs/ui/ctm-progress.js:148",
+        "_extensions/ctm-libs/ui/ctm-progress.js:149",
+        "_extensions/ctm-libs/ui/ctm-progress.js:149"
+      ],
+      "isSecureContext": [
+        "_extensions/ctm-libs/ui/ctm-copy.js:42"
+      ],
+      "length": [
+        "_extensions/ctm-libs/ui/ctm-store.js:82"
+      ],
+      "load": [
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:9",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:8",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:17"
+      ],
+      "loadPyodide": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:128",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:222",
+        "_extensions/pyodide-interaktiv/qpyodide.lua:73"
+      ],
+      "localStorage": [
+        "_extensions/ctm-libs/ui/ctm-store.js:116"
+      ],
+      "location": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:59",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:62",
+        "_extensions/ctm-libs/ui/variants.js:65",
+        "_extensions/ctm-libs/ui/variants.js:65"
+      ],
+      "mainPyodide": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:194",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:195",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:198",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:200",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:201",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:227",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:228",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:370",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:564",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:807",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1106"
+      ],
+      "matchMedia": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:24",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:56"
+      ],
+      "monaco": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:32"
+      ],
+      "navigator": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:78",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:78",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:79"
+      ],
+      "parent": [
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:20",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:20",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:21"
+      ],
+      "qpyodideBuildingInitialUI": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:308",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:736",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-initialization.js:7",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-initialization.js:13"
+      ],
+      "qpyodideCanvasBackend": [
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:64",
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:40"
+      ],
+      "qpyodideCanvasPlots": [
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:47",
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:547",
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:631",
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:637",
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:661",
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:689",
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:737"
+      ],
+      "qpyodideCanvasUpgrade": [
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:651",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:245"
+      ],
+      "qpyodideCanvasWanted": [
+        "_extensions/pyodide-interaktiv/qpyodide-canvas-plots.js:636",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:232",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1022",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1361"
+      ],
+      "qpyodideCellContainer": [
+        "_extensions/ctm-libs/ui/ctm-export.js:42",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:890",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1474",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:102"
+      ],
+      "qpyodideCellDetails": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:49",
+        "_extensions/pyodide-interaktiv/qpyodide-storage.js:16",
+        "_extensions/pyodide-interaktiv/qpyodide-storage.js:124"
+      ],
+      "qpyodideCellsReady": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:104",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:367",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:804",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:851",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1058",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-initialization.js:34",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:28",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:60",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:89",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:135"
+      ],
+      "qpyodideCoiCanStart": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:148",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:151",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:32",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:137"
+      ],
+      "qpyodideCoiOutcome": [
+        "_extensions/ctm-libs/runtime/coi-serviceworker.js:85",
+        "_extensions/ctm-libs/runtime/coi-serviceworker.js:92",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:174",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:180",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:182"
+      ],
+      "qpyodideCoiSettled": [
+        "_extensions/ctm-libs/runtime/coi-frame-startup.js:34",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:59",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:686",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:150",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:14"
+      ],
+      "qpyodideCreateCell": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1460"
+      ],
+      "qpyodideCustomizedPyodideOptions": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:28"
+      ],
+      "qpyodideExamOutput": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:78",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:149",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:150",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:232",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:254",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:123",
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:19"
+      ],
+      "qpyodideFeedback": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:447",
+        "_extensions/pyodide-interaktiv/qpyodide-feedback.js:11"
+      ],
+      "qpyodideFeedbackOptions": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:277",
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:61",
+        "_extensions/pyodide-interaktiv/qpyodide-feedback.js:4"
+      ],
+      "qpyodideInputAvailable": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:105",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:836",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:837",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:37",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:209"
+      ],
+      "qpyodideInputState": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:871",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:30",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:37",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:47",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:59"
+      ],
+      "qpyodideInstallPythonPackagesList": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:11"
+      ],
+      "qpyodideInstance": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:191",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:812",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:816",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:152",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:153"
+      ],
+      "qpyodideLang": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:292",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:975",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:990",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1349",
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:46",
+        "_extensions/pyodide-interaktiv/qpyodide-feedback.js:10",
+        "_extensions/pyodide-interaktiv/qpyodide-locale.js:4",
+        "_extensions/pyodide-interaktiv/qpyodide-locale.js:7",
+        "_extensions/pyodide-interaktiv/qpyodide-storage.js:8"
+      ],
+      "qpyodideLocalStorageOptions": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:77",
+        "_extensions/pyodide-interaktiv/qpyodide-storage.js:36"
+      ],
+      "qpyodidePreloadPackages": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:116",
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:18"
+      ],
+      "qpyodideReady": [
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:808",
+        "_extensions/ctm-libs/runtime/pyodide-worker.js:1106",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:152"
+      ],
+      "qpyodideRefreshStorageUI": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:73",
+        "_extensions/pyodide-interaktiv/qpyodide-storage-settings.js:24",
+        "_extensions/pyodide-interaktiv/qpyodide-storage.js:199"
+      ],
+      "qpyodideResetAllStorageUnits": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:85"
+      ],
+      "qpyodideSetFoldOpen": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1133"
+      ],
+      "qpyodideSetInteractiveButtonState": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:204"
+      ],
+      "qpyodideSetupPythonPackages": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:14"
+      ],
+      "qpyodideShowStartupMessage": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:125",
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:23"
+      ],
+      "qpyodideStartupMessage": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:17"
+      ],
+      "qpyodideStartupPhaseDone": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:115",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:118",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1440"
+      ],
+      "qpyodideStopAfter": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:993",
+        "_extensions/pyodide-interaktiv/qpyodide-document-engine-initialization.js:124",
+        "_extensions/pyodide-interaktiv/qpyodide-document-settings.js:20"
+      ],
+      "qpyodideStorage": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:335",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:552",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:557",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:624",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:625",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:638",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:731",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:761",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:771",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:781",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1258",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1354",
+        "_extensions/pyodide-interaktiv/qpyodide-storage-settings.js:5",
+        "_extensions/pyodide-interaktiv/qpyodide-storage-settings.js:20",
+        "_extensions/pyodide-interaktiv/qpyodide-storage-settings.js:23",
+        "_extensions/pyodide-interaktiv/qpyodide-storage.js:4"
+      ],
+      "qpyodideUpdateStatusHeader": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:229"
+      ],
+      "qpyodideUpdateStatusHeaderSpinner": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:222"
+      ],
+      "qpyodideUpdateStatusMessage": [
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:215"
+      ],
+      "queueMicrotask": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:18",
+        "_extensions/ctm-libs/ui/ctm-layout.js:24"
+      ],
+      "removeEventListener": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:411",
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:30",
+        "_extensions/ctm-libs/ui/ctm-layout.js:88",
+        "_extensions/ctm-libs/ui/ctm-nav.js:352"
+      ],
+      "requestAnimationFrame": [
+        "_extensions/ctm-libs/ui/ctm-layout.js:42"
+      ],
+      "require": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:70",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:677"
+      ],
+      "scrollTo": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:251"
+      ],
+      "scrollX": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:113",
+        "_extensions/ctm-libs/ui/ctm-nav.js:251"
+      ],
+      "scrollY": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:113",
+        "_extensions/ctm-libs/ui/ctm-nav.js:255",
+        "_extensions/ctm-libs/ui/ctm-nav.js:363"
+      ],
+      "sessionStorage": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:60"
+      ],
+      "style": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:249",
+        "_extensions/ctm-libs/ui/ctm-nav.js:250",
+        "_extensions/ctm-libs/ui/ctm-nav.js:252"
+      ],
+      "trustedTypes": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:660",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:660",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:660"
+      ],
+      "visualViewport": [
+        "_extensions/ctm-libs/ui/ctm-progress.js:167",
+        "_extensions/ctm-libs/ui/ctm-progress.js:167",
+        "_extensions/ctm-libs/ui/ctm-progress.js:168"
+      ]
+    },
+    "data_attributes": {
+      "data-ai-feedback-context": [
+        "_extensions/ctm-libs/lua/feedback.lua:313",
+        "_extensions/ctm-libs/lua/feedback.lua:328",
+        "_extensions/ctm-libs/lua/feedback.lua:409"
+      ],
+      "data-ai-feedback-display": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:285",
+        "_extensions/ctm-libs/lua/feedback.lua:167"
+      ],
+      "data-ai-feedback-marked": [
+        "_extensions/ctm-libs/lua/feedback.lua:339",
+        "_extensions/ctm-libs/lua/feedback.lua:343"
+      ],
+      "data-ai-feedback-ready": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:219",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:220"
+      ],
+      "data-ai-feedback-tex": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:284",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:285",
+        "_extensions/ctm-libs/lua/feedback.lua:166"
+      ],
+      "data-answer": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:32"
+      ],
+      "data-auto-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:58",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:90"
+      ],
+      "data-auto-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:58",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:84"
+      ],
+      "data-bs-target": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:128"
+      ],
+      "data-bs-theme": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:38",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:43",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:45"
+      ],
+      "data-bs-toggle": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:434"
+      ],
+      "data-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:57",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:117",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:129",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:157",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:172",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:175",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:187",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:223"
+      ],
+      "data-ctm-clear-course": [
+        "_extensions/ctm-libs/lua/store.lua:72",
+        "_extensions/ctm-libs/ui/ctm-store.js:432"
+      ],
+      "data-ctm-clear-page": [
+        "_extensions/ctm-libs/lua/store.lua:71",
+        "_extensions/ctm-libs/ui/ctm-store.js:431"
+      ],
+      "data-ctm-component": [
+        "_extensions/ctm-libs/lua/store.lua:48",
+        "_extensions/ctm-libs/ui/ctm-progress.js:31",
+        "_extensions/ctm-libs/ui/ctm-progress.js:34"
+      ],
+      "data-ctm-export": [
+        "_extensions/ctm-libs/lua/store.lua:69",
+        "_extensions/ctm-libs/ui/ctm-export.js:103"
+      ],
+      "data-ctm-feedback-output-id": [
+        "_extensions/pyodide-interaktiv/qpyodide.lua:1917",
+        "_extensions/pyodide-interaktiv/qpyodide.lua:2040"
+      ],
+      "data-ctm-id": [
+        "_extensions/ctm-libs/lua/store.lua:48",
+        "_extensions/ctm-libs/ui/ctm-progress.js:32",
+        "_extensions/ctm-libs/ui/ctm-progress.js:33",
+        "_extensions/ctm-libs/ui/ctm-progress.js:38"
+      ],
+      "data-ctm-mathjax-transport": [
+        "_extensions/ctm-libs/runtime/mathjax-opaque-adaptor.js:42"
+      ],
+      "data-ctm-nav": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:36",
+        "_extensions/ctm-libs/ui/ctm-nav.js:401"
+      ],
+      "data-ctm-nav-focus": [
+        "_extensions/ctm-libs/ui/ctm-nav.js:315",
+        "_extensions/ctm-libs/ui/ctm-nav.js:318"
+      ],
+      "data-ctm-quiz": [
+        "_extensions/ctm-libs/lua/progress.lua:21",
+        "_extensions/ctm-libs/ui/ctm-progress.js:82",
+        "_extensions/ctm-libs/ui/ctm-progress.js:82",
+        "_extensions/ctm-libs/ui/ctm-progress.js:82",
+        "_extensions/ctm-libs/ui/ctm-progress.js:112",
+        "_extensions/ctm-libs/ui/ctm-progress.js:115"
+      ],
+      "data-ctm-quiz-heading": [
+        "_extensions/ctm-libs/lua/progress.lua:68",
+        "_extensions/ctm-libs/lua/progress.lua:114",
+        "_extensions/ctm-libs/lua/progress.lua:116"
+      ],
+      "data-ctm-runtime-id": [
+        "_extensions/ctm-libs/lua/store.lua:49",
+        "_extensions/ctm-libs/ui/ctm-progress.js:29",
+        "_extensions/ctm-libs/ui/ctm-progress.js:30",
+        "_extensions/ctm-libs/ui/ctm-progress.js:38",
+        "_extensions/ctm-libs/ui/ctm-store.js:252"
+      ],
+      "data-ctm-save": [
+        "_extensions/ctm-libs/lua/store.lua:50"
+      ],
+      "data-ctm-save-toggle": [
+        "_extensions/ctm-libs/lua/store.lua:67",
+        "_extensions/ctm-libs/ui/ctm-store.js:404",
+        "_extensions/ctm-libs/ui/ctm-store.js:433"
+      ],
+      "data-ctm-source": [
+        "_extensions/ctm-libs/lua/store.lua:50"
+      ],
+      "data-display": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:89",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:215"
+      ],
+      "data-dynamic-action": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:65",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:66",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:68",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:69",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:195",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:219",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:220"
+      ],
+      "data-dynamic-axis": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:64",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:67",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:189"
+      ],
+      "data-dynamic-matrix-name": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:34"
+      ],
+      "data-exercise": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:279",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:283",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:283"
+      ],
+      "data-id": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1201",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1323"
+      ],
+      "data-integration": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:277",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:278",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:290"
+      ],
+      "data-language": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:278"
+      ],
+      "data-last-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:61",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:91",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:107",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:133"
+      ],
+      "data-last-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:61",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:85",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:106",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:136"
+      ],
+      "data-latex": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:298",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:298",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:303"
+      ],
+      "data-learning-mode": [
+        "_extensions/ctm-libs/lua/ui.lua:277"
+      ],
+      "data-lecture": [
+        "_extensions/ctm-libs/lua/ui.lua:251"
+      ],
+      "data-math-exercise-display": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:285"
+      ],
+      "data-math-exercise-source": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:341",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:344"
+      ],
+      "data-math-exercise-tex": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:284",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:285"
+      ],
+      "data-matrix-column": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:35",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:100",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:101",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:122",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:123",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:180"
+      ],
+      "data-matrix-label": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:57",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:82"
+      ],
+      "data-matrix-name": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:279",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:56",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:72",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:81"
+      ],
+      "data-matrix-row": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:35",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:100",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:101",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:122",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:123",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:157",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:180",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:215"
+      ],
+      "data-max-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:60",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:93"
+      ],
+      "data-max-issues": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:290",
+        "_extensions/ctm-libs/feedback/ai-feedback.js:290"
+      ],
+      "data-max-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:59",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:87"
+      ],
+      "data-min-cols": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:60",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:92"
+      ],
+      "data-min-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:59",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:86"
+      ],
+      "data-mml-node": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:298"
+      ],
+      "data-mode": [
+        "_extensions/ctm-libs/lua/ui.lua:249",
+        "_extensions/ctm-libs/lua/ui.lua:250",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:52",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:53",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:70",
+        "_extensions/ctm-libs/ui/ctm-reveal.js:71"
+      ],
+      "data-needs-input": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:105",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:842",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:844",
+        "_extensions/pyodide-interaktiv/qpyodide-document-status.js:209"
+      ],
+      "data-policy": [
+        "_extensions/ctm-libs/feedback/ai-feedback.js:279"
+      ],
+      "data-q-loaded": [
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:146",
+        "_extensions/ctm-libs/runtime/pyodide-runtime.js:149"
+      ],
+      "data-qpyodide-pending": [
+        "_extensions/pyodide-interaktiv/qpyodide.lua:1589",
+        "_extensions/pyodide-interaktiv/qpyodide.lua:1651"
+      ],
+      "data-qpyodide-programmatic": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1130",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1215",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:1216"
+      ],
+      "data-queued": [
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:104",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:892",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:895",
+        "_extensions/pyodide-interaktiv/qpyodide-cell-classes.js:904"
+      ],
+      "data-reading": [
+        "_extensions/ctm-libs/lua/ui.lua:251"
+      ],
+      "data-rows": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:57",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:116",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:129",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:157",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:171",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:174",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:187",
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:223"
+      ],
+      "data-status": [
+        "_extensions/ctm-libs/ui/ctm-progress.js:70"
+      ],
+      "data-structural-label": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:36"
+      ],
+      "data-tex": [
+        "_extensions/ctm-libs/feedback/feedback-dom.js:89",
+        "_extensions/ctm-libs/feedback/feedback-dom.js:215"
+      ],
+      "data-vars": [
+        "_extensions/ctm-libs/ui/ctm-matrix-input.js:33"
+      ]
+    }
+  },
+  "jsxgraph-quarto": {
+    "commit": "49a1c7d575e08b2133e39098e8f9deda61567287",
+    "globals": {
+      "BOARDID": [
+        "_extensions/jsxgraph/lua/jsxgraph.lua:412",
+        "_extensions/jsxgraph/lua/jsxgraph.lua:652"
+      ],
+      "JXG": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "PointerEvent": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "addEventListener": [
+        "_extensions/jsxgraph/lua/jsxgraph.lua:765",
+        "_extensions/jsxgraph/lua/jsxgraph.lua:777"
+      ],
+      "atob": [
+        "_extensions/jsxgraph/lua/jsxgraph.lua:435"
+      ],
+      "btoa": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "clearInterval": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "clientInformation": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "console": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "event": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "getComputedStyle": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "getSelection": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "location": [
+        "_extensions/jsxgraph/lua/jsxgraph.lua:626"
+      ],
+      "matchMedia": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "navigator": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "ontouchstart": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "open": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "parent": [
+        "_extensions/jsxgraph/lua/jsxgraph.lua:767",
+        "_extensions/jsxgraph/lua/jsxgraph.lua:811"
+      ],
+      "safari": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "setInterval": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ],
+      "setTimeout": [
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55",
+        "_extensions/jsxgraph/resources/js/jsxgraphcore.js:55"
+      ]
+    },
+    "data_attributes": {
+      "data-graph-editor-control": [
+        "_extensions/jsxgraph/graph-editor.js:220",
+        "_extensions/jsxgraph/graph-editor.js:240",
+        "_extensions/jsxgraph/graph-editor.js:279"
+      ],
+      "data-graph-editor-ready": [
+        "_extensions/jsxgraph/graph-editor.js:332"
+      ]
+    }
+  },
+  "freehand_ai_assessment": {
+    "commit": "2803b6b6ab3b9a936d03a7985693a97763cf7f4f",
+    "globals": {},
+    "data_attributes": {}
+  }
+}

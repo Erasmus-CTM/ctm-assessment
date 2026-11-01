@@ -1,0 +1,71 @@
+{
+  "total": 147,
+  "groups": [
+    {
+      "count": 1,
+      "file": "tests/stack/test_fixture_import.py",
+      "line": 86,
+      "reason": "pinned upstream checkout unavailable"
+    },
+    {
+      "count": 1,
+      "file": "tests/stack/test_input_text.py",
+      "line": 170,
+      "reason": "STACK checkout unavailable (STACK_UPSTREAM; native-stack.yml checks it)"
+    },
+    {
+      "count": 3,
+      "file": "tests/stack/test_shared_admission.py",
+      "line": 174,
+      "reason": "Dedicated admission CI installs the three browsers"
+    },
+    {
+      "count": 6,
+      "file": "tests/test_authored.py",
+      "line": 109,
+      "reason": "needs CTM_LEGACY_MATH_EXERCISE"
+    },
+    {
+      "count": 1,
+      "file": "tests/test_golden_tables.py",
+      "line": 127,
+      "reason": "needs ctm-assessment at the commit in tools/pins.json in _ci/ctm-assessment"
+    },
+    {
+      "count": 1,
+      "file": "tests/test_golden_tables.py",
+      "line": 146,
+      "reason": "needs ctm-assessment at the commit in tools/pins.json in _ci/ctm-assessment"
+    },
+    {
+      "count": 1,
+      "file": "tests/test_golden_tables.py",
+      "line": 255,
+      "reason": "needs CTM_LEGACY_STACK_SYMPY (stack-sympy at the commit in tools/pins.json)"
+    },
+    {
+      "count": 3,
+      "file": "tests/test_mutations.py",
+      "line": 301,
+      "reason": "set CTM_MUTATION_TESTS=1 (runs on a copy of src/)"
+    },
+    {
+      "count": 102,
+      "file": "tests/test_mutations.py",
+      "line": 307,
+      "reason": "set CTM_MUTATION_TESTS=1 (runs on a copy of src/)"
+    },
+    {
+      "count": 1,
+      "file": "tests/test_mutations.py",
+      "line": 315,
+      "reason": "set CTM_MUTATION_TESTS=1 (runs on a copy of src/)"
+    },
+    {
+      "count": 27,
+      "file": "tests/test_mutations.py",
+      "line": 322,
+      "reason": "set CTM_MUTATION_TESTS=1 (runs on a copy of src/)"
+    }
+  ]
+}

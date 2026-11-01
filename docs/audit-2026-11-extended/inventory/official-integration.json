@@ -1,0 +1,140 @@
+[
+  {
+    "log": "/tmp/audit-official-integration.log",
+    "exit": 1,
+    "sections": [
+      {
+        "suite": "ctm-assessment Python",
+        "tests": 253,
+        "passed": 253,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "ctm-assessment npm",
+        "tests": 142,
+        "passed": 135,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 7
+      },
+      {
+        "suite": "ctm-libs npm",
+        "tests": 458,
+        "passed": 450,
+        "failed": 7,
+        "cancelled": 0,
+        "skipped": 1
+      }
+    ],
+    "missing_mirror_urls": []
+  },
+  {
+    "log": "/tmp/audit-official-local-integration.log",
+    "exit": 1,
+    "sections": [
+      {
+        "suite": "ctm-assessment Python",
+        "tests": 253,
+        "passed": 253,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "ctm-assessment npm",
+        "tests": 142,
+        "passed": 135,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 7
+      },
+      {
+        "suite": "ctm-libs npm",
+        "tests": 458,
+        "passed": 458,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "math-exercise npm",
+        "tests": 208,
+        "passed": 207,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 1
+      },
+      {
+        "suite": "math-exercise npm embedded Python",
+        "tests": 47,
+        "passed": 47,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "py-exercise npm",
+        "tests": 50,
+        "passed": 50,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "pyodide-interaktiv npm",
+        "tests": 135,
+        "passed": 135,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "py-exercise Python",
+        "tests": 17,
+        "passed": 17,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "test:integration",
+        "tests": 29,
+        "passed": 29,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "test:browser"
+      }
+    ],
+    "missing_mirror_urls": [],
+    "browser_smoke": {
+      "completed_checkpoints": 23,
+      "failed_gate": "JSXGraph board startup at integration/feedback/browser-smoke.cjs:392",
+      "classification": "environment: managed Chromium blocks data iframe navigation",
+      "downstream_chained_scripts": "not reached"
+    },
+    "supplemental_browser_runs": [
+      {
+        "script": "integration/feedback/stack-browser.cjs",
+        "exit": 0,
+        "result": "mixed real Python/math/STACK scenario passed; published runtime preserved"
+      },
+      {
+        "script": "integration/feedback/pyodide-browser.cjs",
+        "exit": 1,
+        "completed_static_checks": 1,
+        "runtime_lifecycle_scenarios": "unverified",
+        "blocker": "SW-enabled transport: Pyodide remote module and Monaco AMD fetch failed; first isolation wait timed out at line141"
+      },
+      {
+        "script": "node --test tests/*.browser.cjs",
+        "exit": 0,
+        "tests": 7,
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "duration_ms": 357230
+      }
+    ]
+  }
+]

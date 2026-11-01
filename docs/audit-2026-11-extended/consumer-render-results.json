@@ -1,0 +1,181 @@
+[
+  {
+    "repository": "ctm-demo",
+    "commit": "891e5ffd1c7cd7f400a6f07aa0fc2a13bfd290f8",
+    "command": [
+      "/workspace/.cloud-setup/quarto-1.8.27/bin/quarto",
+      "render"
+    ],
+    "cwd": "/workspace/audit-tests/ctm-demo",
+    "exit": 0,
+    "seconds": 176.246,
+    "html_count": 21,
+    "html": [
+      "index.html",
+      "lund.html",
+      "pages/bevegelse-ii.html",
+      "pages/experiments.html",
+      "pages/fysikk-forkurs.html",
+      "pages/gaussian-elimination.html",
+      "pages/handskrift-ki-prompter.html",
+      "pages/handskrift-ki.html",
+      "pages/handwriting-ai-prompts.html",
+      "pages/handwriting-ai.html",
+      "pages/help.html",
+      "pages/physics.html",
+      "pages/similar-problems-authoring.html",
+      "pages/similar-problems-workflow.html",
+      "pages/similar-problems.html",
+      "pages/stack-oppgaver.html",
+      "pages/step4-ui-de.html",
+      "pages/step4-ui-links.html",
+      "pages/step4-ui-nb.html",
+      "pages/step4-ui-nn.html",
+      "pages/step4-ui.html"
+    ],
+    "progress": [
+      {
+        "page": 1,
+        "of": 21
+      },
+      {
+        "page": 2,
+        "of": 21
+      },
+      {
+        "page": 3,
+        "of": 21
+      },
+      {
+        "page": 4,
+        "of": 21
+      },
+      {
+        "page": 5,
+        "of": 21
+      },
+      {
+        "page": 6,
+        "of": 21
+      },
+      {
+        "page": 7,
+        "of": 21
+      },
+      {
+        "page": 8,
+        "of": 21
+      },
+      {
+        "page": 9,
+        "of": 21
+      },
+      {
+        "page": 10,
+        "of": 21
+      },
+      {
+        "page": 11,
+        "of": 21
+      },
+      {
+        "page": 12,
+        "of": 21
+      },
+      {
+        "page": 13,
+        "of": 21
+      },
+      {
+        "page": 14,
+        "of": 21
+      },
+      {
+        "page": 15,
+        "of": 21
+      },
+      {
+        "page": 16,
+        "of": 21
+      },
+      {
+        "page": 17,
+        "of": 21
+      },
+      {
+        "page": 18,
+        "of": 21
+      },
+      {
+        "page": 19,
+        "of": 21
+      },
+      {
+        "page": 20,
+        "of": 21
+      },
+      {
+        "page": 21,
+        "of": 21
+      }
+    ],
+    "log": "/tmp/ctm-demo-extended-audit-render.log",
+    "own_npm_manifest": false,
+    "own_pytest_manifest": false,
+    "test_directory": false,
+    "page_counts": {
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0
+    },
+    "diagnostics": [
+      "/workspace/audit-tests/ctm-demo/pages/similar-problems.qmd: similar-independence: 1 current approved variants; target 25",
+      "/workspace/audit-tests/ctm-demo/pages/stack-oppgaver.qmd: stack-triangles: 7 current approved variants; target 25",
+      "/workspace/audit-tests/ctm-demo/pages/stack-oppgaver.qmd: stack-values: 6 current approved variants; target 25",
+      "/workspace/audit-tests/ctm-demo/pages/stack-oppgaver.qmd: stack-tangent: 6 current approved variants; target 25"
+    ],
+    "source_errors": [],
+    "environment_errors": [],
+    "test_scope": "Exact consumer Git archive rendered with extended-audit package tuple installed in scratch, not a re-test of its older published package pin.",
+    "native_authoring": "Verified cached native-authoring distribution for the audited tuple, with CTM_CHECKERS_WHEEL and CTM_VARIANTS_NATIVE explicitly set.",
+    "suite_note": "No package.json or pyproject.toml; no npm/pytest suite manifest. Standalone script checks exist, not run in this render-only task.",
+    "quarto": "1.8.27",
+    "python": "3.12.14",
+    "cache": "Separate per-consumer XDG_CACHE_HOME copied from prepared Quarto/Deno caches."
+  },
+  {
+    "repository": "ingmat3a_ntnu",
+    "commit": "5915fa446ba6644ac4c9c9c62cbc315bdd2fb82c",
+    "command": [
+      "/workspace/.cloud-setup/quarto-1.8.27/bin/quarto",
+      "render",
+      "index.qmd"
+    ],
+    "cwd": "/workspace/audit-tests/ingmat3a_ntnu",
+    "exit": 0,
+    "seconds": 2.532,
+    "html_count": 1,
+    "html": [
+      "index.html"
+    ],
+    "progress": [],
+    "log": "/tmp/ingmat3a_ntnu-extended-audit-render.log",
+    "own_npm_manifest": false,
+    "own_pytest_manifest": false,
+    "test_directory": true,
+    "page_counts": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "diagnostics": [],
+    "source_errors": [],
+    "environment_errors": [],
+    "test_scope": "Exact consumer Git archive rendered with extended-audit package tuple installed in scratch, not a re-test of its older published package pin.",
+    "native_authoring": "Verified cached native-authoring distribution for the audited tuple, with CTM_CHECKERS_WHEEL and CTM_VARIANTS_NATIVE explicitly set.",
+    "suite_note": "No package.json or pyproject.toml; no npm/pytest suite manifest. Standalone script checks exist, not run in this render-only task.",
+    "quarto": "1.8.27",
+    "python": "3.12.14",
+    "cache": "Separate per-consumer XDG_CACHE_HOME copied from prepared Quarto/Deno caches."
+  }
+]

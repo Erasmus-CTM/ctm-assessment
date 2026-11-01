@@ -1,0 +1,112 @@
+{
+  "base": "17f1acefeca8a8da7128ffe73301347256e226d8",
+  "head": "39df17ee28789e7d8d5d8e0abc01dcb967fc8858",
+  "exit_code": 0,
+  "summary": {
+    "mode": "builds",
+    "runs": [
+      {
+        "name": "base",
+        "version": "0.28.3",
+        "runtime": null
+      },
+      {
+        "name": "head",
+        "version": "0.28.3",
+        "runtime": null
+      }
+    ],
+    "pythonHashSeed": 0,
+    "minutes": 1.62,
+    "sites": [
+      "math-exercise"
+    ],
+    "sources": [
+      "math-exercise"
+    ],
+    "pages": 11,
+    "duplicatePages": 0,
+    "cells": 105,
+    "variants": 119,
+    "responses": 1668,
+    "stackResponses": 0,
+    "stackCasebook": [
+      [],
+      []
+    ],
+    "responsesBySource": {
+      "keys": 86,
+      "perturbation": 590,
+      "boundary": 48,
+      "challenge": 111,
+      "probe": 645,
+      "authored": 186,
+      "answer": 2
+    },
+    "fixtures": 0,
+    "customCells": 35,
+    "customCoverage": {
+      "math-exercise": {
+        "cells": 35,
+        "labels": 32,
+        "graded": 35,
+        "correct": 35,
+        "partial": 27,
+        "wrong": 34
+      }
+    },
+    "customWithoutCorrect": 0,
+    "authoredResponsesNotPageShaped": 2,
+    "teacherAnswers": 2,
+    "teacherAnswersUnexpected": 0,
+    "teacherAnswersUnused": 0,
+    "teacherAnswersMisfit": 0,
+    "teacherAnswerNotes": 0,
+    "courseCommits": null,
+    "authoredTests": 40,
+    "authoredNotPassing": 0,
+    "variantRecipes": 0,
+    "pythonPrograms": 0,
+    "pythonUnexpected": 0,
+    "skipped": 0,
+    "timeouts": {
+      "base": 0,
+      "head": 0
+    },
+    "incomplete": 0,
+    "statuses": {
+      "authored tests": {
+        "pass": 40
+      },
+      "responses": {
+        "correct": 227,
+        "wrong": 213,
+        "correct+wrong": 297,
+        "not_exact": 3,
+        "error": 9,
+        "partial": 2,
+        "not_form": 5
+      },
+      "cells without keys": {
+        "correct": 149,
+        "wrong": 482,
+        "error": 117,
+        "raised": 51,
+        "partial": 113
+      }
+    },
+    "keysNotCorrect": 0,
+    "fixturesUnexpected": 0,
+    "differences": 0,
+    "expectedDifferences": 0,
+    "staleExpectations": 0,
+    "notes": 0
+  },
+  "native_candidates": 17,
+  "native_authored_test_cases": 58,
+  "environment_restarts": {
+    "base": 1,
+    "head": 1
+  },
+  "raw_report": "/tmp/ctm-audit-math-parity/result-complete/report.json"
+}

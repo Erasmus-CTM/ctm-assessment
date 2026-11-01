@@ -1,0 +1,50 @@
+{
+  "ctm-libs": {
+    "path": "/workspace/ctm-libs",
+    "commit": "b1e7ec80b198eacd04793fd1cec2adb776555b73"
+  },
+  "py-exercise": {
+    "path": "/workspace/py-exercise",
+    "commit": "5682787dbdff309890b8cb85503cc060d981b4e4"
+  },
+  "math-exercise": {
+    "path": "/workspace/math-exercise",
+    "commit": "39df17ee28789e7d8d5d8e0abc01dcb967fc8858"
+  },
+  "ctm-checkers": {
+    "path": "/workspace/ctm-checkers",
+    "commit": "4cff6aa604fb04de838e7c479d38f14ad9e21c57"
+  },
+  "ctm-assessment": {
+    "path": "/workspace/ctm-assessment",
+    "commit": "cf1ca2a9abdb3647b04b8fd298d2b123002ebcaf"
+  },
+  "ctm-stack": {
+    "path": "/workspace/ctm-stack",
+    "commit": "e8437f1f7420ec33dd9f7b7f5a8469e2b6473b55"
+  },
+  "ctm-demo": {
+    "path": "/workspace/ctm-demo",
+    "commit": "891e5ffd1c7cd7f400a6f07aa0fc2a13bfd290f8"
+  },
+  "ingmat3a_ntnu": {
+    "path": "/workspace/ingmat3a_ntnu",
+    "commit": "5915fa446ba6644ac4c9c9c62cbc315bdd2fb82c"
+  },
+  "stack-wasm-maxima": {
+    "path": "/workspace/stack-wasm-maxima",
+    "commit": "63ee8e434339f6553a7bd2a263e794769f40ad9a"
+  },
+  "pyodide-interaktiv": {
+    "path": "/workspace/pyodide-interaktiv",
+    "commit": "793a87262e60ada72c08560ed8c5db011483baae"
+  },
+  "jsxgraph-quarto": {
+    "path": "/workspace/jsxgraph-quarto",
+    "commit": "49a1c7d575e08b2133e39098e8f9deda61567287"
+  },
+  "freehand_ai_assessment": {
+    "path": "/workspace/audit-snapshots/freehand_ai_assessment",
+    "commit": "2803b6b6ab3b9a936d03a7985693a97763cf7f4f"
+  }
+}
