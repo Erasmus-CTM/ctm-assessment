@@ -5,7 +5,9 @@ One register combining:
 - the extended audit of 30 October ([#93](https://github.com/Erasmus-CTM/ctm-assessment/pull/93), `docs/audit-2026-11-extended/`; IDs GR, A, B, R, P, UX, GOV);
 - items found while planning 1.0 (IDs S for STACK, X for the internet-free IDE, D for documentation).
 
-The status is re-checked against the [freeze manifest](freeze-manifest.json) (19 Nov).
+The status is re-checked against the [freeze manifest](freeze-manifest.json) (19 Nov) and updated as review
+branches (`claude/nice-dirac-uz5r4x` in each repository) close items; "fixed" means fixed on a review branch, pending
+Codex review and AC's merge.
 
 **Status:**
 - **open**: present at the frozen commits;
@@ -20,7 +22,7 @@ The status is re-checked against the [freeze manifest](freeze-manifest.json) (19
 
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
-| GR-1 | Inclusive tolerance rejects valid boundary answers (`abs(sv-cv) <= tol` in floating point) | ctm-checkers `math_exercise/checks.py:27`, `numeric.py:30` | open: code unchanged at `4cff6aa` | A2 |
+| GR-1 | Inclusive tolerance rejects valid boundary answers (`abs(sv-cv) <= tol` in floating point) | ctm-checkers `math_exercise/checks.py:27`, `numeric.py:30` | fixed on ctm-checkers `claude/nice-dirac-uz5r4x` (`ac5fd12`): decimal comparison; tests; 9,500/9,500 goldens | A2 |
 | GR-2 | Fixed samples give full credit to a non-derivative | freehand_ai_assessment (consumer) | open, but not reachable from the release work; reported to its owner | A2 (consumer) |
 | GR-3 | Exact tangent task accepts a small intercept error | freehand_ai_assessment (consumer) | open, same as GR-2 | A2 (consumer) |
 | GR-4 | Restored practice key keeps an edited computed badge | math-exercise `math-similar.js` | open: code unchanged at `39df17e` | A2 |
@@ -32,10 +34,10 @@ The status is re-checked against the [freeze manifest](freeze-manifest.json) (19
 
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
-| A-01 / M3 | Authored-answer admission keeps broad SymPy evaluation; the `__` rule still runs `exec`. Blocks exam use | ctm-checkers `math_exercise/inputs.py` | open | A3 |
+| A-01 / M3 | Authored-answer admission keeps broad SymPy evaluation; the `__` rule still runs `exec`. Blocks exam use | ctm-checkers `math_exercise/inputs.py` | fixed on ctm-checkers `claude/nice-dirac-uz5r4x` (`ac5fd12`): token admission; 619 corpus strings admitted, 30 attacks refused | A3 |
 | P01 | SSE stream has no byte, line or time limit | ctm-libs `feedback/feedback-core.js` | open: the 972cae3 change does not touch stream parsing | A3 |
 | P02 | Premature SSE EOF succeeds; data after `[DONE]` is appended | ctm-libs `feedback/feedback-core.js` | open | A3 |
-| M18 | "AI off in exams" relies on a generated profile; no forced `exam: true` | ctm-assessment `ctm_assets.py`, ctm-libs `assets.lua` | open | A3 / A5 |
+| M18 | "AI off in exams" relies on a generated profile; no forced `exam: true` | ctm-assessment `ctm_assets.py`, ctm-libs `assets.lua` | fixed: ctm-libs `claude/nice-dirac-uz5r4x` adds `ctm-assessment: exam`; the umbrella's exam profile sets it (`de87cb8`) | A3 / A5 |
 | GOV-1 | AC-only approval of the exam lock receipt is not enforced | ctm-assessment | open (main unprotected) | A4 |
 | N-1 | New since #93: handwriting-correction request path (`correction.note`, `previousFeedback`) | ctm-libs `972cae3` | to review | A3 |
 | M1 | Feedback KaTeX from a floating CDN | ctm-libs | fixed (`7951db4`, goes through `CTMAssets`) | — |
@@ -51,33 +53,33 @@ The status is re-checked against the [freeze manifest](freeze-manifest.json) (19
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
 | H2 | Golden replay ran only by hand | ctm-checkers | fixed (`12237e9`) | — |
-| H3 | Component CI tests other dependency commits than the package ships | all | partly: `check-component-pins.py` runs nightly, warnings only; ctm-libs, ctm-stack and math-exercise pins still differ | A4 |
+| H3 | Component CI tests other dependency commits than the package ships | all | partly: `release-check.py --remote` now requires agreement for a release (`a23e171`); py-exercise and ctm-stack CI pins moved to the package's on their branches; ctm-libs and math-exercise remain | A4 |
 | M0 / M9 | Manual gate not enforced; no protected `main` | all | partly / open | A4 (AC settings) |
 | M4 / B1 | ctm-libs frozen at 0.9.0; same-version mixed installs bypass the singleton guard | ctm-libs | open | A4 |
 | M5 | API levels do not describe interfaces | ctm-libs, ctm-checkers, components | open | A4 |
-| M6 | No release; `release-check.py` does not compare the CHANGELOG with the pins | all | partly (umbrella CHANGELOG maintained) | A4 / R5 |
-| R-01 | Matching cache marker accepted as a clean pinned source | ctm-assessment `setup-feedback-integration.py` | open | A4 |
-| R-04 | `--release` does not bind the checkout to the tag | ctm-assessment `install-project.py` | open | A4 |
+| M6 | No release; `release-check.py` does not compare the CHANGELOG with the pins | all | fixed in tooling (`a23e171`): notes must name every pin; `--remote` requires component tags; release manifest. Tags themselves: R5 | A4 / R5 |
+| R-01 | Matching cache marker accepted as a clean pinned source | ctm-assessment `setup-feedback-integration.py` | fixed (`a23e171`): snapshots reused only while they match their recorded inventory | A4 |
+| R-04 | `--release` does not bind the checkout to the tag | ctm-assessment `install-project.py` | fixed (`a23e171`): a Git checkout must be the clean tag | A4 |
 | M10 | Acceptance evidence bound to tuples that no longer exist | ctm-assessment | to re-check | A4 |
 | M11 | Umbrella unit tests never ran automatically | ctm-assessment | fixed (`fc8cb99`) | — |
 | M15 / B2 | pyodide-interaktiv ships an older ctm-libs copy | pyodide-interaktiv | open | R2 |
-| M14 | Package JSXGraph is a personal-fork branch | jsxgraph | decided (D8: upstream release) | R3 |
+| M14 | Package JSXGraph is a personal-fork branch | jsxgraph | fixed (`c8e8260`): pinned upstream 5cd0d1e, the fork pin's tree; an upstream tag is still needed | R3 |
 | H4 | pyodide-interaktiv install command installed 1.6.1 | pyodide-interaktiv, docs | fixed (ref added, `81883bc`, `b04b0b1`); goes away for good with R2 | R2 |
 | L20 | `cancel-in-progress` on main/publish groups | ctm-checkers, math-exercise | to re-check | A4 |
-| L21 | Floating refs (py-exercise publish against ctm-libs `main`, unpinned Quarto) | py-exercise, pyodide-interaktiv | to re-check | A4 |
+| L21 | Floating refs (py-exercise publish against ctm-libs `main`, unpinned Quarto) | py-exercise, pyodide-interaktiv | fixed for py-exercise (`claude/nice-dirac-uz5r4x`, `62661b5`) | A4 |
 
 ## Internet-free IDE (A5)
 
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
-| X-1 | IDE ships only two Python-cell pages; math-exercise and py-exercise run only in the `p13-worker` CI fixture | ctm-assessment `integration/offline-ide` | open (D5) | A5 |
+| X-1 | IDE ships only two Python-cell pages; math-exercise and py-exercise run only in the `p13-worker` CI fixture | ctm-assessment `integration/offline-ide` | fixed (`1b8cf57`): Exercises page; graded offline in CI and in the [dry run](a5-offline-dry-run.md) | A5 |
 | X-2 | A STACK page in a local/exam build is not refused | ctm-libs `lua/assets.lua`, ctm-stack | open (D5) | A5 |
-| X-3 | ZIP not released; no `SHA256SUMS`; `release.yml` ships only the tarball | ctm-assessment | open (D6) | A5 / R5 |
-| M16 | Baseline is a CI artifact expiring 2027-01-24; lock not committed; path filter incomplete | ctm-assessment `exam-site-zip.yml`, `p13-lock-review.yml` | partly | A5 |
-| M17 / R-03 | Server speaks HTTP/1.0 and re-hashes on every request; nested asset paths lack headers | ctm-assessment `serve-offline.py` | partly (TLS stall fixed in `b04b0b1`) | A5 (D6: bundled server) |
+| X-3 | ZIP not released; no `SHA256SUMS`; `release.yml` ships only the tarball | ctm-assessment | fixed in CI (`1b8cf57`): `SHA256SUMS`; a release tag attaches the ZIP. First release: R5 | A5 / R5 |
+| M16 | Baseline is a CI artifact expiring 2027-01-24; lock not committed; path filter incomplete | ctm-assessment `exam-site-zip.yml`, `p13-lock-review.yml` | partly: path filter widened (`1b8cf57`); the dry run reproduces the lock without the artifact; the baseline swap is runbook step 5 | A5 |
+| M17 / R-03 | Server speaks HTTP/1.0 and re-hashes on every request; nested asset paths lack headers | ctm-assessment `serve-offline.py` | fixed (`1b8cf57`): HTTP/1.1 keep-alive, cached digests, prefix-aware asset headers; shipped as `serve.py` | A5 |
 | M19 | The lock binds the full bytes of `pyodide-runtime.js`; every ctm-libs re-pin needs AC re-approval | ctm-assessment `ctm_assets.py` | open | A5 |
 | R-02 | P13 manifest covers selected workers, not the whole site | ctm-assessment `p13_assets.py` | open (scope) | A5 |
-| X-4 | SEB settings not documented for IT; manual SEB check not recorded | docs | open (D7) | A5 |
+| X-4 | SEB settings not documented for IT; manual SEB check not recorded | docs | documented ([exam-seb.md](../exam-seb.md)); AC's manual check pending | A5 |
 | H5 | JSXGraph boards cannot load MathJax locally | jsxgraph, ctm-libs | partly: a local render with boards stops on purpose. Boards are out of the IDE (D5) | — |
 | L19 | Offline server test fails on Python 3.13 | ctm-assessment | to re-check | A5 |
 
@@ -92,7 +94,7 @@ The status is re-checked against the [freeze manifest](freeze-manifest.json) (19
 | M13 / B4 | `variants-review.py` twice (≈95 % identical) | math-exercise, ctm-stack | open | A6 / 1.1 |
 | S-5 | ctm-stack MathJax loader and `mathjax@3.2.2` CDN fallback | ctm-stack | open | A6 |
 | H6 / M20 | README example fails to render; wrong policy docs | ctm-stack | fixed (`f9fca46`) | — |
-| M21 | Umbrella docs do not know the package contains ctm-stack | ctm-assessment | partly: installation and reference fixed; authoring guide has no STACK activity | A1 |
+| M21 | Umbrella docs do not know the package contains ctm-stack | ctm-assessment | fixed (`b2dc148`): STACK activity in the authoring guide | A1 |
 | S-6 | ctm-stack CHANGELOG still "0.4.0 (step 6, for review)"; no M4c/M4d entries | ctm-stack | open | A1 / R5 |
 | S-7 | Upstream STACK security report prepared but not sent | — | AC | — |
 | S-8 | Long GC stress run cut short; repeat after packaging | ctm-stack | open | §4 |
@@ -104,13 +106,13 @@ The status is re-checked against the [freeze manifest](freeze-manifest.json) (19
 
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
-| D-1 | Umbrella README says nothing about STACK; still says "`ai-feedback` is read as ctm-libs in 0.9" | ctm-assessment | open | A1 |
-| D-2 | `docs/` mixes user guides with work logs and audits | every repository | open | A1 |
-| D-3 | ctm-demo README stale (variants tooling at `503c868`, `ai-feedback` review-ref example) | ctm-demo | open | A1 |
+| D-1 | Umbrella README says nothing about STACK; still says "`ai-feedback` is read as ctm-libs in 0.9" | ctm-assessment | fixed (`b2dc148`, `227fb85`) | A1 |
+| D-2 | `docs/` mixes user guides with work logs and audits | every repository | partly: umbrella index by audience (`b2dc148`); records stay at their paths (17 are read by tooling) | A1 |
+| D-3 | ctm-demo README stale (variants tooling at `503c868`, `ai-feedback` review-ref example) | ctm-demo | fixed on ctm-demo `claude/nice-dirac-uz5r4x` (`2f5fb2d`) | A1 |
 | D-4 | pyodide-interaktiv `main` README installs without a ref | pyodide-interaktiv | open; goes away with R2 | R2 |
 | L13 | Undocumented settings | ctm-libs, ctm-assessment, py-exercise | to re-check | A1 |
 | L14 | "Site without AI feedback… render succeeds" is false for custom mode without `without-ai:` | ctm-assessment `docs/installation.md` | to re-check | A1 |
-| L15 | Stale values in several docs | several | to re-check | A1 |
+| L15 | Stale values in several docs | several | partly: exam-server HTTPS wording and Stop behaviour fixed (`b2dc148`) | A1 |
 | L12 | ctm-libs README documents the removed alias | ctm-libs | fixed | — |
 | L16 | Approval guide lacks the decision-loss warning | ctm-demo | to re-check | A1 |
 | UX-1 | Math answer inputs have no accessible name | math-exercise | open | A2 / A3 (UI) |
@@ -121,13 +123,13 @@ The status is re-checked against the [freeze manifest](freeze-manifest.json) (19
 
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
-| L8 | "Accepted in 0.9 only" aliases, `--refresh` without effect, `KEEPS_RETIRED_COPIES = ()` | ctm-assessment | open | A6 |
-| L22 / D11 | 46 unmerged non-main branches (gh-pages excluded) | all | decided (delete, archive-tag research and evidence first) | R6 |
+| L8 | "Accepted in 0.9 only" aliases, `--refresh` without effect, `KEEPS_RETIRED_COPIES = ()` | ctm-assessment | fixed (`227fb85`) | A6 |
+| L22 / D11 | 46 unmerged non-main branches (gh-pages excluded) | all | listed ([branch-cleanup.md](branch-cleanup.md)): 34 delete, 65 archive then delete, 5 keep | R6 |
 | M12 | Step-1 shared loaders not done (Monaco, KaTeX, MathJax, `escapeHtml`, bridge client) | components | open; partly in A6, rest 1.1 | A6 / 1.1 |
-| L9 / L10 | `example-source.lua` ×5; `review-dependencies.py` ×3 | several | open | A6 |
+| L9 / L10 | `example-source.lua` ×5; `review-dependencies.py` ×3 | several | partly: py-exercise and ctm-demo copies of review-dependencies.py equal the umbrella's | A6 |
 | L11 | Lua dynamic-matrix twin | math-exercise | open | 1.1 |
 | M22 | Maintainability hot spots (files of 1,300–2,100 lines) | several | open; 1.1 | after 1.0 |
-| M24 | 26 umbrella workflows; one-off `current-closure-store-d2.yml` | ctm-assessment | partly | A6 |
+| M24 | 26 umbrella workflows; one-off `current-closure-store-d2.yml` | ctm-assessment | partly: `current-closure-store-d2.yml` removed (`60f6f8f`); five ctm-demo workflows on old tuples retired | A6 |
 | L26 | ctm-demo has no licence file and commits a 684 KB tarball from an old tuple | ctm-demo | open | A6 |
 | L28 | Review IDs and "step N" history in code comments | several | open; 1.1 | after 1.0 |
 | B5 | Python-exercise grading stays in integration | py-exercise | accepted exception | — |
