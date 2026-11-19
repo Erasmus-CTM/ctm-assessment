@@ -351,5 +351,56 @@ class SharedFiles(unittest.TestCase):
                 del self.hashes[name][path]
 
 
+class SnapshotCache(unittest.TestCase):
+    """R-01 of the 30 Oct audit: a cached snapshot is reused only while its files
+    match the inventory recorded at extraction."""
+
+    def setUp(self):
+        import io, tarfile, tempfile
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.cache = Path(temp.name)
+        payload = io.BytesIO()
+        with tarfile.open(fileobj=payload, mode='w:gz') as tar:
+            for name, data in (('repo-abc/_extensions/x/_extension.yml', b'title: x\n'), ('repo-abc/lib.lua', b'return 1\n')):
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
+        self.archive = payload.getvalue()
+        self.downloads = 0
+
+    def download(self, url, destination):
+        self.downloads += 1
+        Path(destination).write_bytes(self.archive)
+
+    def test_changed_cached_bytes_are_fetched_again(self):
+        sha = 'c' * 40
+        with patch.object(builder, 'download', side_effect=self.download):
+            target = builder.snapshot('Org/repo', sha, self.cache)
+            self.assertEqual((target / 'lib.lua').read_text(), 'return 1\n')
+            self.assertEqual(builder.snapshot('Org/repo', sha, self.cache), target)
+            self.assertEqual(self.downloads, 1, 'an unchanged snapshot is reused')
+            (target / '__pycache__').mkdir()
+            (target / '__pycache__' / 'x.pyc').write_bytes(b'bytecode')
+            builder.snapshot('Org/repo', sha, self.cache)
+            self.assertEqual(self.downloads, 1, 'test bytecode is not source')
+            (target / 'lib.lua').write_text('return 2\n')
+            target = builder.snapshot('Org/repo', sha, self.cache)
+            self.assertEqual(self.downloads, 2, 'a changed file is fetched again')
+            self.assertEqual((target / 'lib.lua').read_text(), 'return 1\n')
+            (target / 'extra.lua').write_text('injected')
+            target = builder.snapshot('Org/repo', sha, self.cache)
+            self.assertEqual(self.downloads, 3, 'an added file is fetched again')
+            self.assertFalse((target / 'extra.lua').exists())
+
+    def test_a_marker_without_an_inventory_is_not_trusted(self):
+        sha = 'd' * 40
+        with patch.object(builder, 'download', side_effect=self.download):
+            target = builder.snapshot('Org/repo', sha, self.cache)
+            (target / builder.SNAPSHOT_MARKER).write_text(json.dumps({'repository': 'Org/repo', 'commit': sha}))
+            builder.snapshot('Org/repo', sha, self.cache)
+            self.assertEqual(self.downloads, 2)
+
+
 if __name__ == '__main__':
     unittest.main()

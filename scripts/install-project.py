@@ -12,7 +12,10 @@ commit pinned in integration/feedback/repos.json, or at the commits given in
 --review-refs for a coordinated review. REFS is NAME=SHA[,NAME=SHA...] or a
 JSON object {"NAME": "SHA"}; each SHA is a full 40-character commit. A release
 tag builds that release's pins, so the installed files are those of the
-release archive; --release checks first that the checkout is that release.
+release archive; --release checks first that the checkout is that release:
+its version, every component pinned by commit and, in a Git checkout, the tag
+vX.Y.Z on HEAD with no change to a tracked file (a source archive without
+.git is accepted with a notice).
 The script replaces only the extensions the package owns, keeps the project's
 other extensions, checks every installed file against the package record and
 copies that record to DIR/.private-extensions/resolved-repos.json. If
@@ -63,6 +66,20 @@ def package_version():
     return found.group(1) if found else "unknown"
 
 
+def git_identity(root=ROOT):
+    """(tags on HEAD, tracked files changed) of a Git checkout; None without Git."""
+    if not (root / ".git").exists() or shutil.which("git") is None:
+        return None
+    def git(*args):
+        return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True).stdout
+    try:
+        tags = set(git("tag", "--points-at", "HEAD").split())
+        changed = bool(git("status", "--porcelain", "--untracked-files=no").strip())
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return tags, changed
+
+
 def check_release(tag):
     """--release vX.Y.Z (or X.Y.Z): the checkout is that release, built from pins only."""
     wanted = tag.strip().removeprefix("v")
@@ -77,6 +94,18 @@ def check_release(tag):
     if unpinned:
         raise InstallError(f"--release {tag}: {', '.join(unpinned)} not pinned by commit in this checkout; "
                            "a release builds from pins only.")
+    identity = git_identity()
+    if identity is None:
+        print(f"Note: --release v{wanted}: this checkout has no Git metadata, so the tag cannot be checked; "
+              "its version and pins are.", flush=True)
+        return
+    tags, changed = identity
+    if f"v{wanted}" not in tags:
+        raise InstallError(f"--release v{wanted}: HEAD of this checkout is not the tag v{wanted} "
+                           f"(tags on HEAD: {', '.join(sorted(tags)) or 'none'}). Check out ctm-assessment at v{wanted}.")
+    if changed:
+        raise InstallError(f"--release v{wanted}: tracked files of this checkout differ from the tag v{wanted}. "
+                           "Use a clean checkout of the release.")
 
 
 def parse_review_refs(text, known, renamed=None):

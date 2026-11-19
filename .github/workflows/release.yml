@@ -1,11 +1,15 @@
 name: Release
 
 # A release is a tag vMAJOR.MINOR.PATCH pushed by the owner. The tag must
-# name the package version (_extensions/ctm-assessment/_extension.yml) and
-# every component must be pinned by commit (scripts/release-check.py). The
+# name the package version (_extensions/ctm-assessment/_extension.yml), every
+# component must be pinned by a commit that carries its own release tag, the
+# components' CI pins must agree with the package's and the CHANGELOG section
+# must name every pin (scripts/release-check.py --remote). The
 # package is built from those pins, tested like a pull request (including the
 # browser tests), and published as a GitHub release with the archive and its
-# record; the notes are the version's CHANGELOG.md section. A course pins
+# record and the release manifest (component tags); the notes are the
+# version's CHANGELOG.md section. The offline website ZIP is attached by
+# exam-site-zip.yml once its acceptance passes. A course pins
 # `ref: v0.9.0`, or installs the release archive:
 #   quarto add https://github.com/Erasmus-CTM/ctm-assessment/releases/download/v0.9.0/ctm-assessment.tar.gz
 # GitHub Pages keeps deploying from main (the site URL is the latest build).
@@ -30,7 +34,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: The tag names the package version; every component is pinned
-        run: python scripts/release-check.py --tag "$GITHUB_REF_NAME" --notes "$RUNNER_TEMP/notes.md"
+        run: python scripts/release-check.py --tag "$GITHUB_REF_NAME" --notes "$RUNNER_TEMP/notes.md" --remote --manifest "$RUNNER_TEMP/release-manifest.json"
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -62,7 +66,7 @@ jobs:
           if record.get('version') != tag[1:] or any(not r['pinned'] for n, r in record['repositories'].items() if n != 'ctm-assessment'):
               sys.exit(f'The build record does not match {tag}: version {record.get("version")}, every component pinned required')
           EOF
-          gh release create "$GITHUB_REF_NAME" .feedback-workspace/ctm-assessment.tar.gz .feedback-workspace/resolved-repos.json \
+          gh release create "$GITHUB_REF_NAME" .feedback-workspace/ctm-assessment.tar.gz .feedback-workspace/resolved-repos.json "$RUNNER_TEMP/release-manifest.json" \
             --title "CTM Assessment ${GITHUB_REF_NAME#v}" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
       - name: Report failure details as an annotation
         if: failure()

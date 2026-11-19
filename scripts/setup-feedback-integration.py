@@ -69,13 +69,39 @@ def without_root(member, destination):
     return tarfile.data_filter(member.replace(**changes, deep=False), destination)
 
 
+SNAPSHOT_MARKER = '.integration-source.json'
+
+
+def source_inventory(folder):
+    """{posix path: sha256} of a snapshot's files, without its marker and the
+    bytecode component tests leave (the builder never copies those)."""
+    inventory = {}
+    for path in sorted(folder.rglob('*')):
+        relative = path.relative_to(folder)
+        if relative.as_posix() == SNAPSHOT_MARKER or '__pycache__' in relative.parts or path.suffix == '.pyc':
+            continue
+        if path.is_symlink() or path.is_file():
+            inventory[relative.as_posix()] = hashlib.sha256(path.read_bytes() if path.is_file() else os.readlink(path).encode()).hexdigest()
+    return inventory
+
+
 def snapshot(repo, sha, cache):
     # Short names: Windows paths are limited to about 260 characters, and the
     # workspace often sits inside a course project.
     target = cache / (repo.rsplit('/', 1)[1] + '-' + sha[:12])
-    marker = target / '.integration-source.json'
-    if marker.exists() and json.loads(marker.read_text()).get('commit') == sha:
-        return target
+    marker = target / SNAPSHOT_MARKER
+    # R-01 of the 30 Oct audit: a matching marker alone made changed cached
+    # bytes count as the pinned source. A reused snapshot must also match the
+    # file inventory recorded when it was extracted; otherwise it is fetched again.
+    if marker.exists():
+        try:
+            recorded = json.loads(marker.read_text())
+        except (OSError, ValueError):
+            recorded = {}
+        if recorded.get('commit') == sha and recorded.get('files') == source_inventory(target):
+            return target
+        if recorded.get('commit') == sha:
+            print(f'Cached source of {repo} @ {sha[:12]} differs from its extracted files; fetching it again.', flush=True)
     if target.exists():
         shutil.rmtree(target)  # A different commit with the same short name, or a partial copy.
     temp = Path(tempfile.mkdtemp(prefix='t', dir=cache))
@@ -87,7 +113,7 @@ def snapshot(repo, sha, cache):
                 raise RuntimeError('Unexpected repository archive structure')
             tar.extractall(temp, filter=without_root)
         # Do not treat generated metadata as part of upstream source.
-        (temp / '.integration-source.json').write_text(json.dumps({'repository': repo, 'commit': sha}))
+        (temp / SNAPSHOT_MARKER).write_text(json.dumps({'repository': repo, 'commit': sha, 'files': source_inventory(temp)}))
         temp.rename(target)
     finally:
         archive.unlink(missing_ok=True)

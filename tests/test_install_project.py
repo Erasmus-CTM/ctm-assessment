@@ -105,9 +105,33 @@ class Release(unittest.TestCase):
 
     def test_the_checkout_of_the_tag_passes(self):
         with patch.object(installer, 'package_version', return_value='0.9.0'), \
-                patch.object(installer, 'manifest', return_value=self.manifest()):
+                patch.object(installer, 'manifest', return_value=self.manifest()), \
+                patch.object(installer, 'git_identity', return_value=({'v0.9.0'}, False)):
             installer.check_release('v0.9.0')
             installer.check_release('0.9.0')
+
+    def test_a_git_checkout_must_be_the_clean_tag(self):
+        # R-04 of the 30 Oct audit: the version and pins alone did not bind the checkout to the tag.
+        with patch.object(installer, 'package_version', return_value='0.9.0'), \
+                patch.object(installer, 'manifest', return_value=self.manifest()):
+            with patch.object(installer, 'git_identity', return_value=(set(), False)), \
+                    self.assertRaisesRegex(installer.InstallError, 'HEAD of this checkout is not the tag v0.9.0'):
+                installer.check_release('v0.9.0')
+            with patch.object(installer, 'git_identity', return_value=({'v0.9.1'}, False)), \
+                    self.assertRaisesRegex(installer.InstallError, 'tags on HEAD: v0.9.1'):
+                installer.check_release('v0.9.0')
+            with patch.object(installer, 'git_identity', return_value=({'v0.9.0'}, True)), \
+                    self.assertRaisesRegex(installer.InstallError, 'tracked files of this checkout differ'):
+                installer.check_release('v0.9.0')
+            with patch.object(installer, 'git_identity', return_value=None):
+                installer.check_release('v0.9.0')  # a source archive: version and pins only
+
+    def test_git_identity_reads_this_checkout(self):
+        identity = installer.git_identity()
+        if identity is not None:
+            tags, changed = identity
+            self.assertIsInstance(tags, set)
+            self.assertIsInstance(changed, bool)
 
     def test_another_version_or_an_unpinned_component_stops(self):
         with patch.object(installer, 'package_version', return_value='0.9.0'), \
