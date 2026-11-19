@@ -1,10 +1,12 @@
 # Offline Python website ZIP
 
 This website contains two Python IDE pages using the existing
-pyodide-interaktiv windows and the shared page worker. P13 adapts those
-windows; editing, saved answers, copy and export remain available. It carries
-the complete verified asset bundle. Course graders and boards are not on these
-IDE pages. STACK/Maxima bundling is P13 phase 2.
+pyodide-interaktiv windows and the shared page worker, and an **Exercises**
+page with a math-exercise and a py-exercise graded on the same worker. P13
+adapts those windows; editing, saved answers, copy and export remain
+available. It carries the complete verified asset bundle. JSXGraph boards and
+STACK questions are online only: a local or exam render of a page with either
+stops (decision D5 of the [1.0 plan](consolidation/2026-11-release-1.0-plan.md)).
 
 This IDE opts out of the frontend's default background package preloads;
 explicit Python imports still request their required local packages. The
@@ -30,9 +32,13 @@ AI feedback is off; answer saving and export remain on. Exam output is text
 and PNG only: returned HTML stays literal, and executable animations and canvas
 upgrades are disabled. Private build metadata is excluded.
 
-The ZIP holds the contents of `_site-exam`, with `index.html` at its root.
-CI extracts that exact ZIP and tests both pages at the web root and below
-`/dept/python/`. Real editor changes and Run execute basic Python; the nested page separately
+The ZIP holds the contents of `_site-exam`, with `index.html` at its root,
+`README-IT.txt` and `serve.py` (the [offline server](exam-server.md),
+Python 3.12 or newer, standard library only). `SHA256SUMS` is published beside
+the ZIP. CI extracts that exact ZIP and tests the IDE pages at the web root and below
+`/dept/python/`; the exercise page is graded with every external request
+refused, served by the extracted `serve.py` at both places
+(`tools/offline-ide-exercises.mjs`). Real editor changes and Run execute basic Python; the nested page separately
 checks an optional local NumPy import while external requests are refused.
 Editor-ready and Run-enabled times are observation upper bounds, not exact
 readiness events. First-run and warm-run durations are measured separately,
@@ -42,6 +48,8 @@ checker runs five fresh loads per page with isolation headers. A separate
 ordinary static server tests plain LAN HTTP without custom headers.
 The website artifact is uploaded only after acceptance. Its single ZIP is
 uploaded as-is (archive:false), so downloading it does not add an outer ZIP.
+For a release tag (`vX.Y.Z`) the accepted ZIP, `SHA256SUMS` and
+`README-IT.txt` are attached to that GitHub release.
 
 Plain LAN HTTP supports Run and terminate/restart Stop; a restart resets Python
 variables but preserves editor text and saved answers. A secure page with
@@ -56,7 +64,8 @@ CI also runs fixed Chromium release branches 139.0.7258.138 and
 not provide the exact CEF patches 139.0.7258.139 and 147.0.7727.118; these are
 one-patch-earlier engine proxies. WebKit uses Playwright 1.55.1 on macOS 15.
 Engine tests are not real-SEB certification. Windows, macOS and iOS manual
-checks remain required; see the [P13 design and checklist](consolidation/2026-10-step5-p13.md).
+checks remain required; see [Safe Exam Browser settings](exam-seb.md) and the
+[P13 design](consolidation/2026-10-step5-p13.md).
 AC's established hand-in is text copied between windows on the existing exam
 web server. Pictures and input have not been exam requirements. The real
 server headers and SEB clipboard/download policy must be checked there.
@@ -70,5 +79,5 @@ network-profile evidence. The curated local results are in
 This paragraph is included in the ZIP as `README-IT.txt`:
 
 <!-- IT -->
-Extract every file in this ZIP into the webserver directory where the Python site should appear. Keep index.html, site_libs, _ctm-assets and the other supplied files together; do not rename or flatten their folders. Open the site's web address using the approved SEB configuration on Windows, macOS or iOS after its manual acceptance check. Chrome/Edge can also open the site. No Python, Quarto, Node or package installation is needed on the webserver. Plain HTTP supports Run and Stop; Stop restarts Python and resets its variables. Interactive input and cooperative interruption require a secure page with isolation headers and browser support. Copy and paste text into the exam answer window as usual; its SEB policy must permit this. Your code and saved answers stay in that browser. External internet access is not required.
+Check the ZIP against SHA256SUMS (sha256sum -c SHA256SUMS). Extract every file in this ZIP into the webserver directory where the Python site should appear. Keep index.html, site_libs, _ctm-assets and the other supplied files together; do not rename or flatten their folders. Any static web server works. For the recommended isolation headers either configure them (docs/exam-server.md in CTM Assessment) or run the included server, which needs only Python 3.12 or newer: python3 serve.py <directory> --bind 0.0.0.0 --port 8443 --cert <certificate.pem> --key <key.pem>. Open the site's web address using the approved SEB configuration on Windows, macOS or iOS after its manual acceptance check (docs/exam-seb.md). Chrome/Edge can also open the site. No Quarto, Node or package installation is needed on the webserver. Plain HTTP supports Run and Stop; Stop restarts Python and resets its variables. Interactive input and cooperative interruption require a secure page with isolation headers and browser support. Copy and paste text into the exam answer window as usual; its SEB policy must permit this. Your code and saved answers stay in that browser. External internet access is not required.
 <!-- /IT -->

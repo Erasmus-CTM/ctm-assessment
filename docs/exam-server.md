@@ -6,9 +6,9 @@ browser answers belong to that origin. Do not mix a host name and IP address,
 clear browser data during the session, or redeploy during an exam.
 
 The `offline` and `exam` profiles are written by CTM Assessment's offline
-asset preparation (`docs/offline-install-preparation.md`), which has no public
-installer option yet; today only the offline Python website ZIP
-(`docs/exam-site-zip.md`) is built this way. This server serves an already
+asset preparation (`docs/offline-install-preparation.md`); the offline Python
+website ZIP (`docs/exam-site-zip.md`) is built this way. SEB settings for exam
+IT are in [Safe Exam Browser settings](exam-seb.md). This server serves an already
 built tree; it does not fetch dependencies or build profiles.
 
 ## Local checks and an administrator dry run
@@ -28,8 +28,13 @@ For a network dry run use the host's trusted certificate and private key:
 python scripts/serve-offline.py /srv/exam/_site-exam --bind 0.0.0.0 --port 8443 --cert /etc/ssl/exam.crt --key /etc/ssl/exam.key
 ```
 
-This standard-library server is a CI and dry-run utility. For the examination,
-exam IT owns TLS, monitoring, capacity and deployment. HTTPS with a certificate
+The same file ships in the offline website ZIP as `serve.py`, so exam IT can
+serve the site without configuring headers themselves. It speaks HTTP/1.1
+with keep-alive (idle connections close after 60 seconds), computes each
+file's ETag once per file version, and recognises assets by their
+`_ctm-assets` path segment, so a site below a prefix such as `/dept/python/`
+keeps the asset headers. Exam IT still owns TLS, monitoring, capacity and
+deployment, and runs the capacity test below on the real server. HTTPS with a certificate
 trusted by every exam machine is required. Plain HTTP on a LAN is a degraded
 mode: Python runs, but `input()` and Stop do not. Browser enterprise exceptions
 are not an exam-browser fallback.
@@ -43,7 +48,7 @@ Every response, including errors, needs these headers:
 | Cross-Origin-Opener-Policy | same-origin |
 | Cross-Origin-Embedder-Policy | require-corp |
 | Cross-Origin-Resource-Policy | cross-origin |
-| Access-Control-Allow-Origin (under /_ctm-assets/) | * |
+| Access-Control-Allow-Origin (below a `_ctm-assets` folder, at any prefix) | * |
 
 The last header lets sandboxed JSXGraph frames with an opaque origin fetch
 MathJax speech data. The server provides GET/HEAD, strong SHA-256 ETags,
@@ -57,7 +62,7 @@ Ranges apply to GET, not HEAD.
 | .wasm | application/wasm |
 | .mjs and .js | text/javascript |
 | .whl | application/octet-stream |
-| successful /_ctm-assets/ responses | public, max-age=31536000, immutable |
+| successful responses below a `_ctm-assets` folder | public, max-age=31536000, immutable |
 | HTML, site_libs, other files and errors | no-cache |
 
 Versioned asset URLs must never be reused for different content. The builder's
@@ -65,9 +70,9 @@ precompressed `.gz` files are selected for wasm/js/mjs/json/css when the client
 accepts gzip; MIME remains that of the original file, with
 `Content-Encoding: gzip` and `Vary: Accept-Encoding`. ETags identify the actual
 selected bytes. No compression happens on demand. Wheels and ZIP files retain
-identity bytes, so the runtime's 512 KiB prefetch ranges work. The utility hashes
-the selected file on each request to avoid stale tags after replacement; use a
-properly configured production server for capacity. It serves contained files
+identity bytes, so the runtime's 512 KiB prefetch ranges work. The server keys
+each tag by the opened file's path, inode, size and modification and change
+times, so a replaced file gets a new tag without hashing every request. It serves contained files
 and directory indexes, without directory listings.
 
 For nginx use static gzip (`gzip_static on; gzip_vary on; gzip off;`) and the

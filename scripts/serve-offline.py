@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
 """Serve a built CTM site with exam headers, static gzip and byte ranges.
 
-Standard-library-only dry-run/CI server. Production exam deployment still needs
-a trusted TLS certificate and the real browser/configuration dry run.
+Standard library only (Python 3.12 or newer). Ships in the offline website ZIP
+as serve.py for exam IT; also the CI dry-run server. HTTP/1.1 with keep-alive;
+each file's strong ETag is computed once per file version (path, inode, size,
+modification and change times of the opened file). Assets are recognised by a
+`_ctm-assets` path segment, so a site served below a prefix (for example
+/dept/python/) keeps their CORS and immutable-cache headers. Production exam
+deployment still needs a certificate trusted by the exam machines and the
+real browser/configuration dry run (docs/exam-server.md).
 """
 import argparse
 import errno
 from functools import partial
 import hashlib
+import os
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import re
 import ssl
+import threading
 from urllib.parse import quote, unquote, urlsplit
 
 COMPRESSIBLE = {".wasm", ".js", ".mjs", ".json", ".css"}
@@ -20,6 +28,39 @@ MIME = {".wasm": "application/wasm", ".mjs": "text/javascript",
         ".js": "text/javascript", ".whl": "application/octet-stream",
         ".zip": "application/zip"}
 IMMUTABLE = "public, max-age=31536000, immutable"
+ASSET_SEGMENT = "_ctm-assets"
+
+
+class DigestCache:
+    """sha256 of a file version, keyed by what changes when the file is
+    replaced or rewritten: path, device, inode, size, mtime_ns and ctime_ns of
+    the opened file (os.fstat), so the tag always describes the bytes served."""
+
+    def __init__(self, limit=20000):
+        self.limit = limit
+        self.entries = {}
+        self.lock = threading.Lock()
+
+    def digest(self, path, source):
+        info = os.fstat(source.fileno())
+        key = (str(path), info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+        with self.lock:
+            cached = self.entries.get(key)
+        if cached is not None:
+            return cached
+        digest = hashlib.sha256()
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+        source.seek(0)
+        value = (digest.hexdigest(), info.st_size)
+        with self.lock:
+            if len(self.entries) >= self.limit:
+                self.entries.clear()
+            self.entries[key] = value
+        return value
+
+
+DIGESTS = DigestCache()
 
 
 def encoding_preferences(value):
@@ -66,6 +107,11 @@ def byte_range(value, size):
 class OfflineHandler(SimpleHTTPRequestHandler):
     """Serve contained regular files only, with headers also on error paths."""
 
+    # Keep-alive: a page loads hundreds of assets. An idle connection is
+    # closed after `timeout` seconds so it cannot hold a thread for ever.
+    protocol_version = "HTTP/1.1"
+    timeout = 60
+
     def send_error(self, code, message=None, explain=None):
         # parse_request can reject a malformed version before assigning it.
         # The stdlib then retains HTTP/0.9, which suppresses all headers.
@@ -87,7 +133,8 @@ class OfflineHandler(SimpleHTTPRequestHandler):
     def is_asset(self):
         # Also applies to encoded paths and errors below the asset directory.
         try:
-            return unquote(urlsplit(getattr(self, "path", "")).path).startswith("/_ctm-assets/")
+            segments = unquote(urlsplit(getattr(self, "path", "")).path).split("/")
+            return ASSET_SEGMENT in segments[:-1]
         except ValueError:
             return False
 
@@ -164,14 +211,10 @@ class OfflineHandler(SimpleHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         with source:
-            # Hash the actual selected representation: never reuse a stale tag
+            # Tag the actual selected representation: never reuse a stale tag
             # when a same-length file is replaced or when gzip is negotiated.
-            digest = hashlib.sha256()
-            while chunk := source.read(1024 * 1024):
-                digest.update(chunk)
-            size = source.tell()
-            etag = '"' + digest.hexdigest() + '"'
-            source.seek(0)
+            digest, size = DIGESTS.digest(candidate, source)
+            etag = '"' + digest + '"'
             condition = self.headers.get("If-None-Match")
             not_modified = condition is not None and (
                 condition.strip() == "*" or

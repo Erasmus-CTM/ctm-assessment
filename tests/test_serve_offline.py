@@ -41,6 +41,10 @@ class OfflineHTTPTests(unittest.TestCase):
         (assets / "core.wasm.gz").write_bytes(cls.compressed)
         (assets / "module.mjs").write_text("export const x=1;", encoding="utf-8")
         (assets / "empty.whl").write_bytes(b"")
+        nested = cls.root / "dept" / "python" / "_ctm-assets" / "pyodide"
+        nested.mkdir(parents=True)
+        (nested / "module.mjs").write_text("export const y=2;", encoding="utf-8")
+        (cls.root / "dept" / "python" / "index.html").write_text("<h1>Dept</h1>", encoding="utf-8")
         cls.server = ThreadingHTTPServer(
             ("127.0.0.1", 0), partial(QuietHandler, directory=str(cls.root)))
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -84,6 +88,53 @@ class OfflineHTTPTests(unittest.TestCase):
         self.assertEqual(headers["Content-Type"], "text/javascript")
         self.assertEqual(headers["Cache-Control"], MODULE.IMMUTABLE)
         self.check_headers(headers, assets=True)
+
+    def test_assets_below_a_prefix_keep_cors_and_immutable_cache(self):
+        # R-03 of the 30 Oct audit: a site served below /dept/python/.
+        status, headers, body = self.request("/dept/python/_ctm-assets/pyodide/module.mjs")
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"export const y=2;")
+        self.assertEqual(headers["Cache-Control"], MODULE.IMMUTABLE)
+        self.check_headers(headers, assets=True)
+        status, headers, _ = self.request("/dept/python/")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Cache-Control"], "no-cache")
+        self.check_headers(headers)
+        # A file merely named like the folder is not an asset.
+        status, headers, _ = self.request("/dept/_ctm-assets")
+        self.assertNotIn("Access-Control-Allow-Origin", headers)
+
+    def test_keep_alive_serves_several_requests_on_one_connection(self):
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        try:
+            for path in ["/", "/_ctm-assets/pyodide/1.0/module.mjs", "/absent", "/site_libs/quarto.js"]:
+                connection.request("GET", path)
+                response = connection.getresponse()
+                response.read()
+                self.assertEqual(response.version, 11)
+                self.assertIn("Content-Length", dict(response.getheaders()))
+                if response.status == 404:
+                    # The standard library closes the connection after an error.
+                    connection.close()
+        finally:
+            connection.close()
+
+    def test_digest_is_computed_once_per_file_version(self):
+        path = self.root / "site_libs" / "cached.js"
+        path.write_text("a()", encoding="utf-8")
+        first = self.request("/site_libs/cached.js")[1]["ETag"]
+        calls = []
+        original = MODULE.hashlib.sha256
+        MODULE.hashlib.sha256 = lambda *a: calls.append(1) or original(*a)
+        try:
+            self.assertEqual(self.request("/site_libs/cached.js")[1]["ETag"], first)
+            self.assertEqual(calls, [])
+            path.write_text("b()", encoding="utf-8")
+            second = self.request("/site_libs/cached.js")[1]["ETag"]
+        finally:
+            MODULE.hashlib.sha256 = original
+        self.assertNotEqual(first, second)
+        self.assertEqual(second, '"' + hashlib.sha256(b"b()").hexdigest() + '"')
 
     def test_errors_keep_isolation_but_never_immutable(self):
         for path in ["/absent", "/_ctm-assets/missing.whl"]:

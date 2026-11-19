@@ -1,0 +1,31 @@
+---
+title: Exercises
+lang: en
+---
+
+Answer and select **Check**. Checking runs in this browser; no internet
+connection is needed.
+
+```{math-exercise}
+#| label: offline-math
+#| context: none
+Compute $\frac{3}{4} + \frac{1}{4}$: _[1]
+```
+
+```{math-exercise}
+#| label: offline-numeric
+#| context: none
+#| mode: numeric
+#| decplaces: 2
+Give $\pi$ to two decimal places: _[pi]
+```
+
+```{py-exercise}
+#| label: offline-python
+# Complete the function so that it returns the sum of the list.
+def total(values):
+    return 0
+## TESTS ##
+assert total([1, 2, 3]) == 6, "total([1, 2, 3]) should be 6"
+assert total([]) == 0
+```

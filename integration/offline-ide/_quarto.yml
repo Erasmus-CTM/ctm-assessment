@@ -1,6 +1,6 @@
 project:
   type: website
-  render: [index.qmd, nested/index.qmd]
+  render: [index.qmd, nested/index.qmd, exercises/index.qmd]
 website:
   title: Python IDE
   favicon: favicon.svg
@@ -10,6 +10,8 @@ website:
         text: Python
       - href: nested/index.qmd
         text: Second window
+      - href: exercises/index.qmd
+        text: Exercises
 format:
   html:
     theme: cosmo

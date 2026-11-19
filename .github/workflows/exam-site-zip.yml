@@ -1,14 +1,18 @@
 name: Rendered offline Python website ZIP
 on:
   pull_request:
-    paths: [integration/offline-ide/**, integration/p13-worker/**, tools/p13-shared-worker.mjs, integration/feedback/repos.json, integration/p13*.json, integration/assets-licences/**, scripts/*p13*.py, tools/p13-loading.cjs, scripts/ctm_assets.py, tools/p13-seb-profile.mjs, tools/p13-controls.mjs, tools/p13-serve.mjs, tests/p13-serve.test.cjs, tests/p13-controls.browser.cjs, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
+    paths: [integration/offline-ide/**, integration/p13-worker/**, tools/p13-shared-worker.mjs, integration/feedback/repos.json, integration/p13*.json, integration/assets-licences/**, scripts/*p13*.py, tools/p13-loading.cjs, scripts/ctm_assets.py, scripts/serve-offline.py, tools/offline-check.mjs, tools/offline-ide-exercises.mjs, _extensions/ctm-assessment/**, tools/p13-seb-profile.mjs, tools/p13-controls.mjs, tools/p13-serve.mjs, tests/p13-serve.test.cjs, tests/p13-controls.browser.cjs, .github/workflows/exam-site-zip.yml, docs/exam-site-zip.md]
+  push:
+    # A release tag: the accepted ZIP is attached to that release (job
+    # publish-release-zip). Pull requests build and test it before.
+    tags: ['v*.*.*']
   workflow_dispatch:
 permissions:
   contents: read
   actions: read
 concurrency:
   group: offline-python-zip-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 jobs:
   website:
     runs-on: ubuntu-24.04
@@ -118,10 +122,13 @@ jobs:
           root = Path(os.environ['RUNNER_TEMP'])
           site = root / 'python-site/_site-exam'
           assert (site / 'index.html').is_file() and (site / 'nested/index.html').is_file()
+          assert (site / 'exercises/index.html').is_file()
           lock = json.loads((root / 'prebuilt-assets/complete-lock.json').read_bytes())
           verify_deployment(site, lock)
           readme = Path('docs/exam-site-zip.md').read_text().split('<!-- IT -->\n', 1)[1].split('\n<!-- /IT -->', 1)[0]
           (site / 'README-IT.txt').write_text(readme + '\n', encoding='utf-8')
+          # The bundled server (docs/exam-server.md): Python 3.12+, standard library only.
+          shutil.copyfile('scripts/serve-offline.py', site / 'serve.py')
           output = root / 'python-offline-website.zip'
           with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
               for file in sorted(site.rglob('*')):
@@ -143,7 +150,9 @@ jobs:
               archive.extractall(deployed)
           verify_deployment(deployed, lock)
           shutil.copytree(deployed, root / 'hosted/dept/python')
-          print('Website ZIP sha256:', a.digest(output.read_bytes()))
+          checksum = a.digest(output.read_bytes())
+          (root / 'SHA256SUMS').write_text(checksum + '  python-offline-website.zip\n', encoding='utf-8')
+          print('Website ZIP sha256:', checksum)
           PY
       - name: Install Chromium from the supported browser platform
         timeout-minutes: 5
@@ -165,6 +174,12 @@ jobs:
           (cd "$RUNNER_TEMP/p13-mixed" && quarto render --profile offline,exam)
           P13_MIXED_SITE="$RUNNER_TEMP/p13-mixed/_site-exam" P13_MIXED_REPORT="$RUNNER_TEMP/p13-shared-worker.json" \
             node tools/p13-shared-worker.mjs
+      - name: Grade the exercise page offline, served by the ZIP's own serve.py
+        run: |
+          OFFLINE_SITE="$RUNNER_TEMP/deployed" OFFLINE_REPORT="$RUNNER_TEMP/offline-exercises-root.json" \
+            node tools/offline-ide-exercises.mjs
+          OFFLINE_SITE="$RUNNER_TEMP/deployed" OFFLINE_PREFIX=/dept/python/ \
+            OFFLINE_REPORT="$RUNNER_TEMP/offline-exercises-subdirectory.json" node tools/offline-ide-exercises.mjs
       - name: Serve the extracted website using ordinary static hosting and optional headers
         run: |
           python -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/deployed" > "$RUNNER_TEMP/plain.log" 2>&1 &
@@ -296,7 +311,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: p13-zip-candidate
-          path: ${{ runner.temp }}/python-offline-website.zip
+          path: |
+            ${{ runner.temp }}/python-offline-website.zip
+            ${{ runner.temp }}/SHA256SUMS
           compression-level: 0
           if-no-files-found: error
       - name: Preserve acceptance evidence
@@ -308,6 +325,7 @@ jobs:
             ${{ runner.temp }}/python-offline-checks.json
             ${{ runner.temp }}/p13-loading-timing.json
             ${{ runner.temp }}/p13-shared-worker.json
+            ${{ runner.temp }}/offline-exercises-*.json
             ${{ runner.temp }}/python-ide.png
             ${{ runner.temp }}/plain.log
             ${{ runner.temp }}/subdirectory.log
@@ -421,3 +439,45 @@ jobs:
           archive: false
           compression-level: 0
           if-no-files-found: error
+      - name: Preserve the checksum beside it
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-offline-website-sha256
+          path: ${{ runner.temp }}/accepted/SHA256SUMS
+          if-no-files-found: error
+
+  publish-release-zip:
+    # A release tag: attach the accepted ZIP, its SHA256SUMS, the IT README
+    # and the notices to the GitHub release that release.yml creates.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [accepted-website]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: p13-zip-candidate
+          path: ${{ runner.temp }}/accepted
+      - name: Upload to the release once it exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/accepted"
+          sha256sum -c SHA256SUMS
+          python3 - "$GITHUB_WORKSPACE/docs/exam-site-zip.md" > README-IT.txt <<'PY'
+          import sys
+          text = open(sys.argv[1], encoding='utf-8').read()
+          print(text.split('<!-- IT -->\n', 1)[1].split('\n<!-- /IT -->', 1)[0])
+          PY
+          # release.yml builds and tests the package first; wait for its release (up to 2 hours).
+          for attempt in $(seq 1 120); do
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then break; fi
+            sleep 60
+          done
+          gh release upload "$TAG" python-offline-website.zip SHA256SUMS README-IT.txt --repo "$GITHUB_REPOSITORY" --clobber
