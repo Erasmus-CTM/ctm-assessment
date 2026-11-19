@@ -15,7 +15,7 @@ fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: website\n  rend
 fs.writeFileSync(path.join(dir,'index.qmd'),'---\ntitle: Mixed runtime test\n---\n\n'
   +'```{math-exercise}\n#| label: mixed-math\nCompute two plus two: _[4]\n```\n\n'
   +'```{pyodide-python}\nprint("mixed Python ready")\n```\n\n'
-  +'```{#mixed-stack .stack-question}\n#| label: mixed-stack\n#| file: question.xml\n#| question: Expand a product (form-sensitive)\n#| checker: |\n#|   def check(response, symbols):\n#|       return bool(response["answers"]["ans"] == response["teacher"]["ans"])\n#| checker-value: 2\n#| review: true\n```\n');
+  +'```{#mixed-stack .stack-question}\n#| label: mixed-stack\n#| cas: sympy\n#| file: question.xml\n#| question: Expand a product (form-sensitive)\n#| checker: |\n#|   def check(response, symbols):\n#|       return bool(response["answers"]["ans"] == response["teacher"]["ans"])\n#| checker-value: 2\n#| review: true\n```\n');
 const render = spawnSync(process.env.QUARTO_BIN || 'quarto',['render'],{cwd:dir,encoding:'utf8',timeout:300000,
   env:{...process.env,CTM_VARIANTS:'review'}});
 assert.equal(render.status,0,render.stderr);

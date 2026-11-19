@@ -114,6 +114,7 @@ Use exact values.
 
 ```{#installed-stack .stack-question}
 #| label: installed-stack
+#| cas: sympy
 #| file: question.xml
 #| question: Expand a product (form-sensitive)
 #| feedback: false
