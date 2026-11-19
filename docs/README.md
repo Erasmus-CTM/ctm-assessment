@@ -34,7 +34,7 @@ Start with the [authoring guide](authoring.md) to adapt an activity to your teac
 Dated audits, designs and work logs. They describe decisions and evidence at the time they were written; the guides
 above describe the current package.
 
-- **Release 1.0.0:** [plan and decisions](consolidation/2026-11-release-1.0-plan.md),
+- **Release 1.0.0:** [plan and decisions](consolidation/2026-11-release-1.0-plan.md), [runbook](release-1.0/runbook.md), [review-set test](release-1.0/review-set-test.md), [branch cleanup](release-1.0/branch-cleanup.md),
   [freeze manifest](release-1.0/freeze-manifest.json), [finding register](release-1.0/finding-register.md),
   [offline dry run](release-1.0/a5-offline-dry-run.md)
 - **Audits:** [16 October 2026, public examples](audit-2026-10-16.md);
