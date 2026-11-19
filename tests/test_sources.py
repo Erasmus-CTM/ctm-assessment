@@ -25,7 +25,7 @@ class SourceSelection(unittest.TestCase):
         self.assertEqual(repositories['ctm-libs']['repository'], 'Erasmus-CTM/ctm-libs')
         self.assertEqual(repositories['ctm-libs']['extensions'], ['ctm-libs'])
         self.assertNotIn('ships-copies', repositories['ctm-libs'])
-        self.assertEqual(repositories['ctm-libs']['review-ref-aliases'], ['ai-feedback'])
+        self.assertNotIn('review-ref-aliases', repositories['ctm-libs'])  # removed in 1.0 (L8)
         for name, source in repositories.items():
             with self.subTest(repository=name):
                 self.assertTrue(source['branch'])
@@ -117,7 +117,7 @@ class SourceSelection(unittest.TestCase):
     def test_update_pins_only_repins_the_named_repositories(self):
         # After the consolidation merges: re-pin ctm-libs, math-exercise and
         # py-exercise; the JSXGraph fork pin (not on upstream main) and
-        # pyodide-interaktiv stay as they are. The old name ai-feedback is read as ctm-libs.
+        # pyodide-interaktiv stay as they are.
         before = json.loads((builder.TEMPLATE / 'repos.json').read_text())
         tips = {'ctm-libs': 'a' * 40, 'math-exercise': 'b' * 40, 'py-exercise': 'c' * 40}
         resolved = []
@@ -127,7 +127,7 @@ class SourceSelection(unittest.TestCase):
         with patch.object(builder, 'remote_revision', side_effect=tip), \
              patch.object(builder, 'descends', return_value=True), \
              patch.object(builder.Path, 'write_text') as write, \
-             patch('sys.argv', ['setup', '--update-pins', '--only', 'ai-feedback, math-exercise,py-exercise']):
+             patch('sys.argv', ['setup', '--update-pins', '--only', 'ctm-libs, math-exercise,py-exercise']):
             builder.main()
         self.assertEqual(sorted(resolved), sorted(tips))
         written = json.loads(write.call_args.args[0])['repositories']
@@ -209,17 +209,6 @@ class SourceSelection(unittest.TestCase):
         clash = {'repositories': {'a': {'extensions': ['x', 'y']}, 'b': {'extension': 'y'}}}
         with self.assertRaisesRegex(SystemExit, 'both own the extension folder y'):
             builder.extension_folders(clash)
-
-    def test_the_old_name_is_an_alias_with_one_notice(self):
-        import contextlib, io
-        config = json.loads((builder.TEMPLATE / 'repos.json').read_text())
-        notices, out = set(), io.StringIO()
-        with contextlib.redirect_stdout(out):
-            self.assertEqual(builder.canonical_name('ai-feedback', config, '--source', notices), 'ctm-libs')
-            self.assertEqual(builder.canonical_name('ai-feedback', config, '--ref', notices), 'ctm-libs')
-            self.assertEqual(builder.canonical_name('math-exercise', config, '--source', notices), 'math-exercise')
-            self.assertEqual(builder.canonical_name('unknown', config, '--source', notices), 'unknown')
-        self.assertEqual(out.getvalue().count('ai-feedback is now part of ctm-libs'), 1)
 
     def test_nested_copies_are_found_in_every_own_folder(self):
         import tempfile

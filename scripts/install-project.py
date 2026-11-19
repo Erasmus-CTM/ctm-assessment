@@ -54,11 +54,6 @@ def components():
     return set(manifest()["repositories"])
 
 
-def aliases():
-    """Old component names accepted for one release: {"ai-feedback": "ctm-libs"}."""
-    return {alias: name for name, spec in manifest()["repositories"].items() for alias in spec.get("review-ref-aliases", [])}
-
-
 def package_version():
     """The version of the CTM Assessment checkout (the package manifest)."""
     text = (ROOT / "_extensions" / "ctm-assessment" / "_extension.yml").read_text(encoding="utf-8")
@@ -108,11 +103,8 @@ def check_release(tag):
                            "Use a clean checkout of the release.")
 
 
-def parse_review_refs(text, known, renamed=None):
-    """NAME=SHA[,NAME=SHA...] or a JSON object -> {name: sha}; raises InstallError.
-
-    `renamed` maps old component names to their current one (ai-feedback ->
-    ctm-libs); such a name is read as the new one, with a notice."""
+def parse_review_refs(text, known):
+    """NAME=SHA[,NAME=SHA...] or a JSON object -> {name: sha}; raises InstallError."""
     text = text.strip()
     if text.startswith(("{", "[")):
         try:
@@ -131,13 +123,6 @@ def parse_review_refs(text, known, renamed=None):
             if name.strip() in refs:
                 raise InstallError(f"--review-refs names {name.strip()} twice")
             refs[name.strip()] = sha.strip()
-    for old, new in (renamed or {}).items():
-        if old in refs:
-            if new in refs:
-                raise InstallError(f"--review-refs names {new} twice (also as its old name {old})")
-            print(f"Note: {old} is now part of {new}; --review-refs {old}=... is used for {new} "
-                  "(the old name is accepted in CTM Assessment 0.9 only).", flush=True)
-            refs = {(new if name == old else name): sha for name, sha in refs.items()}
     if "ctm-assessment" in refs:
         raise InstallError("--review-refs cannot set ctm-assessment: the installer always builds the "
                            "checkout it is part of. Fetch ctm-assessment at the ref you want instead.")
@@ -226,7 +211,7 @@ def main():
     try:
         if not project.is_dir():
             raise InstallError(f"project folder not found: {project}")
-        review_refs = parse_review_refs(args.review_refs, components(), aliases())
+        review_refs = parse_review_refs(args.review_refs, components())
         if args.release:
             if review_refs or args.source:
                 raise InstallError(f"--release {args.release} installs the release's own components; "

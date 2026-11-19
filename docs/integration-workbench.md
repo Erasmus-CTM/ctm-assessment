@@ -35,16 +35,18 @@ that contains that commit and that `--update-pins` follows:
 | Name | Repository | Branch | Extension folders |
 |---|---|---|---|
 | ctm-assessment | this repository | this checkout, including local edits | `ctm-assessment` |
-| ctm-libs | Erasmus-CTM/ctm-libs (formerly ai-feedback) | `main` | `ctm-libs` and the alias `ai-feedback` |
+| ctm-libs | Erasmus-CTM/ctm-libs (formerly ai-feedback) | `main` | `ctm-libs` |
 | py-exercise | Erasmus-CTM/py-exercise | `main` | `py-exercise` |
 | math-exercise | Erasmus-CTM/math-exercise | `main` | `math-exercise` |
 | pyodide-interaktiv | Erasmus-CTM/pyodide-interaktiv | `feature/shared-feedback-integration` | `pyodide-interaktiv` (its shipped `ai-feedback` copy is not packaged) |
-| jsxgraph | jsxgraph/jsxgraph-quarto (upstream) | `main`; pinned to the commit of upstream pull request #2 until it is merged | `jsxgraph` |
+| jsxgraph | aacchhee/jsxgraph-quarto (a fork for fixes proposed upstream) | `audit/2026-10`; 1.0.0 moves to an upstream release (plan decision D8) | `jsxgraph` |
+| ctm-checkers | Erasmus-CTM/ctm-checkers | `main` | `ctm-checkers` |
+| ctm-stack | Erasmus-CTM/ctm-stack | `main` | `ctm-stack` |
 
 A repository may own several extension folders (`extensions`); every folder is
-copied and recorded. `review-ref-aliases` names earlier names of a repository:
-`ai-feedback` is read as `ctm-libs` in `--source`, `--ref`, `--review-refs`,
-`--only` and review trailers, with one notice (CTM Assessment 0.9 only).
+copied and recorded. The earlier name `ai-feedback` was accepted for
+`ctm-libs` in `--source`, `--ref`, `--review-refs`, `--only` and review
+trailers until 0.13; since 1.0 only the current names are.
 
 **Release order.** Merge the component PRs first, keeping their commits (a
 merge commit or rebase; a squash creates new commits that do not contain the
@@ -82,8 +84,7 @@ Commit the updated `repos.json` with the passing run. `--follow-branches`
 builds against the branch tips without changing the manifest; the scheduled
 **Track component branches** workflow does this weekly and fails early when a
 component change breaks the combined page. A pin that its branch does not
-contain (the JSXGraph pin) stays, with a log line saying so. The legacy
-`--refresh` flag has no effect.
+contain (the JSXGraph pin) stays, with a log line saying so.
 For unmerged dependencies, explicitly select a review branch:
 
 ```sh

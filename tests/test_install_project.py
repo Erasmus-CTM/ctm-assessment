@@ -14,7 +14,6 @@ installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
 
 KNOWN = {'ctm-stack', 'ctm-libs', 'math-exercise', 'ctm-checkers', 'py-exercise', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'}
-RENAMED = {'ai-feedback': 'ctm-libs'}
 A, B = 'a' * 40, 'b' * 40
 
 # Stands in for `quarto add DIST --no-prompt`: copies DIST/_extensions/* into
@@ -64,22 +63,10 @@ class ReviewRefs(unittest.TestCase):
         with self.assertRaisesRegex(installer.InstallError, 'NAME=SHA'):
             installer.parse_review_refs('{math-exercise: ' + A + '}', KNOWN)
 
-    def test_the_old_name_ai_feedback_is_read_as_ctm_libs(self):
-        # ai-feedback became ctm-libs; course review refs keep working for 0.9.
-        import contextlib, io
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            self.assertEqual(installer.parse_review_refs(f'ai-feedback={A}', KNOWN, RENAMED), {'ctm-libs': A})
-            self.assertEqual(installer.parse_review_refs(json.dumps({'ai-feedback': A, 'math-exercise': B}), KNOWN, RENAMED),
-                             {'ctm-libs': A, 'math-exercise': B})
-        self.assertIn('ai-feedback is now part of ctm-libs', out.getvalue())
-        with self.assertRaisesRegex(installer.InstallError, 'names ctm-libs twice'):
-            installer.parse_review_refs(f'ai-feedback={A},ctm-libs={B}', KNOWN, RENAMED)
+    def test_the_old_name_ai_feedback_is_an_unknown_component(self):
+        # ai-feedback became ctm-libs in 0.9; the old name was accepted until 0.13 (L8).
         with self.assertRaisesRegex(installer.InstallError, 'unknown component: ai-feedback'):
             installer.parse_review_refs(f'ai-feedback={A}', KNOWN)
-
-    def test_the_manifest_declares_the_alias(self):
-        self.assertEqual(installer.aliases(), RENAMED)
         self.assertEqual(installer.components(), KNOWN)
 
     def test_installer_rejects_ctm_assessment_before_building(self):

@@ -32,10 +32,11 @@ class ReviewDependencies(unittest.TestCase):
         self.assertEqual(json.loads(env.split('=', 1)[1]), SHA)
         self.assertIn('ctm-checkers=' + SHA['ctm-checkers'], outputs)
 
-    def test_the_old_name_is_read_as_ctm_libs(self):
-        result, env, _ = self.run_script('Change\n\nCTM-Review-Refs: {"ai-feedback": "%s"}' % SHA['ctm-libs'])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(env.split('=', 1)[1]), {'ctm-libs': SHA['ctm-libs']})
+    def test_the_old_name_ai_feedback_is_refused(self):
+        # Accepted until CTM Assessment 0.13 (L8).
+        result, _, _ = self.run_script('Change\n\nCTM-Review-Refs: {"ai-feedback": "%s"}' % SHA['ctm-libs'])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('known dependencies', result.stderr)
 
     def test_main_ignores_the_trailer(self):
         result, env, _ = self.run_script('Change\n\nCTM-Review-Refs: ' + json.dumps(SHA), ref='refs/heads/main')

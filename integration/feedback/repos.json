@@ -7,9 +7,6 @@
       "commit": "972cae390b3aa7afd4e66c73bd4db3a33d208746",
       "extensions": [
         "ctm-libs"
-      ],
-      "review-ref-aliases": [
-        "ai-feedback"
       ]
     },
     "py-exercise": {

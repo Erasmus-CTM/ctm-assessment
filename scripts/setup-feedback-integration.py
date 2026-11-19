@@ -22,7 +22,6 @@ BOOTSTRAP_COMPONENTS = ('math-exercise', 'py-exercise', 'pyodide-interaktiv', 'c
 # Copies that moved into ctm-libs in consolidation step 1; pyodide-interaktiv
 # dropped its loader with 1.9 (step 3), so no component keeps one.
 RETIRED_COPIES = ('feedback-loader.lua', 'shared/pyodide-runtime.js')
-KEEPS_RETIRED_COPIES = ()
 # The last standalone ai-feedback release (0.8.1) before it became ctm-libs:
 # tests check that such a copy next to the package is ignored or stops a page.
 LEGACY_AI_FEEDBACK = ('Erasmus-CTM/ctm-libs', '79103a6a829b9c5cf62f645857ca7f8330ff7be2')
@@ -166,23 +165,6 @@ def extension_folders(config):
     return folders
 
 
-def aliases(config):
-    """{old name: repository name} from `review-ref-aliases` (ai-feedback -> ctm-libs)."""
-    return {alias: name for name, spec in config['repositories'].items() for alias in spec.get('review-ref-aliases', [])}
-
-
-def canonical_name(name, config, option, notices):
-    """A repository name as given in --source/--ref/--review-refs/--only, aliases resolved."""
-    renamed = aliases(config)
-    if name in renamed and name not in config['repositories']:
-        if name not in notices:
-            notices.add(name)
-            print(f'Note: {name} is now part of {renamed[name]}; {option} {name} is read as {renamed[name]} '
-                  '(the old name is accepted in CTM Assessment 0.9 only).', flush=True)
-        return renamed[name]
-    return name
-
-
 def check_shared_files(config, sources, extensions, hashes, pinned_libs=None):
     """The shared bootstrap is byte-identical everywhere; retired copies are gone.
 
@@ -213,8 +195,6 @@ def check_shared_files(config, sources, extensions, hashes, pinned_libs=None):
                          + ''.join(f' or the pinned {digest[:12]}' for digest in sorted(accepted - {expected})) + '): '
                          + ', '.join(f'{path}={(digest or "missing")[:12]}' for path, digest in sorted(differ.items())))
     for name in config['repositories']:
-        if name in KEEPS_RETIRED_COPIES:
-            continue
         for folder in extensions[name]:
             left = [path for path in RETIRED_COPIES if path in hashes[folder]]
             if left:
@@ -314,7 +294,6 @@ def followed_revision(name, spec):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--workspace', type=Path, default=ROOT / '.feedback-workspace')
-    parser.add_argument('--refresh', action='store_true', help='Compatibility option without effect: every component is pinned by commit')
     parser.add_argument('--follow-branches', action='store_true', help='Resolve each component\'s branch tip instead of its pinned commit (early warning; not a release build); a pin its branch does not contain is kept')
     parser.add_argument('--update-pins', action='store_true', help='Write the current branch tips into repos.json and stop; then run --test')
     parser.add_argument('--check-pins', action='store_true', help='Check that every pin is a commit of its branch (after a stacked set merged: each pin is on its dependency\'s main) and stop')
@@ -332,7 +311,6 @@ def main():
         raise SystemExit('--only selects the repositories that --update-pins re-pins; use it with --update-pins.')
     config = json.loads((TEMPLATE / 'repos.json').read_text())
     extensions = extension_folders(config)
-    notices = set()
     if args.check_pins:
         # Stacked sets (merge protocol, AC 20 Oct): the pins are the reviewed
         # heads; once the set has merged, each must be on its branch.
@@ -356,7 +334,7 @@ def main():
     if args.update_pins:
         only = None
         if args.only:
-            only = {canonical_name(name.strip(), config, '--only', notices) for name in args.only.split(',') if name.strip()}
+            only = {name.strip() for name in args.only.split(',') if name.strip()}
             unknown = sorted(only - set(config['repositories']) | ({'ctm-assessment'} & only))
             if unknown or not only:
                 raise SystemExit('--only names repositories that repos.json pins: ' + (', '.join(unknown) or 'none given')
@@ -394,7 +372,6 @@ def main():
     local = {'ctm-assessment': ROOT}
     for entry in args.source:
         name, path = entry.split('=', 1)
-        name = canonical_name(name, config, '--source', notices)
         if name not in config['repositories']:
             raise SystemExit('Unknown repository: ' + name)
         local[name] = Path(path).resolve()
@@ -403,13 +380,11 @@ def main():
         raise SystemExit('Review refs must map known repositories to full SHAs')
     review_refs = {}
     for name, ref in given.items():
-        name = canonical_name(name, config, 'review refs', notices)
         if name not in config['repositories'] or not re.fullmatch(r'[0-9a-f]{40}', str(ref)) or name in review_refs:
             raise SystemExit('Review refs must map known repositories to full SHAs, each once')
         review_refs[name] = ref
     for entry in args.ref:
         name, ref = entry.split('=', 1)
-        name = canonical_name(name, config, '--ref', notices)
         if name not in config['repositories'] or not ref.strip():
             raise SystemExit('Unknown repository or empty review branch: ' + name)
         if name in local:
@@ -515,7 +490,7 @@ def main():
         foreign = sorted(foreign)
         if foreign:
             raise SystemExit(f'{name} ships its own copy of {", ".join(foreign)}; use the pinned component instead.')
-    result = {'version': package_version(), 'quarto': quarto_version, 'quarto_required': config['quarto'], 'refresh': args.refresh, 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
+    result = {'version': package_version(), 'quarto': quarto_version, 'quarto_required': config['quarto'], 'follow_branches': args.follow_branches, 'repositories': revisions, 'extension_sha256': hashes}
     (workspace / 'resolved-repos.json').write_text(json.dumps(result, indent=2) + '\n')
     if not args.package_only:
         shutil.copy2(workspace / 'resolved-repos.json', site / 'resolved-repos.json')
