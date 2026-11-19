@@ -15,7 +15,8 @@ class SourceSelection(unittest.TestCase):
         repositories = json.loads((builder.TEMPLATE / 'repos.json').read_text())['repositories']
         self.assertEqual(set(repositories), {'ctm-libs', 'py-exercise', 'math-exercise', 'ctm-stack', 'ctm-checkers', 'pyodide-interaktiv', 'jsxgraph', 'ctm-assessment'})
         self.assertEqual(repositories['ctm-stack']['repository'], 'Erasmus-CTM/ctm-stack')
-        self.assertEqual(repositories['jsxgraph']['repository'], 'aacchhee/jsxgraph-quarto')
+        # Upstream merged the fork's fixes (jsxgraph-quarto#2); 5cd0d1e has the fork pin 49a1c7d's tree (D8).
+        self.assertEqual(repositories['jsxgraph']['repository'], 'jsxgraph/jsxgraph-quarto')
         self.assertNotIn('pin-outside-branch', repositories['jsxgraph'])
         # ctm-checkers, the Python checker library math-exercise grades with: its generated extension folder.
         self.assertEqual(repositories['ctm-checkers']['repository'], 'Erasmus-CTM/ctm-checkers')

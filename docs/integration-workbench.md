@@ -39,7 +39,7 @@ that contains that commit and that `--update-pins` follows:
 | py-exercise | Erasmus-CTM/py-exercise | `main` | `py-exercise` |
 | math-exercise | Erasmus-CTM/math-exercise | `main` | `math-exercise` |
 | pyodide-interaktiv | Erasmus-CTM/pyodide-interaktiv | `feature/shared-feedback-integration` | `pyodide-interaktiv` (its shipped `ai-feedback` copy is not packaged) |
-| jsxgraph | aacchhee/jsxgraph-quarto (a fork for fixes proposed upstream) | `audit/2026-10`; 1.0.0 moves to an upstream release (plan decision D8) | `jsxgraph` |
+| jsxgraph | jsxgraph/jsxgraph-quarto (upstream) | `main`, at the merge of the fixes proposed from the fork aacchhee/jsxgraph-quarto (upstream #2); 1.0.0 needs an upstream release tag on the pin (plan decision D8) | `jsxgraph` |
 | ctm-checkers | Erasmus-CTM/ctm-checkers | `main` | `ctm-checkers` |
 | ctm-stack | Erasmus-CTM/ctm-stack | `main` | `ctm-stack` |
 

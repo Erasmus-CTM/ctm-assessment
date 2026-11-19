@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+Towards **1.0.0** ([plan](docs/consolidation/2026-11-release-1.0-plan.md), [finding register](docs/release-1.0/finding-register.md)):
+
+- **JSXGraph from upstream:** the package pins jsxgraph/jsxgraph-quarto
+  5cd0d1e (`main`), upstream's merge of the fixes proposed from the fork
+  (upstream #2). Its tree equals the fork pin 49a1c7d, so no shipped byte
+  changes (D8, M14). An upstream release tag on it is still needed for 1.0.0.
+- **Offline exam website:** a third page, **Exercises** (a math-exercise and a
+  py-exercise on the shared worker), graded in CI with every external request
+  refused and served by the ZIP's own `serve.py`
+  (`tools/offline-ide-exercises.mjs`). The ZIP ships `serve.py` and
+  `README-IT.txt`; `SHA256SUMS` is published beside it; a release tag attaches
+  the accepted ZIP to the GitHub release. New [SEB guide](docs/exam-seb.md)
+  for exam IT with AC's manual check form.
+- **Offline server** (`scripts/serve-offline.py`, shipped as `serve.py`):
+  HTTP/1.1 keep-alive with an idle timeout, one digest per file version (M17),
+  and asset headers at any path prefix (R-03).
+- **Release chain:** `release-check.py` requires the version's CHANGELOG
+  section to name every pin (M6); `--remote` requires a release tag on every
+  pinned commit and agreeing component CI pins (H3) and writes the release
+  manifest, attached to the release. `install-project.py --release` binds a Git
+  checkout to the clean tag (R-04). Cached component sources are reused only
+  while they match the inventory recorded at extraction (R-01).
+- **Removed:** the review-ref and option alias `ai-feedback` for ctm-libs
+  (accepted until 0.13), `--refresh` and the one-off workflow
+  `current-closure-store-d2.yml` (L8, M24).
+- **Docs:** the documentation index separates guides from project records;
+  the authoring guide has a STACK activity; the README mentions STACK and the
+  exam website.
+
 - Pins ctm-libs 972cae3 (ctm-libs#64): image feedback activities can opt into
   one correction exchange with `corrections="true"` (with `image-upload="true"`).
   After direct API feedback on an uploaded response image, a student can point
