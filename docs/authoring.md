@@ -13,10 +13,32 @@ and then write a short program for the same calculation.
 | Complete a function and check its behavior | Python exercises |
 | Experiment with code and examine the output | Python exploration |
 | Interpret or manipulate a diagram | JSXGraph examples |
+| Reuse a STACK question from Moodle | STACK questions |
 
 [Try the combined examples](https://erasmus-ctm.github.io/ctm-assessment/example.html).
 Open the source beneath a useful activity and copy it into your Quarto page.
 Change the question, starting answer and checks together.
+
+### STACK questions
+
+A STACK question exported from Moodle as XML becomes a card on the page: keep
+the `.xml` file next to the page and name the question.
+
+````markdown
+```{.stack-question}
+#| label: expand-product
+#| file: questions.xml
+#| question: Expand a product
+```
+````
+
+The answer is checked in the browser by Maxima, as in Moodle (`cas: maxima`,
+the default for online pages since 1.0), or by SymPy (`cas: sympy`).
+Building a page with Maxima questions needs the STACK runtime staged once;
+the [ctm-stack documentation](https://github.com/Erasmus-CTM/ctm-stack#readme)
+gives the command, the supported question features and the variant review.
+STACK questions need the online build: an offline or exam build stops at a page
+that has one.
 
 ## Make the first attempt worthwhile
 

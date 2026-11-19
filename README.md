@@ -13,6 +13,7 @@ Choose one small learning goal. Start with an example that comes close, replace 
 ## Ideas for your teaching
 
 - Pair a diagram with a mathematics question or a language activity.
+- Reuse STACK questions from Moodle, checked in the browser by Maxima.
 - Let students complete a short Python function and check it themselves.
 - Compare a gentle hint with a worked explanation of the same problem.
 - Give feedback using the terminology and methods taught in your course.
@@ -45,6 +46,8 @@ explains how to get a complete copy.
 - [Adapt your first activity](docs/authoring.md)
 - [Install and configure the extension](docs/installation.md)
 - [Look up a specific option](docs/reference.md)
+- [Run Python and exercises without internet in an exam](docs/exam-site-zip.md)
+- [All documentation](docs/README.md)
 
 These guides assume you can edit and render a Quarto document. The authoring
 guide starts with the teaching task; setup details are kept separately.

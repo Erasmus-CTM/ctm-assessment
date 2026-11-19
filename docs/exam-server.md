@@ -34,10 +34,12 @@ with keep-alive (idle connections close after 60 seconds), computes each
 file's ETag once per file version, and recognises assets by their
 `_ctm-assets` path segment, so a site below a prefix such as `/dept/python/`
 keeps the asset headers. Exam IT still owns TLS, monitoring, capacity and
-deployment, and runs the capacity test below on the real server. HTTPS with a certificate
-trusted by every exam machine is required. Plain HTTP on a LAN is a degraded
-mode: Python runs, but `input()` and Stop do not. Browser enterprise exceptions
-are not an exam-browser fallback.
+deployment, and runs the capacity test below on the real server. HTTPS with a
+certificate trusted by every exam machine is recommended: it gives a secure,
+cross-origin-isolated page. Plain HTTP on a LAN is a degraded mode: Python
+runs and Stop restarts Python (its variables are reset), but `input()` and
+cooperative interruption are not available. Browser enterprise exceptions are
+not an exam-browser fallback.
 
 ## HTTP contract
 
