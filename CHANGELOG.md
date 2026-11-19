@@ -27,6 +27,22 @@ Towards **1.0.0** ([plan](docs/consolidation/2026-11-release-1.0-plan.md), [find
 - **Removed:** the review-ref and option alias `ai-feedback` for ctm-libs
   (accepted until 0.13), `--refresh` and the one-off workflow
   `current-closure-store-d2.yml` (L8, M24).
+- **Components for review** (branches `claude/nice-dirac-uz5r4x`, named by
+  this branch's `CTM-Review-Refs` trailer; the package re-pins them when they
+  merge, [runbook](docs/release-1.0/runbook.md)):
+  - ctm-checkers: inclusive tolerance boundaries decided in decimal arithmetic
+    (GR-1); learner answers admitted by token, no Python evaluation (A-01/M3).
+  - ctm-libs: bounded AI feedback streams with an explicit end (P01, P02);
+    `ctm-assessment: exam: true` (M18), set by the generated exam profile; a
+    local build stops at STACK questions (X-2); one installation per page by
+    code identity (B1).
+  - math-exercise: a restored practice key is computed again (GR-4); every
+    answer field has an accessible name (UX-1).
+  - ctm-stack: native Maxima is the online default (D4), after a SymPy/Maxima
+    parity check over the example questions; runtime-v3 staging ships in the
+    extension; the package tests stage it and render a default-CAS card.
+  - py-exercise, pyodide-interaktiv (shipped ctm-libs synced), ctm-demo: CI
+    pins, docs and retired October workflows.
 - **Docs:** the documentation index separates guides from project records;
   the authoring guide has a STACK activity; the README mentions STACK and the
   exam website.
