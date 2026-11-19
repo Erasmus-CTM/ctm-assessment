@@ -228,6 +228,8 @@ class Preparation(unittest.TestCase):
         self.assertIn(b'save: answers', edits["_quarto-exam.yml"].data)
         self.assertIn(b'export: true', edits["_quarto-exam.yml"].data)
         self.assertIn(b'enabled: false', edits["_quarto-exam.yml"].data)
+        # M18: ctm-libs' exam setting turns AI feedback off whatever another level says.
+        self.assertIn(b'exam: true', edits["_quarto-exam.yml"].data)
         self.assertEqual(edits[".gitignore"].previous_sha256, assets.digest(b"keep\n"))
 
     def test_repeated_plan_and_noncarried_canonical_build_are_equal(self):

@@ -720,7 +720,7 @@ def write_profiles(project: Path, *, course_key: str | None = None, website: boo
         "_quarto-exam.yml": (
             "# Exam build: quarto render --profile offline,exam\n"
             "project:\n  output-dir: _site-exam\n"
-            "ctm-assessment:\n  export: true\n  save: answers\n  storage-key: "
+            "ctm-assessment:\n  exam: true\n  export: true\n  save: answers\n  storage-key: "
             + json.dumps(storage_key, ensure_ascii=False) + "\n"
             "ai-feedback:\n  enabled: false\n"),
     }
