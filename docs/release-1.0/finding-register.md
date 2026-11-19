@@ -25,7 +25,7 @@ Codex review and AC's merge.
 | GR-1 | Inclusive tolerance rejects valid boundary answers (`abs(sv-cv) <= tol` in floating point) | ctm-checkers `math_exercise/checks.py:27`, `numeric.py:30` | fixed on ctm-checkers `claude/nice-dirac-uz5r4x` (`ac5fd12`): decimal comparison; tests; 9,500/9,500 goldens | A2 |
 | GR-2 | Fixed samples give full credit to a non-derivative | freehand_ai_assessment (consumer) | open, but not reachable from the release work; reported to its owner | A2 (consumer) |
 | GR-3 | Exact tangent task accepts a small intercept error | freehand_ai_assessment (consumer) | open, same as GR-2 | A2 (consumer) |
-| GR-4 | Restored practice key keeps an edited computed badge | math-exercise `math-similar.js` | open: code unchanged at `39df17e` | A2 |
+| GR-4 | Restored practice key keeps an edited computed badge | math-exercise `math-similar.js` | fixed on math-exercise `claude/nice-dirac-uz5r4x` (`bb52c5c`): recomputed before the first check; test fails on main | A2 |
 | M7 | Parity expected-difference entries can whitelist a correct→incorrect flip | ctm-assessment parity harness | to re-check | A2 |
 | L2 | Model-supplied maths can freeze Python | ctm-checkers `generated.py` | fixed: result size bounded (#93 "rejected or already repaired") | — |
 | S-P | SymPy vs Maxima parity never run on the shared corpora; required by D4 (Maxima default online) | ctm-stack, umbrella | open | A2 |
@@ -35,11 +35,11 @@ Codex review and AC's merge.
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
 | A-01 / M3 | Authored-answer admission keeps broad SymPy evaluation; the `__` rule still runs `exec`. Blocks exam use | ctm-checkers `math_exercise/inputs.py` | fixed on ctm-checkers `claude/nice-dirac-uz5r4x` (`ac5fd12`): token admission; 619 corpus strings admitted, 30 attacks refused | A3 |
-| P01 | SSE stream has no byte, line or time limit | ctm-libs `feedback/feedback-core.js` | open: the 972cae3 change does not touch stream parsing | A3 |
-| P02 | Premature SSE EOF succeeds; data after `[DONE]` is appended | ctm-libs `feedback/feedback-core.js` | open | A3 |
+| P01 | SSE stream has no byte, line or time limit | ctm-libs `feedback/feedback-core.js` | fixed on ctm-libs `claude/nice-dirac-uz5r4x` (`1aad554`): text, line, idle and total limits; `OUTPUT_LIMIT`, `TIMEOUT` | A3 |
+| P02 | Premature SSE EOF succeeds; data after `[DONE]` is appended | ctm-libs `feedback/feedback-core.js` | fixed (`1aad554`): ends at `finish_reason`/`[DONE]`; `STREAM_INCOMPLETE` | A3 |
 | M18 | "AI off in exams" relies on a generated profile; no forced `exam: true` | ctm-assessment `ctm_assets.py`, ctm-libs `assets.lua` | fixed: ctm-libs `claude/nice-dirac-uz5r4x` adds `ctm-assessment: exam`; the umbrella's exam profile sets it (`de87cb8`) | A3 / A5 |
 | GOV-1 | AC-only approval of the exam lock receipt is not enforced | ctm-assessment | open (main unprotected) | A4 |
-| N-1 | New since #93: handwriting-correction request path (`correction.note`, `previousFeedback`) | ctm-libs `972cae3` | to review | A3 |
+| N-1 | New since #93: handwriting-correction request path (`correction.note`, `previousFeedback`) | ctm-libs `972cae3` | reviewed, no defect (ctm-libs `8f9bb37`, docs/internal/2026-11-review-correction-path.md) | A3 |
 | M1 | Feedback KaTeX from a floating CDN | ctm-libs | fixed (`7951db4`, goes through `CTMAssets`) | — |
 | M2 | Learner `micropip.install` reaches PyPI in local mode | ctm-libs | fixed (#55) | — |
 | L1 | Model TeX `\href{javascript:…}` after a late MathJax pass | ctm-libs, ctm-stack | to re-check | A3 |
@@ -53,16 +53,16 @@ Codex review and AC's merge.
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
 | H2 | Golden replay ran only by hand | ctm-checkers | fixed (`12237e9`) | — |
-| H3 | Component CI tests other dependency commits than the package ships | all | partly: `release-check.py --remote` now requires agreement for a release (`a23e171`); py-exercise and ctm-stack CI pins moved to the package's on their branches; ctm-libs and math-exercise remain | A4 |
+| H3 | Component CI tests other dependency commits than the package ships | all | fixed on the review branches: py-exercise, ctm-libs, math-exercise and ctm-stack CI pins equal the package's; `release-check.py --remote` requires agreement for a release (`a23e171`) | A4 |
 | M0 / M9 | Manual gate not enforced; no protected `main` | all | partly / open | A4 (AC settings) |
-| M4 / B1 | ctm-libs frozen at 0.9.0; same-version mixed installs bypass the singleton guard | ctm-libs | open | A4 |
+| M4 / B1 | ctm-libs frozen at 0.9.0; same-version mixed installs bypass the singleton guard | ctm-libs | B1 fixed on ctm-libs `claude/nice-dirac-uz5r4x` (`bed034c`): code-digest guard. M4 (version 0.9.0): runbook step 9 | A4 |
 | M5 | API levels do not describe interfaces | ctm-libs, ctm-checkers, components | open | A4 |
 | M6 | No release; `release-check.py` does not compare the CHANGELOG with the pins | all | fixed in tooling (`a23e171`): notes must name every pin; `--remote` requires component tags; release manifest. Tags themselves: R5 | A4 / R5 |
 | R-01 | Matching cache marker accepted as a clean pinned source | ctm-assessment `setup-feedback-integration.py` | fixed (`a23e171`): snapshots reused only while they match their recorded inventory | A4 |
 | R-04 | `--release` does not bind the checkout to the tag | ctm-assessment `install-project.py` | fixed (`a23e171`): a Git checkout must be the clean tag | A4 |
 | M10 | Acceptance evidence bound to tuples that no longer exist | ctm-assessment | to re-check | A4 |
 | M11 | Umbrella unit tests never ran automatically | ctm-assessment | fixed (`fc8cb99`) | — |
-| M15 / B2 | pyodide-interaktiv ships an older ctm-libs copy | pyodide-interaktiv | open | R2 |
+| M15 / B2 | pyodide-interaktiv ships an older ctm-libs copy | pyodide-interaktiv | fixed on pyodide-interaktiv `claude/nice-dirac-uz5r4x` (`4e8fb76`): copy synced to ctm-libs `bed034c`, stale target record removed | R2 |
 | M14 | Package JSXGraph is a personal-fork branch | jsxgraph | fixed (`c8e8260`): pinned upstream 5cd0d1e, the fork pin's tree; an upstream tag is still needed | R3 |
 | H4 | pyodide-interaktiv install command installed 1.6.1 | pyodide-interaktiv, docs | fixed (ref added, `81883bc`, `b04b0b1`); goes away for good with R2 | R2 |
 | L20 | `cancel-in-progress` on main/publish groups | ctm-checkers, math-exercise | to re-check | A4 |
@@ -73,7 +73,7 @@ Codex review and AC's merge.
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
 | X-1 | IDE ships only two Python-cell pages; math-exercise and py-exercise run only in the `p13-worker` CI fixture | ctm-assessment `integration/offline-ide` | fixed (`1b8cf57`): Exercises page; graded offline in CI and in the [dry run](a5-offline-dry-run.md) | A5 |
-| X-2 | A STACK page in a local/exam build is not refused | ctm-libs `lua/assets.lua`, ctm-stack | open (D5) | A5 |
+| X-2 | A STACK page in a local/exam build is not refused | ctm-libs `lua/assets.lua`, ctm-stack | fixed on ctm-libs `claude/nice-dirac-uz5r4x` (`53e1a5e`) | A5 |
 | X-3 | ZIP not released; no `SHA256SUMS`; `release.yml` ships only the tarball | ctm-assessment | fixed in CI (`1b8cf57`): `SHA256SUMS`; a release tag attaches the ZIP. First release: R5 | A5 / R5 |
 | M16 | Baseline is a CI artifact expiring 2027-01-24; lock not committed; path filter incomplete | ctm-assessment `exam-site-zip.yml`, `p13-lock-review.yml` | partly: path filter widened (`1b8cf57`); the dry run reproduces the lock without the artifact; the baseline swap is runbook step 5 | A5 |
 | M17 / R-03 | Server speaks HTTP/1.0 and re-hashes on every request; nested asset paths lack headers | ctm-assessment `serve-offline.py` | fixed (`1b8cf57`): HTTP/1.1 keep-alive, cached digests, prefix-aware asset headers; shipped as `serve.py` | A5 |
@@ -115,7 +115,7 @@ Codex review and AC's merge.
 | L15 | Stale values in several docs | several | partly: exam-server HTTPS wording and Stop behaviour fixed (`b2dc148`) | A1 |
 | L12 | ctm-libs README documents the removed alias | ctm-libs | fixed | — |
 | L16 | Approval guide lacks the decision-loss warning | ctm-demo | to re-check | A1 |
-| UX-1 | Math answer inputs have no accessible name | math-exercise | open | A2 / A3 (UI) |
+| UX-1 | Math answer inputs have no accessible name | math-exercise | fixed on math-exercise `claude/nice-dirac-uz5r4x` (`ea409e0`): names in Lua and JS, en and nb; no screen-reader run | A2 / A3 (UI) |
 | UX-2 | Consumer primary buttons fail contrast | freehand_ai_assessment (consumer) | open (consumer) | — |
 | B3 / L7 | Feedback widget maps `nn` to `nb` | ctm-libs | open | A6 |
 
