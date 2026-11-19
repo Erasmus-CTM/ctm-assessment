@@ -22,6 +22,7 @@ merged by AC.
 | Similar problems | AI-generated practice problems, phase 1 (G1–G4) | [similar-problems.md](../similar-problems.md) | merged: ctm-checkers #34, ctm-libs #48, #46, math-exercise #37, py-exercise #15, pyodide-interaktiv #12, umbrella #69, ctm-demo #28; phase 2 (rag_app relay) not started |
 | Variants approval rework | Replace the PR-comment approval workflow (AC, 26 Oct: "has to be reworked") | — (design needed; problems in the 26 Oct log) | not started; blocks nothing, but every variant approval goes through it until replaced |
 | Native build-time SymPy (option B) | Grade native authored tests at build time in the shared Pyodide runtime instead of host CPython: no second interpreter, no host SymPy pin | — (design item, native track) | deferred: needs build-time measurement; meanwhile option A (28 Oct): ctm-stack's host SymPy is checked against ctm-libs' record of its Pyodide's SymPy (ctm-libs #59, ctm-stack #41) |
+| Release 1.0.0 | Audit, documentation and release of everything as CTM Assessment 1.0.0; native Maxima online, Python-only internet-free IDE | [2026-11-release-1.0-plan.md](2026-11-release-1.0-plan.md); [freeze manifest](../release-1.0/freeze-manifest.json); [finding register](../release-1.0/finding-register.md) | A0 done (19 Nov); A1–A6 in progress |
 
 ## Log
 

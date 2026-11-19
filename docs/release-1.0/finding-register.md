@@ -1,0 +1,134 @@
+# Finding register for CTM Assessment 1.0.0
+
+One register combining:
+- the [26 October review](../audit-2026-11/README.md) (IDs H, M, L);
+- the extended audit of 30 October ([#93](https://github.com/Erasmus-CTM/ctm-assessment/pull/93), `docs/audit-2026-11-extended/`; IDs GR, A, B, R, P, UX, GOV);
+- items found while planning 1.0 (IDs S for STACK, X for the internet-free IDE, D for documentation).
+
+The status is re-checked against the [freeze manifest](freeze-manifest.json) (19 Nov).
+
+**Status:**
+- **open**: present at the frozen commits;
+- **partly**: mitigated or partly fixed;
+- **fixed**: fixed at the frozen commits, with evidence;
+- **decided**: closed by a decision in the [plan](../consolidation/2026-11-release-1.0-plan.md);
+- **AC**: left to AC.
+
+**Phase:** the plan phase that closes it.
+
+## Grading correctness (A2)
+
+| ID | Finding | Repository | Status (19 Nov) | Phase |
+|---|---|---|---|---|
+| GR-1 | Inclusive tolerance rejects valid boundary answers (`abs(sv-cv) <= tol` in floating point) | ctm-checkers `math_exercise/checks.py:27`, `numeric.py:30` | open: code unchanged at `4cff6aa` | A2 |
+| GR-2 | Fixed samples give full credit to a non-derivative | freehand_ai_assessment (consumer) | open, but not reachable from the release work; reported to its owner | A2 (consumer) |
+| GR-3 | Exact tangent task accepts a small intercept error | freehand_ai_assessment (consumer) | open, same as GR-2 | A2 (consumer) |
+| GR-4 | Restored practice key keeps an edited computed badge | math-exercise `math-similar.js` | open: code unchanged at `39df17e` | A2 |
+| M7 | Parity expected-difference entries can whitelist a correct→incorrect flip | ctm-assessment parity harness | to re-check | A2 |
+| L2 | Model-supplied maths can freeze Python | ctm-checkers `generated.py` | fixed: result size bounded (#93 "rejected or already repaired") | — |
+| S-P | SymPy vs Maxima parity never run on the shared corpora; required by D4 (Maxima default online) | ctm-stack, umbrella | open | A2 |
+
+## Security and exam integrity (A3)
+
+| ID | Finding | Repository | Status (19 Nov) | Phase |
+|---|---|---|---|---|
+| A-01 / M3 | Authored-answer admission keeps broad SymPy evaluation; the `__` rule still runs `exec`. Blocks exam use | ctm-checkers `math_exercise/inputs.py` | open | A3 |
+| P01 | SSE stream has no byte, line or time limit | ctm-libs `feedback/feedback-core.js` | open: the 972cae3 change does not touch stream parsing | A3 |
+| P02 | Premature SSE EOF succeeds; data after `[DONE]` is appended | ctm-libs `feedback/feedback-core.js` | open | A3 |
+| M18 | "AI off in exams" relies on a generated profile; no forced `exam: true` | ctm-assessment `ctm_assets.py`, ctm-libs `assets.lua` | open | A3 / A5 |
+| GOV-1 | AC-only approval of the exam lock receipt is not enforced | ctm-assessment | open (main unprotected) | A4 |
+| N-1 | New since #93: handwriting-correction request path (`correction.note`, `previousFeedback`) | ctm-libs `972cae3` | to review | A3 |
+| M1 | Feedback KaTeX from a floating CDN | ctm-libs | fixed (`7951db4`, goes through `CTMAssets`) | — |
+| M2 | Learner `micropip.install` reaches PyPI in local mode | ctm-libs | fixed (#55) | — |
+| L1 | Model TeX `\href{javascript:…}` after a late MathJax pass | ctm-libs, ctm-stack | to re-check | A3 |
+| L3 | Legacy API-key copies never deleted | ctm-libs | to re-check | A3 |
+| L4 | No CSP, also in local/exam builds | — | open; 1.1 (structural) | after 1.0 |
+| L17 | `src_mjx_preload` not checked in local mode | ctm-libs | to re-check | A5 |
+| L18 | Runtime falls back to jsDelivr without `CTMAssets` | ctm-libs | fixed (#56, explicit `indexURL`) | — |
+
+## Release chain and versions (A4)
+
+| ID | Finding | Repository | Status (19 Nov) | Phase |
+|---|---|---|---|---|
+| H2 | Golden replay ran only by hand | ctm-checkers | fixed (`12237e9`) | — |
+| H3 | Component CI tests other dependency commits than the package ships | all | partly: `check-component-pins.py` runs nightly, warnings only; ctm-libs, ctm-stack and math-exercise pins still differ | A4 |
+| M0 / M9 | Manual gate not enforced; no protected `main` | all | partly / open | A4 (AC settings) |
+| M4 / B1 | ctm-libs frozen at 0.9.0; same-version mixed installs bypass the singleton guard | ctm-libs | open | A4 |
+| M5 | API levels do not describe interfaces | ctm-libs, ctm-checkers, components | open | A4 |
+| M6 | No release; `release-check.py` does not compare the CHANGELOG with the pins | all | partly (umbrella CHANGELOG maintained) | A4 / R5 |
+| R-01 | Matching cache marker accepted as a clean pinned source | ctm-assessment `setup-feedback-integration.py` | open | A4 |
+| R-04 | `--release` does not bind the checkout to the tag | ctm-assessment `install-project.py` | open | A4 |
+| M10 | Acceptance evidence bound to tuples that no longer exist | ctm-assessment | to re-check | A4 |
+| M11 | Umbrella unit tests never ran automatically | ctm-assessment | fixed (`fc8cb99`) | — |
+| M15 / B2 | pyodide-interaktiv ships an older ctm-libs copy | pyodide-interaktiv | open | R2 |
+| M14 | Package JSXGraph is a personal-fork branch | jsxgraph | decided (D8: upstream release) | R3 |
+| H4 | pyodide-interaktiv install command installed 1.6.1 | pyodide-interaktiv, docs | fixed (ref added, `81883bc`, `b04b0b1`); goes away for good with R2 | R2 |
+| L20 | `cancel-in-progress` on main/publish groups | ctm-checkers, math-exercise | to re-check | A4 |
+| L21 | Floating refs (py-exercise publish against ctm-libs `main`, unpinned Quarto) | py-exercise, pyodide-interaktiv | to re-check | A4 |
+
+## Internet-free IDE (A5)
+
+| ID | Finding | Repository | Status (19 Nov) | Phase |
+|---|---|---|---|---|
+| X-1 | IDE ships only two Python-cell pages; math-exercise and py-exercise run only in the `p13-worker` CI fixture | ctm-assessment `integration/offline-ide` | open (D5) | A5 |
+| X-2 | A STACK page in a local/exam build is not refused | ctm-libs `lua/assets.lua`, ctm-stack | open (D5) | A5 |
+| X-3 | ZIP not released; no `SHA256SUMS`; `release.yml` ships only the tarball | ctm-assessment | open (D6) | A5 / R5 |
+| M16 | Baseline is a CI artifact expiring 2027-01-24; lock not committed; path filter incomplete | ctm-assessment `exam-site-zip.yml`, `p13-lock-review.yml` | partly | A5 |
+| M17 / R-03 | Server speaks HTTP/1.0 and re-hashes on every request; nested asset paths lack headers | ctm-assessment `serve-offline.py` | partly (TLS stall fixed in `b04b0b1`) | A5 (D6: bundled server) |
+| M19 | The lock binds the full bytes of `pyodide-runtime.js`; every ctm-libs re-pin needs AC re-approval | ctm-assessment `ctm_assets.py` | open | A5 |
+| R-02 | P13 manifest covers selected workers, not the whole site | ctm-assessment `p13_assets.py` | open (scope) | A5 |
+| X-4 | SEB settings not documented for IT; manual SEB check not recorded | docs | open (D7) | A5 |
+| H5 | JSXGraph boards cannot load MathJax locally | jsxgraph, ctm-libs | partly: a local render with boards stops on purpose. Boards are out of the IDE (D5) | — |
+| L19 | Offline server test fails on Python 3.13 | ctm-assessment | to re-check | A5 |
+
+## STACK integration (§1 of the plan)
+
+| ID | Finding | Repository | Status (19 Nov) | Phase |
+|---|---|---|---|---|
+| S-1 | Native Maxima backend not packaged; pin `e8437f1` stops on `cas: maxima`; ctm-stack main 23 commits ahead | ctm-assessment, ctm-stack | open (D3) | §4 |
+| S-2 | `runtime-v3` not in any asset lock; staged by hand | ctm-stack, ctm-assessment, stack-wasm-maxima | open | §4 |
+| S-3 | No Maxima browser or parity tests in the umbrella | ctm-assessment | open | §4 |
+| S-4 | Default CAS is SymPy (provisional) | ctm-stack `ctm-stack.lua` | decided (D4: Maxima online, after S-P) | §4 |
+| M13 / B4 | `variants-review.py` twice (≈95 % identical) | math-exercise, ctm-stack | open | A6 / 1.1 |
+| S-5 | ctm-stack MathJax loader and `mathjax@3.2.2` CDN fallback | ctm-stack | open | A6 |
+| H6 / M20 | README example fails to render; wrong policy docs | ctm-stack | fixed (`f9fca46`) | — |
+| M21 | Umbrella docs do not know the package contains ctm-stack | ctm-assessment | partly: installation and reference fixed; authoring guide has no STACK activity | A1 |
+| S-6 | ctm-stack CHANGELOG still "0.4.0 (step 6, for review)"; no M4c/M4d entries | ctm-stack | open | A1 / R5 |
+| S-7 | Upstream STACK security report prepared but not sent | — | AC | — |
+| S-8 | Long GC stress run cut short; repeat after packaging | ctm-stack | open | §4 |
+| S-9 | stack-wasm-maxima follow-ups F-1, F-7, F-8, F-11, F-12; M4h distribution; issue #14 | stack-wasm-maxima | open; F-7 is needed for S-2 | §4 / after 1.0 |
+| L25 | STACK data tagged GPL-3.0-or-later | ctm-checkers | AC (licence) | — |
+| L27 | Backend registry name | ctm-stack | fixed (`CTMStackAdapters` in both backends) | — |
+
+## Documentation (A1)
+
+| ID | Finding | Repository | Status (19 Nov) | Phase |
+|---|---|---|---|---|
+| D-1 | Umbrella README says nothing about STACK; still says "`ai-feedback` is read as ctm-libs in 0.9" | ctm-assessment | open | A1 |
+| D-2 | `docs/` mixes user guides with work logs and audits | every repository | open | A1 |
+| D-3 | ctm-demo README stale (variants tooling at `503c868`, `ai-feedback` review-ref example) | ctm-demo | open | A1 |
+| D-4 | pyodide-interaktiv `main` README installs without a ref | pyodide-interaktiv | open; goes away with R2 | R2 |
+| L13 | Undocumented settings | ctm-libs, ctm-assessment, py-exercise | to re-check | A1 |
+| L14 | "Site without AI feedback… render succeeds" is false for custom mode without `without-ai:` | ctm-assessment `docs/installation.md` | to re-check | A1 |
+| L15 | Stale values in several docs | several | to re-check | A1 |
+| L12 | ctm-libs README documents the removed alias | ctm-libs | fixed | — |
+| L16 | Approval guide lacks the decision-loss warning | ctm-demo | to re-check | A1 |
+| UX-1 | Math answer inputs have no accessible name | math-exercise | open | A2 / A3 (UI) |
+| UX-2 | Consumer primary buttons fail contrast | freehand_ai_assessment (consumer) | open (consumer) | — |
+| B3 / L7 | Feedback widget maps `nn` to `nb` | ctm-libs | open | A6 |
+
+## Hygiene and duplication (A6)
+
+| ID | Finding | Repository | Status (19 Nov) | Phase |
+|---|---|---|---|---|
+| L8 | "Accepted in 0.9 only" aliases, `--refresh` without effect, `KEEPS_RETIRED_COPIES = ()` | ctm-assessment | open | A6 |
+| L22 / D11 | 46 unmerged non-main branches (gh-pages excluded) | all | decided (delete, archive-tag research and evidence first) | R6 |
+| M12 | Step-1 shared loaders not done (Monaco, KaTeX, MathJax, `escapeHtml`, bridge client) | components | open; partly in A6, rest 1.1 | A6 / 1.1 |
+| L9 / L10 | `example-source.lua` ×5; `review-dependencies.py` ×3 | several | open | A6 |
+| L11 | Lua dynamic-matrix twin | math-exercise | open | 1.1 |
+| M22 | Maintainability hot spots (files of 1,300–2,100 lines) | several | open; 1.1 | after 1.0 |
+| M24 | 26 umbrella workflows; one-off `current-closure-store-d2.yml` | ctm-assessment | partly | A6 |
+| L26 | ctm-demo has no licence file and commits a 684 KB tarball from an old tuple | ctm-demo | open | A6 |
+| L28 | Review IDs and "step N" history in code comments | several | open; 1.1 | after 1.0 |
+| B5 | Python-exercise grading stays in integration | py-exercise | accepted exception | — |
+| H7 / L24 | Unlicensed inherited code shipped as AGPL; coi-serviceworker MIT notice | pyodide-interaktiv, ctm-libs | H7: AC (D12). L24: to re-check | — / A6 |

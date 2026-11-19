@@ -1,0 +1,32 @@
+{
+  "frozen": "2026-11-19",
+  "purpose": "A0 baseline for the CTM Assessment 1.0.0 audit (docs/consolidation/2026-11-release-1.0-plan.md). Every audit statement refers to these commits unless it names another.",
+  "umbrella": {
+    "repository": "Erasmus-CTM/ctm-assessment",
+    "branch": "main",
+    "commit": "8a779d4757f151a00ca3f44a25a2eb74b879de69",
+    "version": "0.13.0 (CHANGELOG: Unreleased above 0.13.0)"
+  },
+  "quarto": "1.8.27",
+  "components": {
+    "ctm-libs": {"repository": "Erasmus-CTM/ctm-libs", "branch": "main", "pinned": "972cae390b3aa7afd4e66c73bd4db3a33d208746", "head": "972cae390b3aa7afd4e66c73bd4db3a33d208746", "head_ahead_of_pin": 0, "declared_version": "0.9.0", "tags": []},
+    "ctm-checkers": {"repository": "Erasmus-CTM/ctm-checkers", "branch": "main", "pinned": "4cff6aa604fb04de838e7c479d38f14ad9e21c57", "head": "4cff6aa604fb04de838e7c479d38f14ad9e21c57", "head_ahead_of_pin": 0, "declared_version": "0.12.0.dev0 (API 1.1)", "tags": []},
+    "math-exercise": {"repository": "Erasmus-CTM/math-exercise", "branch": "main", "pinned": "39df17ee28789e7d8d5d8e0abc01dcb967fc8858", "head": "39df17ee28789e7d8d5d8e0abc01dcb967fc8858", "head_ahead_of_pin": 0, "declared_version": "0.11.0", "tags": []},
+    "py-exercise": {"repository": "Erasmus-CTM/py-exercise", "branch": "main", "pinned": "5682787dbdff309890b8cb85503cc060d981b4e4", "head": "5682787dbdff309890b8cb85503cc060d981b4e4", "head_ahead_of_pin": 0, "declared_version": "0.5.0", "tags": []},
+    "pyodide-interaktiv": {"repository": "Erasmus-CTM/pyodide-interaktiv", "branch": "feature/shared-feedback-integration", "pinned": "793a87262e60ada72c08560ed8c5db011483baae", "head": "793a87262e60ada72c08560ed8c5db011483baae", "head_ahead_of_pin": 0, "declared_version": "1.10.0 (main: 1.6.1 at 02cbb90)", "tags": []},
+    "ctm-stack": {"repository": "Erasmus-CTM/ctm-stack", "branch": "main", "pinned": "e8437f1f7420ec33dd9f7b7f5a8469e2b6473b55", "head": "7b68ec8d4dcc73f4cbdd950e30f4fd19a51d807d", "head_ahead_of_pin": 23, "declared_version": "0.4.0", "tags": [], "note": "head adds native Maxima cards (#39), native PythonChecker nodes (#40), host-SymPy identity check (#41); not packaged"},
+    "jsxgraph": {"repository": "aacchhee/jsxgraph-quarto", "branch": "audit/2026-10", "pinned": "49a1c7d575e08b2133e39098e8f9deda61567287", "head": "49a1c7d575e08b2133e39098e8f9deda61567287", "head_ahead_of_pin": 0, "declared_version": "1.2.0 (JSXGraph 1.14.2)", "tags": [], "note": "personal fork for bugfixes and upstream PRs; 1.0.0 moves to an upstream release (decision D8)"}
+  },
+  "not_packaged": {
+    "stack-wasm-maxima": {"repository": "Erasmus-CTM/stack-wasm-maxima", "branch": "main", "head": "63ee8e434339f6553a7bd2a263e794769f40ad9a", "tags": ["runtime-v1", "runtime-v2", "runtime-v3"], "contract": "ctm-stack native/release.json pins runtime-v3 (maxima-runtime-v3.json)"}
+  },
+  "consumers": {
+    "ctm-demo": {"repository": "aacchhee/ctm-demo", "branch": "main", "head": "f9a4a493e5bcff664a4654fe5f1b283b5417ac65", "installs": "ctm-assessment@8a779d4757f151a00ca3f44a25a2eb74b879de69"},
+    "ingmat3a_ntnu": {"repository": "aacchhee/ingmat3a_ntnu", "note": "not reachable from this session; last audited at 5915fa4 (#93)"},
+    "freehand_ai_assessment": {"repository": "aacchhee/freehand_ai_assessment", "note": "not reachable from this session; last audited at 2803b6b (#93); owns GR-2 and GR-3"}
+  },
+  "identity_with_audits": {
+    "extended_audit_93": "#93 audited umbrella cf1ca2a and ctm-libs b1e7ec8; all other components at the frozen pins. Since then: umbrella 8a779d4 changes only the ctm-libs pin, the P13 receipt and docs; ctm-libs 972cae3 adds the handwriting-correction request path (feedback-core.js, ai-feedback.js, locales) and does not touch SSE parsing, so P01/P02 remain as reported.",
+    "review_2026_10_26": "docs/audit-2026-11 snapshot predates all of the above; its findings were re-checked against the frozen commits in finding-register.md"
+  }
+}
