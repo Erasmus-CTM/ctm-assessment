@@ -165,6 +165,35 @@ def extension_folders(config):
     return folders
 
 
+def stage_stack_native(extensions_root, workspace, given=None):
+    """The staged Maxima runtime (runtime-v3) that the tests' native STACK cards
+    use, or None when the packaged ctm-stack has no native staging. Since 1.0
+    `cas: maxima` is the online default (plan D4); ctm-stack's own
+    stage-native.py verifies the release record, archive and STACK source. A
+    package staged for the same release record and STACK pin is reused."""
+    script = extensions_root / 'ctm-stack' / 'stage-native.py'
+    if not script.is_file():
+        return None
+    given = given or os.environ.get('CTM_STACK_NATIVE_PACKAGE')
+    if given:
+        return Path(given).resolve()
+    native = extensions_root / 'ctm-stack' / 'native'
+    key = hashlib.sha256(b''.join((native / name).read_bytes() for name in ('release.json', 'stack-pin.json'))).hexdigest()[:16]
+    target = workspace / 'stack-native' / key
+    if (target / '.ctm-staged').is_file():
+        return target
+    if target.exists():
+        shutil.rmtree(target)  # an interrupted staging
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temp = target.parent / (key + '.partial')
+    if temp.exists():
+        shutil.rmtree(temp)
+    run([sys.executable, script, '--download', '--output', temp])
+    (temp / '.ctm-staged').write_text(key + '\n')
+    temp.rename(target)
+    return target
+
+
 def check_shared_files(config, sources, extensions, hashes, pinned_libs=None):
     """The shared bootstrap is byte-identical everywhere; retired copies are gone.
 
@@ -299,6 +328,7 @@ def main():
     parser.add_argument('--check-pins', action='store_true', help='Check that every pin is a commit of its branch (after a stacked set merged: each pin is on its dependency\'s main) and stop')
     parser.add_argument('--only', metavar='NAME[,NAME]', help='With --update-pins: re-pin only these repositories (others, such as the JSXGraph fork pin, stay as they are)')
     parser.add_argument('--ref', action='append', default=[], metavar='NAME=BRANCH', help='Use a review branch for a dependency without changing normal build defaults')
+    parser.add_argument('--stack-native', type=Path, help='A staged runtime-v3 package for the tests\' Maxima STACK cards (default: CTM_STACK_NATIVE_PACKAGE, else staged with ctm-stack\'s stage-native.py --download into the workspace)')
     parser.add_argument('--review-refs', default='{}', help='Explicit JSON dependency SHA map for coordinated review builds; normal defaults stay unchanged')
     parser.add_argument('--source', action='append', default=[], metavar='NAME=PATH', help='Use a local Git checkout for a repository; record SHA and dirty files')
     parser.add_argument('--package-only', action='store_true', help='Build the installable package only, without rendering the example site (course installs; used by install-project.py)')
@@ -521,6 +551,9 @@ def main():
         checker_manifest = json.loads((checker_extension / 'checkers.json').read_text())
         env['CTM_CHECKERS_WHEEL'] = str(checker_extension / checker_manifest['wheel'])
         env['CTM_VARIANTS_NATIVE'] = str(checker_extension / 'native-authoring')
+        stack_native = stage_stack_native(extensions_root, workspace, args.stack_native)
+        if stack_native:
+            env['CTM_STACK_NATIVE_PACKAGE'] = str(stack_native)
         run(['npm', 'ci', '--ignore-scripts'], cwd=ROOT)
         if args.test:
             legacy = snapshot(*LEGACY_AI_FEEDBACK, cache)

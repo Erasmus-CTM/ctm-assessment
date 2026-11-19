@@ -22,6 +22,17 @@ legacy = Path(os.environ.get('CTM_LEGACY_AI_FEEDBACK', ''))
 assert (legacy / 'feedback-quarto.lua').is_file(), 'Set CTM_LEGACY_AI_FEEDBACK to the ai-feedback 0.8.1 extension folder'
 
 
+
+# The same question with the package's default CAS (Maxima since 1.0).
+MAXIMA_CARD = '''
+```{#installed-maxima .stack-question}
+#| label: installed-maxima
+#| file: question.xml
+#| question: Expand a product (form-sensitive)
+#| feedback: false
+```
+'''
+
 def version(folder):
     return re.search(r'(?m)^version:\s*(\S+)', (folder / '_extension.yml').read_text()).group(1)
 
@@ -98,6 +109,10 @@ with tempfile.TemporaryDirectory(prefix='ctm-install-', dir=archive.parent) as t
         f'math-exercise {math_version} does not grade with ctm-checkers; the package ships 0.11 or later'
     SCRIPTS.append(('ctm-checkers', manifest['script']))
     stack = extensions / 'ctm-stack'
+    # The online default CAS is Maxima since 1.0 (D4): with a staged runtime
+    # (the builder's --test stages one), the same question renders as a
+    # native card with the package's default.
+    native = bool(os.environ.get('CTM_STACK_NATIVE_PACKAGE')) and (stack / 'stage-native.py').is_file()
     assert (stack / 'ctm-bootstrap.lua').read_bytes() == (extensions / 'math-exercise/ctm-bootstrap.lua').read_bytes()
     assert not (stack / 'worker.js').exists() and not (stack / 'vendor/matrix-input.js').exists()
     source = Path(os.environ['CTM_CHECKERS_SOURCE']) / 'examples/stack/polynomial-expansion.xml'
@@ -119,7 +134,7 @@ Use exact values.
 #| question: Expand a product (form-sensitive)
 #| feedback: false
 ```
-
+''' + (MAXIMA_CARD if native else '') + '''
 ::: {.ai-feedback}
 Explain a half.
 :::
@@ -151,6 +166,9 @@ board.create('circle', [[0,0],1]);
     html = (course / 'example.html').read_text()
     for marker in ['ai-feedback-activity', 'math-exercise-cell', 'ctm-stack-data', 'py-exercise-cell', 'qpyodide-insertion-location-', '<iframe']:
         assert marker in html, marker + ' missing after archive installation'
+    if native:
+        assert 'installed-maxima' in html, 'the default (Maxima) STACK card is missing'
+        assert 'ctm-stack-native' in html, 'a Maxima card loads the native runtime'
     # Scripts are cacheable files, each once per page, none inlined (D1).
     once(html, SCRIPTS)
     assert 'var ME_CFG =' not in html, 'math-exercise must not inline its bundle'

@@ -28,7 +28,7 @@ Codex review and AC's merge.
 | GR-4 | Restored practice key keeps an edited computed badge | math-exercise `math-similar.js` | fixed on math-exercise `claude/nice-dirac-uz5r4x` (`bb52c5c`): recomputed before the first check; test fails on main | A2 |
 | M7 | Parity expected-difference entries can whitelist a correct→incorrect flip | ctm-assessment parity harness | to re-check | A2 |
 | L2 | Model-supplied maths can freeze Python | ctm-checkers `generated.py` | fixed: result size bounded (#93 "rejected or already repaired") | — |
-| S-P | SymPy vs Maxima parity never run on the shared corpora; required by D4 (Maxima default online) | ctm-stack, umbrella | open | A2 |
+| S-P | SymPy vs Maxima parity never run on the shared corpora; required by D4 (Maxima default online) | ctm-stack, umbrella | done (ctm-stack `claude/nice-dirac-uz5r4x`, `reports/2026-11-sympy-maxima-parity.md`): 59 questions, 42 prepared by both; one verdict difference (AlgMap-8.10), explained as a seed artefact reproduced natively | A2 |
 
 ## Security and exam integrity (A3)
 
@@ -87,17 +87,17 @@ Codex review and AC's merge.
 
 | ID | Finding | Repository | Status (19 Nov) | Phase |
 |---|---|---|---|---|
-| S-1 | Native Maxima backend not packaged; pin `e8437f1` stops on `cas: maxima`; ctm-stack main 23 commits ahead | ctm-assessment, ctm-stack | open (D3) | §4 |
-| S-2 | `runtime-v3` not in any asset lock; staged by hand | ctm-stack, ctm-assessment, stack-wasm-maxima | open | §4 |
-| S-3 | No Maxima browser or parity tests in the umbrella | ctm-assessment | open | §4 |
-| S-4 | Default CAS is SymPy (provisional) | ctm-stack `ctm-stack.lua` | decided (D4: Maxima online, after S-P) | §4 |
+| S-1 | Native Maxima backend not packaged; pin `e8437f1` stops on `cas: maxima`; ctm-stack main 23 commits ahead | ctm-assessment, ctm-stack | ready: ctm-stack `claude/nice-dirac-uz5r4x` (`9f872e4`) on ctm-stack main; the package re-pins it at merge (runbook step 3); umbrella tests stage runtime-v3 and render a default-CAS card | §4 |
+| S-2 | `runtime-v3` not in any asset lock; staged by hand | ctm-stack, ctm-assessment, stack-wasm-maxima | partly: staging ships in the extension (`stage-native.py --download`, verified record, archive and STACK source); a project-local `_ctm-stack-native/` is found. An asset lock of the runtime for online builds is not done (online builds serve the staged files) | §4 |
+| S-3 | No Maxima browser or parity tests in the umbrella | ctm-assessment | partly: the package test renders a Maxima card with the staged runtime; no Maxima browser or parity test in the umbrella yet (ctm-stack's own CI has both) | §4 |
+| S-4 | Default CAS is SymPy (provisional) | ctm-stack `ctm-stack.lua` | done (ctm-stack `claude/nice-dirac-uz5r4x`, `98d054c`): Maxima default; a defaulted card without a runtime stops with the staging command or `cas: sympy`; no fallback | §4 |
 | M13 / B4 | `variants-review.py` twice (≈95 % identical) | math-exercise, ctm-stack | open | A6 / 1.1 |
 | S-5 | ctm-stack MathJax loader and `mathjax@3.2.2` CDN fallback | ctm-stack | open | A6 |
 | H6 / M20 | README example fails to render; wrong policy docs | ctm-stack | fixed (`f9fca46`) | — |
 | M21 | Umbrella docs do not know the package contains ctm-stack | ctm-assessment | fixed (`b2dc148`): STACK activity in the authoring guide | A1 |
-| S-6 | ctm-stack CHANGELOG still "0.4.0 (step 6, for review)"; no M4c/M4d entries | ctm-stack | open | A1 / R5 |
+| S-6 | ctm-stack CHANGELOG still "0.4.0 (step 6, for review)"; no M4c/M4d entries | ctm-stack | fixed (ctm-stack `claude/nice-dirac-uz5r4x`, `9f872e4`): CHANGELOG Unreleased (1.0.0) with M4c, M4d, #41 and the default | A1 / R5 |
 | S-7 | Upstream STACK security report prepared but not sent | — | AC | — |
-| S-8 | Long GC stress run cut short; repeat after packaging | ctm-stack | open | §4 |
+| S-8 | Long GC stress run cut short; repeat after packaging | ctm-stack | passed: full GC stress, 3,200 GC-target calls and 327 replays, no deviation (2,711 s) | §4 |
 | S-9 | stack-wasm-maxima follow-ups F-1, F-7, F-8, F-11, F-12; M4h distribution; issue #14 | stack-wasm-maxima | open; F-7 is needed for S-2 | §4 / after 1.0 |
 | L25 | STACK data tagged GPL-3.0-or-later | ctm-checkers | AC (licence) | — |
 | L27 | Backend registry name | ctm-stack | fixed (`CTMStackAdapters` in both backends) | — |
