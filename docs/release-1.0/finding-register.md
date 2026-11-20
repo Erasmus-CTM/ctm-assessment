@@ -18,6 +18,10 @@ Codex review and AC's merge.
 
 **Phase:** the plan phase that closes it.
 
+The [internal audit of 20 Nov](audit-2026-11-20.md) re-checked these fixes and found one critical defect in the
+first A-01 fix (an admission bypass) and a loosening in the first GR-1 fix. Both are fixed on the same branches;
+its findings and their dispositions are listed there.
+
 ## Grading correctness (A2)
 
 | ID | Finding | Repository | Status (19 Nov) | Phase |
