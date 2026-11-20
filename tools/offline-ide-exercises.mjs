@@ -89,11 +89,28 @@ try {
 
   await page.waitForFunction(() => document.querySelector('.py-exercise-check') &&
     !document.querySelector('.py-exercise-check').disabled, null, {timeout: 180000});
-  await page.locator('.py-exercise-check').click();
-  await page.waitForFunction(() => __offlineResults.some(x => x.id === 'offline-python'), null, {timeout: 180000});
-  const python = await page.evaluate(() => __offlineResults.filter(x => x.id === 'offline-python').at(-1));
-  assert.notEqual(python.status, 'correct', 'the starter code fails its tests');
-  report.checks.push({label: 'offline-python', value: 'starter code', status: python.status, score: python.score});
+  // Audit of 20 Nov: "not correct" alone also passed with a grader that
+  // returns invalid for everything. The starter passes one of its two tests;
+  // a solution passes both.
+  async function checkPython(value, expected) {
+    const before = await page.evaluate(() => __offlineResults.filter(x => x.id === 'offline-python').length);
+    if (value !== null) {
+      await page.evaluate(code => {
+        const cell = document.querySelector('.py-exercise-cell');
+        const editor = (globalThis.monaco?.editor?.getEditors?.() || []).find(e => cell?.contains(e.getDomNode()));
+        if (!editor) throw new Error('py-exercise editor not found');
+        editor.setValue(code);
+      }, value);
+    }
+    await page.locator('.py-exercise-check').click();
+    await page.waitForFunction(n => __offlineResults.filter(x => x.id === 'offline-python').length > n, before, {timeout: 180000});
+    const result = await page.evaluate(() => __offlineResults.filter(x => x.id === 'offline-python').at(-1));
+    assert.equal(result.status, expected.status, 'py-exercise ' + (value === null ? 'starter' : 'solution'));
+    assert.equal(result.score, expected.score);
+    report.checks.push({label: 'offline-python', value: value === null ? 'starter code' : 'solution', ...expected});
+  }
+  await checkPython(null, {status: 'partial', score: 0.5});
+  await checkPython('def total(values):\n    return sum(values)\n', {status: 'correct', score: 1});
 
   const results = await page.evaluate(() => __offlineResults.map(({id, status, score}) => ({id, status, score})));
   report.results = results;
@@ -102,6 +119,11 @@ try {
   report.failed = failed;
   assert.deepEqual(external, [], 'no request leaves the exam host');
   assert.deepEqual(errors, [], 'no page error');
+  assert.deepEqual(failed, [], 'no failed request');
+  // Resource hints open connections without a request the route sees.
+  const hints = await page.evaluate(() => [...document.querySelectorAll('link[rel~=preconnect], link[rel~=dns-prefetch], link[rel~=prefetch], link[rel~=preload], link[rel~=modulepreload]')]
+    .map(link => link.href).filter(href => href && new URL(href, location.href).origin !== location.origin));
+  assert.deepEqual(hints, [], 'no resource hint to another origin');
   report.ok = true;
   await context.close();
 } finally {

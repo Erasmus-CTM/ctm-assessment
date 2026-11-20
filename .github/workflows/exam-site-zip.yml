@@ -476,8 +476,18 @@ jobs:
           print(text.split('<!-- IT -->\n', 1)[1].split('\n<!-- /IT -->', 1)[0])
           PY
           # release.yml builds and tests the package first; wait for its release (up to 2 hours).
+          found=
           for attempt in $(seq 1 120); do
-            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then break; fi
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then found=1; break; fi
             sleep 60
           done
-          gh release upload "$TAG" python-offline-website.zip SHA256SUMS README-IT.txt --repo "$GITHUB_REPOSITORY" --clobber
+          if [ -z "$found" ]; then echo "::error::No release $TAG after 2 hours; nothing uploaded"; exit 1; fi
+          # A published ZIP is never replaced: the ZIP is not byte-reproducible
+          # and exam IT records its SHA-256 (audit of 20 Nov).
+          assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          for name in python-offline-website.zip SHA256SUMS README-IT.txt; do
+            if printf '%s\n' "$assets" | grep -qxF "$name"; then
+              echo "::error::Release $TAG already has $name; delete it by hand to publish another build"; exit 1
+            fi
+          done
+          gh release upload "$TAG" python-offline-website.zip SHA256SUMS README-IT.txt --repo "$GITHUB_REPOSITORY"

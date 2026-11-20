@@ -108,10 +108,17 @@ class Release(unittest.TestCase):
                     self.assertRaisesRegex(installer.InstallError, 'tags on HEAD: v0.9.1'):
                 installer.check_release('v0.9.0')
             with patch.object(installer, 'git_identity', return_value=({'v0.9.0'}, True)), \
-                    self.assertRaisesRegex(installer.InstallError, 'tracked files of this checkout differ'):
+                    self.assertRaisesRegex(installer.InstallError, 'files of this checkout differ'):
                 installer.check_release('v0.9.0')
             with patch.object(installer, 'git_identity', return_value=None):
                 installer.check_release('v0.9.0')  # a source archive: version and pins only
+
+    def test_unreadable_git_metadata_is_an_error(self):
+        import subprocess
+        error = subprocess.CalledProcessError(128, ['git'], stderr='fatal: detected dubious ownership')
+        with patch.object(installer.subprocess, 'run', side_effect=error), \
+                self.assertRaisesRegex(installer.InstallError, 'dubious ownership'):
+            installer.git_identity()
 
     def test_git_identity_reads_this_checkout(self):
         identity = installer.git_identity()

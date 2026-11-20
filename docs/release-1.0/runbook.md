@@ -24,10 +24,29 @@ and tests the whole set together.
 
 ## Steps
 
-1. **Codex review** of every branch above. Fixes land on the same branches.
-2. **Merge the components** (AC), keeping their commits (merge commits), in this order: ctm-checkers, ctm-libs,
-   math-exercise, py-exercise, ctm-stack, pyodide-interaktiv.
-3. **Re-pin the umbrella** on its branch, then run the full test:
+The order matters. A merge commit changes the commit that dependents' CI pins and the package must name, and the P13
+lock binds the exact ctm-libs and pyodide-interaktiv commits. So components converge and are tagged first; the
+umbrella re-pins once, to the tags; the lock is approved once (internal audit of 20 Nov, finding 4).
+
+1. **Review** every branch above. Fixes land on the same branches.
+2. **Components, in dependency order**, each with a merge commit (AC). For each one:
+   1. Point its CI pins at the merged and tagged commits of its dependencies, if they moved.
+   2. Bump its version and write its CHANGELOG section.
+   3. Merge.
+   4. Tag it.
+
+   The order:
+   1. **ctm-checkers:** v1.0.0. It depends on no CTM component.
+   2. **ctm-libs:** `tests/pins.json` names the ctm-checkers tag commit; then v1.0.0.
+   3. **math-exercise and py-exercise:** CI pins name the ctm-libs and ctm-checkers tag commits; then v1.0.0 each.
+   4. **ctm-stack:** `.github/pins.json` names the same; v1.0.0 if the Maxima default stands, otherwise v0.5.0.
+   5. **pyodide-interaktiv:** first run `python scripts/sync-ctm-libs.py <ctm-libs at its tag>` so the shipped copy
+      equals the tagged ctm-libs. Then merge `feature/shared-feedback-integration` into `main` (step 8, D9; main is
+      an ancestor). Then v2.0.0.
+3. **JSXGraph (D8):** ask the jsxgraph-quarto maintainers for a release tag on `5cd0d1e`, or on a later commit
+   (JSXGraph 1.14.3) that is then pinned. `release-check.py --remote` requires a tag on every pin.
+4. **Re-pin the umbrella once**, to the tag commits, on its branch. Set pyodide-interaktiv's branch to `main` in
+   `repos.json`. Then run the full test:
 
    ```bash
    python scripts/setup-feedback-integration.py --update-pins --only ctm-checkers,ctm-libs,math-exercise,py-exercise,ctm-stack,pyodide-interaktiv
@@ -36,32 +55,33 @@ and tests the whole set together.
    ```bash
    python scripts/setup-feedback-integration.py --test --browser
    ```
-4. **P13 lock (AC):** the ctm-libs and pyodide-interaktiv pins move, so `p13-lock-review.yml` produces an
-   unapproved lock diff. AC reviews it and records the receipt as for the earlier locks
-   (`integration/p13-complete-assets.json`, `docs/exam-site-zip.md`). Vendor subsets should be unchanged.
-5. **Replace the expiring baseline** before 2027-01-24 (M16). `exam-site-zip.yml` downloads the #80 baseline
+
+   Check that every component CI pin agrees with the package:
+
+   ```bash
+   python tools/ci/check-component-pins.py --strict
+   ```
+5. **P13 lock (AC), once:** `p13-lock-review.yml` produces the unapproved lock diff for the new ctm-libs and
+   pyodide-interaktiv commits. The worker files changed (WebKit stop probe, interrupt buffer), so review them as well
+   as the vendor subsets. Record the receipt (`integration/p13-complete-assets.json`, `docs/exam-site-zip.md`).
+6. **Replace the expiring baseline** before 2027-01-24 (M16). `exam-site-zip.yml` downloads the #80 baseline
    artifact of run 40389684095. The A5 dry run showed that `build-p13-assets.py` reproduces the approved lock from
-   upstream without it. Either commit the complete lock metadata, or re-approve a baseline from a fresh run.
-6. **pyodide-interaktiv step 8 (AC, D9):** open and merge `feature/shared-feedback-integration` → `main` (main is an
-   ancestor: a fast-forward of 137 commits). Then set the package's branch for it to `main` and its version to
-   2.0.0.
-7. **JSXGraph (D8):** ask the jsxgraph-quarto maintainers for a release tag on `5cd0d1e` (or a later commit with
-   JSXGraph 1.14.3). `release-check.py --remote` requires a tag on every pin.
-8. **Merge the umbrella** (AC). Then pin ctm-demo (and ingmat3a) to the merge commit and run their builds.
-9. **Versions and notes:**
-   - Bump each component to its 1.0 version ([plan §5](../consolidation/2026-11-release-1.0-plan.md)), write its
-     CHANGELOG section and tag it.
+   upstream without it. Commit the complete lock metadata, or re-approve a baseline from a fresh run.
+7. **Version and notes:**
    - Bump the umbrella to 1.0.0 (`_extensions/ctm-assessment/_extension.yml`, `package.json`).
-   - Write the `## 1.0.0` CHANGELOG section naming every pin. Check it with:
+   - Write the `## 1.0.0` CHANGELOG section naming each component with its pin.
+   - Then check:
 
      ```bash
      python scripts/release-check.py --tag v1.0.0 --remote --manifest release-manifest.json
      ```
-10. **Tag `v1.0.0`** (AC). `release.yml` publishes the package archive, its record and the manifest.
-    `exam-site-zip.yml` attaches the accepted offline ZIP, `SHA256SUMS` and `README-IT.txt`.
-11. **After the release:**
+8. **Merge the umbrella and tag `v1.0.0`** (AC). `release.yml` publishes the package archive, its record and the
+   manifest. `exam-site-zip.yml` attaches the accepted offline ZIP, `SHA256SUMS` and `README-IT.txt`, and never
+   replaces assets already published.
+9. **Consumers:** pin ctm-demo (and ingmat3a, for the semester) to `v1.0.0` and run their builds. A course with STACK
+   questions whose variants were approved under SymPy sets `stack: cas: sympy` first (see ctm-stack's upgrade note).
+10. **After the release:**
     - Run the SEB manual check on Windows, macOS and iOS and record it in [exam-seb.md](../exam-seb.md).
-    - Pin ingmat3a to `v1.0.0` for the semester.
     - Execute the [branch cleanup](branch-cleanup.md).
 
 ## AC's actions outside the code

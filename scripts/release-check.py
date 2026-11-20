@@ -83,12 +83,21 @@ def problems(tag, root=None):
     else:
         for name, spec in repositories.items():
             commit = spec.get('commit', '')
-            if name != 'ctm-assessment' and re.fullmatch(r'[0-9a-f]{40}', commit) and commit[:7] not in section:
+            # The prefix as a word of its own on a line that names the component
+            # (audit of 20 Nov: a substring could match inside another SHA).
+            named = any(re.search(r'(?<![0-9a-f])' + commit[:7] + r'[0-9a-f]*(?![0-9a-zA-Z])', line) and name in line
+                        for line in section.splitlines())
+            if name != 'ctm-assessment' and re.fullmatch(r'[0-9a-f]{40}', commit) and not named:
                 found.append(f'CHANGELOG.md "## {version}" does not name {name} at {commit[:7]} (the notes describe the pinned components)')
     return found
 
 
 RELEASE_TAG = re.compile(r'v\d+\.\d+\.\d+|runtime-v\d+')
+
+
+def tag_order(name):
+    """Version order of a release tag (v1.10.0 after v1.9.0)."""
+    return tuple(int(part) for part in re.findall(r'\d+', name))
 
 
 def tags_at(repository, commit):
@@ -116,7 +125,7 @@ def remote_problems(root=None, tags=tags_at, pin_check=None):
         named = tags(spec['repository'], commit)
         if not named:
             found.append(f'{name}: {spec["repository"]} has no release tag on the pinned commit {commit[:12]}')
-        components[name] = {'repository': spec['repository'], 'commit': commit, 'tag': named[-1] if named else None}
+        components[name] = {'repository': spec['repository'], 'commit': commit, 'tag': max(named, key=tag_order) if named else None}
     if pin_check is None:
         pin_check = component_pin_differences
     for component, path, dependency, commit, expected in pin_check(repositories):

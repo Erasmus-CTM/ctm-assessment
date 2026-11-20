@@ -144,8 +144,20 @@ class OfflineHandler(SimpleHTTPRequestHandler):
     def do_HEAD(self):
         self.serve_file(head=True)
 
+    def handle_expect_100(self):
+        # No interim 100 Continue: the body a client would then send is never
+        # read, and the connection closes after the response (below).
+        self.close_connection = True
+        return True
+
     def serve_file(self, *, head):
         self._cache_sent = False
+        # GET and HEAD carry no body here. A request that announces one would
+        # leave its bytes on a kept-alive connection, read as the next request
+        # (audit of 20 Nov: a smuggled request): answer, then close.
+        if self.headers.get("Transfer-Encoding") or self.headers.get("Expect") or \
+                self.headers.get("Content-Length", "0").strip() not in ("", "0"):
+            self.close_connection = True
         if self.request_version == "HTTP/0.9":
             self.send_error(HTTPStatus.HTTP_VERSION_NOT_SUPPORTED)
             return
@@ -261,6 +273,10 @@ class OfflineHandler(SimpleHTTPRequestHandler):
                 while count:
                     data = source.read(min(count, 1024 * 1024))
                     if not data:
+                        # The file shrank while it was served: fewer bytes
+                        # than Content-Length promised. Close, so the client
+                        # cannot read the next response as this body.
+                        self.close_connection = True
                         break
                     self.wfile.write(data)
                     count -= len(data)

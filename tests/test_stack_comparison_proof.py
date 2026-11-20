@@ -29,7 +29,7 @@ class StackComparisonProof(unittest.TestCase):
         self.project=Path(self.temporary.name)
         shutil.copytree(self.extension,self.project/'_extensions/ctm-checkers')
         shutil.copy2(self.source/'examples/stack/polynomial-expansion.xml',self.project/'question.xml')
-        (self.project/'page.qmd').write_text('```{.stack-question}\n#| label: proof-card\n#| file: question.xml\n#| question: Expand a product (form-sensitive)\n```\n')
+        (self.project/'page.qmd').write_text('```{.stack-question}\n#| label: proof-card\n#| cas: sympy\n#| file: question.xml\n#| question: Expand a product (form-sensitive)\n```\n')
         (self.project/'_site').mkdir()
         self.page=self.project/'_site/page.html';self.page.write_text('')
         code='''import json,sys

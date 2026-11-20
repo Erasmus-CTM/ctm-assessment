@@ -28,7 +28,7 @@ served gzip representation, against the locked source bytes. Repository and
 upstream licence texts and source references are included.
 
 The canonical carried installer and profile writer render `offline,exam`.
-The exam profile sets `ctm-assessment: exam: true` (ctm-libs), so AI feedback and similar-problem generation are off whatever another level says, and a build without local assets stops; answer saving and export remain on. Exam output is text
+The exam profile sets `ctm-assessment: exam: true`, so with the 1.0 ctm-libs (the package pins it at the 1.0 re-pin; until then the key only warns) AI feedback and similar-problem generation are off whatever another level says, and a build without local assets stops; answer saving and export remain on. Exam output is text
 and PNG only: returned HTML stays literal, and executable animations and canvas
 upgrades are disabled. Private build metadata is excluded.
 

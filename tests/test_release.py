@@ -67,6 +67,20 @@ class ReleaseCheck(unittest.TestCase):
         found, _ = release.remote_problems(root, tags=lambda r, c: ['runtime-v3'], pin_check=lambda r: [])
         self.assertEqual(found, [])
 
+    def test_a_prefix_inside_other_text_or_without_the_name_does_not_count(self):
+        root = self.copy()
+        version = self.notes_naming_the_pins(root)
+        repositories = json.loads((root / 'integration/feedback/repos.json').read_text())['repositories']
+        libs = repositories['ctm-libs']['commit'][:7]
+        changelog = (root / 'CHANGELOG.md').read_text()
+        for replacement in ('ctm-libs at ab' + libs, 'ctm-libs at ' + libs + 'zz', 'unrelated ' + libs):
+            with self.subTest(replacement=replacement):
+                (root / 'CHANGELOG.md').write_text(changelog.replace('ctm-libs at ' + libs, replacement))
+                self.assertTrue(any('does not name ctm-libs' in p for p in release.problems('v' + version, root)))
+
+    def test_the_manifest_names_the_highest_release_tag(self):
+        self.assertEqual(max(['v1.9.0', 'v1.10.0', 'v1.2.3'], key=release.tag_order), 'v1.10.0')
+
     def test_release_tag_names(self):
         for name in ('v1.0.0', 'v12.3.45', 'runtime-v3'):
             self.assertTrue(release.RELEASE_TAG.fullmatch(name), name)

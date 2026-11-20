@@ -136,6 +136,29 @@ class OfflineHTTPTests(unittest.TestCase):
         self.assertNotEqual(first, second)
         self.assertEqual(second, '"' + hashlib.sha256(b"b()").hexdigest() + '"')
 
+    def raw(self, data, timeout=3):
+        with socket.create_connection(("127.0.0.1", self.server.server_port), timeout=timeout) as sock:
+            sock.sendall(data)
+            chunks = []
+            try:
+                while chunk := sock.recv(65536):
+                    chunks.append(chunk)
+            except socket.timeout:
+                pass
+        return b"".join(chunks)
+
+    def test_a_request_body_is_never_read_as_the_next_request(self):
+        # Audit of 20 Nov: with keep-alive, a GET body was served as a second request.
+        smuggled = b"GET /site_libs/quarto.js HTTP/1.1\r\nHost: x\r\n\r\n"
+        for headers in (b"Content-Length: %d\r\n" % len(smuggled),
+                        b"Content-Length: %d\r\nExpect: 100-continue\r\n" % len(smuggled),
+                        b"Transfer-Encoding: chunked\r\n"):
+            with self.subTest(headers=headers):
+                reply = self.raw(b"GET / HTTP/1.1\r\nHost: x\r\n" + headers + b"\r\n" + smuggled)
+                self.assertEqual(reply.count(b"HTTP/1.1 "), 1, reply[:300])
+                self.assertNotIn(b"100 Continue", reply)
+                self.assertNotIn(b"quarto()", reply)
+
     def test_errors_keep_isolation_but_never_immutable(self):
         for path in ["/absent", "/_ctm-assets/missing.whl"]:
             with self.subTest(path=path):

@@ -61,17 +61,30 @@ def package_version():
     return found.group(1) if found else "unknown"
 
 
+# Untracked files under these folders would be built into the package.
+BUILT_FOLDERS = ("_extensions", "scripts", "integration", "_filters", "tools")
+
+
 def git_identity(root=ROOT):
-    """(tags on HEAD, tracked files changed) of a Git checkout; None without Git."""
-    if not (root / ".git").exists() or shutil.which("git") is None:
+    """(tags on HEAD, files changed) of a Git checkout; None without .git.
+
+    Changed means a modified tracked file or an untracked file under a folder
+    the package is built from. A checkout with .git that Git cannot read (no
+    git, "dubious ownership") is an error, not a checkout without Git (audit
+    of 20 Nov: R-04 failed open)."""
+    if not (root / ".git").exists():
         return None
+    if shutil.which("git") is None:
+        raise InstallError("--release: this checkout has .git but git is not installed, so the tag cannot be checked.")
     def git(*args):
         return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True).stdout
     try:
         tags = set(git("tag", "--points-at", "HEAD").split())
-        changed = bool(git("status", "--porcelain", "--untracked-files=no").strip())
-    except (OSError, subprocess.CalledProcessError):
-        return None
+        changed = bool(git("status", "--porcelain", "--untracked-files=no").strip()) or \
+            bool(git("ls-files", "--others", "--exclude-standard", "--", *BUILT_FOLDERS).strip())
+    except (OSError, subprocess.CalledProcessError) as error:
+        detail = getattr(error, "stderr", "") or str(error)
+        raise InstallError(f"--release: git cannot read this checkout ({detail.strip()[:200]}); the tag cannot be checked.") from None
     return tags, changed
 
 
@@ -99,7 +112,7 @@ def check_release(tag):
         raise InstallError(f"--release v{wanted}: HEAD of this checkout is not the tag v{wanted} "
                            f"(tags on HEAD: {', '.join(sorted(tags)) or 'none'}). Check out ctm-assessment at v{wanted}.")
     if changed:
-        raise InstallError(f"--release v{wanted}: tracked files of this checkout differ from the tag v{wanted}. "
+        raise InstallError(f"--release v{wanted}: files of this checkout differ from the tag v{wanted} (changed or untracked). "
                            "Use a clean checkout of the release.")
 
 

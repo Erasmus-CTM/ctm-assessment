@@ -40,9 +40,17 @@ file. The package installs the folders `ctm-assessment`, `ctm-libs`,
 `pyodide-interaktiv`; authors list only `ctm-assessment`.
 
 **STACK questions** (`{.stack-question}` blocks) are prepared while the page
-renders: the Python that Quarto uses needs SymPy 1.13.3
-(`python -m pip install 'sympy==1.13.3'`). Pages without STACK questions need
-no Python at build time. (Packages before
+renders. From CTM Assessment 1.0 they use Maxima by default: the build needs
+Node 22 or 24, Python 3.12 (or a recent 3.9–3.11 patch release) and the STACK
+runtime staged once in the project
+(`python _extensions/ctm-stack/stage-native.py --download --output _ctm-stack-native`;
+see the [ctm-stack documentation](https://github.com/Erasmus-CTM/ctm-stack#readme)).
+`cas: sympy` (on a question, or `stack: cas: sympy` for the project) keeps the
+SymPy backend, for which the Python that Quarto uses needs SymPy 1.13.3
+(`python -m pip install 'sympy==1.13.3'`). A course whose variants were
+approved under SymPy sets `stack: cas: sympy` before upgrading, or reviews them
+again under Maxima. Pages without STACK questions need no Python at build
+time. (Packages before
 step 3 also installed `ai-feedback`, a thin alias of ctm-libs; an old copy left
 in a course is inert.)
 
