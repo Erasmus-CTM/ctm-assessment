@@ -131,7 +131,8 @@ jobs:
           path: .feedback-workspace/site/_site
 
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # build needs the skipped campaign job, so deploy must not rely on the implicit success()
+    if: ${{ !cancelled() && needs.build.result == 'success' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     needs: build
     runs-on: ubuntu-latest
     permissions:
