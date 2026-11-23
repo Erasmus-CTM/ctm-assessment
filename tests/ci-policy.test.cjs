@@ -114,7 +114,14 @@ test('main still renders and publishes; only a confirmed manual build runs the b
   assert.ok(render.includes('tests=(); [ "${{ github.event_name }}" = push ] || tests=(--test)'));
   assert.ok(render.includes('"${tests[@]}"'));
   for (const name of ['Install Chromium', 'Test all five integration tabs']) assert.equal(build.find(step => step.name === name).if, "github.event_name == 'workflow_dispatch'");
-  assert.equal(workflow.jobs.deploy.if, "github.ref == 'refs/heads/main' && github.event_name != 'pull_request'");
+  // build needs the campaign job, which a push skips: deploy must not rely on the implicit success().
+  const deploys = (event, ref, result) => Boolean(value(workflow.jobs.deploy.if, {
+    github: {event_name: event, ref}, needs: {build: {result}}
+  }));
+  assert.equal(deploys('push', 'refs/heads/main', 'success'), true);
+  assert.equal(deploys('push', 'refs/heads/main', 'failure'), false);
+  assert.equal(deploys('push', 'refs/heads/feature/test', 'success'), false);
+  assert.equal(deploys('pull_request', 'refs/pull/1/merge', 'success'), false);
   assert.equal(workflow.jobs.deploy.needs, 'build');
   // The fast tier: every unit and source-contract test without Quarto, browser or download.
   assert.ok(workflow.jobs.source.steps.some(step => step.run === 'npm test'));
