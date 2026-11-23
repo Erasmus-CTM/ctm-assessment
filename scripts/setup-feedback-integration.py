@@ -506,6 +506,11 @@ def main():
         return
     archive = shutil.make_archive(str(workspace / 'ctm-assessment'), 'gztar', root_dir=distribution)
     shutil.copy2(archive, site / '_site' / 'ctm-assessment.tar.gz')
+    # The same files as a ZIP: on Windows `quarto add <URL>` unpacks a downloaded archive
+    # as a ZIP, so the .tar.gz fails there (InvalidDataException). The ZIP installs
+    # with the same one-line command on every system.
+    archive_zip = shutil.make_archive(str(workspace / 'ctm-assessment'), 'zip', root_dir=distribution)
+    shutil.copy2(archive_zip, site / '_site' / 'ctm-assessment.zip')
     if args.test or args.browser:
         libs = sources['ctm-libs'] / '_extensions' / 'ctm-libs'
         # CTM_LIBS_EXTENSION: ctm-libs' extension folder (the components' tests
@@ -525,7 +530,7 @@ def main():
             legacy = snapshot(*LEGACY_AI_FEEDBACK, cache)
             env['CTM_LEGACY_AI_FEEDBACK'] = str(legacy / '_extensions' / 'ai-feedback')
             run(['python', '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'], cwd=ROOT, env=env)
-            run(['python', ROOT / 'scripts/test-package.py', archive], env=env)
+            run(['python', ROOT / 'scripts/test-package.py', archive, archive_zip], env=env)
             run(['python', sources['ctm-libs'] / 'scripts/sync-feedback-defaults.py', '--check'], env=env)
             run(['python', sources['ctm-libs'] / 'scripts/check-locales.py'], env=env)
             # The packaged ctm-checkers folder (wheel and page script) is the one

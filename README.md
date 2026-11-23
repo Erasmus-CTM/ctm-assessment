@@ -43,7 +43,7 @@ explains how to get a complete copy.
 ## Take the next step
 
 - [Adapt your first activity](docs/authoring.md)
-- [Install and configure the extension](docs/installation.md)
+- [Install and configure the extension](docs/installation.md) (`quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.zip`, also on Windows)
 - [Look up a specific option](docs/reference.md)
 
 These guides assume you can edit and render a Quarto document. The authoring

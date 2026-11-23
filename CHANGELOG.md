@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- `quarto add` now works on Windows: the package is also published as
+  `ctm-assessment.zip` (same files as the `.tar.gz`; Quarto on Windows unpacks
+  every downloaded archive as a ZIP, so the `.tar.gz` failed there with
+  `InvalidDataException`). Use
+  `quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.zip`.
+  The build installs both archives and checks that the files are identical; the
+  release workflow attaches the `.zip`. The `.tar.gz` stays. Installation guide,
+  development guide and README name the `.zip`. The install hints in error
+  messages of the components still show the `.tar.gz` URL (still valid on
+  macOS and Linux).
 - Code editors (pyodide-interaktiv, py-exercise) and large math-exercise text
   areas get a size switch with arrow buttons at the bottom right: normal, larger
   (60% of the window) and full screen. A click beside the field or Escape makes

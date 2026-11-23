@@ -14,7 +14,18 @@ extension). **ctm-checkers** is the Python checker library: from math-exercise
 STACK questions run on its STACK engine. Install it once in your Quarto project:
 
 ```sh
-quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz
+quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.zip
+```
+
+On Windows only the `.zip` works with `quarto add <URL>`: Quarto unpacks a
+downloaded archive as a ZIP there, so the `.tar.gz` stops with
+`InvalidDataException`. The `.tar.gz` (same files, same URL with `.tar.gz`) stays
+available; where `quarto add` does not accept it, download it and install the
+local file:
+
+```sh
+curl -L -o ctm-assessment.tar.gz https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz
+quarto add ctm-assessment.tar.gz
 ```
 
 ```yaml
@@ -48,8 +59,9 @@ in a course is inert.)
 
 **Versions.** The URL above is the latest build of `main`
 ([changes](../CHANGELOG.md)). No release has been tagged yet. A tagged release
-will also be a GitHub release asset,
-`https://github.com/Erasmus-CTM/ctm-assessment/releases/download/v<version>/ctm-assessment.tar.gz`;
+will also be GitHub release assets,
+`https://github.com/Erasmus-CTM/ctm-assessment/releases/download/v<version>/ctm-assessment.zip`
+(and `.tar.gz`);
 until then, a course that must stay on one version builds the package from a
 full commit SHA (below).
 

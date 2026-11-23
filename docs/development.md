@@ -447,8 +447,8 @@ workflow checks with `scripts/release-check.py` that the tag names the package
 version (`_extensions/ctm-assessment/_extension.yml`, also in `package.json`),
 that every component in `repos.json` is pinned by commit and that
 `CHANGELOG.md` has the version's section; it builds and tests the package from
-the pins (including the browser tests) and publishes `ctm-assessment.tar.gz`
-and `resolved-repos.json` as a GitHub release with that section as notes. For
+the pins (including the browser tests) and publishes `ctm-assessment.zip`,
+`ctm-assessment.tar.gz` and `resolved-repos.json` as a GitHub release with that section as notes. For
 a release: update `CHANGELOG.md` and the version in both files, merge, then
 tag `main`. Pages keep deploying from `main`.
 

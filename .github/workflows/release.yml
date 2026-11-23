@@ -7,7 +7,7 @@ name: Release
 # browser tests), and published as a GitHub release with the archive and its
 # record; the notes are the version's CHANGELOG.md section. A course pins
 # `ref: v0.9.0`, or installs the release archive:
-#   quarto add https://github.com/Erasmus-CTM/ctm-assessment/releases/download/v0.9.0/ctm-assessment.tar.gz
+#   quarto add https://github.com/Erasmus-CTM/ctm-assessment/releases/download/v0.9.0/ctm-assessment.zip
 # GitHub Pages keeps deploying from main (the site URL is the latest build).
 on:
   push:
@@ -62,7 +62,7 @@ jobs:
           if record.get('version') != tag[1:] or any(not r['pinned'] for n, r in record['repositories'].items() if n != 'ctm-assessment'):
               sys.exit(f'The build record does not match {tag}: version {record.get("version")}, every component pinned required')
           EOF
-          gh release create "$GITHUB_REF_NAME" .feedback-workspace/ctm-assessment.tar.gz .feedback-workspace/resolved-repos.json \
+          gh release create "$GITHUB_REF_NAME" .feedback-workspace/ctm-assessment.tar.gz .feedback-workspace/ctm-assessment.zip .feedback-workspace/resolved-repos.json \
             --title "CTM Assessment ${GITHUB_REF_NAME#v}" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
       - name: Report failure details as an annotation
         if: failure()

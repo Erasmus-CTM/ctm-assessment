@@ -18,6 +18,8 @@ import tempfile
 
 INSTALL = 'quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz'
 archive = Path(sys.argv[1]).resolve()
+# Optional second argument: the ZIP build of the same package, which `quarto add <URL>` needs on Windows.
+archive_zip = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else None
 legacy = Path(os.environ.get('CTM_LEGACY_AI_FEEDBACK', ''))
 assert (legacy / 'feedback-quarto.lua').is_file(), 'Set CTM_LEGACY_AI_FEEDBACK to the ai-feedback 0.8.1 extension folder'
 
@@ -294,6 +296,18 @@ assert answer() == 2
         assert result.returncode != 0 and 'needs its library ctm-libs' in result.stderr and INSTALL in result.stderr, result.stderr
     (course / '_quarto.yml').write_text('project:\n  type: default\n  render: [mixed.qmd]\nfilters: [ctm-assessment]\n')
     assert render(course, expect_ok=False).returncode != 0, 'the package must not render without ctm-libs'
+# The ZIP build is the archive `quarto add <URL>` can unpack on Windows: it must install
+# the same folders and the same files as the .tar.gz.
+if archive_zip is not None:
+    def installed(root):
+        return {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in sorted((root / '_extensions').rglob('*')) if path.is_file()}
+    with tempfile.TemporaryDirectory(prefix='ctm-install-tar-', dir=archive.parent) as tar_dir:
+        with tempfile.TemporaryDirectory(prefix='ctm-install-zip-', dir=archive.parent) as zip_dir:
+            for target, source in ((Path(tar_dir), archive), (Path(zip_dir), archive_zip)):
+                (target / '_quarto.yml').write_text('project:\n  type: default\n')
+                subprocess.run(['quarto', 'add', str(source), '--no-prompt'], cwd=target, check=True)
+            assert installed(Path(tar_dir)) == installed(Path(zip_dir)), 'the ZIP installs other files than the .tar.gz'
 print('Installable archive passed: all five components render from a fresh course with one copy of each script, no ai-feedback folder, '
       'also next to standalone copies (an old ai-feedback 0.8.1, a newer ctm-libs, a standalone pyodide-interaktiv); '
       'an old ai-feedback listed with the package stops; '
