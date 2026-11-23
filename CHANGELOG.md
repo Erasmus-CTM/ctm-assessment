@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Code editors (pyodide-interaktiv, py-exercise) and large math-exercise text
+  areas get a size switch with arrow buttons at the bottom right: normal, larger
+  (60% of the window) and full screen. A click beside the field or Escape makes
+  it smaller again. The switch comes from the package itself
+  (`ctm-resize.js`, `ctm-resize.css`) and works with the pinned components as
+  they are.
 - Pins ctm-libs 972cae3 (ctm-libs#64): image feedback activities can opt into
   one correction exchange with `corrections="true"` (with `image-upload="true"`).
   After direct API feedback on an uploaded response image, a student can point

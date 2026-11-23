@@ -41,9 +41,22 @@ local function defaultMathjaxPreloader()
   return pandoc.MetaString('data:text/javascript;base64,' .. quarto.base64.encode(capability .. script))
 end
 
+-- Input size toggle: every code editor (pyodide-interaktiv, py-exercise) and large
+-- math-exercise text area gets a normal / larger / full screen switch. The script
+-- only reacts to those fields, so it needs no component support.
+local function sizeToggle()
+  if not quarto.doc.is_format("html") then return end
+  quarto.doc.add_html_dependency({
+    name = "ctm-resize", version = "1",
+    scripts = {quarto.utils.resolve_path("ctm-resize.js")},
+    stylesheets = {quarto.utils.resolve_path("ctm-resize.css")}
+  })
+end
+
 function Meta(meta)
   _G.__ctmAuthorImports = dofile(quarto.utils.resolve_path("author-imports.lua"))
   warnNestedJsxgraph()
+  sizeToggle()
   -- Recomputed from the keys this invocation actually fills. Never accept an
   -- author-supplied marker as evidence that a CDN URL came from this hook.
   local defaults = pandoc.MetaMap({})
