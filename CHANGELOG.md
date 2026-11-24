@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pins ctm-libs 5761529 and pyodide-interaktiv db12915: a page shows one
+  settings gear (in the Pyodide status row when there is one); the dialog lists
+  AI feedback first; the API base URL and model fields offer suggestions through
+  a ▾ (free providers, local servers, fetched models with type-to-filter) and an
+  ⓘ explains how to get a key. The P13 lock is unchanged.
 - Pins ctm-libs 67925e2: Python cells, py-exercise and math-exercise no
   longer show Pyodide's package loading messages ("Loading mpmath, sympy",
   "No new packages to load") in their output. Pyodide 0.27.7 and later print
