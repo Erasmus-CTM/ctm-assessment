@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pins ctm-libs 67925e2: Python cells, py-exercise and math-exercise no
+  longer show Pyodide's package loading messages ("Loading mpmath, sympy",
+  "No new packages to load") in their output. Pyodide 0.27.7 and later print
+  them to the cell's stdout; the worker now silences them. The P13 lock
+  (ctm-libs 972cae3) is unchanged.
 - `quarto add` now works on Windows: the package is also published as
   `ctm-assessment.zip` (same files as the `.tar.gz`; Quarto on Windows unpacks
   every downloaded archive as a ZIP, so the `.tar.gz` failed there with
